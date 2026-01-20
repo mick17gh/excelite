@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
@@ -9,39 +8,176 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  CEO
+  SENIOR_MANAGEMENT
+  BRANCH_MANAGER
+  FINANCE_OPS
+  CASHIER
+}
+
+enum StaffRole {
+  MANAGER
+  KITCHEN
+  SERVICE
+  CASHIER
+  DELIVERY
+}
+
+enum DutyStatus {
+  ON_DUTY
+  OFF_DUTY
+  ON_LEAVE
+  SICK
+}
+
+enum DayPart {
+  BREAKFAST
+  LUNCH
+  DINNER
+  LATE_NIGHT
+}
+
+enum SalesChannel {
+  DINE_IN
+  TAKEOUT
+  DELIVERY
+  APP
+}
+
+enum AlertType {
+  SALES_DROP
+  WASTE_SPIKE
+  LOW_STOCK
+  OVERSTOCK
+  STAFF_SHORTAGE
+  EXCEPTIONAL_GROWTH
+  UNDERPERFORMING_BRANCH
+  TARGET_MISSED
+  TARGET_ACHIEVED
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ADJUSTMENT
+  TRANSFER
+  VOID
+}
+
+enum StockMovementType {
+  INBOUND
+  OUTBOUND_SALE
+  OUTBOUND_WASTE
+  OUTBOUND_TRANSFER
+  ADJUSTMENT_DAMAGE
+  ADJUSTMENT_LOSS
+  ADJUSTMENT_CORRECTION
+}
+
+enum InventoryCategory {
+  FOOD
+  BEVERAGE
+  PACKAGING
+  CLEANING
+  EQUIPMENT
+  OTHER
+}
+
+enum UnitType {
+  KG
+  GRAM
+  LITER
+  ML
+  PIECE
+  BOX
+  CASE
+  PACK
+}
+
+enum OrderStatus {
+  NEW
+  IN_PROGRESS
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEOUT
+  DELIVERY
+  APP
+}
+
+// ============================================
+// AUTH MODELS (BetterAuth)
+// ============================================
 
 model User {
   id            String    @id @default(cuid())
   name          String
-  email         String
-  emailVerified Boolean
+  email         String    @unique
+  emailVerified Boolean   @default(false)
   image         String?
   phoneNumber   String?
-  createdAt     DateTime
-  updatedAt     DateTime
-  sessions      Session[]
-  accounts      Account[]
-  @@unique([email])
+  role          Role      @default(BRANCH_MANAGER)
+  branchId      String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  // Relations
+  branch             Branch?            @relation(fields: [branchId], references: [id])
+  sessions           Session[]
+  accounts           Account[]
+  auditLogs          AuditLog[]         @relation("AuditUser")
+  posOrders          PosOrder[]
+  manualEntryBatches ManualEntryBatch[]
+
+  @@index([email])
+  @@index([role])
+  @@index([branchId])
   @@map("user")
 }
 
 model Session {
-  id        String   @id
+  id        String   @id @default(cuid())
   expiresAt DateTime
-  token     String
-  createdAt DateTime
-  updatedAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([token])
+  @@index([userId])
   @@map("session")
 }
 
 model Account {
-  id                    String    @id
+  id                    String    @id @default(cuid())
   accountId             String
   providerId            String
   userId                String
@@ -53,8 +189,647 @@ model Account {
   refreshTokenExpiresAt DateTime?
   scope                 String?
   password              String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
+  @@index([userId])
   @@map("account")
+}
+
+// ============================================
+// CORE BUSINESS MODELS
+// ============================================
+
+model Branch {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    @unique
+  address     String
+  city        String
+  state       String?
+  country     String    @default("GH")
+  currency    String    @default("GHS")
+  phone       String?
+  email       String?
+  timezone    String    @default("Africa/Accra")
+  isActive    Boolean   @default(true)
+  openingDate DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  users              User[]
+  staff              Staff[]
+  sales              Sale[]
+  transactions       Transaction[]
+  inventoryItems     InventoryItem[]
+  inboundStock       InboundStock[]
+  outboundStock      OutboundStock[]
+  transfersFrom      TransferLog[]      @relation("TransferFrom")
+  transfersTo        TransferLog[]      @relation("TransferTo")
+  wasteLogs          WasteLog[]
+  targets            Target[]
+  alerts             Alert[]
+  staffSchedules     StaffSchedule[]
+  posOrders          PosOrder[]
+  kitchenStations    KitchenStation[]
+  manualEntryBatches ManualEntryBatch[]
+  apiKeys            ApiKey[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("branch")
+}
+
+model Staff {
+  id         String     @id @default(cuid())
+  employeeId String     @unique
+  firstName  String
+  lastName   String
+  email      String?
+  phone      String?
+  role       StaffRole
+  hourlyRate Decimal    @db.Decimal(10, 2)
+  hireDate   DateTime
+  branchId   String
+  isActive   Boolean    @default(true)
+  dutyStatus DutyStatus @default(OFF_DUTY)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+
+  // Relations
+  branch       Branch          @relation(fields: [branchId], references: [id])
+  schedules    StaffSchedule[]
+  transactions Transaction[]
+
+  @@index([branchId])
+  @@index([role])
+  @@index([dutyStatus])
+  @@map("staff")
+}
+
+model StaffSchedule {
+  id            String     @id @default(cuid())
+  staffId       String
+  branchId      String
+  scheduledDate DateTime   @db.Date
+  shiftStart    DateTime
+  shiftEnd      DateTime
+  actualStart   DateTime?
+  actualEnd     DateTime?
+  status        DutyStatus @default(OFF_DUTY)
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  staff  Staff  @relation(fields: [staffId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@index([staffId])
+  @@index([branchId])
+  @@index([scheduledDate])
+  @@map("staff_schedule")
+}
+
+// ============================================
+// SALES & TRANSACTIONS
+// ============================================
+
+model MenuItem {
+  id          String    @id @default(cuid())
+  name        String
+  sku         String    @unique
+  category    String
+  price       Decimal   @db.Decimal(10, 2)
+  cost        Decimal   @db.Decimal(10, 2)
+  isActive    Boolean   @default(true)
+  description String?
+  imageUrl    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  saleItems   SaleItem[]
+  posItems    PosOrderItem[]
+  ingredients MenuItemIngredient[]
+  manualLines ManualEntryLine[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("menu_item")
+}
+
+model Sale {
+  id            String       @id @default(cuid())
+  saleNumber    String       @unique
+  branchId      String
+  transactionId String?      @unique
+  subtotal      Decimal      @db.Decimal(12, 2)
+  tax           Decimal      @default(0) @db.Decimal(12, 2)
+  discount      Decimal      @default(0) @db.Decimal(12, 2)
+  total         Decimal      @db.Decimal(12, 2)
+  dayPart       DayPart
+  channel       SalesChannel
+  customerCount Int          @default(1)
+  saleDate      DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+
+  // Relations
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+  items       SaleItem[]
+
+  @@index([branchId])
+  @@index([saleDate])
+  @@index([dayPart])
+  @@index([channel])
+  @@index([branchId, saleDate])
+  @@map("sale")
+}
+
+model SaleItem {
+  id         String  @id @default(cuid())
+  saleId     String
+  menuItemId String
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  unitCost   Decimal @db.Decimal(10, 2)
+  total      Decimal @db.Decimal(12, 2)
+  discount   Decimal @default(0) @db.Decimal(10, 2)
+
+  // Relations
+  sale     Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([saleId])
+  @@index([menuItemId])
+  @@map("sale_item")
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  transactionRef  String   @unique
+  branchId        String
+  staffId         String?
+  paymentMethod   String
+  amount          Decimal  @db.Decimal(12, 2)
+  tip             Decimal  @default(0) @db.Decimal(10, 2)
+  isVoided        Boolean  @default(false)
+  voidReason      String?
+  transactionDate DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  branch Branch @relation(fields: [branchId], references: [id])
+  staff  Staff? @relation(fields: [staffId], references: [id])
+  sale   Sale?
+
+  @@index([branchId])
+  @@index([transactionDate])
+  @@index([branchId, transactionDate])
+  @@map("transaction")
+}
+
+// ============================================
+// INVENTORY MANAGEMENT
+// ============================================
+
+model Supplier {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    @unique
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  inboundStock InboundStock[]
+
+  @@index([code])
+  @@map("supplier")
+}
+
+model InventoryItem {
+  id              String            @id @default(cuid())
+  name            String
+  sku             String            @unique
+  category        InventoryCategory
+  unit            UnitType
+  unitCost        Decimal           @db.Decimal(10, 2)
+  currentStock    Decimal           @default(0) @db.Decimal(12, 3)
+  minStock        Decimal           @default(0) @db.Decimal(12, 3)
+  maxStock        Decimal           @default(1000) @db.Decimal(12, 3)
+  reorderPoint    Decimal           @default(10) @db.Decimal(12, 3)
+  branchId        String
+  isActive        Boolean           @default(true)
+  lastRestockDate DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  branch        Branch               @relation(fields: [branchId], references: [id])
+  inboundStock  InboundStock[]
+  outboundStock OutboundStock[]
+  wasteLogs     WasteLog[]
+  transferLogs  TransferLog[]
+  ingredients   MenuItemIngredient[]
+
+  @@unique([sku, branchId])
+  @@index([branchId])
+  @@index([category])
+  @@index([currentStock])
+  @@map("inventory_item")
+}
+
+model InboundStock {
+  id            String   @id @default(cuid())
+  branchId      String
+  itemId        String
+  supplierId    String
+  quantity      Decimal  @db.Decimal(12, 3)
+  unitCost      Decimal  @db.Decimal(10, 2)
+  totalCost     Decimal  @db.Decimal(12, 2)
+  invoiceNumber String?
+  deliveryDate  DateTime
+  receivedBy    String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  branch   Branch        @relation(fields: [branchId], references: [id])
+  item     InventoryItem @relation(fields: [itemId], references: [id])
+  supplier Supplier      @relation(fields: [supplierId], references: [id])
+
+  @@index([branchId])
+  @@index([itemId])
+  @@index([deliveryDate])
+  @@index([branchId, deliveryDate])
+  @@map("inbound_stock")
+}
+
+model OutboundStock {
+  id           String            @id @default(cuid())
+  branchId     String
+  itemId       String
+  quantity     Decimal           @db.Decimal(12, 3)
+  movementType StockMovementType
+  reason       String?
+  reference    String?
+  createdBy    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  // Relations
+  branch Branch        @relation(fields: [branchId], references: [id])
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([branchId])
+  @@index([itemId])
+  @@index([movementType])
+  @@index([createdAt])
+  @@map("outbound_stock")
+}
+
+model WasteLog {
+  id         String   @id @default(cuid())
+  branchId   String
+  itemId     String
+  quantity   Decimal  @db.Decimal(12, 3)
+  unitCost   Decimal  @db.Decimal(10, 2)
+  totalCost  Decimal  @db.Decimal(12, 2)
+  reason     String
+  wasteDate  DateTime
+  recordedBy String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  branch Branch        @relation(fields: [branchId], references: [id])
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([branchId])
+  @@index([itemId])
+  @@index([wasteDate])
+  @@index([branchId, wasteDate])
+  @@map("waste_log")
+}
+
+model TransferLog {
+  id           String   @id @default(cuid())
+  fromBranchId String
+  toBranchId   String
+  itemId       String
+  quantity     Decimal  @db.Decimal(12, 3)
+  unitCost     Decimal  @db.Decimal(10, 2)
+  totalCost    Decimal  @db.Decimal(12, 2)
+  transferDate DateTime
+  approvedBy   String?
+  receivedBy   String?
+  status       String   @default("PENDING")
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  fromBranch Branch        @relation("TransferFrom", fields: [fromBranchId], references: [id])
+  toBranch   Branch        @relation("TransferTo", fields: [toBranchId], references: [id])
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([fromBranchId])
+  @@index([toBranchId])
+  @@index([itemId])
+  @@index([transferDate])
+  @@map("transfer_log")
+}
+
+// ============================================
+// MENU INGREDIENT MAPPING
+// ============================================
+
+model MenuItemIngredient {
+  id              String   @id @default(cuid())
+  menuItemId      String
+  inventoryItemId String
+  quantity        Decimal  @db.Decimal(12, 3)
+  unit            UnitType
+
+  // Relations
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id])
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([menuItemId])
+  @@index([inventoryItemId])
+  @@map("menu_item_ingredient")
+}
+
+// ============================================
+// POS ORDERS
+// ============================================
+
+model PosOrder {
+  id            String       @id @default(cuid())
+  orderNumber   String       @unique
+  branchId      String
+  cashierId     String?
+  status        OrderStatus  @default(NEW)
+  type          OrderType
+  sourceChannel SalesChannel
+  subtotal      Decimal      @db.Decimal(12, 2)
+  tax           Decimal      @default(0) @db.Decimal(12, 2)
+  discount      Decimal      @default(0) @db.Decimal(12, 2)
+  total         Decimal      @db.Decimal(12, 2)
+  paymentMethod String?
+  customerName  String?
+  notes         String?
+  openedAt      DateTime     @default(now())
+  closedAt      DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  branch  Branch          @relation(fields: [branchId], references: [id])
+  cashier User?           @relation(fields: [cashierId], references: [id])
+  items   PosOrderItem[]
+  tickets KitchenTicket[]
+
+  @@index([branchId])
+  @@index([cashierId])
+  @@index([openedAt])
+  @@map("pos_order")
+}
+
+model PosOrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  menuItemId String
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  lineTotal  Decimal @db.Decimal(12, 2)
+  notes      String?
+
+  // Relations
+  order        PosOrder      @relation(fields: [orderId], references: [id])
+  menuItem     MenuItem      @relation(fields: [menuItemId], references: [id])
+  kitchenItems KitchenItem[]
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@map("pos_order_item")
+}
+
+// ============================================
+// KITCHEN DISPLAY SYSTEM
+// ============================================
+
+model KitchenStation {
+  id          String   @id @default(cuid())
+  branchId    String
+  name        String
+  description String?
+  categories  String? // comma-separated menu categories for routing
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  branch  Branch          @relation(fields: [branchId], references: [id])
+  tickets KitchenTicket[]
+
+  @@index([branchId])
+  @@map("kitchen_station")
+}
+
+model KitchenTicket {
+  id          String      @id @default(cuid())
+  orderId     String
+  stationId   String
+  status      OrderStatus @default(NEW)
+  createdAt   DateTime    @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  order   PosOrder       @relation(fields: [orderId], references: [id])
+  station KitchenStation @relation(fields: [stationId], references: [id])
+  items   KitchenItem[]
+
+  @@index([orderId])
+  @@index([stationId])
+  @@map("kitchen_ticket")
+}
+
+model KitchenItem {
+  id          String      @id @default(cuid())
+  ticketId    String
+  orderItemId String
+  status      OrderStatus @default(NEW)
+  createdAt   DateTime    @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  ticket    KitchenTicket @relation(fields: [ticketId], references: [id])
+  orderItem PosOrderItem  @relation(fields: [orderItemId], references: [id])
+
+  @@index([ticketId])
+  @@index([orderItemId])
+  @@map("kitchen_item")
+}
+
+// ============================================
+// MANUAL POS ENTRY
+// ============================================
+
+model ManualEntryBatch {
+  id          String   @id @default(cuid())
+  branchId    String
+  periodStart DateTime
+  periodEnd   DateTime
+  createdBy   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  branch        Branch            @relation(fields: [branchId], references: [id])
+  createdByUser User?             @relation(fields: [createdBy], references: [id])
+  lines         ManualEntryLine[]
+
+  @@index([branchId, periodStart, periodEnd])
+  @@map("manual_entry_batch")
+}
+
+model ManualEntryLine {
+  id               String       @id @default(cuid())
+  batchId          String
+  date             DateTime     @db.Date
+  channel          SalesChannel
+  totalRevenue     Decimal      @db.Decimal(12, 2)
+  transactionCount Int
+  menuItemId       String?
+  notes            String?
+
+  // Relations
+  batch    ManualEntryBatch @relation(fields: [batchId], references: [id])
+  menuItem MenuItem?        @relation(fields: [menuItemId], references: [id])
+
+  @@index([batchId])
+  @@index([date])
+  @@map("manual_entry_line")
+}
+
+// ============================================
+// API KEYS FOR EXTERNAL ACCESS
+// ============================================
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  scopes    String // comma-separated scopes
+  branchId  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  // Relations
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([branchId])
+  @@map("api_key")
+}
+
+// ============================================
+// TARGETS & ALERTS
+// ============================================
+
+model Target {
+  id           String   @id @default(cuid())
+  branchId     String
+  targetType   String
+  period       String
+  periodStart  DateTime
+  periodEnd    DateTime
+  targetValue  Decimal  @db.Decimal(14, 2)
+  currentValue Decimal  @default(0) @db.Decimal(14, 2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@index([branchId])
+  @@index([targetType])
+  @@index([periodStart, periodEnd])
+  @@map("target")
+}
+
+model Alert {
+  id          String        @id @default(cuid())
+  branchId    String?
+  type        AlertType
+  severity    AlertSeverity
+  status      AlertStatus   @default(ACTIVE)
+  title       String
+  message     String
+  data        Json?
+  triggeredAt DateTime      @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  @@index([branchId])
+  @@index([type])
+  @@index([severity])
+  @@index([status])
+  @@index([triggeredAt])
+  @@map("alert")
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String
+  action     AuditAction
+  entityType String
+  entityId   String
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  // Relations
+  user User @relation("AuditUser", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
 }

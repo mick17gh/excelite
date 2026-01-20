@@ -1,0 +1,181 @@
+"use server";
+
+import { db } from "@/lib/db";
+import { revalidatePath } from "next/cache";
+import { Role } from "@/lib/generated/prisma/client";
+import bcrypt from "bcryptjs";
+
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+  branchId?: string;
+  phoneNumber?: string;
+  isActive: boolean;
+}
+
+export interface UpdateUserInput {
+  id: string;
+  name?: string;
+  email?: string;
+  role?: Role;
+  branchId?: string;
+  phoneNumber?: string;
+  isActive?: boolean;
+}
+
+export async function createUser(input: CreateUserInput) {
+  try {
+    // Check if email already exists
+    const existing = await db.user.findUnique({
+      where: { email: input.email },
+    });
+
+    if (existing) {
+      return { success: false, error: "Email already in use" };
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(input.password, 10);
+
+    // Create user
+    const user = await db.user.create({
+      data: {
+        name: input.name,
+        email: input.email,
+        role: input.role,
+        branchId: input.branchId,
+        phoneNumber: input.phoneNumber,
+        isActive: input.isActive,
+        emailVerified: false,
+      },
+    });
+
+    // Create account with password
+    await db.account.create({
+      data: {
+        accountId: user.id,
+        providerId: "credential",
+        userId: user.id,
+        password: hashedPassword,
+      },
+    });
+
+    revalidatePath("/dashboard/users");
+    return { success: true, data: user };
+  } catch (error) {
+    console.error("[createUser] Error:", error);
+    return { success: false, error: "Failed to create user" };
+  }
+}
+
+export async function updateUser(input: UpdateUserInput) {
+  try {
+    const { id, ...data } = input;
+    const user = await db.user.update({
+      where: { id },
+      data,
+    });
+
+    revalidatePath("/dashboard/users");
+    return { success: true, data: user };
+  } catch (error) {
+    console.error("[updateUser] Error:", error);
+    return { success: false, error: "Failed to update user" };
+  }
+}
+
+export async function deleteUser(id: string) {
+  try {
+    await db.user.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+
+    revalidatePath("/dashboard/users");
+    return { success: true };
+  } catch (error) {
+    console.error("[deleteUser] Error:", error);
+    return { success: false, error: "Failed to delete user" };
+  }
+}
+
+export async function getUsers() {
+  try {
+    const users = await db.user.findMany({
+      where: { deletedAt: null },
+      include: {
+        branch: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const formattedUsers = users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      branchId: user.branchId,
+      branchName: user.branch?.name || null,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    }));
+
+    return { success: true, data: formattedUsers };
+  } catch (error) {
+    console.error("[getUsers] Error:", error);
+    return { success: false, error: "Failed to fetch users", data: [] };
+  }
+}
+
+export async function getUserById(id: string) {
+  try {
+    const user = await db.user.findUnique({
+      where: { id },
+      include: {
+        branch: true,
+      },
+    });
+    return { success: true, data: user };
+  } catch (error) {
+    console.error("[getUserById] Error:", error);
+    return { success: false, error: "Failed to fetch user" };
+  }
+}
+
+export async function toggleUserActive(id: string) {
+  try {
+    const user = await db.user.findUnique({ where: { id } });
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    const updated = await db.user.update({
+      where: { id },
+      data: { isActive: !user.isActive },
+    });
+
+    revalidatePath("/dashboard/users");
+    return { success: true, data: updated };
+  } catch (error) {
+    console.error("[toggleUserActive] Error:", error);
+    return { success: false, error: "Failed to toggle user status" };
+  }
+}
+
+export async function resetUserPassword(id: string, newPassword: string) {
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await db.account.updateMany({
+      where: { userId: id, providerId: "credential" },
+      data: { password: hashedPassword },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("[resetUserPassword] Error:", error);
+    return { success: false, error: "Failed to reset password" };
+  }
+}

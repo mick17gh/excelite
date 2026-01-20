@@ -5,6 +5,64 @@ import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { sendPasswordResetEmail } from "./services/email";
 
+export const ROLES = {
+    CEO: "CEO",
+    SENIOR_MANAGEMENT: "SENIOR_MANAGEMENT",
+    BRANCH_MANAGER: "BRANCH_MANAGER",
+    FINANCE_OPS: "FINANCE_OPS",
+    CASHIER: "CASHIER",
+} as const;
+
+export type Role = keyof typeof ROLES;
+
+export const ROLE_PERMISSIONS = {
+    CEO: {
+        canViewAllBranches: true,
+        canEditData: true,
+        canDeleteData: true,
+        canManageUsers: true,
+        canViewReports: true,
+        canViewAuditLogs: true,
+        canManageSettings: true,
+    },
+    SENIOR_MANAGEMENT: {
+        canViewAllBranches: true,
+        canEditData: false,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: true,
+        canViewAuditLogs: true,
+        canManageSettings: false,
+    },
+    BRANCH_MANAGER: {
+        canViewAllBranches: false,
+        canEditData: true,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: true,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+    },
+    FINANCE_OPS: {
+        canViewAllBranches: true,
+        canEditData: true,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: true,
+        canViewAuditLogs: true,
+        canManageSettings: false,
+    },
+    CASHIER: {
+        canViewAllBranches: false,
+        canEditData: true,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+    },
+} as const;
+
 export const auth = betterAuth({
     database: prismaAdapter(db, {
         provider: "postgresql",
@@ -54,13 +112,13 @@ export const auth = betterAuth({
             role: {
                 type: "string",
                 required: false,
-                defaultValue: "GATE_OFFICER",
+                defaultValue: "BRANCH_MANAGER",
             },
             branchId: {
                 type: "string",
                 required: false,
             },
-            phone: {
+            phoneNumber: {
                 type: "string",
                 required: false,
             },
@@ -77,3 +135,28 @@ export const auth = betterAuth({
 });
 
 export type Session = typeof auth.$Infer.Session;
+
+export function hasPermission(role: Role, permission: keyof typeof ROLE_PERMISSIONS.CEO): boolean {
+    return ROLE_PERMISSIONS[role]?.[permission] ?? false;
+}
+
+export function canAccessBranch(userRole: Role, userBranchId: string | null, targetBranchId: string): boolean {
+    if (ROLE_PERMISSIONS[userRole].canViewAllBranches) {
+        return true;
+    }
+    return userBranchId === targetBranchId;
+}
+
+export function canManageBranchData(session: Session | null, targetBranchId: string): boolean {
+    if (!session?.user) return false;
+    const role = session.user.role as Role;
+    const userBranchId = session.user.branchId ?? null;
+    if (!ROLE_PERMISSIONS[role]?.canEditData) return false;
+    return canAccessBranch(role, userBranchId, targetBranchId);
+}
+
+export function isInRole(session: Session | null, roles: Role[]): boolean {
+    if (!session?.user) return false;
+    const role = session.user.role as Role;
+    return roles.includes(role);
+}

@@ -1,0 +1,243 @@
+"use client";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Receipt, Printer, Download, X } from "lucide-react";
+import { useCurrency } from "@/contexts/currency-context";
+import { format } from "date-fns";
+
+interface ReceiptModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  order: any;
+  onClose: () => void;
+}
+
+export function ReceiptModal({ open, onOpenChange, order, onClose }: ReceiptModalProps) {
+  const { formatCurrency } = useCurrency();
+
+  const handlePrint = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const receiptHtml = generateReceiptHTML(order, formatCurrency);
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
+  const handleDownload = () => {
+    const receiptText = generateReceiptText(order, formatCurrency);
+    const blob = new Blob([receiptText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `receipt-${order.orderNumber}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (!order) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            Receipt
+          </DialogTitle>
+          <DialogDescription>Order #{order.orderNumber}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Receipt Content */}
+          <div className="rounded-lg border bg-muted/30 p-6 font-mono text-sm space-y-3">
+            <div className="text-center space-y-1 border-b pb-3 mb-3">
+              <h3 className="font-bold text-lg">{order.branch?.name || "Restaurant"}</h3>
+              <p className="text-xs text-muted-foreground">
+                {order.branch?.code || ""}
+              </p>
+            </div>
+
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span>Order #:</span>
+                <span className="font-medium">{order.orderNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Date:</span>
+                <span>{format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}</span>
+              </div>
+              {order.customerName && (
+                <div className="flex justify-between">
+                  <span>Customer:</span>
+                  <span>{order.customerName}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span>Type:</span>
+                <span>{order.type.replace(/_/g, " ")}</span>
+              </div>
+              {order.paymentMethod && (
+                <div className="flex justify-between">
+                  <span>Payment:</span>
+                  <span>{order.paymentMethod.replace(/_/g, " ")}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-b py-2 my-3">
+              <div className="space-y-1">
+                {order.items?.map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between text-xs">
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        {item.quantity}x {item.menuItem?.name || "Item"}
+                      </div>
+                    </div>
+                    <div className="ml-2">
+                      {formatCurrency(Number(item.unitPrice) * item.quantity)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>{formatCurrency(Number(order.subtotal))}</span>
+              </div>
+              {Number(order.discount) > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Discount:</span>
+                  <span>-{formatCurrency(Number(order.discount))}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span>Tax (12.5%):</span>
+                <span>{formatCurrency(Number(order.tax))}</span>
+              </div>
+              <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
+                <span>TOTAL:</span>
+                <span>{formatCurrency(Number(order.total))}</span>
+              </div>
+            </div>
+
+            {order.notes && (
+              <div className="border-t pt-2 mt-3 text-xs">
+                <div className="font-medium mb-1">Notes:</div>
+                <div className="text-muted-foreground">{order.notes}</div>
+              </div>
+            )}
+
+            <div className="text-center text-xs text-muted-foreground border-t pt-3 mt-3">
+              Thank you for your business!
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={handleDownload} className="w-full sm:w-auto">
+            <Download className="mr-2 h-4 w-4" />
+            Download
+          </Button>
+          <Button variant="outline" onClick={handlePrint} className="w-full sm:w-auto">
+            <Printer className="mr-2 h-4 w-4" />
+            Print
+          </Button>
+          <Button onClick={onClose} className="w-full sm:w-auto">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function generateReceiptHTML(order: any, formatCurrency: (amount: number) => string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Receipt - ${order.orderNumber}</title>
+  <style>
+    body { font-family: monospace; font-size: 12px; padding: 20px; max-width: 300px; margin: 0 auto; }
+    .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
+    .item { display: flex; justify-content: space-between; margin: 5px 0; }
+    .total { border-top: 1px solid #000; padding-top: 10px; margin-top: 10px; font-weight: bold; }
+    .footer { text-align: center; margin-top: 20px; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>${order.branch?.name || "Restaurant"}</h2>
+    <p>Order #${order.orderNumber}</p>
+    <p>${format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}</p>
+  </div>
+  ${order.items?.map((item: any) => `
+    <div class="item">
+      <span>${item.quantity}x ${item.menuItem?.name || "Item"}</span>
+      <span>${formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
+    </div>
+  `).join("")}
+  <div class="total">
+    <div class="item">
+      <span>Subtotal:</span>
+      <span>${formatCurrency(Number(order.subtotal))}</span>
+    </div>
+    <div class="item">
+      <span>Tax:</span>
+      <span>${formatCurrency(Number(order.tax))}</span>
+    </div>
+    <div class="item">
+      <span>TOTAL:</span>
+      <span>${formatCurrency(Number(order.total))}</span>
+    </div>
+  </div>
+  <div class="footer">Thank you for your business!</div>
+</body>
+</html>
+  `;
+}
+
+function generateReceiptText(order: any, formatCurrency: (amount: number) => string): string {
+  const lines = [
+    "=".repeat(40),
+    `  ${order.branch?.name || "Restaurant"}`,
+    `  ${order.branch?.code || ""}`,
+    "=".repeat(40),
+    `Order #: ${order.orderNumber}`,
+    `Date: ${format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}`,
+    order.customerName ? `Customer: ${order.customerName}` : "",
+    `Type: ${order.type.replace(/_/g, " ")}`,
+    order.paymentMethod ? `Payment: ${order.paymentMethod.replace(/_/g, " ")}` : "",
+    "-".repeat(40),
+    ...order.items?.map((item: any) =>
+      `${item.quantity}x ${item.menuItem?.name || "Item"}${" ".repeat(20)}${formatCurrency(Number(item.unitPrice) * item.quantity)}`
+    ) || [],
+    "-".repeat(40),
+    `Subtotal:${" ".repeat(25)}${formatCurrency(Number(order.subtotal))}`,
+    `Tax (12.5%):${" ".repeat(22)}${formatCurrency(Number(order.tax))}`,
+    `TOTAL:${" ".repeat(28)}${formatCurrency(Number(order.total))}`,
+    "=".repeat(40),
+    "Thank you for your business!",
+    "=".repeat(40),
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}

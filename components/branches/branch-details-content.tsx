@@ -1,0 +1,466 @@
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
+  DollarSign,
+  Package,
+  Users,
+  TrendingUp,
+  Calendar,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  Clock,
+} from "lucide-react";
+import { useCurrency } from "@/contexts/currency-context";
+import { format } from "date-fns";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+interface Branch {
+  id: string;
+  name: string;
+  code: string;
+  address?: string | null;
+  city: string;
+  phoneNumber?: string | null;
+  email?: string | null;
+  currency?: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Transaction {
+  id: string;
+  transactionRef: string;
+  amount: number;
+  paymentMethod: string;
+  transactionDate: Date;
+}
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  currentStock: number;
+  unitCost: number;
+  status: string;
+}
+
+interface StaffMember {
+  id: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+  status?: string;
+  dutyStatus?: string;
+}
+
+interface Target {
+  id: string;
+  targetType: string;
+  period: string;
+  targetValue: number;
+  currentValue: number;
+  periodStart: Date | string;
+  periodEnd: Date | string;
+}
+
+interface BranchDetailsContentProps {
+  branch: Branch;
+  transactions: Transaction[];
+  inventory: InventoryItem[];
+  staff: StaffMember[];
+  targets: Target[];
+}
+
+export function BranchDetailsContent({
+  branch,
+  transactions,
+  inventory,
+  staff,
+  targets,
+}: BranchDetailsContentProps) {
+  const { formatCurrency } = useCurrency();
+  const router = useRouter();
+
+  const totalRevenue = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalInventoryValue = inventory.reduce(
+    (sum, item) => sum + Number(item.currentStock) * Number(item.unitCost),
+    0
+  );
+  const activeStaff = staff.filter((s) => s.status === "ON_DUTY").length;
+  const activeTargets = targets.filter((t) => t.currentValue > 0).length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/branches">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+              {branch.name}
+            </h1>
+            <p className="text-muted-foreground">Branch Code: {branch.code}</p>
+          </div>
+        </div>
+        <Badge variant={branch.isActive ? "default" : "secondary"}>
+          {branch.isActive ? (
+            <>
+              <CheckCircle2 className="mr-1 h-3 w-3" />
+              Active
+            </>
+          ) : (
+            <>
+              <XCircle className="mr-1 h-3 w-3" />
+              Inactive
+            </>
+          )}
+        </Badge>
+      </div>
+
+      {/* Branch Info Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="text-xl font-bold">{formatCurrency(totalRevenue)}</p>
+              </div>
+              <div className="rounded-xl bg-primary/10 p-3">
+                <DollarSign className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Inventory Value</p>
+                <p className="text-xl font-bold">{formatCurrency(totalInventoryValue)}</p>
+              </div>
+              <div className="rounded-xl bg-primary/10 p-3">
+                <Package className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Active Staff</p>
+                <p className="text-xl font-bold">{activeStaff}</p>
+              </div>
+              <div className="rounded-xl bg-primary/10 p-3">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Active Targets</p>
+                <p className="text-xl font-bold">{activeTargets}</p>
+              </div>
+              <div className="rounded-xl bg-primary/10 p-3">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Branch Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Branch Information</CardTitle>
+          <CardDescription>Contact and location details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex items-start gap-3">
+              <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Address</p>
+                <p className="text-sm text-muted-foreground">
+                  {branch.address || "Not specified"}
+                </p>
+                <p className="text-sm text-muted-foreground">{branch.city}</p>
+              </div>
+            </div>
+            {branch.phoneNumber && (
+              <div className="flex items-start gap-3">
+                <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Phone</p>
+                  <p className="text-sm text-muted-foreground">{branch.phoneNumber}</p>
+                </div>
+              </div>
+            )}
+            {branch.email && (
+              <div className="flex items-start gap-3">
+                <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Email</p>
+                  <p className="text-sm text-muted-foreground">{branch.email}</p>
+                </div>
+              </div>
+            )}
+            <div className="flex items-start gap-3">
+              <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Created</p>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(branch.createdAt), "MMM dd, yyyy")}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabs */}
+      <Tabs defaultValue="transactions" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="staff">Staff</TabsTrigger>
+          <TabsTrigger value="targets">Targets</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Transactions</CardTitle>
+              <CardDescription>
+                Latest transactions for this branch
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {transactions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>No transactions found</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment Method</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.slice(0, 10).map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="font-medium">
+                          {transaction.transactionRef}
+                        </TableCell>
+                        <TableCell>{formatCurrency(Number(transaction.amount))}</TableCell>
+                        <TableCell>{transaction.paymentMethod}</TableCell>
+                        <TableCell>
+                          {format(new Date(transaction.transactionDate), "MMM dd, yyyy HH:mm")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="inventory" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inventory Items</CardTitle>
+              <CardDescription>Current stock levels</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {inventory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>No inventory items found</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Stock</TableHead>
+                      <TableHead>Unit Cost</TableHead>
+                      <TableHead>Total Value</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inventory.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>{Number(item.currentStock).toLocaleString()}</TableCell>
+                        <TableCell>{formatCurrency(Number(item.unitCost))}</TableCell>
+                        <TableCell>
+                          {formatCurrency(Number(item.currentStock) * Number(item.unitCost))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              item.status === "IN_STOCK"
+                                ? "default"
+                                : item.status === "LOW_STOCK"
+                                ? "secondary"
+                                : "destructive"
+                            }
+                          >
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="staff" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Staff Members</CardTitle>
+              <CardDescription>Current staff assignments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {staff.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>No staff members found</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {staff.map((member: any) => {
+                      const name = member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim();
+                      const status = member.status || member.dutyStatus || 'UNKNOWN';
+                      return (
+                        <TableRow key={member.id}>
+                          <TableCell className="font-medium">{name || 'Unknown'}</TableCell>
+                          <TableCell>{member.role}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                status === "ON_DUTY" ? "default" : "secondary"
+                              }
+                            >
+                              {status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="targets" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Performance Targets</CardTitle>
+              <CardDescription>Branch KPI targets and progress</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {targets.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>No targets set</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Current</TableHead>
+                      <TableHead>Progress</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {targets.map((target) => {
+                      const progress = target.targetValue > 0
+                        ? (target.currentValue / target.targetValue) * 100
+                        : 0;
+                      return (
+                        <TableRow key={target.id}>
+                          <TableCell className="font-medium">{target.targetType}</TableCell>
+                          <TableCell>{target.period}</TableCell>
+                          <TableCell>{formatCurrency(target.targetValue)}</TableCell>
+                          <TableCell>{formatCurrency(target.currentValue)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary transition-all"
+                                  style={{ width: `${Math.min(progress, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-sm text-muted-foreground w-12 text-right">
+                                {progress.toFixed(0)}%
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
