@@ -120,22 +120,28 @@ export async function getBranchById(id: string) {
   }
 }
 
-export async function getBranchPerformance() {
+export async function getBranchPerformance(startDate?: Date, endDate?: Date) {
   try {
+    const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    const effectiveEndDate = endDate || new Date();
+    
     const branches = await db.branch.findMany({
       where: { deletedAt: null, isActive: true },
       include: {
         sales: {
           where: {
+            deletedAt: null,
             saleDate: {
-              gte: new Date(new Date().setDate(new Date().getDate() - 30)),
+              gte: effectiveStartDate,
+              lte: effectiveEndDate,
             },
           },
         },
         wasteLogs: {
           where: {
             wasteDate: {
-              gte: new Date(new Date().setDate(new Date().getDate() - 30)),
+              gte: effectiveStartDate,
+              lte: effectiveEndDate,
             },
           },
         },

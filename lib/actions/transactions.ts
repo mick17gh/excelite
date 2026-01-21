@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { DayPart, SalesChannel } from "@/lib/generated/prisma/client";
+import { logCreate, logVoid } from "@/lib/services/audit";
 
 function generateTransactionRef(): string {
   const prefix = "TXN";
@@ -112,9 +113,45 @@ export async function createTransaction(input: CreateTransactionInput) {
       },
     });
 
+    // Create audit log for the transaction
+    await logCreate(
+      "Transaction",
+      transaction.id,
+      {
+        transactionRef,
+        saleNumber,
+        amount,
+        branchId: input.branchId,
+        channel: input.channel,
+        itemCount: saleItems.length,
+      }
+    );
+
     revalidatePath("/dashboard/transactions");
     revalidatePath("/dashboard");
-    return { success: true, data: { transaction, sale } };
+    
+    // Convert Decimal types to plain numbers for client serialization
+    const serializedTransaction = {
+      ...transaction,
+      amount: Number(transaction.amount),
+      tip: Number(transaction.tip),
+    };
+    
+    const serializedSale = {
+      ...sale,
+      subtotal: Number(sale.subtotal),
+      tax: Number(sale.tax),
+      total: Number(sale.total),
+      items: sale.items.map((item) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        unitCost: Number(item.unitCost),
+        total: Number(item.total),
+        discount: Number(item.discount),
+      })),
+    };
+    
+    return { success: true, data: { transaction: serializedTransaction, sale: serializedSale } };
   } catch (error) {
     console.error("[createTransaction] Error:", error);
     return { success: false, error: "Failed to create transaction" };
@@ -123,6 +160,15 @@ export async function createTransaction(input: CreateTransactionInput) {
 
 export async function voidTransaction(transactionId: string, reason: string) {
   try {
+    // Get current transaction state for audit log
+    const existingTransaction = await db.transaction.findUnique({
+      where: { id: transactionId },
+    });
+
+    if (!existingTransaction) {
+      return { success: false, error: "Transaction not found" };
+    }
+
     const transaction = await db.transaction.update({
       where: { id: transactionId },
       data: {
@@ -137,8 +183,28 @@ export async function voidTransaction(transactionId: string, reason: string) {
       data: { deletedAt: new Date() },
     });
 
+    // Create audit log for the void action
+    await logVoid(
+      "Transaction",
+      transactionId,
+      {
+        transactionRef: existingTransaction.transactionRef,
+        amount: Number(existingTransaction.amount),
+        branchId: existingTransaction.branchId,
+      },
+      reason
+    );
+
     revalidatePath("/dashboard/transactions");
-    return { success: true, data: transaction };
+    
+    // Convert Decimal types to plain numbers for client serialization
+    const serializedTransaction = {
+      ...transaction,
+      amount: Number(transaction.amount),
+      tip: Number(transaction.tip),
+    };
+    
+    return { success: true, data: serializedTransaction };
   } catch (error) {
     console.error("[voidTransaction] Error:", error);
     return { success: false, error: "Failed to void transaction" };
@@ -177,7 +243,32 @@ export async function getTransactions(branchId?: string, date?: Date) {
       orderBy: { transactionDate: "desc" },
     });
 
-    return { success: true, data: transactions };
+    // Convert Decimal types to plain numbers for client serialization
+    const serializedTransactions = transactions.map((t) => ({
+      ...t,
+      amount: Number(t.amount),
+      tip: Number(t.tip),
+      sale: t.sale ? {
+        ...t.sale,
+        subtotal: Number(t.sale.subtotal),
+        tax: Number(t.sale.tax),
+        total: Number(t.sale.total),
+        items: t.sale.items.map((item) => ({
+          ...item,
+          unitPrice: Number(item.unitPrice),
+          unitCost: Number(item.unitCost),
+          total: Number(item.total),
+          discount: Number(item.discount),
+          menuItem: {
+            ...item.menuItem,
+            price: Number(item.menuItem.price),
+            cost: Number(item.menuItem.cost),
+          },
+        })),
+      } : null,
+    }));
+
+    return { success: true, data: serializedTransactions };
   } catch (error) {
     console.error("[getTransactions] Error:", error);
     return { success: false, error: "Failed to fetch transactions", data: [] };
@@ -209,22 +300,42 @@ export async function getSales(branchId?: string, startDate?: Date, endDate?: Da
       orderBy: { saleDate: "desc" },
     });
 
-    return { success: true, data: sales };
+    // Convert Decimal types to plain numbers for client serialization
+    const serializedSales = sales.map((sale) => ({
+      ...sale,
+      subtotal: Number(sale.subtotal),
+      tax: Number(sale.tax),
+      total: Number(sale.total),
+      items: sale.items.map((item) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        unitCost: Number(item.unitCost),
+        total: Number(item.total),
+        discount: Number(item.discount),
+        menuItem: {
+          ...item.menuItem,
+          price: Number(item.menuItem.price),
+          cost: Number(item.menuItem.cost),
+        },
+      })),
+    }));
+
+    return { success: true, data: serializedSales };
   } catch (error) {
     console.error("[getSales] Error:", error);
     return { success: false, error: "Failed to fetch sales", data: [] };
   }
 }
 
-export async function getSalesByChannel(branchId?: string, days: number = 30) {
+export async function getSalesByChannel(branchId?: string, startDate?: Date, endDate?: Date) {
   try {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    const effectiveEndDate = endDate || new Date();
 
     const sales = await db.sale.findMany({
       where: {
         deletedAt: null,
-        saleDate: { gte: startDate },
+        saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
         ...(branchId && { branchId }),
       },
     });
@@ -258,15 +369,15 @@ export async function getSalesByChannel(branchId?: string, days: number = 30) {
   }
 }
 
-export async function getSalesByDaypart(branchId?: string, days: number = 30) {
+export async function getSalesByDaypart(branchId?: string, startDate?: Date, endDate?: Date) {
   try {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    const effectiveEndDate = endDate || new Date();
 
     const sales = await db.sale.findMany({
       where: {
         deletedAt: null,
-        saleDate: { gte: startDate },
+        saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
         ...(branchId && { branchId }),
       },
     });
@@ -296,16 +407,16 @@ export async function getSalesByDaypart(branchId?: string, days: number = 30) {
   }
 }
 
-export async function getTopMenuItems(branchId?: string, days: number = 30, limit: number = 5) {
+export async function getTopMenuItems(branchId?: string, startDate?: Date, endDate?: Date, limit: number = 5) {
   try {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    const effectiveEndDate = endDate || new Date();
 
     const saleItems = await db.saleItem.findMany({
       where: {
         sale: {
           deletedAt: null,
-          saleDate: { gte: startDate },
+          saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
           ...(branchId && { branchId }),
         },
       },
@@ -340,17 +451,19 @@ export async function getTopMenuItems(branchId?: string, days: number = 30, limi
   }
 }
 
-export async function getRevenueData(branchId?: string, days: number = 30) {
+export async function getRevenueData(branchId?: string, startDate?: Date, endDate?: Date) {
   try {
     const data: Array<{ date: string; revenue: number; target: number }> = [];
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const effectiveEndDate = endDate || new Date();
+    const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    
+    // Calculate days between dates
+    const days = Math.ceil((effectiveEndDate.getTime() - effectiveStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     const sales = await db.sale.findMany({
       where: {
         deletedAt: null,
-        saleDate: { gte: startDate, lte: endDate },
+        saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
         ...(branchId && { branchId }),
       },
     });
@@ -362,10 +475,10 @@ export async function getRevenueData(branchId?: string, days: number = 30) {
       salesByDate[dateKey] = (salesByDate[dateKey] || 0) + Number(sale.total);
     }
 
-    // Generate data for each day
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
+    // Generate data for each day in the range
+    for (let i = 0; i < days; i++) {
+      const date = new Date(effectiveStartDate);
+      date.setDate(date.getDate() + i);
       const dateKey = date.toISOString().split("T")[0];
       const monthDay = date.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
 
@@ -383,21 +496,21 @@ export async function getRevenueData(branchId?: string, days: number = 30) {
   }
 }
 
-export async function getKPIData(branchIds?: string[]) {
+export async function getKPIData(branchIds?: string[], startDate?: Date, endDate?: Date) {
   try {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-
-    const prevStartDate = new Date();
-    prevStartDate.setDate(prevStartDate.getDate() - 60);
-    const prevEndDate = new Date();
-    prevEndDate.setDate(prevEndDate.getDate() - 30);
+    const effectiveEndDate = endDate || new Date();
+    const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    
+    // Calculate the same period length for comparison
+    const periodLength = effectiveEndDate.getTime() - effectiveStartDate.getTime();
+    const prevEndDate = new Date(effectiveStartDate.getTime() - 1);
+    const prevStartDate = new Date(prevEndDate.getTime() - periodLength);
 
     // Current period sales
     const currentSales = await db.sale.findMany({
       where: {
         deletedAt: null,
-        saleDate: { gte: startDate },
+        saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
         ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
       },
       include: { items: true },
@@ -415,7 +528,7 @@ export async function getKPIData(branchIds?: string[]) {
     // Current period waste
     const currentWaste = await db.wasteLog.findMany({
       where: {
-        wasteDate: { gte: startDate },
+        wasteDate: { gte: effectiveStartDate, lte: effectiveEndDate },
         ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
       },
     });
@@ -478,7 +591,15 @@ export async function getMenuItems() {
       where: { deletedAt: null, isActive: true },
       orderBy: { name: "asc" },
     });
-    return { success: true, data: items };
+    
+    // Convert Decimal types to plain numbers for client serialization
+    const serializedItems = items.map((item) => ({
+      ...item,
+      price: Number(item.price),
+      cost: Number(item.cost),
+    }));
+    
+    return { success: true, data: serializedItems };
   } catch (error) {
     console.error("[getMenuItems] Error:", error);
     return { success: false, error: "Failed to fetch menu items", data: [] };
@@ -542,5 +663,48 @@ export async function getHourlySalesData(branchId?: string, days: number = 1) {
   } catch (error) {
     console.error("[getHourlySalesData] Error:", error);
     return { success: false, error: "Failed to fetch hourly sales data", data: [] };
+  }
+}
+
+// Combined function to fetch all dashboard data with date range
+export async function getDashboardData(branchIds?: string[], startDate?: Date, endDate?: Date) {
+  try {
+    const [
+      revenueDataResult,
+      salesByChannelResult,
+      salesByDaypartResult,
+      topMenuItemsResult,
+      kpiDataResult,
+    ] = await Promise.all([
+      getRevenueData(branchIds?.[0], startDate, endDate),
+      getSalesByChannel(branchIds?.[0], startDate, endDate),
+      getSalesByDaypart(branchIds?.[0], startDate, endDate),
+      getTopMenuItems(branchIds?.[0], startDate, endDate),
+      getKPIData(branchIds, startDate, endDate),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        revenueData: revenueDataResult.data || [],
+        salesByChannel: salesByChannelResult.data || [],
+        salesByDaypart: salesByDaypartResult.data || [],
+        topMenuItems: topMenuItemsResult.data?.top || [],
+        worstMenuItems: topMenuItemsResult.data?.worst || [],
+        kpiData: kpiDataResult.data || {
+          totalRevenue: 0,
+          revenueGrowth: 0,
+          cogsPercentage: 0,
+          profitMargin: 0,
+          transactionCount: 0,
+          averageTicket: 0,
+          wasteTotal: 0,
+          wasteChange: 0,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("[getDashboardData] Error:", error);
+    return { success: false, error: "Failed to fetch dashboard data" };
   }
 }

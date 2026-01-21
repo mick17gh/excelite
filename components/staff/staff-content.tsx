@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -22,6 +24,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Users,
   UserCheck,
   UserX,
@@ -30,8 +40,25 @@ import {
   Clock,
   Calendar,
   Plus,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Square,
+  Loader2,
+  CalendarDays,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  scheduleShift,
+  clockIn,
+  clockOut,
+  getWeeklySchedule,
+  getAvailableStaff,
+  getTimesheetData,
+} from "@/lib/actions/staff";
+import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 
 interface StaffSummary {
   branchId: string;
@@ -59,15 +86,82 @@ interface Branch {
   code: string;
 }
 
+interface WeeklySchedule {
+  [dateKey: string]: Array<{
+    id: string;
+    staffId: string;
+    scheduledDate: Date;
+    shiftStart: Date;
+    shiftEnd: Date;
+    actualStart?: Date | null;
+    actualEnd?: Date | null;
+    status: string;
+    staff: {
+      id: string;
+      employeeId: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+    };
+  }>;
+}
+
+interface TimesheetEntry {
+  staff: {
+    id: string;
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    hourlyRate: number;
+  };
+  branch: { id: string; name: string } | null;
+  totalHours: number;
+  estimatedPay: number;
+}
+
 interface StaffContentProps {
   summary: StaffSummary[];
   schedule: StaffMember[];
   branches: Branch[];
+  allStaff?: Array<{
+    id: string;
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    branchId: string;
+    dutyStatus: string;
+  }>;
 }
 
-export function StaffContent({ summary, schedule, branches }: StaffContentProps) {
+export function StaffContent({ summary, schedule, branches, allStaff = [] }: StaffContentProps) {
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isPending, startTransition] = useTransition();
+  
+  // Schedule dialog state
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    staffId: "",
+    branchId: "",
+    date: format(new Date(), "yyyy-MM-dd"),
+    shiftStart: "09:00",
+    shiftEnd: "17:00",
+  });
+  
+  // Weekly schedule state
+  const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>({});
+  const [selectedBranchForWeek, setSelectedBranchForWeek] = useState<string>("");
+  const [loadingWeek, setLoadingWeek] = useState(false);
+  
+  // Timesheet state
+  const [timesheetData, setTimesheetData] = useState<TimesheetEntry[]>([]);
+  const [loadingTimesheet, setLoadingTimesheet] = useState(false);
+  
+  // Clock in/out loading state
+  const [clockingStaffId, setClockingStaffId] = useState<string | null>(null);
 
   const totalStaff = summary.reduce((sum, s) => sum + s.totalStaff, 0);
   const totalOnDuty = summary.reduce((sum, s) => sum + s.onDuty, 0);
@@ -151,87 +245,182 @@ export function StaffContent({ summary, schedule, branches }: StaffContentProps)
     return <Badge className={colors[role] || "bg-slate-100 text-slate-700"}>{role}</Badge>;
   };
 
+  // Handlers
+  const handleAddSchedule = async () => {
+    if (!scheduleForm.staffId || !scheduleForm.branchId || !scheduleForm.date) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    const dateObj = new Date(scheduleForm.date);
+    const [startHour, startMin] = scheduleForm.shiftStart.split(":").map(Number);
+    const [endHour, endMin] = scheduleForm.shiftEnd.split(":").map(Number);
+
+    const shiftStart = new Date(dateObj);
+    shiftStart.setHours(startHour, startMin, 0, 0);
+
+    const shiftEnd = new Date(dateObj);
+    shiftEnd.setHours(endHour, endMin, 0, 0);
+
+    startTransition(async () => {
+      const result = await scheduleShift({
+        staffId: scheduleForm.staffId,
+        branchId: scheduleForm.branchId,
+        date: dateObj,
+        shiftStart,
+        shiftEnd,
+      });
+
+      if (result.success) {
+        toast.success("Shift scheduled successfully");
+        setIsScheduleOpen(false);
+        setScheduleForm({
+          staffId: "",
+          branchId: "",
+          date: format(new Date(), "yyyy-MM-dd"),
+          shiftStart: "09:00",
+          shiftEnd: "17:00",
+        });
+      } else {
+        toast.error(result.error || "Failed to schedule shift");
+      }
+    });
+  };
+
+  const handleClockIn = async (staffId: string) => {
+    setClockingStaffId(staffId);
+    startTransition(async () => {
+      const result = await clockIn(staffId);
+      if (result.success) {
+        toast.success("Clocked in successfully");
+      } else {
+        toast.error(result.error || "Failed to clock in");
+      }
+      setClockingStaffId(null);
+    });
+  };
+
+  const handleClockOut = async (staffId: string) => {
+    setClockingStaffId(staffId);
+    startTransition(async () => {
+      const result = await clockOut(staffId);
+      if (result.success) {
+        toast.success("Clocked out successfully");
+      } else {
+        toast.error(result.error || "Failed to clock out");
+      }
+      setClockingStaffId(null);
+    });
+  };
+
+  const loadWeeklySchedule = async (branchId: string) => {
+    if (!branchId) return;
+    setLoadingWeek(true);
+    try {
+      const result = await getWeeklySchedule(branchId, weekStart);
+      if (result.success && result.data) {
+        setWeeklySchedule(result.data);
+      }
+    } catch {
+      toast.error("Failed to load weekly schedule");
+    } finally {
+      setLoadingWeek(false);
+    }
+  };
+
+  const loadTimesheetData = async () => {
+    setLoadingTimesheet(true);
+    try {
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
+      const result = await getTimesheetData(
+        branchFilter === "all" ? undefined : branchFilter,
+        startOfMonth,
+        new Date()
+      );
+      if (result.success && result.data) {
+        setTimesheetData(result.data as TimesheetEntry[]);
+      }
+    } catch {
+      toast.error("Failed to load timesheet data");
+    } finally {
+      setLoadingTimesheet(false);
+    }
+  };
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Staff</p>
-                <p className="text-xl font-bold">{totalStaff}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Across all branches
-                </p>
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Staff</p>
+                <p className="text-base font-bold mt-0.5">{totalStaff}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Users className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Users className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Currently On Duty</p>
-                <p className="text-xl font-bold text-emerald-600">{totalOnDuty}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {totalRequired} required
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">On Duty</p>
+                <p className="text-base font-bold mt-0.5 text-emerald-600">{totalOnDuty}</p>
               </div>
-              <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/30 p-3">
-                <UserCheck className="h-5 w-5 text-emerald-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                <UserCheck className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Off Duty</p>
-                <p className="text-xl font-bold">{totalStaff - totalOnDuty}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Available for scheduling
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Off Duty</p>
+                <p className="text-base font-bold mt-0.5">{totalStaff - totalOnDuty}</p>
               </div>
-              <div className="rounded-xl bg-slate-100 dark:bg-slate-900/30 p-3">
-                <UserX className="h-5 w-5 text-slate-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-slate-100 dark:bg-slate-900/30">
+                <UserX className="h-4 w-4 text-slate-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={cn(
-          "glass",
-          understaffedBranches > 0 && "border-red-200 dark:border-red-800"
+          "kpi-card rounded-xl",
+          understaffedBranches > 0 && "border-red-200/50 dark:border-red-800/50"
         )}>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Understaffed Branches</p>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Understaffed</p>
                 <p className={cn(
-                  "text-xl font-bold",
+                  "text-base font-bold mt-0.5",
                   understaffedBranches > 0 ? "text-red-600" : "text-emerald-600"
                 )}>
                   {understaffedBranches}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {understaffedBranches > 0 ? "Need attention" : "All branches covered"}
-                </p>
               </div>
               <div className={cn(
-                "rounded-xl p-3",
+                "rounded-lg p-1.5 shrink-0",
                 understaffedBranches > 0 
                   ? "bg-red-100 dark:bg-red-900/30" 
                   : "bg-emerald-100 dark:bg-emerald-900/30"
               )}>
                 <AlertCircle className={cn(
-                  "h-5 w-5",
+                  "h-4 w-4",
                   understaffedBranches > 0 ? "text-red-600" : "text-emerald-600"
                 )} />
               </div>
@@ -243,13 +432,22 @@ export function StaffContent({ summary, schedule, branches }: StaffContentProps)
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList>
-            <TabsTrigger value="overview">Branch Overview</TabsTrigger>
-            <TabsTrigger value="schedule">Today's Schedule</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsList className="h-9">
+            <TabsTrigger value="overview" className="text-xs px-3">Branch Overview</TabsTrigger>
+            <TabsTrigger value="schedule" className="text-xs px-3">Today's Schedule</TabsTrigger>
+            <TabsTrigger value="weekly" className="text-xs px-3" onClick={() => {
+              if (selectedBranchForWeek) loadWeeklySchedule(selectedBranchForWeek);
+            }}>
+              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+              Weekly
+            </TabsTrigger>
+            <TabsTrigger value="timesheet" className="text-xs px-3" onClick={loadTimesheetData}>
+              <DollarSign className="mr-1.5 h-3.5 w-3.5" />
+              Timesheet
+            </TabsTrigger>
           </TabsList>
 
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setIsScheduleOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Schedule
           </Button>
@@ -341,35 +539,251 @@ export function StaffContent({ summary, schedule, branches }: StaffContentProps)
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="text-xs">Employee</TableHead>
+                    <TableHead className="text-xs">Role</TableHead>
+                    <TableHead className="text-xs">Branch</TableHead>
+                    <TableHead className="text-xs">Shift</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredSchedule.map((staff) => (
                     <TableRow key={staff.id}>
-                      <TableCell>
+                      <TableCell className="py-2">
                         <div>
-                          <p className="font-medium">{staff.name}</p>
+                          <p className="text-sm font-medium">{staff.name}</p>
                           <p className="text-xs text-muted-foreground">{staff.employeeId}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{getRoleBadge(staff.role)}</TableCell>
-                      <TableCell>{staff.branchName}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">{getRoleBadge(staff.role)}</TableCell>
+                      <TableCell className="py-2 text-sm">{staff.branchName}</TableCell>
+                      <TableCell className="py-2">
                         <div className="flex items-center gap-1 text-sm">
                           <Clock className="h-3 w-3 text-muted-foreground" />
                           {staff.shiftStart} - {staff.shiftEnd}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(staff.status)}</TableCell>
+                      <TableCell className="py-2">{getStatusBadge(staff.status)}</TableCell>
+                      <TableCell className="py-2 text-right">
+                        {staff.status === "ON_DUTY" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleClockOut(staff.id)}
+                            disabled={clockingStaffId === staff.id}
+                          >
+                            {clockingStaffId === staff.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                <Square className="mr-1 h-3 w-3" />
+                                Clock Out
+                              </>
+                            )}
+                          </Button>
+                        ) : staff.status === "OFF_DUTY" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleClockIn(staff.id)}
+                            disabled={clockingStaffId === staff.id}
+                          >
+                            {clockingStaffId === staff.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                <Play className="mr-1 h-3 w-3" />
+                                Clock In
+                              </>
+                            )}
+                          </Button>
+                        ) : null}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="weekly" className="mt-6">
+          <Card className="glass">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarDays className="h-5 w-5 text-primary" />
+                    Weekly Schedule
+                  </CardTitle>
+                  <CardDescription>View and manage weekly shifts</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={selectedBranchForWeek} onValueChange={(v) => {
+                    setSelectedBranchForWeek(v);
+                    loadWeeklySchedule(v);
+                  }}>
+                    <SelectTrigger className="w-40 h-8 text-xs">
+                      <SelectValue placeholder="Select Branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => {
+                      const newWeek = subWeeks(weekStart, 1);
+                      setWeekStart(newWeek);
+                      if (selectedBranchForWeek) loadWeeklySchedule(selectedBranchForWeek);
+                    }}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs font-medium w-32 text-center">
+                      {format(weekStart, "MMM d")} - {format(addDays(weekStart, 6), "MMM d, yyyy")}
+                    </span>
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => {
+                      const newWeek = addWeeks(weekStart, 1);
+                      setWeekStart(newWeek);
+                      if (selectedBranchForWeek) loadWeeklySchedule(selectedBranchForWeek);
+                    }}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingWeek ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : !selectedBranchForWeek ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  Select a branch to view the weekly schedule
+                </div>
+              ) : (
+                <div className="grid grid-cols-7 gap-2">
+                  {weekDays.map((day) => {
+                    const dateKey = format(day, "yyyy-MM-dd");
+                    const daySchedules = weeklySchedule[dateKey] || [];
+                    const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                    
+                    return (
+                      <div key={dateKey} className={cn(
+                        "border rounded-lg p-2 min-h-[180px]",
+                        isToday && "border-primary bg-primary/5"
+                      )}>
+                        <div className={cn(
+                          "text-xs font-medium mb-2 pb-1 border-b",
+                          isToday && "text-primary"
+                        )}>
+                          <div>{format(day, "EEE")}</div>
+                          <div className="text-lg">{format(day, "d")}</div>
+                        </div>
+                        <div className="space-y-1">
+                          {daySchedules.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-2">No shifts</p>
+                          ) : (
+                            daySchedules.map((shift) => (
+                              <div key={shift.id} className="text-xs bg-muted/50 rounded p-1.5">
+                                <div className="font-medium truncate">
+                                  {shift.staff.firstName} {shift.staff.lastName.charAt(0)}.
+                                </div>
+                                <div className="text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {format(new Date(shift.shiftStart), "HH:mm")} - {format(new Date(shift.shiftEnd), "HH:mm")}
+                                </div>
+                                <Badge variant="outline" className="mt-1 text-[10px] h-4">
+                                  {shift.staff.role}
+                                </Badge>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="timesheet" className="mt-6">
+          <Card className="glass">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                    Timesheet & Payroll
+                  </CardTitle>
+                  <CardDescription>Hours worked and estimated pay for current month</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="h-8" onClick={loadTimesheetData}>
+                  {loadingTimesheet ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingTimesheet ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : timesheetData.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  No timesheet data available. Click refresh to load.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Employee</TableHead>
+                      <TableHead className="text-xs">Role</TableHead>
+                      <TableHead className="text-xs">Branch</TableHead>
+                      <TableHead className="text-xs text-right">Hours</TableHead>
+                      <TableHead className="text-xs text-right">Rate</TableHead>
+                      <TableHead className="text-xs text-right">Est. Pay</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {timesheetData.map((entry) => (
+                      <TableRow key={entry.staff.id}>
+                        <TableCell className="py-2">
+                          <div>
+                            <p className="text-sm font-medium">{entry.staff.firstName} {entry.staff.lastName}</p>
+                            <p className="text-xs text-muted-foreground">{entry.staff.employeeId}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">{getRoleBadge(entry.staff.role)}</TableCell>
+                        <TableCell className="py-2 text-sm">{entry.branch?.name || "-"}</TableCell>
+                        <TableCell className="py-2 text-sm text-right font-medium">{entry.totalHours.toFixed(1)}h</TableCell>
+                        <TableCell className="py-2 text-sm text-right">GH₵ {entry.staff.hourlyRate.toFixed(2)}/h</TableCell>
+                        <TableCell className="py-2 text-right">
+                          <span className="font-bold text-emerald-600">GH₵ {entry.estimatedPay.toFixed(2)}</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/30">
+                      <TableCell colSpan={3} className="font-medium">Total</TableCell>
+                      <TableCell className="text-right font-bold">
+                        {timesheetData.reduce((sum, e) => sum + e.totalHours, 0).toFixed(1)}h
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right font-bold text-emerald-600">
+                        GH₵ {timesheetData.reduce((sum, e) => sum + e.estimatedPay, 0).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -401,6 +815,81 @@ export function StaffContent({ summary, schedule, branches }: StaffContentProps)
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add Schedule Dialog */}
+      <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule Shift</DialogTitle>
+            <DialogDescription>Add a new shift for a staff member</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Staff Member</Label>
+              <Select value={scheduleForm.staffId} onValueChange={(v) => setScheduleForm(prev => ({ ...prev, staffId: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select staff" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allStaff.map((staff) => (
+                    <SelectItem key={staff.id} value={staff.id}>
+                      {staff.firstName} {staff.lastName} ({staff.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Branch</Label>
+              <Select value={scheduleForm.branchId} onValueChange={(v) => setScheduleForm(prev => ({ ...prev, branchId: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={scheduleForm.date}
+                onChange={(e) => setScheduleForm(prev => ({ ...prev, date: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Shift Start</Label>
+                <Input
+                  type="time"
+                  value={scheduleForm.shiftStart}
+                  onChange={(e) => setScheduleForm(prev => ({ ...prev, shiftStart: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Shift End</Label>
+                <Input
+                  type="time"
+                  value={scheduleForm.shiftEnd}
+                  onChange={(e) => setScheduleForm(prev => ({ ...prev, shiftEnd: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsScheduleOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddSchedule} disabled={isPending}>
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Schedule Shift
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

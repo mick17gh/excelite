@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, useEffect, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -20,8 +23,13 @@ import {
   AlertCircle,
   ChefHat,
   Timer,
+  RefreshCw,
+  Volume2,
+  VolumeX,
+  Undo2,
+  FastForward,
 } from "lucide-react";
-import { updateKitchenItemStatus } from "@/lib/actions/kitchen";
+import { updateKitchenItemStatus, bumpTicket, recallTicket, listKitchenTickets } from "@/lib/actions/kitchen";
 import { OrderStatus } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -97,10 +105,49 @@ function calculateTimeElapsed(createdAt: Date): number {
   return Math.floor((new Date().getTime() - new Date(createdAt).getTime()) / 1000 / 60);
 }
 
-export function KitchenContent({ branches, stations, tickets }: KitchenContentProps) {
+export function KitchenContent({ branches, stations, tickets: initialTickets }: KitchenContentProps) {
+  const [tickets, setTickets] = useState(initialTickets);
   const [branchId, setBranchId] = useState<string>("all");
   const [stationId, setStationId] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [lastTicketCount, setLastTicketCount] = useState(initialTickets.length);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-refresh tickets every 10 seconds
+  const refreshTickets = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const result = await listKitchenTickets(
+        branchId === "all" ? undefined : branchId,
+        stationId === "all" ? undefined : stationId
+      );
+      if (result.success && result.data) {
+        const newTickets = result.data as Ticket[];
+        
+        // Check for new tickets and play sound
+        const activeNewTickets = newTickets.filter(t => t.status !== "COMPLETED");
+        if (soundEnabled && activeNewTickets.length > lastTicketCount) {
+          // Visual notification since we can't play audio without user interaction
+          toast.info("New order received!", { duration: 3000 });
+        }
+        setLastTicketCount(activeNewTickets.length);
+        setTickets(newTickets);
+      }
+    } catch (error) {
+      console.error("Failed to refresh tickets:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [branchId, stationId, soundEnabled, lastTicketCount]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const interval = setInterval(refreshTickets, 10000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, refreshTickets]);
 
   const filteredStations = useMemo(() => {
     if (branchId === "all") return stations;
@@ -123,6 +170,31 @@ export function KitchenContent({ branches, stations, tickets }: KitchenContentPr
         return;
       }
       toast.success("Item status updated");
+      refreshTickets();
+    });
+  };
+
+  const handleBumpTicket = (ticketId: string) => {
+    startTransition(async () => {
+      const res = await bumpTicket(ticketId);
+      if (!res.success) {
+        toast.error(res.error || "Failed to bump ticket");
+        return;
+      }
+      toast.success("Ticket bumped");
+      refreshTickets();
+    });
+  };
+
+  const handleRecallTicket = (ticketId: string) => {
+    startTransition(async () => {
+      const res = await recallTicket(ticketId);
+      if (!res.success) {
+        toast.error(res.error || "Failed to recall ticket");
+        return;
+      }
+      toast.success("Ticket recalled");
+      refreshTickets();
     });
   };
 
@@ -134,240 +206,321 @@ export function KitchenContent({ branches, stations, tickets }: KitchenContentPr
   }, [filteredTickets]);
 
   return (
-    <div className="space-y-6">
-      {/* Header with Stats */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Kitchen Display System</h2>
-          <p className="text-muted-foreground">Monitor and manage kitchen orders in real-time</p>
-        </div>
-        <div className="flex gap-3">
-          <Select value={branchId} onValueChange={setBranchId}>
-            <SelectTrigger className="w-full sm:w-56">
-              <SelectValue placeholder="All branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {branches.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={stationId} onValueChange={setStationId}>
-            <SelectTrigger className="w-full sm:w-56">
-              <SelectValue placeholder="All stations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All stations</SelectItem>
-              {filteredStations.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass border-blue-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">New Orders</p>
-                <p className="text-xl font-bold text-blue-600">{stats.newCount}</p>
-              </div>
-              <div className="rounded-xl bg-blue-500/10 p-3">
-                <AlertCircle className="h-5 w-5 text-blue-600" />
-              </div>
+    <div className="flex flex-col h-[calc(100vh-100px)] gap-4">
+      {/* Fixed Header */}
+      <div className="flex flex-col gap-4 shrink-0">
+        {/* Title and Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <ChefHat className="h-6 w-6 text-primary" />
+              <h2 className="text-2xl font-bold tracking-tight">
+                Kitchen Display System
+              </h2>
+              {isRefreshing && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass border-amber-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">In Progress</p>
-                <p className="text-xl font-bold text-amber-600">{stats.inProgressCount}</p>
-              </div>
-              <div className="rounded-xl bg-amber-500/10 p-3">
-                <Play className="h-5 w-5 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass border-emerald-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Ready</p>
-                <p className="text-xl font-bold text-emerald-600">{stats.readyCount}</p>
-              </div>
-              <div className="rounded-xl bg-emerald-500/10 p-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Active</p>
-                <p className="text-xl font-bold">{stats.total}</p>
-              </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <ChefHat className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tickets Grid */}
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {filteredTickets.map((ticket) => {
-          const timeElapsed = calculateTimeElapsed(ticket.createdAt);
-          const StatusIcon = getStatusIcon(ticket.status);
-          const isUrgent = timeElapsed > 15;
-
-          return (
-            <Card
-              key={ticket.id}
-              className={cn(
-                "glass transition-all hover:shadow-lg",
-                isUrgent && ticket.status !== "READY" && "border-red-500/50 bg-red-500/5"
-              )}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <span className="font-mono text-sm">{ticket.order.orderNumber}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {ticket.station.name}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription className="mt-1 flex items-center gap-2">
-                      <span>{ticket.order.branch.name}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Timer className="h-3 w-3" />
-                        {timeElapsed}m ago
-                      </span>
-                    </CardDescription>
-                  </div>
-                  <Badge className={cn("border", statusColor(ticket.status))}>
-                    <StatusIcon className="mr-1 h-3 w-3" />
-                    {ticket.status.replace(/_/g, " ")}
-                  </Badge>
-                </div>
-                {isUrgent && ticket.status !== "READY" && (
-                  <div className="mt-2">
-                    <Progress value={Math.min((timeElapsed / 20) * 100, 100)} className="h-1" />
-                    <p className="text-xs text-red-600 mt-1 font-medium">
-                      ⚠️ Order taking longer than expected
-                    </p>
-                  </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Controls */}
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5">
+              <Switch
+                id="auto-refresh"
+                checked={autoRefresh}
+                onCheckedChange={setAutoRefresh}
+              />
+              <Label htmlFor="auto-refresh" className="text-xs cursor-pointer">
+                Auto-refresh
+              </Label>
+              <div className="w-px h-4 bg-border mx-1" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                title={soundEnabled ? "Mute notifications" : "Enable notifications"}
+              >
+                {soundEnabled ? (
+                  <Volume2 className="h-4 w-4" />
+                ) : (
+                  <VolumeX className="h-4 w-4 text-muted-foreground" />
                 )}
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {ticket.items.map((item) => {
-                  const itemTimeElapsed = calculateTimeElapsed(item.createdAt);
-                  const ItemStatusIcon = getStatusIcon(item.status);
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => refreshTickets()}
+                disabled={isRefreshing}
+                title="Refresh now"
+              >
+                <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              </Button>
+            </div>
 
-                  return (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors",
-                        item.status === "NEW" && "bg-blue-500/5 border-blue-500/20",
-                        item.status === "IN_PROGRESS" && "bg-amber-500/5 border-amber-500/20",
-                        item.status === "READY" && "bg-emerald-500/5 border-emerald-500/20"
-                      )}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm">
-                          {item.orderItem.quantity}× {item.orderItem.menuItem.name}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs border", statusColor(item.status))}
-                          >
-                            <ItemStatusIcon className="mr-1 h-2.5 w-2.5" />
-                            {item.status.replace(/_/g, " ")}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {itemTimeElapsed}m
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-1.5">
-                        {item.status === "NEW" && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => bumpItem(item.id, "IN_PROGRESS")}
-                            disabled={isPending}
-                            className="h-8 px-3"
-                          >
-                            <Play className="mr-1 h-3 w-3" />
-                            Start
-                          </Button>
-                        )}
-                        {item.status === "IN_PROGRESS" && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => bumpItem(item.id, "READY")}
-                            disabled={isPending}
-                            className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700"
-                          >
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Ready
-                          </Button>
-                        )}
-                        {item.status === "READY" && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => bumpItem(item.id, "COMPLETED")}
-                            disabled={isPending}
-                            className="h-8 px-3"
-                          >
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Complete
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          );
-        })}
+            {/* Filters */}
+            <Select value={branchId} onValueChange={setBranchId}>
+              <SelectTrigger className="w-[160px] h-9 bg-background">
+                <SelectValue placeholder="All branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All branches</SelectItem>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        {filteredTickets.length === 0 && (
-          <Card className="glass lg:col-span-2 xl:col-span-3">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <ChefHat className="h-16 w-16 text-muted-foreground/30 mb-4" />
-              <h3 className="font-semibold text-lg mb-1">No Active Tickets</h3>
-              <p className="text-sm text-muted-foreground text-center max-w-md">
-                All orders are completed or there are no active kitchen tickets for the selected
-                filters.
-              </p>
+            <Select value={stationId} onValueChange={setStationId}>
+              <SelectTrigger className="w-[160px] h-9 bg-background">
+                <SelectValue placeholder="All stations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All stations</SelectItem>
+                {filteredStations.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Stats Cards - Compact */}
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+          <Card className="border-blue-500/20 bg-blue-500/5">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">New Orders</p>
+                  <p className="text-xl font-bold text-blue-600">{stats.newCount}</p>
+                </div>
+                <div className="rounded-lg bg-blue-500/10 p-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
-        )}
+
+          <Card className="border-amber-500/20 bg-amber-500/5">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">In Progress</p>
+                  <p className="text-xl font-bold text-amber-600">{stats.inProgressCount}</p>
+                </div>
+                <div className="rounded-lg bg-amber-500/10 p-2">
+                  <Play className="h-4 w-4 text-amber-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-emerald-500/20 bg-emerald-500/5">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Ready</p>
+                  <p className="text-xl font-bold text-emerald-600">{stats.readyCount}</p>
+                </div>
+                <div className="rounded-lg bg-emerald-500/10 p-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Total Active</p>
+                  <p className="text-xl font-bold">{stats.total}</p>
+                </div>
+                <div className="rounded-lg bg-primary/10 p-2">
+                  <ChefHat className="h-4 w-4 text-primary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Scrollable Tickets Grid */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 p-1 pb-4">
+            {filteredTickets.map((ticket) => {
+              const timeElapsed = calculateTimeElapsed(ticket.createdAt);
+              const StatusIcon = getStatusIcon(ticket.status);
+              const isUrgent = timeElapsed > 15;
+
+              return (
+                <Card
+                  key={ticket.id}
+                  className={cn(
+                    "transition-all hover:shadow-md border",
+                    isUrgent && ticket.status !== "READY" && "border-red-500/50 bg-red-500/5 ring-2 ring-red-500/20"
+                  )}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <span className="font-mono text-sm font-bold">{ticket.order.orderNumber}</span>
+                          <Badge variant="outline" className="text-xs h-5">
+                            {ticket.station.name}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="mt-1.5 flex items-center gap-2 text-xs">
+                          <span>{ticket.order.branch.name}</span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Timer className="h-3 w-3" />
+                            {timeElapsed}m ago
+                          </span>
+                        </CardDescription>
+                      </div>
+                      <Badge className={cn("border shrink-0", statusColor(ticket.status))}>
+                        <StatusIcon className="mr-1 h-3 w-3" />
+                        {ticket.status.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    {isUrgent && ticket.status !== "READY" && (
+                      <div className="mt-2">
+                        <Progress value={Math.min((timeElapsed / 20) * 100, 100)} className="h-1.5" />
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">
+                          ⚠️ Order taking longer than expected
+                        </p>
+                      </div>
+                    )}
+                    {/* Ticket-level actions */}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                      {ticket.status === "READY" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRecallTicket(ticket.id)}
+                          disabled={isPending}
+                          className="h-7 text-xs"
+                        >
+                          <Undo2 className="mr-1 h-3 w-3" />
+                          Recall
+                        </Button>
+                      )}
+                      {ticket.status !== "READY" && ticket.status !== "COMPLETED" && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleBumpTicket(ticket.id)}
+                          disabled={isPending}
+                          className="h-7 text-xs"
+                        >
+                          <FastForward className="mr-1 h-3 w-3" />
+                          Bump All
+                        </Button>
+                      )}
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {ticket.items.length} item{ticket.items.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {ticket.items.map((item) => {
+                      const itemTimeElapsed = calculateTimeElapsed(item.createdAt);
+                      const ItemStatusIcon = getStatusIcon(item.status);
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={cn(
+                            "flex items-center justify-between gap-3 rounded-lg border p-2.5 transition-colors",
+                            item.status === "NEW" && "bg-blue-500/5 border-blue-500/20",
+                            item.status === "IN_PROGRESS" && "bg-amber-500/5 border-amber-500/20",
+                            item.status === "READY" && "bg-emerald-500/5 border-emerald-500/20"
+                          )}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm leading-tight">
+                              {item.orderItem.quantity}× {item.orderItem.menuItem.name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge
+                                variant="outline"
+                                className={cn("text-xs border h-5", statusColor(item.status))}
+                              >
+                                <ItemStatusIcon className="mr-1 h-2.5 w-2.5" />
+                                {item.status.replace(/_/g, " ")}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {itemTimeElapsed}m
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            {item.status === "NEW" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => bumpItem(item.id, "IN_PROGRESS")}
+                                disabled={isPending}
+                                className="h-7 px-2.5 text-xs"
+                              >
+                                <Play className="mr-1 h-3 w-3" />
+                                Start
+                              </Button>
+                            )}
+                            {item.status === "IN_PROGRESS" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => bumpItem(item.id, "READY")}
+                                disabled={isPending}
+                                className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+                              >
+                                <CheckCircle2 className="mr-1 h-3 w-3" />
+                                Ready
+                              </Button>
+                            )}
+                            {item.status === "READY" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => bumpItem(item.id, "COMPLETED")}
+                                disabled={isPending}
+                                className="h-7 px-2.5 text-xs"
+                              >
+                                <CheckCircle2 className="mr-1 h-3 w-3" />
+                                Complete
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              );
+            })}
+
+            {filteredTickets.length === 0 && (
+              <Card className="lg:col-span-2 xl:col-span-3">
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
+                    <ChefHat className="h-10 w-10 text-muted-foreground/40" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-1">No Active Tickets</h3>
+                  <p className="text-sm text-muted-foreground text-center max-w-md">
+                    All orders are completed or there are no active kitchen tickets for the selected filters.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

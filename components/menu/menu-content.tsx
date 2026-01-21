@@ -106,72 +106,60 @@ export function MenuContent({ items, categories }: MenuContentProps) {
   }, {} as Record<string, MenuItem[]>);
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Items</p>
-                <p className="text-xl font-bold">{totalItems}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {activeItems} active
-                </p>
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Items</p>
+                <p className="text-base font-bold mt-0.5">{totalItems}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Package className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Package className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Items</p>
-                <p className="text-xl font-bold text-emerald-600">{activeItems}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {totalItems - activeItems} inactive
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Active</p>
+                <p className="text-base font-bold mt-0.5 text-emerald-600">{activeItems}</p>
               </div>
-              <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/30 p-3">
-                <TrendingUp className="h-5 w-5 text-emerald-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg. Margin</p>
-                <p className="text-xl font-bold">{avgMargin.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Profit margin
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Margin</p>
+                <p className="text-base font-bold mt-0.5">{avgMargin.toFixed(1)}%</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <DollarSign className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Categories</p>
-                <p className="text-xl font-bold">{categories.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Menu categories
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Categories</p>
+                <p className="text-base font-bold mt-0.5">{categories.length}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Package className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Package className="h-4 w-4" />
               </div>
             </div>
           </CardContent>

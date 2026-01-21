@@ -28,37 +28,37 @@ export function RevenueChart({
   title = "Revenue Trend",
   loading = false,
 }: RevenueChartProps) {
-  const { formatCurrency, formatCurrencyShort, currency } = useCurrency();
+  const { formatCurrency, formatCurrencyShort } = useCurrency();
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">{title}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px] w-full animate-pulse rounded bg-muted" />
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="h-[220px] w-full animate-pulse rounded bg-muted" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="chart-card rounded-xl">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2">
+    <Card className="chart-card rounded-xl h-full">
+      <CardHeader className="py-3 px-4">
+        <CardTitle className="flex items-center gap-2 text-base">
           <div className="icon-blue rounded-lg p-1.5">
             <TrendingUp className="h-4 w-4" />
           </div>
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-[250px] sm:h-[300px] w-full">
+      <CardContent className="px-4 pb-4 pt-0">
+        <div className="h-[220px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
-              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+              margin={{ top: 5, right: 5, left: -15, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -83,30 +83,27 @@ export function RevenueChart({
               />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 className="text-muted-foreground"
               />
               <YAxis
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => formatCurrencyShort(value)}
                 className="text-muted-foreground"
+                width={50}
               />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (!active || !payload) return null;
                   return (
-                    <div className="rounded-lg border bg-background p-3 shadow-lg">
-                      <p className="text-sm font-medium">{label}</p>
+                    <div className="rounded-lg border bg-background p-2 shadow-lg text-xs">
+                      <p className="font-medium">{label}</p>
                       {payload.map((entry, index) => (
-                        <p
-                          key={index}
-                          className="text-sm"
-                          style={{ color: entry.color }}
-                        >
+                        <p key={index} style={{ color: entry.color }}>
                           {entry.name}: {formatCurrency(entry.value as number)}
                         </p>
                       ))}
@@ -119,7 +116,7 @@ export function RevenueChart({
                 dataKey="revenue"
                 name="Revenue"
                 stroke="url(#strokeRevenue)"
-                strokeWidth={3}
+                strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorRevenue)"
               />
@@ -129,7 +126,7 @@ export function RevenueChart({
                   dataKey="target"
                   name="Target"
                   stroke="hsl(var(--chart-3))"
-                  strokeWidth={2}
+                  strokeWidth={1.5}
                   strokeDasharray="5 5"
                   fillOpacity={1}
                   fill="url(#colorTarget)"

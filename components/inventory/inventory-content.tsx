@@ -33,7 +33,15 @@ import {
   RefreshCw,
   Trash2,
   Download,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import {
   InboundStockForm,
@@ -162,73 +170,65 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
     }
   };
 
+  const { formatCurrencyShort } = useCurrency();
+
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Inventory Value</p>
-                <p className="text-xl font-bold">{formatCurrency(totalValue)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {items.length} items tracked
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Inventory Value</p>
+                <p className="text-base font-bold mt-0.5 truncate">
+                  {totalValue >= 10000 ? formatCurrencyShort(totalValue) : formatCurrency(totalValue)}
                 </p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Package className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Package className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass border-red-200 dark:border-red-800">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Critical Items</p>
-                <p className="text-xl font-bold text-red-600">{criticalItems}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Need immediate restock
-                </p>
+        <Card className="kpi-card rounded-xl border-red-200/50 dark:border-red-800/50">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Critical</p>
+                <p className="text-base font-bold mt-0.5 text-red-600">{criticalItems}</p>
               </div>
-              <div className="rounded-xl bg-red-100 dark:bg-red-900/30 p-3">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-red-100 dark:bg-red-900/30">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass border-amber-200 dark:border-amber-800">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Low Stock Items</p>
-                <p className="text-xl font-bold text-amber-600">{lowStockItems}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Below reorder point
-                </p>
+        <Card className="kpi-card rounded-xl border-amber-200/50 dark:border-amber-800/50">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Low Stock</p>
+                <p className="text-base font-bold mt-0.5 text-amber-600">{lowStockItems}</p>
               </div>
-              <div className="rounded-xl bg-amber-100 dark:bg-amber-900/30 p-3">
-                <TrendingDown className="h-5 w-5 text-amber-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-amber-100 dark:bg-amber-900/30">
+                <TrendingDown className="h-4 w-4 text-amber-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Overstock Items</p>
-                <p className="text-xl font-bold text-blue-600">{overstockItems}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Above max threshold
-                </p>
+        <Card className="kpi-card rounded-xl border-blue-200/50 dark:border-blue-800/50">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Overstock</p>
+                <p className="text-base font-bold mt-0.5 text-blue-600">{overstockItems}</p>
               </div>
-              <div className="rounded-xl bg-blue-100 dark:bg-blue-900/30 p-3">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-blue-100 dark:bg-blue-900/30">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -237,18 +237,19 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
 
       {/* Tabs for different inventory views */}
       <Tabs defaultValue="all" className="w-full">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList>
-            <TabsTrigger value="all">All Items</TabsTrigger>
-            <TabsTrigger value="inbound">Inbound</TabsTrigger>
-            <TabsTrigger value="outbound">Outbound</TabsTrigger>
-            <TabsTrigger value="transfers">Transfers</TabsTrigger>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList className="h-8">
+            <TabsTrigger value="all" className="text-xs h-7">All Items</TabsTrigger>
+            <TabsTrigger value="inbound" className="text-xs h-7">Inbound</TabsTrigger>
+            <TabsTrigger value="outbound" className="text-xs h-7">Outbound</TabsTrigger>
+            <TabsTrigger value="transfers" className="text-xs h-7">Transfers</TabsTrigger>
           </TabsList>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
+              className="h-8"
               onClick={() => {
                 const exportData = filteredItems.map((i) => ({
                   Name: i.name,
@@ -264,29 +265,40 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
                 downloadCSV(exportData, `inventory-${formatDateForFilename()}`);
               }}
             >
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="mr-1.5 h-3.5 w-3.5" />
               Export
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsAddItemOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+            <Button size="sm" className="h-8" onClick={() => setIsAddItemOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
               Add Item
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsInboundOpen(true)}>
-              <ArrowDownToLine className="mr-2 h-4 w-4" />
-              Inbound
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsOutboundOpen(true)}>
-              <ArrowUpFromLine className="mr-2 h-4 w-4" />
-              Outbound
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsWasteOpen(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Waste
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsTransferOpen(true)}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Transfer
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                  Actions
+                  <MoreHorizontal className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setIsInboundOpen(true)}>
+                  <ArrowDownToLine className="mr-2 h-4 w-4" />
+                  Record Inbound
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsOutboundOpen(true)}>
+                  <ArrowUpFromLine className="mr-2 h-4 w-4" />
+                  Record Outbound
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsWasteOpen(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Log Waste
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsTransferOpen(true)}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Transfer Stock
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

@@ -114,60 +114,60 @@ export function UsersContent({ users, branches }: UsersContentProps) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Users</p>
-                <p className="text-xl font-bold">{totalUsers}</p>
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Users</p>
+                <p className="text-base font-bold mt-0.5">{totalUsers}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Users className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Users</p>
-                <p className="text-xl font-bold text-emerald-600">{activeUsers}</p>
-              </div>
-              <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/30 p-3">
-                <UserCheck className="h-5 w-5 text-emerald-600" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Users className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Administrators</p>
-                <p className="text-xl font-bold">{adminUsers}</p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Active</p>
+                <p className="text-base font-bold mt-0.5 text-emerald-600">{activeUsers}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Shield className="h-5 w-5 text-primary" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                <UserCheck className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Branch Managers</p>
-                <p className="text-xl font-bold">{branchManagers}</p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Admins</p>
+                <p className="text-base font-bold mt-0.5">{adminUsers}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Users className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Shield className="h-4 w-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Managers</p>
+                <p className="text-base font-bold mt-0.5">{branchManagers}</p>
+              </div>
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Users className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
@@ -210,7 +210,7 @@ export function UsersContent({ users, branches }: UsersContentProps) {
           </Select>
         </div>
 
-        <Button onClick={() => setIsAddUserOpen(true)} className="bg-gradient-to-r from-blue-600 to-blue-700">
+        <Button onClick={() => setIsAddUserOpen(true)} size="sm" className="h-8">
           <UserPlus className="mr-2 h-4 w-4" />
           Add User
         </Button>

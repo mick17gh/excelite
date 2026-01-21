@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,13 +21,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import {
   recordInbound,
   recordOutbound,
   recordWaste,
   transferStock,
   createInventoryItem,
+  getSuppliers,
+  createSupplier,
 } from "@/lib/actions/inventory";
 import { StockMovementType, InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
 
@@ -46,6 +48,12 @@ interface InventoryItem {
   branchName: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+  code: string;
+}
+
 // Inbound Stock Form
 interface InboundFormProps {
   open: boolean;
@@ -56,24 +64,91 @@ interface InboundFormProps {
 
 export function InboundStockForm({ open, onOpenChange, branches, items }: InboundFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+  const [showNewSupplier, setShowNewSupplier] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
   const [formData, setFormData] = useState({
     branchId: "",
     itemId: "",
+    supplierId: "",
     quantity: "",
     unitCost: "",
     supplierInvoice: "",
     notes: "",
   });
 
+  // Load suppliers when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadSuppliers();
+    }
+  }, [open]);
+
+  const loadSuppliers = async () => {
+    setIsLoadingSuppliers(true);
+    try {
+      const result = await getSuppliers();
+      if (result.success && result.data) {
+        setSuppliers(result.data);
+      }
+    } catch (error) {
+      console.error("Error loading suppliers:", error);
+    } finally {
+      setIsLoadingSuppliers(false);
+    }
+  };
+
+  const handleAddSupplier = async () => {
+    if (!newSupplierName.trim()) {
+      toast.error("Please enter a supplier name");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const code = newSupplierName
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 6) + "-" + Date.now().toString(36).slice(-4).toUpperCase();
+      
+      const result = await createSupplier({
+        name: newSupplierName.trim(),
+        code,
+      });
+
+      if (result.success && result.data) {
+        toast.success("Supplier added successfully");
+        setSuppliers([...suppliers, result.data]);
+        setFormData({ ...formData, supplierId: result.data.id });
+        setNewSupplierName("");
+        setShowNewSupplier(false);
+      } else {
+        toast.error(result.error || "Failed to add supplier");
+      }
+    } catch (error) {
+      console.error("Error adding supplier:", error);
+      toast.error("Failed to add supplier");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.supplierId) {
+      toast.error("Please select a supplier");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const result = await recordInbound({
         branchId: formData.branchId,
         itemId: formData.itemId,
-        supplierId: "default-supplier", // TODO: Add supplier selection
+        supplierId: formData.supplierId,
         quantity: parseFloat(formData.quantity),
         unitCost: parseFloat(formData.unitCost),
         invoiceNumber: formData.supplierInvoice || undefined,
@@ -86,6 +161,7 @@ export function InboundStockForm({ open, onOpenChange, branches, items }: Inboun
         setFormData({
           branchId: "",
           itemId: "",
+          supplierId: "",
           quantity: "",
           unitCost: "",
           supplierInvoice: "",
@@ -112,24 +188,86 @@ export function InboundStockForm({ open, onOpenChange, branches, items }: Inboun
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 px-6 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="branch">Branch</Label>
-              <Select
-                value={formData.branchId}
-                onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="branch">Branch</Label>
+                <Select
+                  value={formData.branchId}
+                  onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="supplier">Supplier</Label>
+                {showNewSupplier ? (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Supplier name"
+                      value={newSupplierName}
+                      onChange={(e) => setNewSupplierName(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAddSupplier}
+                      disabled={isSubmitting}
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setShowNewSupplier(false);
+                        setNewSupplierName("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.supplierId}
+                      onValueChange={(value) => setFormData({ ...formData, supplierId: value })}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder={isLoadingSuppliers ? "Loading..." : "Select supplier"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((supplier) => (
+                          <SelectItem key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => setShowNewSupplier(true)}
+                      title="Add new supplier"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="grid gap-2">

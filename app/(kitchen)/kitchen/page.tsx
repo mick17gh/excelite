@@ -20,14 +20,7 @@ export default async function KitchenPage() {
   const tickets = ticketsResult.data || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Kitchen (KDS)</h1>
-        <p className="text-muted-foreground">
-          Station screens for incoming orders, routing, and production flow.
-        </p>
-      </div>
-
+    <div className="h-full">
       <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-muted" />}>
         <KitchenContent branches={branches} stations={stations} tickets={tickets} />
       </Suspense>

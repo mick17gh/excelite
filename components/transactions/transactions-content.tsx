@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -31,24 +30,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus,
   Receipt,
   ShoppingCart,
   DollarSign,
   Clock,
-  Trash2,
-  Edit,
-  CheckCircle2,
   X,
+  CheckCircle2,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { getTransactions } from "@/lib/actions/transactions";
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface Branch {
   id: string;
@@ -68,6 +67,7 @@ interface MenuItem {
 interface CartItem {
   id: string;
   menuItem: string;
+  menuItemId: string;
   quantity: number;
   unitPrice: number;
   total: number;
@@ -90,28 +90,8 @@ interface TransactionsContentProps {
   menuItems: MenuItem[];
 }
 
-const menuItemsWithPrices = [
-  { id: "1", name: "Grilled Salmon", price: 25.0, category: "Main Course" },
-  { id: "2", name: "Classic Burger", price: 15.0, category: "Main Course" },
-  { id: "3", name: "Caesar Salad", price: 14.0, category: "Salads" },
-  { id: "4", name: "Margherita Pizza", price: 18.0, category: "Pizza" },
-  { id: "5", name: "Pasta Carbonara", price: 18.0, category: "Pasta" },
-  { id: "6", name: "Fish & Chips", price: 16.0, category: "Main Course" },
-  { id: "7", name: "Chicken Wings", price: 12.0, category: "Appetizers" },
-  { id: "8", name: "French Fries", price: 6.0, category: "Sides" },
-  { id: "9", name: "Soft Drink", price: 3.0, category: "Beverages" },
-  { id: "10", name: "Coffee", price: 4.5, category: "Beverages" },
-];
-
-const sampleTransactions: Transaction[] = [
-  { id: "1", saleNumber: "TXN-001", items: 3, total: 58.0, channel: "DINE_IN", daypart: "LUNCH", paymentMethod: "Card", time: "12:35 PM", status: "completed" },
-  { id: "2", saleNumber: "TXN-002", items: 2, total: 33.0, channel: "TAKEOUT", daypart: "LUNCH", paymentMethod: "Cash", time: "12:42 PM", status: "completed" },
-  { id: "3", saleNumber: "TXN-003", items: 5, total: 89.5, channel: "DELIVERY", daypart: "LUNCH", paymentMethod: "Card", time: "12:58 PM", status: "completed" },
-  { id: "4", saleNumber: "TXN-004", items: 1, total: 25.0, channel: "DINE_IN", daypart: "LUNCH", paymentMethod: "Card", time: "13:15 PM", status: "completed" },
-];
-
 export function TransactionsContent({ branches, menuItems }: TransactionsContentProps) {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyShort } = useCurrency();
   const router = useRouter();
   const [selectedBranch, setSelectedBranch] = useState<string>(branches[0]?.id || "");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -119,8 +99,9 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   const [paymentMethod, setPaymentMethod] = useState<string>("Card");
   const [customerCount, setCustomerCount] = useState<number>(1);
   const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>(sampleTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Auto-set currency based on selected branch
   useBranchCurrency(selectedBranch, branches);
@@ -133,7 +114,6 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
       try {
         const result = await getTransactions(selectedBranch);
         if (result.success && result.data) {
-          // Transform database transactions to display format
           const formatted = result.data.map((t: any) => ({
             id: t.id,
             saleNumber: t.transactionRef,
@@ -157,12 +137,15 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
     fetchTransactions();
   }, [selectedBranch]);
 
-  const addToCart = (item: typeof menuItemsWithPrices[0]) => {
-    const existingItem = cart.find((c) => c.menuItem === item.name);
+  // Use actual menu items from props
+  const displayMenuItems = menuItems.length > 0 ? menuItems : [];
+
+  const addToCart = (item: MenuItem) => {
+    const existingItem = cart.find((c) => c.menuItemId === item.id);
     if (existingItem) {
       setCart(
         cart.map((c) =>
-          c.menuItem === item.name
+          c.menuItemId === item.id
             ? { ...c, quantity: c.quantity + 1, total: (c.quantity + 1) * c.unitPrice }
             : c
         )
@@ -173,6 +156,7 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
         {
           id: Date.now().toString(),
           menuItem: item.name,
+          menuItemId: item.id,
           quantity: 1,
           unitPrice: item.price,
           total: item.price,
@@ -198,16 +182,8 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const tax = cartTotal * 0.125; // 12.5% VAT for Ghana
+  const tax = cartTotal * 0.125;
   const grandTotal = cartTotal + tax;
-
-  const getDaypart = () => {
-    const hour = new Date().getHours();
-    if (hour < 11) return "BREAKFAST";
-    if (hour < 15) return "LUNCH";
-    if (hour < 21) return "DINNER";
-    return "LATE_NIGHT";
-  };
 
   const handleSubmitSale = async () => {
     if (cart.length === 0) {
@@ -221,7 +197,6 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
     }
 
     try {
-      // Create transaction via server action
       const { createTransaction } = await import("@/lib/actions/transactions");
       const result = await createTransaction({
         branchId: selectedBranch,
@@ -230,16 +205,12 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
         tip: 0,
         customerCount,
         items: cart.map((item) => {
-          const menuItem = menuItems.find((mi) => mi.name === item.menuItem);
-          if (!menuItem) {
-            throw new Error(`Menu item not found: ${item.menuItem}`);
-          }
-          // Get cost from menu item, or estimate 30% of price
+          const menuItem = menuItems.find((mi) => mi.id === item.menuItemId);
           return {
-            menuItemId: menuItem.id,
+            menuItemId: item.menuItemId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            unitCost: menuItem.cost || item.unitPrice * 0.3,
+            unitCost: menuItem?.cost || item.unitPrice * 0.3,
           };
         }),
       });
@@ -275,13 +246,31 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
 
   const todayTotal = transactions.reduce((sum, t) => sum + t.total, 0);
   const todayCount = transactions.length;
+  const avgTicket = todayCount > 0 ? todayTotal / todayCount : 0;
+
+  const getDaypart = () => {
+    const hour = new Date().getHours();
+    if (hour < 11) return "BREAKFAST";
+    if (hour < 15) return "LUNCH";
+    if (hour < 21) return "DINNER";
+    return "LATE_NIGHT";
+  };
+
+  const filteredMenuItems = displayMenuItems.filter(
+    (item) =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Group menu items by category
+  const categories = [...new Set(displayMenuItems.map((i) => i.category))];
 
   return (
-    <div className="space-y-6">
-      {/* Branch Selection and Summary */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      {/* Header Controls */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-          <SelectTrigger className="w-full sm:w-[200px]">
+          <SelectTrigger className="w-full sm:w-[180px] h-9">
             <SelectValue placeholder="Select branch" />
           </SelectTrigger>
           <SelectContent>
@@ -295,231 +284,254 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
 
         <Dialog open={isNewSaleOpen} onOpenChange={setIsNewSaleOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-blue-700">
+            <Button size="sm" className="h-9">
               <Plus className="mr-2 h-4 w-4" />
               New Transaction
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[85vh] p-0 gap-0 flex flex-col">
+            <DialogHeader className="p-4 pb-3 border-b shrink-0">
               <DialogTitle>New Sale Transaction</DialogTitle>
               <DialogDescription>
                 Add items to create a new sale transaction
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+            <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2">
               {/* Menu Items */}
-              <div>
-                <h3 className="font-semibold mb-3">Menu Items</h3>
-                <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2">
-                  {menuItemsWithPrices.map((item) => (
-                    <Button
-                      key={item.id}
-                      variant="outline"
-                      className="h-auto py-3 px-3 flex flex-col items-start justify-start text-left"
-                      onClick={() => addToCart(item)}
-                    >
-                      <span className="font-medium text-sm">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">{item.category}</span>
-                      <span className="text-sm font-semibold text-primary mt-1">
-                        {formatCurrency(item.price)}
-                      </span>
-                    </Button>
-                  ))}
+              <div className="border-r flex flex-col overflow-hidden">
+                <div className="p-3 border-b shrink-0">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search menu items..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-9"
+                    />
+                  </div>
                 </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-3 space-y-3">
+                    {categories.map((category) => {
+                      const items = filteredMenuItems.filter((i) => i.category === category);
+                      if (items.length === 0) return null;
+                      return (
+                        <div key={category}>
+                          <h4 className="text-xs font-medium text-muted-foreground mb-2">{category}</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {items.map((item) => (
+                              <Button
+                                key={item.id}
+                                variant="outline"
+                                className="h-auto py-2 px-2 flex flex-col items-start justify-start text-left"
+                                onClick={() => addToCart(item)}
+                              >
+                                <span className="font-medium text-xs truncate w-full">{item.name}</span>
+                                <span className="text-xs font-semibold text-primary mt-0.5">
+                                  {formatCurrency(item.price)}
+                                </span>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               </div>
 
               {/* Cart */}
-              <div>
-                <h3 className="font-semibold mb-3">Current Order</h3>
-                <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex flex-col overflow-hidden">
+                <div className="p-3 border-b shrink-0">
+                  <h3 className="font-semibold text-sm">Current Order ({cart.length} items)</h3>
+                </div>
+                <ScrollArea className="flex-1 p-3">
                   {cart.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                      <p>No items in cart</p>
+                      <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm">No items in cart</p>
                     </div>
                   ) : (
-                    <>
-                      <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                        {cart.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-lg"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{item.menuItem}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatCurrency(item.unitPrice)} each
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              >
-                                -
-                              </Button>
-                              <span className="w-8 text-center text-sm">{item.quantity}</span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              >
-                                +
-                              </Button>
-                              <span className="w-16 text-right font-medium text-sm">
-                                {formatCurrency(item.total)}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive"
-                                onClick={() => removeFromCart(item.id)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
+                    <div className="space-y-2">
+                      {cart.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-lg"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-xs truncate">{item.menuItem}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {formatCurrency(item.unitPrice)} each
+                            </p>
                           </div>
-                        ))}
-                      </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            >
+                              -
+                            </Button>
+                            <span className="w-6 text-center text-xs">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            >
+                              +
+                            </Button>
+                            <span className="w-14 text-right font-medium text-xs">
+                              {formatCurrency(item.total)}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive"
+                              onClick={() => removeFromCart(item.id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
 
-                      <div className="border-t pt-4 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Subtotal</span>
-                          <span>{formatCurrency(cartTotal)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Tax (12.5%)</span>
-                          <span>{formatCurrency(tax)}</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-lg">
-                          <span>Total</span>
-                          <span>{formatCurrency(grandTotal)}</span>
-                        </div>
+                {/* Cart Footer */}
+                <div className="p-3 border-t space-y-3 shrink-0">
+                  {cart.length > 0 && (
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span>{formatCurrency(cartTotal)}</span>
                       </div>
-                    </>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Tax (12.5%)</span>
+                        <span>{formatCurrency(tax)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold">
+                        <span>Total</span>
+                        <span>{formatCurrency(grandTotal)}</span>
+                      </div>
+                    </div>
                   )}
 
-                  {/* Transaction Details */}
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <Label className="text-xs">Channel</Label>
+                      <Label className="text-[10px]">Channel</Label>
                       <Select value={channel} onValueChange={setChannel}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="h-8 mt-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="DINE_IN">Dine-in</SelectItem>
                           <SelectItem value="TAKEOUT">Takeout</SelectItem>
                           <SelectItem value="DELIVERY">Delivery</SelectItem>
-                          <SelectItem value="APP">App Order</SelectItem>
+                          <SelectItem value="APP">App</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs">Payment</Label>
+                      <Label className="text-[10px]">Payment</Label>
                       <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="h-8 mt-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Card">Card</SelectItem>
                           <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="Mobile">Mobile Pay</SelectItem>
+                          <SelectItem value="Mobile">Mobile</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs">Customer Count</Label>
+                    <div>
+                      <Label className="text-[10px]">Customers</Label>
                       <Input
                         type="number"
                         min="1"
                         value={customerCount}
                         onChange={(e) => setCustomerCount(parseInt(e.target.value) || 1)}
-                        className="mt-1"
+                        className="h-8 mt-1"
                       />
                     </div>
                   </div>
+
+                  <Button
+                    onClick={handleSubmitSale}
+                    disabled={cart.length === 0}
+                    className="w-full h-10"
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Complete Sale ({formatCurrency(grandTotal)})
+                  </Button>
                 </div>
               </div>
             </div>
-
-            <DialogFooter className="mt-6">
-              <Button variant="outline" onClick={() => setIsNewSaleOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmitSale}
-                disabled={cart.length === 0}
-                className="bg-gradient-to-r from-blue-600 to-blue-700"
-              >
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Complete Sale ({formatCurrency(grandTotal)})
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Today's Summary */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Today's Revenue</p>
-                <p className="text-xl font-bold">{formatCurrency(todayTotal)}</p>
-              </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <DollarSign className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Transactions</p>
-                <p className="text-xl font-bold">{todayCount}</p>
-              </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Receipt className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Ticket</p>
-                <p className="text-xl font-bold">
-                  {formatCurrency(todayCount > 0 ? todayTotal / todayCount : 0)}
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Today's Revenue</p>
+                <p className="text-base font-bold mt-0.5 truncate" title={formatCurrency(todayTotal)}>
+                  {todayTotal >= 10000 ? formatCurrencyShort(todayTotal) : formatCurrency(todayTotal)}
                 </p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <ShoppingCart className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <DollarSign className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Current Daypart</p>
-                <p className="text-xl font-bold">{getDaypart()}</p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Transactions</p>
+                <p className="text-base font-bold mt-0.5">{todayCount}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Clock className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Receipt className="h-4 w-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Ticket</p>
+                <p className="text-base font-bold mt-0.5 truncate">
+                  {formatCurrency(avgTicket)}
+                </p>
+              </div>
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <ShoppingCart className="h-4 w-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Daypart</p>
+                <p className="text-base font-bold mt-0.5">{getDaypart()}</p>
+              </div>
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Clock className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
@@ -527,51 +539,75 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
       </div>
 
       {/* Recent Transactions */}
-      <Card className="glass">
-        <CardHeader>
-          <CardTitle>Today's Transactions</CardTitle>
-          <CardDescription>
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">Today's Transactions</CardTitle>
+          <CardDescription className="text-xs">
             {format(new Date(), "EEEE, MMMM d, yyyy")}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Sale #</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {transactions.map((txn) => (
-                <TableRow key={txn.id}>
-                  <TableCell className="font-medium">{txn.saleNumber}</TableCell>
-                  <TableCell>{txn.time}</TableCell>
-                  <TableCell>{txn.items} items</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {txn.channel.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{txn.paymentMethod}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(txn.total)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                      <CheckCircle2 className="mr-1 h-3 w-3" />
-                      Completed
-                    </Badge>
-                  </TableCell>
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Sale #</TableHead>
+                  <TableHead className="text-xs">Time</TableHead>
+                  <TableHead className="text-xs">Items</TableHead>
+                  <TableHead className="text-xs">Channel</TableHead>
+                  <TableHead className="text-xs">Payment</TableHead>
+                  <TableHead className="text-right text-xs">Total</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : transactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
+                      No transactions yet today
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  transactions.map((txn) => (
+                    <TableRow key={txn.id}>
+                      <TableCell className="text-xs font-medium py-2">{txn.saleNumber}</TableCell>
+                      <TableCell className="text-xs py-2">{txn.time}</TableCell>
+                      <TableCell className="text-xs py-2">{txn.items}</TableCell>
+                      <TableCell className="py-2">
+                        <Badge variant="secondary" className="text-[10px] h-5">
+                          {txn.channel.replace("_", " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs py-2">{txn.paymentMethod}</TableCell>
+                      <TableCell className="text-right text-xs font-medium py-2">
+                        {formatCurrency(txn.total)}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Badge className={cn(
+                          "text-[10px] h-5",
+                          txn.status === "completed" 
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        )}>
+                          {txn.status === "completed" ? (
+                            <><CheckCircle2 className="mr-0.5 h-3 w-3" />Done</>
+                          ) : "Voided"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

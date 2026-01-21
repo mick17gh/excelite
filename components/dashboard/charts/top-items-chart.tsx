@@ -9,7 +9,7 @@ import {
   YAxis,
   Cell,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Utensils } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
@@ -35,28 +35,28 @@ export function TopItemsChart({
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Menu Performance</CardTitle>
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">Menu Performance</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px] w-full animate-pulse rounded bg-muted" />
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="h-[200px] w-full animate-pulse rounded bg-muted" />
         </CardContent>
       </Card>
     );
   }
 
   const renderChart = (data: MenuItem[], color: string) => (
-    <div className="h-[260px] w-full">
+    <div className="h-[160px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
-          data={data}
+          data={data.slice(0, 5)}
           layout="vertical"
-          margin={{ top: 10, right: 30, left: 100, bottom: 0 }}
+          margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
         >
           <XAxis
             type="number"
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 9 }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(value) => formatCurrencyShort(value)}
@@ -65,31 +65,31 @@ export function TopItemsChart({
           <YAxis
             type="category"
             dataKey="name"
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 10 }}
             tickLine={false}
             axisLine={false}
             className="text-muted-foreground"
-            width={100}
+            width={80}
           />
           <Tooltip
             content={({ active, payload }) => {
               if (!active || !payload?.[0]) return null;
               const item = payload[0].payload as MenuItem;
               return (
-                <div className="rounded-lg border bg-background p-3 shadow-lg">
-                  <p className="text-sm font-medium">{item.name}</p>
-                  <p className="text-sm text-muted-foreground">
+                <div className="rounded-lg border bg-background p-2 shadow-lg text-xs">
+                  <p className="font-medium">{item.name}</p>
+                  <p className="text-muted-foreground">
                     Revenue: {formatCurrency(item.revenue)}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Quantity: {item.quantity.toLocaleString()}
+                  <p className="text-muted-foreground">
+                    Qty: {item.quantity.toLocaleString()}
                   </p>
                 </div>
               );
             }}
           />
-          <Bar dataKey="revenue" radius={[0, 6, 6, 0]}>
-            {data.map((_, index) => (
+          <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
+            {data.slice(0, 5).map((_, index) => (
               <Cell key={`cell-${index}`} fill={color} />
             ))}
           </Bar>
@@ -100,25 +100,24 @@ export function TopItemsChart({
 
   return (
     <Card className="chart-card rounded-xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="py-3 px-4">
+        <CardTitle className="flex items-center gap-2 text-base">
           <div className="icon-blue rounded-lg p-1.5">
             <Utensils className="h-4 w-4" />
           </div>
           Menu Performance
         </CardTitle>
-        <CardDescription>Top and worst performing menu items</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4 pt-0">
         <Tabs defaultValue="top" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="top">Top Sellers</TabsTrigger>
-            <TabsTrigger value="worst">Underperformers</TabsTrigger>
+          <TabsList className="mb-2 h-7">
+            <TabsTrigger value="top" className="text-xs h-6">Top Sellers</TabsTrigger>
+            <TabsTrigger value="worst" className="text-xs h-6">Underperformers</TabsTrigger>
           </TabsList>
-          <TabsContent value="top">
+          <TabsContent value="top" className="mt-0">
             {renderChart(topItems, "#10b981")}
           </TabsContent>
-          <TabsContent value="worst">
+          <TabsContent value="worst" className="mt-0">
             {renderChart(worstItems, "#f59e0b")}
           </TabsContent>
         </Tabs>

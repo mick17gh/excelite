@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -14,11 +17,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Loader2, Upload, Image as ImageIcon, X } from "lucide-react";
-import { createMenuItem, updateMenuItem } from "@/lib/actions/menu";
+import { Loader2, Upload, Image as ImageIcon, X, Plus, Trash2, ChevronDown, Package } from "lucide-react";
+import { 
+  createMenuItem, 
+  updateMenuItem, 
+  getInventoryItemsForIngredients,
+  getMenuItemWithIngredients,
+  calculateRecipeCost,
+} from "@/lib/actions/menu";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { UnitType } from "@/lib/generated/prisma/client";
 
 interface MenuItem {
   id: string;
@@ -37,6 +59,34 @@ interface MenuFormProps {
   onOpenChange: (open: boolean) => void;
   item?: MenuItem | null;
 }
+
+interface InventoryItemOption {
+  id: string;
+  name: string;
+  sku: string;
+  unit: UnitType;
+  unitCost: number;
+  category: string;
+}
+
+interface IngredientRow {
+  inventoryItemId: string;
+  inventoryItemName?: string;
+  quantity: number;
+  unit: UnitType;
+  unitCost?: number;
+}
+
+const unitOptions: { value: UnitType; label: string }[] = [
+  { value: "KG", label: "Kilogram (kg)" },
+  { value: "GRAM", label: "Gram (g)" },
+  { value: "LITER", label: "Liter (L)" },
+  { value: "ML", label: "Milliliter (ml)" },
+  { value: "PIECE", label: "Piece" },
+  { value: "BOX", label: "Box" },
+  { value: "CASE", label: "Case" },
+  { value: "DOZEN", label: "Dozen" },
+];
 
 const categories = [
   "Appetizers",
@@ -67,6 +117,65 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
     isActive: true,
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
+  const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
+  const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
+
+  // Load inventory items when ingredients section is opened
+  useEffect(() => {
+    if (isIngredientsOpen && inventoryItems.length === 0) {
+      loadInventoryItems();
+    }
+  }, [isIngredientsOpen, inventoryItems.length]);
+
+  // Calculate cost when ingredients change
+  useEffect(() => {
+    if (ingredients.length > 0) {
+      const total = ingredients.reduce((sum, ing) => {
+        const item = inventoryItems.find((i) => i.id === ing.inventoryItemId);
+        return sum + (item ? ing.quantity * item.unitCost : 0);
+      }, 0);
+      setCalculatedCost(Math.round(total * 100) / 100);
+    } else {
+      setCalculatedCost(null);
+    }
+  }, [ingredients, inventoryItems]);
+
+  const loadInventoryItems = async () => {
+    const result = await getInventoryItemsForIngredients();
+    if (result.success && result.data) {
+      setInventoryItems(result.data);
+    }
+  };
+
+  const addIngredient = () => {
+    setIngredients([
+      ...ingredients,
+      { inventoryItemId: "", quantity: 0, unit: "KG" as UnitType },
+    ]);
+  };
+
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
+  };
+
+  const updateIngredient = (index: number, field: keyof IngredientRow, value: string | number) => {
+    const updated = [...ingredients];
+    if (field === "inventoryItemId") {
+      const item = inventoryItems.find((i) => i.id === value);
+      updated[index] = {
+        ...updated[index],
+        inventoryItemId: value as string,
+        inventoryItemName: item?.name,
+        unit: item?.unit || updated[index].unit,
+        unitCost: item?.unitCost,
+      };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+    setIngredients(updated);
+  };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,15 +230,20 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
     setIsSubmitting(true);
 
     try {
+      const validIngredients = ingredients.filter(
+        (ing) => ing.inventoryItemId && ing.quantity > 0
+      );
+
       const result = await createMenuItem({
         name: formData.name,
         sku: formData.sku,
         category: formData.category,
         price: parseFloat(formData.price),
-        cost: parseFloat(formData.cost),
+        cost: calculatedCost ?? parseFloat(formData.cost),
         description: formData.description || undefined,
         imageUrl: formData.imageUrl || undefined,
         isActive: formData.isActive,
+        ingredients: validIngredients.length > 0 ? validIngredients : undefined,
       });
 
       if (result.success) {
@@ -146,6 +260,8 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
           isActive: true,
         });
         setImagePreview(null);
+        setIngredients([]);
+        setCalculatedCost(null);
         router.refresh();
       } else {
         toast.error(result.error || "Failed to create menu item");
@@ -342,6 +458,105 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
                 rows={3}
               />
             </div>
+
+            {/* Ingredients Section */}
+            <Collapsible open={isIngredientsOpen} onOpenChange={setIsIngredientsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" type="button" className="w-full justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Recipe Ingredients
+                    {ingredients.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {ingredients.length}
+                      </Badge>
+                    )}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${isIngredientsOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <div className="space-y-3 rounded-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Link inventory items to auto-calculate cost
+                    </p>
+                    <Button type="button" size="sm" variant="outline" onClick={addIngredient}>
+                      <Plus className="mr-1 h-3 w-3" />
+                      Add
+                    </Button>
+                  </div>
+
+                  {ingredients.length > 0 && (
+                    <ScrollArea className="max-h-48">
+                      <div className="space-y-2">
+                        {ingredients.map((ing, index) => (
+                          <div key={index} className="flex items-center gap-2 rounded border p-2">
+                            <Select
+                              value={ing.inventoryItemId}
+                              onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                            >
+                              <SelectTrigger className="flex-1 h-8 text-xs">
+                                <SelectValue placeholder="Select item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {inventoryItems.map((item) => (
+                                  <SelectItem key={item.id} value={item.id}>
+                                    {item.name} ({item.sku})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              placeholder="Qty"
+                              value={ing.quantity || ""}
+                              onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                              className="w-20 h-8 text-xs"
+                            />
+                            <Select
+                              value={ing.unit}
+                              onValueChange={(value) => updateIngredient(index, "unit", value)}
+                            >
+                              <SelectTrigger className="w-24 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {unitOptions.map((unit) => (
+                                  <SelectItem key={unit.value} value={unit.value}>
+                                    {unit.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => removeIngredient(index)}
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+
+                  {calculatedCost !== null && (
+                    <div className="flex items-center justify-between rounded bg-muted/50 p-2">
+                      <span className="text-sm font-medium">Calculated Cost:</span>
+                      <span className="text-sm font-bold text-primary">
+                        GH₵ {calculatedCost.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
@@ -378,6 +593,11 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
     isActive: item?.isActive ?? true,
   });
   const [imagePreview, setImagePreview] = useState<string | null>(item?.imageUrl || null);
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
+  const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
+  const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
+  const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
 
   useEffect(() => {
     if (item) {
@@ -394,6 +614,86 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
       setImagePreview(item.imageUrl || null);
     }
   }, [item]);
+
+  // Load inventory items and existing ingredients when section opens
+  useEffect(() => {
+    if (isIngredientsOpen && item) {
+      loadData();
+    }
+  }, [isIngredientsOpen, item]);
+
+  // Calculate cost when ingredients change
+  useEffect(() => {
+    if (ingredients.length > 0) {
+      const total = ingredients.reduce((sum, ing) => {
+        const itemData = inventoryItems.find((i) => i.id === ing.inventoryItemId);
+        const unitCost = itemData?.unitCost || ing.unitCost || 0;
+        return sum + ing.quantity * unitCost;
+      }, 0);
+      setCalculatedCost(Math.round(total * 100) / 100);
+    } else {
+      setCalculatedCost(null);
+    }
+  }, [ingredients, inventoryItems]);
+
+  const loadData = async () => {
+    if (!item) return;
+    setIsLoadingIngredients(true);
+    try {
+      const [invResult, ingResult] = await Promise.all([
+        getInventoryItemsForIngredients(),
+        getMenuItemWithIngredients(item.id),
+      ]);
+      
+      if (invResult.success && invResult.data) {
+        setInventoryItems(invResult.data);
+      }
+      
+      if (ingResult.success && ingResult.data?.ingredients) {
+        setIngredients(
+          ingResult.data.ingredients.map((ing) => ({
+            inventoryItemId: ing.inventoryItemId,
+            inventoryItemName: ing.inventoryItemName,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            unitCost: ing.unitCost,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setIsLoadingIngredients(false);
+    }
+  };
+
+  const addIngredient = () => {
+    setIngredients([
+      ...ingredients,
+      { inventoryItemId: "", quantity: 0, unit: "KG" as UnitType },
+    ]);
+  };
+
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
+  };
+
+  const updateIngredient = (index: number, field: keyof IngredientRow, value: string | number) => {
+    const updated = [...ingredients];
+    if (field === "inventoryItemId") {
+      const itemData = inventoryItems.find((i) => i.id === value);
+      updated[index] = {
+        ...updated[index],
+        inventoryItemId: value as string,
+        inventoryItemName: itemData?.name,
+        unit: itemData?.unit || updated[index].unit,
+        unitCost: itemData?.unitCost,
+      };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+    setIngredients(updated);
+  };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -450,16 +750,21 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
     setIsSubmitting(true);
 
     try {
+      const validIngredients = ingredients.filter(
+        (ing) => ing.inventoryItemId && ing.quantity > 0
+      );
+
       const result = await updateMenuItem({
         id: item.id,
         name: formData.name,
         sku: formData.sku,
         category: formData.category,
         price: parseFloat(formData.price),
-        cost: parseFloat(formData.cost),
+        cost: calculatedCost ?? parseFloat(formData.cost),
         description: formData.description || undefined,
         imageUrl: formData.imageUrl || undefined,
         isActive: formData.isActive,
+        ingredients: validIngredients,
       });
 
       if (result.success) {
@@ -658,6 +963,113 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
                 rows={3}
               />
             </div>
+
+            {/* Ingredients Section */}
+            <Collapsible open={isIngredientsOpen} onOpenChange={setIsIngredientsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" type="button" className="w-full justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Recipe Ingredients
+                    {ingredients.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {ingredients.length}
+                      </Badge>
+                    )}
+                  </div>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${isIngredientsOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <div className="space-y-3 rounded-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Link inventory items to auto-calculate cost
+                    </p>
+                    <Button type="button" size="sm" variant="outline" onClick={addIngredient}>
+                      <Plus className="mr-1 h-3 w-3" />
+                      Add
+                    </Button>
+                  </div>
+
+                  {isLoadingIngredients ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : ingredients.length > 0 ? (
+                    <ScrollArea className="max-h-48">
+                      <div className="space-y-2">
+                        {ingredients.map((ing, index) => (
+                          <div key={index} className="flex items-center gap-2 rounded border p-2">
+                            <Select
+                              value={ing.inventoryItemId}
+                              onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                            >
+                              <SelectTrigger className="flex-1 h-8 text-xs">
+                                <SelectValue placeholder="Select item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {inventoryItems.map((invItem) => (
+                                  <SelectItem key={invItem.id} value={invItem.id}>
+                                    {invItem.name} ({invItem.sku})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              placeholder="Qty"
+                              value={ing.quantity || ""}
+                              onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                              className="w-20 h-8 text-xs"
+                            />
+                            <Select
+                              value={ing.unit}
+                              onValueChange={(value) => updateIngredient(index, "unit", value)}
+                            >
+                              <SelectTrigger className="w-24 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {unitOptions.map((unit) => (
+                                  <SelectItem key={unit.value} value={unit.value}>
+                                    {unit.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => removeIngredient(index)}
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-3">
+                      No ingredients linked. Add ingredients to auto-calculate recipe cost.
+                    </p>
+                  )}
+
+                  {calculatedCost !== null && (
+                    <div className="flex items-center justify-between rounded bg-muted/50 p-2">
+                      <span className="text-sm font-medium">Calculated Cost:</span>
+                      <span className="text-sm font-bold text-primary">
+                        GH₵ {calculatedCost.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

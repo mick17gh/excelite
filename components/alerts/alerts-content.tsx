@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -27,9 +27,12 @@ import {
   X,
   Eye,
   Settings,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+import { acknowledgeAlert, resolveAlert, dismissAlert } from "@/lib/actions/alerts";
 
 interface Alert {
   id: string;
@@ -72,11 +75,77 @@ const getAlertIcon = (type: string) => {
   }
 };
 
-export function AlertsContent({ alerts, branches }: AlertsContentProps) {
+export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContentProps) {
+  const [alerts, setAlerts] = useState(initialAlerts);
   const [searchQuery, setSearchQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [isPending, startTransition] = useTransition();
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  const handleAcknowledge = (alertId: string) => {
+    setActionLoadingId(alertId);
+    startTransition(async () => {
+      try {
+        const result = await acknowledgeAlert(alertId);
+        if (result.success) {
+          toast.success("Alert acknowledged");
+          setAlerts(alerts.map((a) => 
+            a.id === alertId ? { ...a, status: "acknowledged" } : a
+          ));
+        } else {
+          toast.error(result.error || "Failed to acknowledge alert");
+        }
+      } catch {
+        toast.error("Failed to acknowledge alert");
+      } finally {
+        setActionLoadingId(null);
+      }
+    });
+  };
+
+  const handleResolve = (alertId: string) => {
+    setActionLoadingId(alertId);
+    startTransition(async () => {
+      try {
+        const result = await resolveAlert(alertId);
+        if (result.success) {
+          toast.success("Alert resolved");
+          setAlerts(alerts.map((a) => 
+            a.id === alertId ? { ...a, status: "resolved" } : a
+          ));
+        } else {
+          toast.error(result.error || "Failed to resolve alert");
+        }
+      } catch {
+        toast.error("Failed to resolve alert");
+      } finally {
+        setActionLoadingId(null);
+      }
+    });
+  };
+
+  const handleDismiss = (alertId: string) => {
+    setActionLoadingId(alertId);
+    startTransition(async () => {
+      try {
+        const result = await dismissAlert(alertId);
+        if (result.success) {
+          toast.success("Alert dismissed");
+          setAlerts(alerts.map((a) => 
+            a.id === alertId ? { ...a, status: "dismissed" } : a
+          ));
+        } else {
+          toast.error(result.error || "Failed to dismiss alert");
+        }
+      } catch {
+        toast.error("Failed to dismiss alert");
+      } finally {
+        setActionLoadingId(null);
+      }
+    });
+  };
 
   const filteredAlerts = alerts.filter((alert) => {
     const matchesSearch =
@@ -156,72 +225,60 @@ export function AlertsContent({ alerts, branches }: AlertsContentProps) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Alerts</p>
-                <p className="text-xl font-bold">{activeAlerts.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Requiring attention
-                </p>
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Active</p>
+                <p className="text-base font-bold mt-0.5">{activeAlerts.length}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Bell className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Bell className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass border-red-200 dark:border-red-800">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Critical</p>
-                <p className="text-xl font-bold text-red-600">{criticalAlerts.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Immediate action needed
-                </p>
+        <Card className="kpi-card rounded-xl border-red-200/50 dark:border-red-800/50">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Critical</p>
+                <p className="text-base font-bold mt-0.5 text-red-600">{criticalAlerts.length}</p>
               </div>
-              <div className="rounded-xl bg-red-100 dark:bg-red-900/30 p-3">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-red-100 dark:bg-red-900/30">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass border-orange-200 dark:border-orange-800">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">High Priority</p>
-                <p className="text-xl font-bold text-orange-600">{highAlerts.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Should address soon
-                </p>
+        <Card className="kpi-card rounded-xl border-orange-200/50 dark:border-orange-800/50">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">High</p>
+                <p className="text-base font-bold mt-0.5 text-orange-600">{highAlerts.length}</p>
               </div>
-              <div className="rounded-xl bg-orange-100 dark:bg-orange-900/30 p-3">
-                <Bell className="h-5 w-5 text-orange-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-orange-100 dark:bg-orange-900/30">
+                <Bell className="h-4 w-4 text-orange-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Resolved Today</p>
-                <p className="text-xl font-bold text-emerald-600">{resolvedToday.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Successfully handled
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Resolved</p>
+                <p className="text-base font-bold mt-0.5 text-emerald-600">{resolvedToday.length}</p>
               </div>
-              <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/30 p-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
           </CardContent>
@@ -230,17 +287,17 @@ export function AlertsContent({ alerts, branches }: AlertsContentProps) {
 
       {/* Tabs */}
       <Tabs defaultValue="all" className="w-full">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList>
-            <TabsTrigger value="all">All Alerts</TabsTrigger>
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="resolved">Resolved</TabsTrigger>
-            <TabsTrigger value="rules">Alert Rules</TabsTrigger>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList className="h-8">
+            <TabsTrigger value="all" className="text-xs h-7">All Alerts</TabsTrigger>
+            <TabsTrigger value="active" className="text-xs h-7">Active</TabsTrigger>
+            <TabsTrigger value="resolved" className="text-xs h-7">Resolved</TabsTrigger>
+            <TabsTrigger value="rules" className="text-xs h-7">Rules</TabsTrigger>
           </TabsList>
 
-          <Button variant="outline" size="sm">
-            <Settings className="mr-2 h-4 w-4" />
-            Configure Alerts
+          <Button variant="outline" size="sm" className="h-8 text-xs">
+            <Settings className="mr-1.5 h-3.5 w-3.5" />
+            Configure
           </Button>
         </div>
 
@@ -322,7 +379,7 @@ export function AlertsContent({ alerts, branches }: AlertsContentProps) {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-4">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-background/50">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/50">
                           <Icon className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -346,16 +403,45 @@ export function AlertsContent({ alerts, branches }: AlertsContentProps) {
                           </div>
                           {alert.status !== "resolved" && alert.status !== "dismissed" && (
                             <div className="flex gap-2 mt-4">
-                              <Button size="sm" variant="outline">
-                                <Eye className="mr-2 h-3 w-3" />
-                                Acknowledge
-                              </Button>
-                              <Button size="sm" variant="outline">
-                                <Check className="mr-2 h-3 w-3" />
+                              {alert.status !== "acknowledged" && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleAcknowledge(alert.id)}
+                                  disabled={actionLoadingId === alert.id}
+                                >
+                                  {actionLoadingId === alert.id ? (
+                                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Eye className="mr-2 h-3 w-3" />
+                                  )}
+                                  Acknowledge
+                                </Button>
+                              )}
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleResolve(alert.id)}
+                                disabled={actionLoadingId === alert.id}
+                              >
+                                {actionLoadingId === alert.id ? (
+                                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Check className="mr-2 h-3 w-3" />
+                                )}
                                 Resolve
                               </Button>
-                              <Button size="sm" variant="ghost">
-                                <X className="mr-2 h-3 w-3" />
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                onClick={() => handleDismiss(alert.id)}
+                                disabled={actionLoadingId === alert.id}
+                              >
+                                {actionLoadingId === alert.id ? (
+                                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                ) : (
+                                  <X className="mr-2 h-3 w-3" />
+                                )}
                                 Dismiss
                               </Button>
                             </div>
@@ -383,7 +469,7 @@ export function AlertsContent({ alerts, branches }: AlertsContentProps) {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-4">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-background/50">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/50">
                           <Icon className="h-5 w-5" />
                         </div>
                         <div className="flex-1">

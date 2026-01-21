@@ -32,12 +32,12 @@ export function SalesByDaypartChart({
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">{title}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px] w-full animate-pulse rounded bg-muted" />
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="h-[200px] w-full animate-pulse rounded bg-muted" />
         </CardContent>
       </Card>
     );
@@ -45,20 +45,20 @@ export function SalesByDaypartChart({
 
   return (
     <Card className="chart-card rounded-xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="py-3 px-4">
+        <CardTitle className="flex items-center gap-2 text-base">
           <div className="icon-blue rounded-lg p-1.5">
             <Clock className="h-4 w-4" />
           </div>
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-[300px] w-full">
+      <CardContent className="px-4 pb-4 pt-0">
+        <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+              margin={{ top: 5, right: 5, left: -15, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
@@ -73,29 +73,30 @@ export function SalesByDaypartChart({
               />
               <XAxis
                 dataKey="daypart"
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 className="text-muted-foreground"
               />
               <YAxis
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => formatCurrencyShort(value)}
                 className="text-muted-foreground"
+                width={50}
               />
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (!active || !payload?.[0]) return null;
                   const item = payload[0].payload;
                   return (
-                    <div className="rounded-lg border bg-background p-3 shadow-lg">
-                      <p className="text-sm font-medium">{label}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="rounded-lg border bg-background p-2 shadow-lg text-xs">
+                      <p className="font-medium">{label}</p>
+                      <p className="text-muted-foreground">
                         Revenue: {formatCurrency(item.revenue)}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground">
                         Transactions: {item.transactions.toLocaleString()}
                       </p>
                     </div>
@@ -105,7 +106,7 @@ export function SalesByDaypartChart({
               <Bar
                 dataKey="revenue"
                 fill="url(#barGradient)"
-                radius={[6, 6, 0, 0]}
+                radius={[4, 4, 0, 0]}
               />
             </BarChart>
           </ResponsiveContainer>

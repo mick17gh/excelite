@@ -171,46 +171,46 @@ export function ApiKeysContent({ apiKeys, branches }: ApiKeysContentProps) {
   const totalKeys = apiKeys.length;
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total API Keys</p>
-                <p className="text-xl font-bold">{totalKeys}</p>
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-3">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Keys</p>
+                <p className="text-base font-bold mt-0.5">{totalKeys}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Key className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Keys</p>
-                <p className="text-xl font-bold text-emerald-600">{activeKeys}</p>
-              </div>
-              <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/30 p-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Key className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Inactive Keys</p>
-                <p className="text-xl font-bold">{totalKeys - activeKeys}</p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Active</p>
+                <p className="text-base font-bold mt-0.5 text-emerald-600">{activeKeys}</p>
               </div>
-              <div className="rounded-xl bg-slate-100 dark:bg-slate-900/30 p-3">
-                <XCircle className="h-5 w-5 text-slate-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Inactive</p>
+                <p className="text-base font-bold mt-0.5">{totalKeys - activeKeys}</p>
+              </div>
+              <div className="rounded-lg p-1.5 shrink-0 bg-slate-100 dark:bg-slate-900/30">
+                <XCircle className="h-4 w-4 text-slate-600" />
               </div>
             </div>
           </CardContent>

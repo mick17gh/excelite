@@ -118,73 +118,65 @@ export function BranchesContent({ branches, branchList }: BranchesContentProps) 
     status: b.status,
   }));
 
+  const { formatCurrencyShort } = useCurrency();
+
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-xl font-bold">{formatCurrency(totalRevenue)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Target: {formatCurrency(totalTarget)}
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Revenue</p>
+                <p className="text-base font-bold mt-0.5 truncate">
+                  {totalRevenue >= 10000 ? formatCurrencyShort(totalRevenue) : formatCurrency(totalRevenue)}
                 </p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <DollarSign className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Performance</p>
-                <p className="text-xl font-bold">{avgPerformance.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  vs target
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Performance</p>
+                <p className="text-base font-bold mt-0.5">{avgPerformance.toFixed(1)}%</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Target className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Target className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Transactions</p>
-                <p className="text-xl font-bold">{totalTransactions.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Across all branches
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Transactions</p>
+                <p className="text-base font-bold mt-0.5">{totalTransactions.toLocaleString()}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <ShoppingCart className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <ShoppingCart className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Branches</p>
-                <p className="text-xl font-bold">{branches.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {branches.filter((b) => b.status === "critical").length} need attention
-                </p>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Branches</p>
+                <p className="text-base font-bold mt-0.5">{branches.length}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Building2 className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Building2 className="h-4 w-4" />
               </div>
             </div>
           </CardContent>

@@ -91,9 +91,9 @@ export function DashboardContent({
   }));
 
   return (
-    <>
-      {/* KPI Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3">
+    <div className="space-y-4">
+      {/* KPI Cards - Compact Grid */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <KPICard
           title="Total Revenue"
           value={kpiData.totalRevenue}
@@ -103,7 +103,7 @@ export function DashboardContent({
           icon={DollarSign}
         />
         <KPICard
-          title="Revenue Growth"
+          title="Growth"
           value={kpiData.revenueGrowth}
           change={2.1}
           trend="up"
@@ -144,8 +144,8 @@ export function DashboardContent({
         />
       </div>
 
-      {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Main Content - Revenue & Alerts */}
+      <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <RevenueChart data={revenueData} title="Revenue Trend (30 Days)" />
         </div>
@@ -155,7 +155,7 @@ export function DashboardContent({
       </div>
 
       {/* Charts Row */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <SalesByDaypartChart data={salesByDaypart} />
         <SalesByChannelChart data={salesByChannel} />
         <TopItemsChart topItems={topMenuItems} worstItems={worstMenuItems} />
@@ -163,21 +163,21 @@ export function DashboardContent({
 
       {/* Branch Performance Section */}
       <Card className="chart-card rounded-xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="flex items-center gap-2 text-base">
             <div className="icon-blue rounded-lg p-1.5">
               <Building2 className="h-4 w-4" />
             </div>
             Branch Performance
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4 pt-0">
           <Tabs defaultValue="table" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="table">Table View</TabsTrigger>
-              <TabsTrigger value="chart">Chart View</TabsTrigger>
+            <TabsList className="mb-3 h-8">
+              <TabsTrigger value="table" className="text-xs h-7">Table</TabsTrigger>
+              <TabsTrigger value="chart" className="text-xs h-7">Chart</TabsTrigger>
             </TabsList>
-            <TabsContent value="table">
+            <TabsContent value="table" className="mt-0">
               <BranchTable
                 branches={branchPerformance.map((b) => ({
                   id: b.id,
@@ -192,7 +192,7 @@ export function DashboardContent({
                 }))}
               />
             </TabsContent>
-            <TabsContent value="chart">
+            <TabsContent value="chart" className="mt-0">
               <BranchPerformanceChart data={branchChartData} title="" />
             </TabsContent>
           </Tabs>
@@ -200,36 +200,36 @@ export function DashboardContent({
       </Card>
 
       {/* Staff & Waste Summary */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <StaffSummaryWidget data={staffSummary} />
         <Card className="chart-card rounded-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="flex items-center gap-2 text-base">
               <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30">
                 <Trash2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               </div>
               Waste Summary
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="px-4 pb-4 pt-0">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xl font-bold">
+                <span className="text-lg font-bold">
                   {formatCurrency(kpiData.wasteTotal)}
                 </span>
-                <span className="flex items-center text-emerald-600 dark:text-emerald-400">
-                  <TrendingUp className="mr-1 h-4 w-4 rotate-180" />
+                <span className="flex items-center text-xs text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="mr-1 h-3 w-3 rotate-180" />
                   {Math.abs(kpiData.wasteChange)}% vs last period
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {branchPerformance.map((branch) => (
                   <div
                     key={branch.id}
-                    className="flex items-center justify-between text-sm"
+                    className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
                   >
-                    <span className="text-muted-foreground">{branch.name}</span>
-                    <span className="font-medium">
+                    <span className="text-muted-foreground text-xs">{branch.name}</span>
+                    <span className="font-medium text-xs">
                       {formatCurrency(branch.waste)}
                     </span>
                   </div>
@@ -239,6 +239,6 @@ export function DashboardContent({
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

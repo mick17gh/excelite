@@ -36,9 +36,12 @@ import {
   Clock,
   ChevronUp,
   ChevronDown,
+  ChefHat,
+  Send,
 } from "lucide-react";
-import { createPosOrder } from "@/lib/actions/pos";
+import { createPosOrder, sendToKitchen, getKitchenStations } from "@/lib/actions/pos";
 import { OrderType, SalesChannel } from "@/lib/generated/prisma/client";
+import { useEffect, useCallback } from "react";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -195,6 +198,30 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<any>(null);
+  
+  // Kitchen integration state
+  const [kitchenStations, setKitchenStations] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedStation, setSelectedStation] = useState<string>("");
+  const [sendingToKitchen, setSendingToKitchen] = useState(false);
+  const [autoSendToKitchen, setAutoSendToKitchen] = useState(true);
+  
+  // Load kitchen stations when branch changes
+  const loadKitchenStations = useCallback(async (branchId: string) => {
+    if (!branchId) return;
+    const result = await getKitchenStations(branchId);
+    if (result.success && result.data) {
+      setKitchenStations(result.data);
+      if (result.data.length > 0 && !selectedStation) {
+        setSelectedStation(result.data[0].id);
+      }
+    }
+  }, [selectedStation]);
+  
+  useEffect(() => {
+    if (branchId) {
+      loadKitchenStations(branchId);
+    }
+  }, [branchId, loadKitchenStations]);
 
   const submitOrder = () => {
     if (!branchId) return toast.error("Select a branch");
@@ -216,6 +243,8 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
         paymentMethod: paymentData.paymentMethod,
         customerName: paymentData.customerName,
         notes: paymentData.notes,
+        sendToKitchen: autoSendToKitchen && kitchenStations.length > 0,
+        stationId: selectedStation || undefined,
       });
       if (!result.success) {
         toast.error(result.error || "Failed to create order");
@@ -225,25 +254,49 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
       setCompletedOrder(result.data);
       setIsPaymentOpen(false);
       setIsReceiptOpen(true);
-      toast.success("Order completed successfully", {
-        description: `Order #${result.data?.orderNumber}`,
-      });
+      
+      if (autoSendToKitchen && kitchenStations.length > 0) {
+        toast.success("Order sent to kitchen", {
+          description: `Order #${result.data?.orderNumber} sent to kitchen display`,
+        });
+      } else {
+        toast.success("Order completed successfully", {
+          description: `Order #${result.data?.orderNumber}`,
+        });
+      }
       setCart([]);
     });
+  };
+  
+  const handleSendToKitchen = async (orderId: string) => {
+    if (!orderId) return;
+    setSendingToKitchen(true);
+    try {
+      const result = await sendToKitchen(orderId, undefined, selectedStation || undefined);
+      if (result.success) {
+        toast.success("Sent to kitchen", {
+          description: `Ticket created for ${result.data?.itemCount} items`,
+        });
+      } else {
+        toast.error(result.error || "Failed to send to kitchen");
+      }
+    } finally {
+      setSendingToKitchen(false);
+    }
   };
 
   const selectedBranch = branches.find((b) => b.id === branchId);
   const selectedOrderType = orderTypes.find((t) => t.value === orderType);
 
   return (
-    <div className="flex h-[calc(100vh-160px)] gap-6">
+    <div className="flex h-[calc(100vh-100px)] gap-4">
       {/* Left Panel - Menu */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header Controls */}
-        <div className="flex flex-wrap items-center gap-3 pb-4">
+        <div className="flex flex-wrap items-center gap-3 pb-3 shrink-0">
           {/* Branch Selector */}
           <Select value={branchId} onValueChange={setBranchId}>
-            <SelectTrigger className="w-[180px] h-11 bg-background">
+            <SelectTrigger className="w-[180px] h-10 bg-background">
               <Store className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Select Branch" />
             </SelectTrigger>
@@ -267,7 +320,7 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
                   variant={isActive ? "default" : "ghost"}
                   size="sm"
                   className={cn(
-                    "h-9 px-4 transition-all",
+                    "h-8 px-3 transition-all",
                     isActive && type.color
                   )}
                   onClick={() => setOrderType(type.value as OrderType)}
@@ -278,16 +331,43 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
               );
             })}
           </div>
+          
+          {/* Kitchen Station Selector */}
+          {kitchenStations.length > 0 && (
+            <div className="flex items-center gap-2 ml-auto">
+              <Button
+                variant={autoSendToKitchen ? "default" : "outline"}
+                size="sm"
+                className={cn("h-8", autoSendToKitchen && "bg-orange-500 hover:bg-orange-600")}
+                onClick={() => setAutoSendToKitchen(!autoSendToKitchen)}
+              >
+                <ChefHat className="h-4 w-4 mr-1.5" />
+                Auto Kitchen
+              </Button>
+              <Select value={selectedStation} onValueChange={setSelectedStation}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue placeholder="Kitchen Station" />
+                </SelectTrigger>
+                <SelectContent>
+                  {kitchenStations.map((station) => (
+                    <SelectItem key={station.id} value={station.id}>
+                      {station.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Search */}
-        <div className="relative mb-4">
+        <div className="relative mb-3 shrink-0">
           <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search menu items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-12 h-12 text-base bg-background"
+            className="pl-12 h-11 text-base bg-background"
           />
           {search && (
             <Button
@@ -302,11 +382,11 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
         </div>
 
         {/* Category Tabs */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+        <div className="flex gap-2 pb-3 shrink-0 overflow-x-auto">
           <Button
             variant={selectedCategory === "all" ? "default" : "outline"}
             size="sm"
-            className="shrink-0 h-9"
+            className="shrink-0 h-8"
             onClick={() => setSelectedCategory("all")}
           >
             All ({menuItems.length})
@@ -316,7 +396,7 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
               key={cat.name}
               variant={selectedCategory === cat.name ? "default" : "outline"}
               size="sm"
-              className="shrink-0 h-9"
+              className="shrink-0 h-8"
               onClick={() => setSelectedCategory(cat.name)}
             >
               {cat.name} ({cat.count})
@@ -325,15 +405,15 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
         </div>
 
         {/* Menu Grid */}
-        <ScrollArea className="flex-1 -mx-1 px-1">
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-4">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 p-1 pb-4">
             {filteredMenu.map((m) => {
               const inCart = cart.find((c) => c.menuItemId === m.id);
               return (
                 <button
                   key={m.id}
                   className={cn(
-                    "relative my-2 mx-1 flex flex-col rounded-xl border bg-card p-3 text-left transition-all hover:shadow-md hover:border-primary/50 active:scale-[0.98]",
+                    "relative flex flex-col rounded-xl border bg-card p-3 text-left transition-all hover:shadow-md hover:border-primary/50 active:scale-[0.98]",
                     inCart && "ring-2 ring-primary border-primary"
                   )}
                   onClick={() => addToCart(m)}
@@ -379,9 +459,9 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
       </div>
 
       {/* Right Panel - Cart */}
-      <div className="w-[380px] flex flex-col bg-card rounded-2xl border shadow-sm">
+      <div className="w-[380px] flex flex-col bg-card rounded-2xl border shadow-sm overflow-hidden">
         {/* Cart Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 border-b shrink-0">
           <div className="flex items-center gap-3">
             <div className="relative">
               <ShoppingCart className="h-6 w-6" />
@@ -409,8 +489,9 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
           )}
         </div>
 
-        {/* Cart Items */}
-        <ScrollArea className="flex-1 p-4">
+        {/* Cart Items - Scrollable area */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full p-4">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -422,38 +503,40 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {cart.map((l) => (
                 <div
                   key={l.menuItemId}
-                  className="flex items-start gap-3 rounded-xl border bg-muted/30 p-3"
+                  className="flex items-center gap-2 rounded-lg border bg-muted/30 p-2"
                 >
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm">{l.name}</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatCurrency(l.unitPrice)} each
-                    </p>
-                    <p className="text-sm font-semibold mt-1">
-                      {formatCurrency(l.unitPrice * l.quantity)}
-                    </p>
+                    <h4 className="font-medium text-xs leading-tight truncate">{l.name}</h4>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground">
+                        {formatCurrency(l.unitPrice)}
+                      </span>
+                      <span className="text-xs font-semibold text-primary">
+                        {formatCurrency(l.unitPrice * l.quantity)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     <Button
                       size="icon"
                       variant="outline"
-                      className="h-8 w-8 rounded-full"
+                      className="h-6 w-6 rounded-full"
                       onClick={() => setQty(l.menuItemId, l.quantity - 1)}
                       disabled={isPending}
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="w-8 text-center font-semibold text-sm">
+                    <span className="w-6 text-center font-semibold text-xs">
                       {l.quantity}
                     </span>
                     <Button
                       size="icon"
                       variant="outline"
-                      className="h-8 w-8 rounded-full"
+                      className="h-6 w-6 rounded-full"
                       onClick={() => setQty(l.menuItemId, l.quantity + 1)}
                       disabled={isPending}
                     >
@@ -462,21 +545,22 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 rounded-full text-destructive hover:text-destructive hover:bg-destructive/10 ml-1"
+                      className="h-6 w-6 rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => removeFromCart(l.menuItemId)}
                       disabled={isPending}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </ScrollArea>
+          </ScrollArea>
+        </div>
 
         {/* Cart Footer - Fixed at bottom */}
-        <div className="border-t bg-card p-4 space-y-4 mt-auto">
+        <div className="border-t bg-card p-4 space-y-3 shrink-0">
           {cart.length > 0 && (
             <>
               <div className="space-y-2">
@@ -540,14 +624,14 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
                   {recentOrders.slice(0, 5).map((o) => (
                     <div
                       key={o.id}
-                      className="flex items-center justify-between rounded-lg border p-3 text-sm"
+                      className="flex items-center justify-between rounded-lg border p-2 text-sm"
                     >
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{o.orderNumber}</p>
-                        <p className="text-xs text-muted-foreground">{o.branch?.name}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-xs truncate">{o.orderNumber}</p>
+                        <p className="text-[10px] text-muted-foreground">{o.branch?.name}</p>
                       </div>
-                      <div className="flex items-center gap-2 ml-2">
-                        <span className="font-semibold">{formatCurrency(Number(o.total))}</span>
+                      <div className="flex items-center gap-1.5 ml-2">
+                        <span className="font-semibold text-xs">{formatCurrency(Number(o.total))}</span>
                         <Badge
                           variant={
                             o.status === "COMPLETED"
@@ -556,10 +640,29 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
                               ? "secondary"
                               : "outline"
                           }
-                          className="text-xs"
+                          className="text-[10px] h-5"
                         >
                           {o.status}
                         </Badge>
+                        {o.status === "NEW" && kitchenStations.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSendToKitchen(o.id);
+                            }}
+                            disabled={sendingToKitchen}
+                            title="Send to Kitchen"
+                          >
+                            {sendingToKitchen ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Send className="h-3 w-3" />
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}

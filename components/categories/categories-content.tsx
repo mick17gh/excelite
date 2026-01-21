@@ -141,48 +141,48 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
   const totalItems = initialCategories.reduce((sum, cat) => sum + cat.itemCount, 0);
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Categories</p>
-                <p className="text-xl font-bold">{totalCategories}</p>
+    <div className="space-y-4">
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-3">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Categories</p>
+                <p className="text-base font-bold mt-0.5">{totalCategories}</p>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Tag className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Menu Items</p>
-                <p className="text-xl font-bold">{totalItems}</p>
-              </div>
-              <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/30 p-3">
-                <Package className="h-5 w-5 text-emerald-600" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Tag className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Items/Category</p>
-                <p className="text-xl font-bold">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Menu Items</p>
+                <p className="text-base font-bold mt-0.5">{totalItems}</p>
+              </div>
+              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                <Package className="h-4 w-4 text-emerald-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg/Category</p>
+                <p className="text-base font-bold mt-0.5">
                   {totalCategories > 0 ? Math.round(totalItems / totalCategories) : 0}
                 </p>
               </div>
-              <div className="rounded-xl bg-blue-100 dark:bg-blue-900/30 p-3">
-                <Package className="h-5 w-5 text-blue-600" />
+              <div className="rounded-lg p-1.5 shrink-0 bg-blue-100 dark:bg-blue-900/30">
+                <Package className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>

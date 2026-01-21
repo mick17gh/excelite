@@ -22,29 +22,30 @@ interface StaffSummaryProps {
 
 export function StaffSummaryWidget({ data, loading = false }: StaffSummaryProps) {
   const getStatusBadge = (status: string) => {
+    const baseClasses = "text-[10px] h-5 px-1.5";
     switch (status) {
       case "adequate":
         return (
-          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Adequate
+          <Badge className={cn(baseClasses, "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400")}>
+            <CheckCircle2 className="mr-0.5 h-3 w-3" />
+            OK
           </Badge>
         );
       case "understaffed":
         return (
-          <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-            <AlertCircle className="mr-1 h-3 w-3" />
-            Understaffed
+          <Badge className={cn(baseClasses, "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400")}>
+            <AlertCircle className="mr-0.5 h-3 w-3" />
+            Low
           </Badge>
         );
       case "overstaffed":
         return (
-          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-            Overstaffed
+          <Badge className={cn(baseClasses, "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400")}>
+            High
           </Badge>
         );
       default:
-        return <Badge variant="secondary">Unknown</Badge>;
+        return <Badge variant="secondary" className={baseClasses}>-</Badge>;
     }
   };
 
@@ -63,19 +64,16 @@ export function StaffSummaryWidget({ data, loading = false }: StaffSummaryProps)
 
   if (loading) {
     return (
-      <Card className="glass">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            Staff Overview
-          </CardTitle>
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">Staff Overview</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                <div className="h-2 w-full animate-pulse rounded bg-muted" />
+              <div key={i} className="space-y-1">
+                <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+                <div className="h-1.5 w-full animate-pulse rounded bg-muted" />
               </div>
             ))}
           </div>
@@ -86,36 +84,36 @@ export function StaffSummaryWidget({ data, loading = false }: StaffSummaryProps)
 
   return (
     <Card className="chart-card rounded-xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="py-3 px-4">
+        <CardTitle className="flex items-center gap-2 text-base">
           <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30">
             <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
           Staff Overview
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="px-4 pb-4 pt-0">
+        <div className="space-y-3">
           {data.map((branch) => {
             const percentage = Math.min(
               (branch.onDuty / branch.required) * 100,
               100
             );
             return (
-              <div key={branch.branchId} className="space-y-2">
+              <div key={branch.branchId} className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{branch.branchName}</span>
-                  {getStatusBadge(branch.status)}
+                  <span className="text-xs font-medium">{branch.branchName}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      {branch.onDuty}/{branch.required}
+                    </span>
+                    {getStatusBadge(branch.status)}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Progress
-                    value={percentage}
-                    className={cn("h-2 flex-1", getProgressColor(branch.status))}
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {branch.onDuty}/{branch.required}
-                  </span>
-                </div>
+                <Progress
+                  value={percentage}
+                  className={cn("h-1.5", getProgressColor(branch.status))}
+                />
               </div>
             );
           })}

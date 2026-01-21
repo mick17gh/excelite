@@ -78,7 +78,7 @@ export function SalesContent({
   const avgTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -115,75 +115,75 @@ export function SalesContent({
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-xl font-bold">{formatCurrency(totalRevenue)}</p>
-                <div className="flex items-center mt-1 text-emerald-600">
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span className="text-xs">8.5% vs last period</span>
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Revenue</p>
+                <p className="text-base font-bold mt-0.5 truncate">{formatCurrency(totalRevenue)}</p>
+                <div className="flex items-center text-[11px] text-emerald-600 mt-0.5">
+                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                  <span>8.5%</span>
                 </div>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <DollarSign className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Daily Revenue</p>
-                <p className="text-xl font-bold">{formatCurrency(avgDailyRevenue)}</p>
-                <div className="flex items-center mt-1 text-emerald-600">
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span className="text-xs">5.2% vs last period</span>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Daily</p>
+                <p className="text-base font-bold mt-0.5 truncate">{formatCurrency(avgDailyRevenue)}</p>
+                <div className="flex items-center text-[11px] text-emerald-600 mt-0.5">
+                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                  <span>5.2%</span>
                 </div>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <TrendingUp className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <TrendingUp className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Transactions</p>
-                <p className="text-xl font-bold">{totalTransactions.toLocaleString()}</p>
-                <div className="flex items-center mt-1 text-emerald-600">
-                  <ArrowUpRight className="h-4 w-4 mr-1" />
-                  <span className="text-xs">12.3% vs last period</span>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Transactions</p>
+                <p className="text-base font-bold mt-0.5">{totalTransactions.toLocaleString()}</p>
+                <div className="flex items-center text-[11px] text-emerald-600 mt-0.5">
+                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                  <span>12.3%</span>
                 </div>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <ShoppingCart className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <ShoppingCart className="h-4 w-4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Ticket Size</p>
-                <p className="text-xl font-bold">{formatCurrency(avgTicket)}</p>
-                <div className="flex items-center mt-1 text-red-600">
-                  <ArrowDownRight className="h-4 w-4 mr-1" />
-                  <span className="text-xs">2.1% vs last period</span>
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Ticket</p>
+                <p className="text-base font-bold mt-0.5 truncate">{formatCurrency(avgTicket)}</p>
+                <div className="flex items-center text-[11px] text-red-600 mt-0.5">
+                  <ArrowDownRight className="h-3 w-3 mr-0.5" />
+                  <span>2.1%</span>
                 </div>
               </div>
-              <div className="rounded-xl bg-primary/10 p-3">
-                <Receipt className="h-5 w-5 text-primary" />
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Receipt className="h-4 w-4" />
               </div>
             </div>
           </CardContent>

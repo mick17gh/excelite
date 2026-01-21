@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useTransition, useCallback } from "react";
 import { DateRange } from "react-day-picker";
 import { subDays } from "date-fns";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
@@ -8,6 +8,8 @@ import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { CurrencyCode } from "@/lib/currency";
+import { getDashboardData } from "@/lib/actions/transactions";
+import { getBranchPerformance } from "@/lib/actions/branches";
 
 interface Branch {
   id: string;
@@ -99,15 +101,15 @@ interface DashboardWrapperProps {
 
 export function DashboardWrapper({
   branches,
-  revenueData,
-  salesByChannel,
-  salesByDaypart,
-  branchPerformance,
-  topMenuItems,
-  worstMenuItems,
+  revenueData: initialRevenueData,
+  salesByChannel: initialSalesByChannel,
+  salesByDaypart: initialSalesByDaypart,
+  branchPerformance: initialBranchPerformance,
+  topMenuItems: initialTopMenuItems,
+  worstMenuItems: initialWorstMenuItems,
   activeAlerts,
   staffSummary,
-  kpiData,
+  kpiData: initialKpiData,
 }: DashboardWrapperProps) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
@@ -116,10 +118,58 @@ export function DashboardWrapper({
   const [selectedBranches, setSelectedBranches] = useState<string[]>(
     branches.map((b) => b.id)
   );
+  const [isPending, startTransition] = useTransition();
+  
+  // State for dynamic data
+  const [revenueData, setRevenueData] = useState(initialRevenueData);
+  const [salesByChannel, setSalesByChannel] = useState(initialSalesByChannel);
+  const [salesByDaypart, setSalesByDaypart] = useState(initialSalesByDaypart);
+  const [branchPerformance, setBranchPerformance] = useState(initialBranchPerformance);
+  const [topMenuItems, setTopMenuItems] = useState(initialTopMenuItems);
+  const [worstMenuItems, setWorstMenuItems] = useState(initialWorstMenuItems);
+  const [kpiData, setKpiData] = useState(initialKpiData);
 
   // Set currency based on first selected branch
   const firstBranchId = selectedBranches.length > 0 ? selectedBranches[0] : null;
   useBranchCurrency(firstBranchId, branches);
+
+  // Refetch data when date range changes
+  const fetchData = useCallback(async () => {
+    if (!dateRange?.from || !dateRange?.to) return;
+    
+    startTransition(async () => {
+      const [dashboardResult, branchPerfResult] = await Promise.all([
+        getDashboardData(selectedBranches, dateRange.from, dateRange.to),
+        getBranchPerformance(dateRange.from, dateRange.to),
+      ]);
+      
+      if (dashboardResult.success && dashboardResult.data) {
+        setRevenueData(dashboardResult.data.revenueData);
+        setSalesByChannel(dashboardResult.data.salesByChannel);
+        setSalesByDaypart(dashboardResult.data.salesByDaypart);
+        setTopMenuItems(dashboardResult.data.topMenuItems);
+        setWorstMenuItems(dashboardResult.data.worstMenuItems);
+        setKpiData(dashboardResult.data.kpiData);
+      }
+      
+      if (branchPerfResult.success && branchPerfResult.data) {
+        setBranchPerformance(branchPerfResult.data);
+      }
+    });
+  }, [dateRange, selectedBranches]);
+
+  // Refetch when date range changes
+  useEffect(() => {
+    // Skip initial render - only fetch when date actually changes from initial
+    const initialFrom = subDays(new Date(), 30);
+    const isInitialRange = 
+      dateRange?.from?.toDateString() === initialFrom.toDateString() &&
+      dateRange?.to?.toDateString() === new Date().toDateString();
+    
+    if (!isInitialRange) {
+      fetchData();
+    }
+  }, [dateRange, fetchData]);
 
   // Filter data based on selected branches
   const filteredBranchPerformance = useMemo(() => {
@@ -227,6 +277,9 @@ export function DashboardWrapper({
         <div>
           <h1 className="text-xl font-bold tracking-tight md:text-2xl">
             Executive Dashboard
+            {isPending && (
+              <span className="ml-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
+            )}
           </h1>
           <p className="text-muted-foreground">
             Real-time overview of your restaurant operations

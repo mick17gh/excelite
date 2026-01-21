@@ -29,17 +29,30 @@ export function KPICard({
   className,
   loading = false,
 }: KPICardProps) {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyShort } = useCurrency();
 
+  // Smart format for currency - use abbreviated format for large values
   const formatValue = (val: string | number) => {
     if (typeof val === "string") return val;
     if (val === undefined || val === null || isNaN(val)) return "—";
+    
     switch (format) {
       case "currency":
+        // Use abbreviated format for values >= 10,000
+        if (Math.abs(val) >= 10000) {
+          return formatCurrencyShort(val);
+        }
         return formatCurrency(val);
       case "percentage":
         return `${val.toFixed(1)}%`;
       default:
+        // Abbreviate large numbers
+        if (Math.abs(val) >= 1000000) {
+          return `${(val / 1000000).toFixed(1)}M`;
+        }
+        if (Math.abs(val) >= 10000) {
+          return `${(val / 1000).toFixed(1)}K`;
+        }
         return new Intl.NumberFormat("en-US").format(val);
     }
   };
@@ -61,11 +74,11 @@ export function KPICard({
   if (loading) {
     return (
       <Card className={cn("overflow-hidden", className)}>
-        <CardContent className="p-6">
-          <div className="space-y-3">
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-            <div className="h-8 w-32 animate-pulse rounded bg-muted" />
-            <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+        <CardContent className="p-3">
+          <div className="space-y-2">
+            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+            <div className="h-5 w-20 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-12 animate-pulse rounded bg-muted" />
           </div>
         </CardContent>
       </Card>
@@ -75,30 +88,29 @@ export function KPICard({
   return (
     <Card
       className={cn(
-        "kpi-card rounded-xl group",
+        "kpi-card rounded-xl group hover:shadow-md transition-shadow overflow-hidden",
         className
       )}
     >
-      <CardContent className="p-4  relative z-10">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1 min-w-0 flex-1">
-            <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
-            <p className="text-xl font-bold tracking-tight text-foreground">
+      <CardContent className="p-3 relative z-10">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="text-[11px] font-medium text-muted-foreground truncate">{title}</p>
+            <p className="text-base font-bold tracking-tight text-foreground mt-0.5 truncate" title={String(value)}>
               {formatValue(value)}
             </p>
             {change !== undefined && (
-              <div className={cn("flex items-center gap-1 text-xs sm:text-sm flex-wrap", getTrendColor())}>
-                <TrendIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="font-semibold">
+              <div className={cn("flex items-center gap-1 text-[11px] mt-0.5", getTrendColor())}>
+                <TrendIcon className="h-3 w-3 flex-shrink-0" />
+                <span className="font-medium">
                   {Math.abs(change).toFixed(1)}%
                 </span>
-                <span className="text-muted-foreground text-xs hidden sm:inline">{changeLabel}</span>
               </div>
             )}
           </div>
           {Icon && (
-            <div className="icon-blue rounded-xl p-2.5 sm:p-3 flex-shrink-0 shadow-sm">
-              <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div className="icon-blue rounded-lg p-1.5 flex-shrink-0">
+              <Icon className="h-4 w-4" />
             </div>
           )}
         </div>

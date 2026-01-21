@@ -2,10 +2,18 @@ import { db } from "@/lib/db";
 
 export type ApiScope =
   | "menu:read"
+  | "menu:write"
   | "categories:read"
   | "branches:read"
   | "inventory:read"
-  | "sales:read";
+  | "inventory:write"
+  | "sales:read"
+  | "sales:write"
+  | "orders:read"
+  | "orders:write"
+  | "analytics:read"
+  | "staff:read"
+  | "reports:read";
 
 export interface ApiKeyAuthResult {
   ok: boolean;

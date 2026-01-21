@@ -196,18 +196,9 @@ export function Sidebar({ className }: SidebarProps) {
       <ScrollArea className="flex-1 px-3 py-4 overflow-y-auto">
         <nav className="space-y-1 min-w-0">
           {navigation.map((item) => {
-            // More precise active state checking - only exact match or direct child
-            let isActive = false;
-            if (item.href === "/dashboard") {
-              isActive = pathname === "/dashboard";
-            } else {
-              // For other routes, check exact match or if it's a direct child path
-              // But exclude parent paths that might match multiple items
-              const exactMatch = pathname === item.href;
-              const isDirectChild = pathname.startsWith(item.href + "/") && 
-                pathname.split("/").length === item.href.split("/").length + 1;
-              isActive = exactMatch || isDirectChild;
-            }
+            // Use exact matching to prevent parent routes from being active when on child routes
+            // Exception: /dashboard only matches exact
+            const isActive = pathname === item.href;
             
             return (
               <Link
@@ -216,7 +207,7 @@ export function Sidebar({ className }: SidebarProps) {
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-smooth min-w-0",
                   isActive
-                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-l-3 border-blue-500 -ml-[1px]"
+                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
                     : "text-sidebar-foreground/70 hover:bg-blue-500/5 hover:text-blue-600 dark:hover:text-blue-400",
                   collapsed && "justify-center px-2"
                 )}

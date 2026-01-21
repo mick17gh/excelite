@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { InventoryCategory, UnitType, StockMovementType } from "@/lib/generated/prisma/client";
+import { logCreate, logAdjustment, logTransfer } from "@/lib/services/audit";
 
 export interface CreateInventoryItemInput {
   name: string;
@@ -97,7 +98,29 @@ export async function getInventoryItems(branchId?: string) {
       },
       orderBy: { name: "asc" },
     });
-    return { success: true, data: items };
+
+    // Convert Decimal fields to plain numbers
+    const convertedItems = items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      sku: item.sku,
+      category: item.category,
+      unit: item.unit,
+      unitCost: Number(item.unitCost),
+      currentStock: Number(item.currentStock),
+      minStock: Number(item.minStock),
+      maxStock: Number(item.maxStock),
+      reorderPoint: Number(item.reorderPoint),
+      branchId: item.branchId,
+      isActive: item.isActive,
+      lastRestockDate: item.lastRestockDate,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      deletedAt: item.deletedAt,
+      branch: item.branch,
+    }));
+
+    return { success: true, data: convertedItems };
   } catch (error) {
     console.error("[getInventoryItems] Error:", error);
     return { success: false, error: "Failed to fetch inventory items", data: [] };
@@ -143,6 +166,20 @@ export async function recordInbound(input: RecordInboundInput) {
         lastRestockDate: new Date(),
       },
     });
+
+    // Create audit log
+    await logCreate(
+      "InboundStock",
+      inbound.id,
+      {
+        itemId: input.itemId,
+        branchId: input.branchId,
+        quantity: input.quantity,
+        unitCost: input.unitCost,
+        totalCost,
+        supplierId: input.supplierId,
+      }
+    );
 
     revalidatePath("/dashboard/inventory");
     return { success: true, data: inbound };
@@ -330,6 +367,19 @@ export async function transferStock(input: TransferStockInput) {
       });
     }
 
+    // Create audit log
+    await logTransfer(
+      "InventoryItem",
+      input.itemId,
+      {
+        fromBranchId: input.fromBranchId,
+        toBranchId: input.toBranchId,
+        quantity: input.quantity,
+        totalCost,
+        transferId: transfer.id,
+      }
+    );
+
     revalidatePath("/dashboard/inventory");
     return { success: true, data: transfer };
   } catch (error) {
@@ -398,7 +448,28 @@ export async function getLowStockItems() {
       (item) => Number(item.currentStock) <= Number(item.reorderPoint)
     );
 
-    return { success: true, data: lowStock };
+    // Convert Decimal fields to plain numbers
+    const convertedItems = lowStock.map((item) => ({
+      id: item.id,
+      name: item.name,
+      sku: item.sku,
+      category: item.category,
+      unit: item.unit,
+      unitCost: Number(item.unitCost),
+      currentStock: Number(item.currentStock),
+      minStock: Number(item.minStock),
+      maxStock: Number(item.maxStock),
+      reorderPoint: Number(item.reorderPoint),
+      branchId: item.branchId,
+      isActive: item.isActive,
+      lastRestockDate: item.lastRestockDate,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      deletedAt: item.deletedAt,
+      branch: item.branch,
+    }));
+
+    return { success: true, data: convertedItems };
   } catch (error) {
     console.error("[getLowStockItems] Error:", error);
     return { success: false, error: "Failed to fetch low stock items", data: [] };

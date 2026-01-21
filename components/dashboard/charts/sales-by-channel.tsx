@@ -32,12 +32,12 @@ export function SalesByChannelChart({
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">{title}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-[300px] w-full animate-pulse rounded bg-muted" />
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="h-[200px] w-full animate-pulse rounded bg-muted" />
         </CardContent>
       </Card>
     );
@@ -45,24 +45,24 @@ export function SalesByChannelChart({
 
   return (
     <Card className="chart-card rounded-xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="py-3 px-4">
+        <CardTitle className="flex items-center gap-2 text-base">
           <div className="icon-blue rounded-lg p-1.5">
             <PieChartIcon className="h-4 w-4" />
           </div>
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-[300px] w-full">
+      <CardContent className="px-4 pb-4 pt-0">
+        <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
+                cy="45%"
+                innerRadius={40}
+                outerRadius={70}
                 paddingAngle={2}
                 dataKey="revenue"
                 nameKey="channel"
@@ -79,9 +79,9 @@ export function SalesByChannelChart({
                   if (!active || !payload?.[0]) return null;
                   const item = payload[0].payload;
                   return (
-                    <div className="rounded-lg border bg-background p-3 shadow-lg">
-                      <p className="text-sm font-medium">{item.channel}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="rounded-lg border bg-background p-2 shadow-lg text-xs">
+                      <p className="font-medium">{item.channel}</p>
+                      <p className="text-muted-foreground">
                         {formatCurrency(item.revenue)} ({item.percentage}%)
                       </p>
                     </div>
@@ -90,9 +90,9 @@ export function SalesByChannelChart({
               />
               <Legend
                 verticalAlign="bottom"
-                height={36}
+                height={28}
                 formatter={(value) => (
-                  <span className="text-sm text-muted-foreground">{value}</span>
+                  <span className="text-xs text-muted-foreground">{value}</span>
                 )}
               />
             </PieChart>
