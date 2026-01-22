@@ -295,7 +295,7 @@ export async function generateReportData(input: GenerateReportInput): Promise<Re
     }
 
     case "inventory-report": {
-      const [items, movements, branches] = await Promise.all([
+      const [items, movements, _branches] = await Promise.all([
         db.inventoryItem.findMany({
           where: {
             deletedAt: null,
@@ -304,11 +304,12 @@ export async function generateReportData(input: GenerateReportInput): Promise<Re
           },
           include: { branch: true },
         }),
-        db.stockMovement.findMany({
+        db.outboundStock.findMany({
           where: {
             ...branchFilter,
             createdAt: { gte: input.startDate, lte: input.endDate },
           },
+          include: { item: true },
         }),
         db.branch.findMany({
           where: { isActive: true, deletedAt: null },
@@ -319,13 +320,9 @@ export async function generateReportData(input: GenerateReportInput): Promise<Re
       const lowStockItems = items.filter((i) => Number(i.currentStock) <= Number(i.reorderPoint));
       const overstockItems = items.filter((i) => Number(i.currentStock) > Number(i.maxStock));
 
-      // Movement summary
-      const inboundValue = movements
-        .filter((m) => m.movementType === "INBOUND")
-        .reduce((s, m) => s + Number(m.quantity) * Number(m.unitCost || 0), 0);
-      const outboundQty = movements
-        .filter((m) => m.movementType.startsWith("OUTBOUND"))
-        .reduce((s, m) => s + Number(m.quantity), 0);
+      // Movement summary (outbound only from outboundStock table)
+      const outboundQty = movements.reduce((s, m) => s + Number(m.quantity), 0);
+      const outboundValue = movements.reduce((s, m) => s + Number(m.quantity) * Number(m.item?.unitCost || 0), 0);
 
       // By category
       const byCategory: Record<string, { count: number; value: number }> = {};
@@ -347,7 +344,7 @@ export async function generateReportData(input: GenerateReportInput): Promise<Re
             totalValue: Math.round(totalValue * 100) / 100,
             lowStockCount: lowStockItems.length,
             overstockCount: overstockItems.length,
-            inboundValue: Math.round(inboundValue * 100) / 100,
+            outboundValue: Math.round(outboundValue * 100) / 100,
             outboundQuantity: outboundQty,
           },
           byCategory: Object.entries(byCategory).map(([category, data]) => ({

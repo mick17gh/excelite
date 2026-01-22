@@ -252,7 +252,7 @@ export function ReportsContent({ branches }: ReportsContentProps) {
               </DialogTitle>
             </div>
             <p className="text-sm text-muted-foreground">
-              {data.branchName as string} • {format(new Date(data.period?.startDate as string), "MMM dd")} - {format(new Date(data.period?.endDate as string), "MMM dd, yyyy")}
+              {data.branchName as string} • {format(new Date((data.period as { startDate: string; endDate: string })?.startDate), "MMM dd")} - {format(new Date((data.period as { startDate: string; endDate: string })?.endDate), "MMM dd, yyyy")}
             </p>
           </DialogHeader>
 

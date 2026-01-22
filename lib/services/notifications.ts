@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { AlertType, AlertSeverity } from "@/lib/generated/prisma/client";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
@@ -227,20 +228,22 @@ export async function dismissNotification(notificationId: string) {
 
 // Helper functions to map between notification types and alert types
 
-function mapTypeToAlertType(type: NotificationType): string {
+function mapTypeToAlertType(type: NotificationType): AlertType {
   switch (type) {
     case "alert":
-      return "SYSTEM_ALERT";
+      return "SALES_DROP";
     case "order":
-      return "ORDER_STATUS";
+      return "TARGET_ACHIEVED";
     case "inventory":
       return "LOW_STOCK";
     case "staff":
       return "STAFF_SHORTAGE";
     case "report":
-      return "REPORT_READY";
+      return "TARGET_ACHIEVED";
+    case "system":
+      return "SALES_DROP";
     default:
-      return "SYSTEM_ALERT";
+      return "SALES_DROP";
   }
 }
 
@@ -252,18 +255,18 @@ function mapAlertTypeToType(alertType: string): NotificationType {
   return "alert";
 }
 
-function mapPriorityToSeverity(priority: NotificationPriority): "low" | "medium" | "high" | "critical" {
+function mapPriorityToSeverity(priority: NotificationPriority): AlertSeverity {
   switch (priority) {
     case "low":
-      return "low";
+      return "LOW";
     case "medium":
-      return "medium";
+      return "MEDIUM";
     case "high":
-      return "high";
+      return "HIGH";
     case "urgent":
-      return "critical";
+      return "CRITICAL";
     default:
-      return "medium";
+      return "MEDIUM";
   }
 }
 
@@ -282,7 +285,7 @@ function mapSeverityToPriority(severity: string): NotificationPriority {
   }
 }
 
-function getActionUrl(alertType: string, branchId?: string | null): string | undefined {
+function getActionUrl(alertType: string, _branchId?: string | null): string | undefined {
   if (alertType.includes("STOCK")) return "/dashboard/inventory";
   if (alertType.includes("STAFF")) return "/dashboard/staff";
   if (alertType.includes("SALES")) return "/dashboard/sales";

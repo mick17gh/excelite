@@ -10,7 +10,7 @@ export const metadata = {
 export default async function CategoriesPage() {
   const categoriesResult = await getCategories();
   const categories = categoriesResult.data || [];
-
+  
   return (
     <div className="space-y-6">
       <div>

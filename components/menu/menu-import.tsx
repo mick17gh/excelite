@@ -87,7 +87,7 @@ export function MenuImportDialog({ open, onOpenChange }: MenuImportDialogProps) 
         if (!item.name || item.name.trim() === "") {
           errors.push("Name is required");
         }
-        if (!item.category || item.category.trim() === "") {
+        if (!item.categoryId || item.categoryId.trim() === "") {
           errors.push("Category is required");
         }
         if (isNaN(item.price) || item.price <= 0) {
@@ -299,7 +299,7 @@ export function MenuImportDialog({ open, onOpenChange }: MenuImportDialogProps) 
                         </TableCell>
                         <TableCell className="font-medium">{row.name || "-"}</TableCell>
                         <TableCell className="font-mono text-xs">{row.sku || "Auto"}</TableCell>
-                        <TableCell>{row.category || "-"}</TableCell>
+                        <TableCell>{row.categoryId || "-"}</TableCell>
                         <TableCell className="text-right">
                           {isNaN(row.price) ? "-" : `GH₵ ${row.price.toFixed(2)}`}
                         </TableCell>

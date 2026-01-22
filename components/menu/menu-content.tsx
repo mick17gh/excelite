@@ -42,6 +42,7 @@ interface MenuItem {
   id: string;
   name: string;
   sku: string;
+  categoryId?: string | null;
   category: string;
   price: number;
   cost: number;
@@ -50,9 +51,14 @@ interface MenuItem {
   isActive: boolean;
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 interface MenuContentProps {
   items: MenuItem[];
-  categories: string[];
+  categories: CategoryOption[];
 }
 
 export function MenuContent({ items, categories }: MenuContentProps) {
@@ -185,8 +191,8 @@ export function MenuContent({ items, categories }: MenuContentProps) {
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
+                <SelectItem key={cat.id} value={cat.name}>
+                  {cat.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -442,12 +448,13 @@ export function MenuContent({ items, categories }: MenuContentProps) {
       </Tabs>
 
       {/* Forms */}
-      <AddMenuItemForm open={isAddOpen} onOpenChange={setIsAddOpen} />
+      <AddMenuItemForm open={isAddOpen} onOpenChange={setIsAddOpen} categories={categories} />
       {editingItem && (
         <EditMenuItemForm
           open={!!editingItem}
           onOpenChange={(open) => !open && setEditingItem(null)}
           item={editingItem}
+          categories={categories}
         />
       )}
     </div>

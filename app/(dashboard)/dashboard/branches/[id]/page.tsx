@@ -3,6 +3,7 @@ import { getBranchById } from "@/lib/actions/branches";
 import { getTransactions } from "@/lib/actions/transactions";
 import { getInventoryItems } from "@/lib/actions/inventory";
 import { getStaffByBranch } from "@/lib/actions/staff";
+import { getUsersByBranch } from "@/lib/actions/users";
 import { getTargets } from "@/lib/actions/targets";
 import { BranchDetailsContent } from "@/components/branches/branch-details-content";
 import { notFound } from "next/navigation";
@@ -24,12 +25,14 @@ export default async function BranchDetailsPage({
     transactionsResult,
     inventoryResult,
     staffResult,
+    usersResult,
     targetsResult,
   ] = await Promise.all([
     getBranchById(id),
     getTransactions(id),
     getInventoryItems(id),
     getStaffByBranch(id),
+    getUsersByBranch(id),
     getTargets(id),
   ]);
 
@@ -41,6 +44,7 @@ export default async function BranchDetailsPage({
   const rawTransactions = transactionsResult.data || [];
   const rawInventory = inventoryResult.data || [];
   const staff = staffResult.data || [];
+  const users = usersResult.data || [];
   const targetsData = targetsResult.data || [];
   
   // Convert Decimal fields to numbers
@@ -66,6 +70,7 @@ export default async function BranchDetailsPage({
           transactions={transactions}
           inventory={inventory}
           staff={staff}
+          users={users}
           targets={targets}
         />
       </Suspense>

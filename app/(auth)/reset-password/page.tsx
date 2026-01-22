@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { TrendingUp } from "lucide-react";
 import Link from "next/link";
@@ -29,7 +30,9 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="p-8 rounded-2xl bg-card/80 backdrop-blur-sm border shadow-xl gradient-glow">
-          <ResetPasswordForm />
+          <Suspense fallback={<div className="h-32 flex items-center justify-center">Loading...</div>}>
+            <ResetPasswordForm />
+          </Suspense>
         </div>
 
         <p className="text-center text-sm text-muted-foreground">

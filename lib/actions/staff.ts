@@ -53,7 +53,13 @@ export async function createStaff(input: CreateStaffInput) {
     });
 
     revalidatePath("/dashboard/staff");
-    return { success: true, data: staff };
+    return { 
+      success: true, 
+      data: {
+        ...staff,
+        hourlyRate: Number(staff.hourlyRate)
+      }
+    };
   } catch (error) {
     console.error("[createStaff] Error:", error);
     return { success: false, error: "Failed to create staff member" };
@@ -69,7 +75,13 @@ export async function updateStaff(input: UpdateStaffInput) {
     });
 
     revalidatePath("/dashboard/staff");
-    return { success: true, data: staff };
+    return { 
+      success: true, 
+      data: {
+        ...staff,
+        hourlyRate: Number(staff.hourlyRate)
+      }
+    };
   } catch (error) {
     console.error("[updateStaff] Error:", error);
     return { success: false, error: "Failed to update staff member" };
@@ -492,27 +504,47 @@ export async function getWeeklySchedule(branchId: string, weekStart: Date) {
   try {
     const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
 
-    const schedules = await db.staffSchedule.findMany({
-      where: {
-        branchId,
-        scheduledDate: {
-          gte: weekStart,
-          lte: weekEnd,
-        },
-      },
-      include: {
-        staff: {
-          select: {
-            id: true,
-            employeeId: true,
-            firstName: true,
-            lastName: true,
-            role: true,
+    // Use a single optimized query with timeout handling
+    const schedules = await Promise.race([
+      db.staffSchedule.findMany({
+        where: {
+          branchId,
+          scheduledDate: {
+            gte: weekStart,
+            lte: weekEnd,
           },
         },
-      },
-      orderBy: [{ scheduledDate: "asc" }, { shiftStart: "asc" }],
-    });
+        include: {
+          staff: {
+            select: {
+              id: true,
+              employeeId: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          },
+        },
+        orderBy: [{ scheduledDate: "asc" }, { shiftStart: "asc" }],
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 8000)
+      )
+    ]) as Array<{
+      id: string;
+      staffId: string;
+      branchId: string;
+      scheduledDate: Date;
+      shiftStart: Date;
+      shiftEnd: Date;
+      staff: {
+        id: string;
+        employeeId: string;
+        firstName: string;
+        lastName: string;
+        role: string;
+      };
+    }>;
 
     // Group by date
     const weekDays: { [key: string]: typeof schedules } = {};
@@ -532,7 +564,22 @@ export async function getWeeklySchedule(branchId: string, weekStart: Date) {
     return { success: true, data: weekDays };
   } catch (error) {
     console.error("[getWeeklySchedule] Error:", error);
-    return { success: false, error: "Failed to fetch weekly schedule" };
+    
+    // Return empty week structure on error to prevent UI crashes
+    const emptyWeek: { [key: string]: any[] } = {};
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000);
+      const dateKey = date.toISOString().split("T")[0];
+      emptyWeek[dateKey] = [];
+    }
+    
+    return { 
+      success: false, 
+      error: error instanceof Error && error.message === 'Query timeout' 
+        ? "Request timed out. Please try again." 
+        : "Failed to fetch weekly schedule", 
+      data: emptyWeek 
+    };
   }
 }
 
@@ -688,10 +735,21 @@ export async function getTimesheetData(
     });
 
     const timesheets = Array.from(timesheetMap.values()).map((entry) => ({
-      ...entry,
+      staff: {
+        ...entry.staff,
+        hourlyRate: Number(entry.staff.hourlyRate)
+      },
+      branch: entry.branch,
       totalHours: Math.round(entry.totalHours * 100) / 100,
       estimatedPay:
         Math.round(entry.totalHours * Number(entry.staff.hourlyRate) * 100) / 100,
+      schedules: entry.schedules.map(schedule => ({
+        ...schedule,
+        staff: {
+          ...schedule.staff,
+          hourlyRate: Number(schedule.staff.hourlyRate)
+        }
+      }))
     }));
 
     return { success: true, data: timesheets };

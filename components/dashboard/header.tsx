@@ -14,17 +14,40 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import Link from "next/link";
 
 interface HeaderProps {
   onMenuClick?: () => void;
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
+  const { data: session } = authClient.useSession();
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  
   const user = {
-    name: "Alex Johnson",
-    email: "alex@dinelytix.com",
-    role: "CEO",
-    image: null,
+    name: session?.user?.name,
+    email: session?.user?.email,
+    role: "",
+    image: session?.user?.image,
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      await authClient.signOut();
+      toast.success("Signed out successfully");
+      router.push("/login");
+    } catch (error) {
+      console.error("Sign out error:", error);
+      toast.error("Failed to sign out");
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -67,15 +90,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <AvatarImage src={user.image || undefined} alt={user.name} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                   {user.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                    ? user.name.split(" ").map((n) => n[0]).join("")
+                    : "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden flex-col items-start text-left md:flex">
-                <span className="text-sm font-medium">{user.name}</span>
+                <span className="text-sm font-medium">{user.name || "User"}</span>
                 <span className="text-xs text-muted-foreground">
-                  {user.role}
+                  {user.role || "Member"}
                 </span>
               </div>
             </Button>
@@ -83,12 +105,16 @@ export function Header({ onMenuClick }: HeaderProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Audit Logs</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/settings">Settings</Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
-              Sign out
+            <DropdownMenuItem 
+              className="text-destructive"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "Signing out..." : "Sign out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

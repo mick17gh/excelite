@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EditBranchForm } from "./branch-forms";
 import {
   Table,
   TableBody,
@@ -83,11 +84,23 @@ interface Target {
   periodEnd: Date | string;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  branchId: string | null;
+  branchName: string | null;
+  isActive: boolean;
+  createdAt: Date | string;
+}
+
 interface BranchDetailsContentProps {
   branch: Branch;
   transactions: Transaction[];
   inventory: InventoryItem[];
   staff: StaffMember[];
+  users: User[];
   targets: Target[];
 }
 
@@ -96,18 +109,20 @@ export function BranchDetailsContent({
   transactions,
   inventory,
   staff,
+  users,
   targets,
 }: BranchDetailsContentProps) {
   const { formatCurrency } = useCurrency();
   const router = useRouter();
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const totalRevenue = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
   const totalInventoryValue = inventory.reduce(
     (sum, item) => sum + Number(item.currentStock) * Number(item.unitCost),
     0
   );
-  const activeStaff = staff.filter((s) => s.status === "ON_DUTY").length;
-  const activeTargets = targets.filter((t) => t.currentValue > 0).length;
+  const activeStaff = staff.filter((s) => s.dutyStatus === "ON_DUTY").length;
+  const activeTargets = targets.filter((t) => Number(t.currentValue) > 0).length;
 
   return (
     <div className="space-y-6">
@@ -126,19 +141,24 @@ export function BranchDetailsContent({
             <p className="text-muted-foreground">Branch Code: {branch.code}</p>
           </div>
         </div>
-        <Badge variant={branch.isActive ? "default" : "secondary"}>
-          {branch.isActive ? (
-            <>
-              <CheckCircle2 className="mr-1 h-3 w-3" />
-              Active
-            </>
-          ) : (
-            <>
-              <XCircle className="mr-1 h-3 w-3" />
-              Inactive
-            </>
-          )}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={branch.isActive ? "default" : "secondary"}>
+            {branch.isActive ? (
+              <>
+                <CheckCircle2 className="mr-1 h-3 w-3" />
+                Active
+              </>
+            ) : (
+              <>
+                <XCircle className="mr-1 h-3 w-3" />
+                Inactive
+              </>
+            )}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
+            Edit Branch
+          </Button>
+        </div>
       </div>
 
       {/* Branch Info Cards */}
@@ -147,8 +167,8 @@ export function BranchDetailsContent({
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-xl font-bold">{formatCurrency(totalRevenue)}</p>
+                <p className="text-xs text-muted-foreground">Total Revenue</p>
+                <p className="text-lg font-bold">{formatCurrency(totalRevenue)}</p>
               </div>
               <div className="rounded-xl bg-primary/10 p-3">
                 <DollarSign className="h-5 w-5 text-primary" />
@@ -161,8 +181,8 @@ export function BranchDetailsContent({
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Inventory Value</p>
-                <p className="text-xl font-bold">{formatCurrency(totalInventoryValue)}</p>
+                <p className="text-xs text-muted-foreground">Inventory Value</p>
+                <p className="text-lg font-bold">{formatCurrency(totalInventoryValue)}</p>
               </div>
               <div className="rounded-xl bg-primary/10 p-3">
                 <Package className="h-5 w-5 text-primary" />
@@ -175,8 +195,8 @@ export function BranchDetailsContent({
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active Staff</p>
-                <p className="text-xl font-bold">{activeStaff}</p>
+                <p className="text-xs text-muted-foreground">Active Staff</p>
+                <p className="text-lg font-bold">{activeStaff}</p>
               </div>
               <div className="rounded-xl bg-primary/10 p-3">
                 <Users className="h-5 w-5 text-primary" />
@@ -189,8 +209,8 @@ export function BranchDetailsContent({
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active Targets</p>
-                <p className="text-xl font-bold">{activeTargets}</p>
+                <p className="text-xs text-muted-foreground">Active Targets</p>
+                <p className="text-lg font-bold">{activeTargets}</p>
               </div>
               <div className="rounded-xl bg-primary/10 p-3">
                 <TrendingUp className="h-5 w-5 text-primary" />
@@ -255,6 +275,7 @@ export function BranchDetailsContent({
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
           <TabsTrigger value="staff">Staff</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="targets">Targets</TabsTrigger>
         </TabsList>
 
@@ -404,6 +425,58 @@ export function BranchDetailsContent({
           </Card>
         </TabsContent>
 
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Users</CardTitle>
+              <CardDescription>Users with access to this branch</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {users.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                  <p>No users assigned to this branch</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {user.role.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={user.isActive ? "default" : "secondary"}
+                          >
+                            {user.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(user.createdAt), "MMM dd, yyyy")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="targets" className="space-y-4">
           <Card>
             <CardHeader>
@@ -461,6 +534,13 @@ export function BranchDetailsContent({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Branch Form */}
+      <EditBranchForm 
+        open={isEditOpen} 
+        onOpenChange={setIsEditOpen} 
+        branch={branch} 
+      />
     </div>
   );
 }

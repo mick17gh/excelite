@@ -112,7 +112,11 @@ export async function getProductPerformance(
       include: {
         items: {
           include: {
-            menuItem: true,
+            menuItem: {
+              include: {
+                category: true,
+              },
+            },
           },
         },
       },
@@ -137,7 +141,7 @@ export async function getProductPerformance(
         if (!productData[id]) {
           productData[id] = {
             name: item.menuItem?.name || "Unknown",
-            category: item.menuItem?.category || "Unknown",
+            category: item.menuItem?.category?.name || "Unknown",
             quantitySold: 0,
             revenue: 0,
             cost: 0,
@@ -382,7 +386,7 @@ export async function getInventoryAnalytics(branchId?: string) {
         },
         include: { branch: true },
       }),
-      db.stockMovement.findMany({
+      db.outboundStock.findMany({
         where: {
           ...branchFilter,
           createdAt: { gte: new Date(new Date().setDate(new Date().getDate() - 30)) },
@@ -406,7 +410,7 @@ export async function getInventoryAnalytics(branchId?: string) {
     // Calculate turnover rate (simplified)
     const totalOutbound = recentMovements
       .filter((m) => m.movementType.startsWith("OUTBOUND"))
-      .reduce((s, m) => s + Number(m.quantity) * Number(m.unitCost || 0), 0);
+      .reduce((s, m) => s + Number(m.quantity) * Number(m.item?.unitCost || 0), 0);
     const turnoverRate = totalValue > 0 ? (totalOutbound / totalValue) * 12 : 0; // Annualized
 
     // Group by category

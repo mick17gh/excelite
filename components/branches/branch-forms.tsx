@@ -67,6 +67,7 @@ export function AddBranchForm({ open, onOpenChange }: AddBranchFormProps) {
     email: "",
     timezone: "Africa/Accra",
     openingDate: format(new Date(), "yyyy-MM-dd"),
+    requiredStaff: "5",
     isActive: true,
   });
 
@@ -87,6 +88,7 @@ export function AddBranchForm({ open, onOpenChange }: AddBranchFormProps) {
         email: formData.email || undefined,
         timezone: formData.timezone,
         openingDate: formData.openingDate ? new Date(formData.openingDate) : undefined,
+        requiredStaff: parseInt(formData.requiredStaff) || 5,
         isActive: formData.isActive,
       });
 
@@ -105,6 +107,7 @@ export function AddBranchForm({ open, onOpenChange }: AddBranchFormProps) {
           email: "",
           timezone: "Africa/Accra",
           openingDate: format(new Date(), "yyyy-MM-dd"),
+          requiredStaff: "5",
           isActive: true,
         });
       } else {
@@ -279,6 +282,19 @@ export function AddBranchForm({ open, onOpenChange }: AddBranchFormProps) {
                   required
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="requiredStaff">Required Staff</Label>
+                <Input
+                  id="requiredStaff"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={formData.requiredStaff}
+                  onChange={(e) => setFormData({ ...formData, requiredStaff: e.target.value })}
+                  placeholder="5"
+                  required
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-4">
@@ -317,11 +333,12 @@ interface EditBranchFormProps {
     id: string;
     name: string;
     code: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    phone?: string;
-    email?: string;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    requiredStaff?: number;
     isActive: boolean;
   } | null;
 }
@@ -336,6 +353,7 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
     state: branch?.state || "",
     phone: branch?.phone || "",
     email: branch?.email || "",
+    requiredStaff: branch?.requiredStaff?.toString() || "5",
     isActive: branch?.isActive ?? true,
   });
 
@@ -353,6 +371,7 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
         state: formData.state || undefined,
         phone: formData.phone || undefined,
         email: formData.email || undefined,
+        requiredStaff: parseInt(formData.requiredStaff) || 5,
         isActive: formData.isActive,
       });
 
@@ -448,6 +467,19 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="requiredStaff">Required Staff</Label>
+                <Input
+                  id="requiredStaff"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={formData.requiredStaff}
+                  onChange={(e) => setFormData({ ...formData, requiredStaff: e.target.value })}
+                  placeholder="5"
+                  required
                 />
               </div>
             </div>

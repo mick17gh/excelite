@@ -109,7 +109,7 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
     setActionLoadingId(alertId);
     startTransition(async () => {
       try {
-        const result = await resolveAlert(alertId);
+        const result = await resolveAlert(alertId, "system");
         if (result.success) {
           toast.success("Alert resolved");
           setAlerts(alerts.map((a) => 

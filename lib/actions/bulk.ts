@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { logCreate, logUpdate, logDelete } from "@/lib/services/audit";
+import { InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
 
 // =====================================
 // MENU BULK OPERATIONS
@@ -11,7 +12,7 @@ import { logCreate, logUpdate, logDelete } from "@/lib/services/audit";
 export interface BulkMenuItemInput {
   name: string;
   sku?: string;
-  category: string;
+  categoryId: string;
   price: number;
   cost?: number;
   description?: string;
@@ -58,7 +59,7 @@ export async function bulkCreateMenuItems(items: BulkMenuItemInput[]) {
     await logCreate("MenuItem", "BULK", {
       action: "BULK_CREATE",
       count: result.count,
-      categories: [...new Set(items.map((i) => i.category))],
+      categoryIds: [...new Set(items.map((i) => i.categoryId))],
     });
 
     revalidatePath("/dashboard/menu");
@@ -143,7 +144,7 @@ export async function bulkUpdateMenuPrices(
     // Get items to update
     const where = Array.isArray(categoryOrIds)
       ? { id: { in: categoryOrIds }, deletedAt: null }
-      : { category: categoryOrIds, deletedAt: null };
+      : { categoryId: categoryOrIds, deletedAt: null };
 
     const items = await db.menuItem.findMany({
       where,
@@ -225,6 +226,8 @@ export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) 
     const itemsWithDefaults = items.map((item, index) => ({
       ...item,
       sku: item.sku || `INV-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`,
+      category: item.category as InventoryCategory,
+      unit: item.unit as UnitType,
       currentStock: item.currentStock ?? 0,
       minStock: item.minStock ?? 10,
       maxStock: item.maxStock ?? 100,
@@ -276,17 +279,18 @@ export async function bulkUpdateInventoryStock(
             data: { currentStock: newStock },
           });
 
-          // Create stock movement record
-          await db.stockMovement.create({
-            data: {
-              itemId,
-              branchId: item.branchId,
-              movementType: adjustment >= 0 ? "INBOUND" : "ADJUSTMENT_LOSS",
-              quantity: Math.abs(adjustment),
-              unitCost: item.unitCost,
-              reference: reason || "Bulk stock adjustment",
-            },
-          });
+          // Create stock movement record for negative adjustments
+          if (adjustment < 0) {
+            await db.outboundStock.create({
+              data: {
+                itemId,
+                branchId: item.branchId,
+                movementType: "ADJUSTMENT_LOSS",
+                quantity: Math.abs(adjustment),
+                reason: reason || "Bulk stock adjustment",
+              },
+            });
+          }
 
           return { itemId, success: true, newStock };
         } catch {
@@ -413,7 +417,7 @@ export function parseMenuCSV(rows: ParsedCSVRow[]): BulkMenuItemInput[] {
   return rows.map((row) => ({
     name: row.name || row.Name || "",
     sku: row.sku || row.SKU || undefined,
-    category: row.category || row.Category || "Uncategorized",
+    categoryId: row.categoryId || row.CategoryId || row.category || row.Category || "",
     price: parseFloat(row.price || row.Price || "0"),
     cost: row.cost || row.Cost ? parseFloat(row.cost || row.Cost) : undefined,
     description: row.description || row.Description || undefined,

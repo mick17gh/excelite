@@ -50,14 +50,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import {
-  scheduleShift,
-  clockIn,
-  clockOut,
-  getWeeklySchedule,
-  getAvailableStaff,
-  getTimesheetData,
-} from "@/lib/actions/staff";
+import { scheduleShift, clockIn, clockOut, getWeeklySchedule, getTimesheetData } from "@/lib/actions/staff";
+import { AddStaffForm } from "./staff-forms";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 
 interface StaffSummary {
@@ -84,18 +78,17 @@ interface Branch {
   id: string;
   name: string;
   code: string;
+  requiredStaff?: number;
 }
 
 interface WeeklySchedule {
   [dateKey: string]: Array<{
     id: string;
     staffId: string;
+    branchId: string;
     scheduledDate: Date;
     shiftStart: Date;
     shiftEnd: Date;
-    actualStart?: Date | null;
-    actualEnd?: Date | null;
-    status: string;
     staff: {
       id: string;
       employeeId: string;
@@ -144,10 +137,11 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     staffId: "",
-    branchId: "",
     date: format(new Date(), "yyyy-MM-dd"),
     shiftStart: "09:00",
     shiftEnd: "17:00",
+    shiftTemplate: "",
+    selectedStaff: [] as string[],
   });
   
   // Weekly schedule state
@@ -162,10 +156,24 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
   
   // Clock in/out loading state
   const [clockingStaffId, setClockingStaffId] = useState<string | null>(null);
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [isAutoFillOpen, setIsAutoFillOpen] = useState(false);
+  const [autoFillDate, setAutoFillDate] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  // Predefined shift templates
+  const shiftTemplates = {
+    morning: { start: "06:00", end: "14:00", label: "Morning (6 AM - 2 PM)" },
+    evening: { start: "14:00", end: "22:00", label: "Evening (2 PM - 10 PM)" },
+    night: { start: "22:00", end: "06:00", label: "Night (10 PM - 6 AM)" },
+    full: { start: "09:00", end: "17:00", label: "Full Day (9 AM - 5 PM)" },
+  };
+  
+  // Add staff dialog state
+  const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
 
   const totalStaff = summary.reduce((sum, s) => sum + s.totalStaff, 0);
   const totalOnDuty = summary.reduce((sum, s) => sum + s.onDuty, 0);
-  const totalRequired = summary.reduce((sum, s) => sum + s.required, 0);
+  // const totalRequired = summary.reduce((sum, s) => sum + s.required, 0);
   const understaffedBranches = summary.filter((s) => s.status === "understaffed").length;
 
   const filteredSchedule = schedule.filter((staff) => {
@@ -245,10 +253,217 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
     return <Badge className={colors[role] || "bg-slate-100 text-slate-700"}>{role}</Badge>;
   };
 
+  // Handle shift template selection
+  const handleShiftTemplateChange = (template: string) => {
+    if (template && shiftTemplates[template as keyof typeof shiftTemplates]) {
+      const selectedTemplate = shiftTemplates[template as keyof typeof shiftTemplates];
+      setScheduleForm(prev => ({
+        ...prev,
+        shiftTemplate: template,
+        shiftStart: selectedTemplate.start,
+        shiftEnd: selectedTemplate.end,
+      }));
+    }
+  };
+
+  // Handle bulk staff selection
+  const handleStaffSelection = (staffId: string, checked: boolean) => {
+    setScheduleForm(prev => ({
+      ...prev,
+      selectedStaff: checked 
+        ? [...prev.selectedStaff, staffId]
+        : prev.selectedStaff.filter(id => id !== staffId)
+    }));
+  };
+
   // Handlers
   const handleAddSchedule = async () => {
-    if (!scheduleForm.staffId || !scheduleForm.branchId || !scheduleForm.date) {
+    const staffToSchedule = isBulkMode ? scheduleForm.selectedStaff : [scheduleForm.staffId];
+    
+    if (staffToSchedule.length === 0 || !scheduleForm.date) {
+      toast.error("Please select staff and fill in all required fields");
+      return;
+    }
+
+    const dateObj = new Date(scheduleForm.date);
+    const [startHour, startMin] = scheduleForm.shiftStart.split(":").map(Number);
+    const [endHour, endMin] = scheduleForm.shiftEnd.split(":").map(Number);
+
+    const shiftStart = new Date(dateObj);
+    shiftStart.setHours(startHour, startMin, 0, 0);
+
+    const shiftEnd = new Date(dateObj);
+    shiftEnd.setHours(endHour, endMin, 0, 0);
+
+    startTransition(async () => {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const staffId of staffToSchedule) {
+        // Find the staff member to get their branch
+        const selectedStaff = allStaff.find(staff => staff.id === staffId);
+        if (!selectedStaff) {
+          errorCount++;
+          continue;
+        }
+
+        const result = await scheduleShift({
+          staffId,
+          branchId: selectedStaff.branchId,
+          date: dateObj,
+          shiftStart,
+          shiftEnd,
+        });
+
+        if (result.success) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} shift(s) scheduled successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
+        setIsScheduleOpen(false);
+        setScheduleForm({
+          staffId: "",
+          date: format(new Date(), "yyyy-MM-dd"),
+          shiftStart: "09:00",
+          shiftEnd: "17:00",
+          shiftTemplate: "",
+          selectedStaff: [],
+        });
+        setIsBulkMode(false);
+      } else {
+        toast.error("Failed to schedule shifts");
+      }
+    });
+  };
+
+  // Copy previous week's schedule
+  const handleCopyPreviousWeek = async () => {
+    if (!selectedBranchForWeek) {
+      toast.error("Please select a branch first");
+      return;
+    }
+
+    const previousWeekStart = new Date(weekStart);
+    previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+    
+    startTransition(async () => {
+      try {
+        const result = await getWeeklySchedule(selectedBranchForWeek, previousWeekStart);
+        if (result.success && result.data) {
+          // Copy each schedule from previous week to current week
+          let copiedCount = 0;
+          
+          for (const [dateKey, schedules] of Object.entries(result.data)) {
+            const originalDate = new Date(dateKey);
+            const newDate = new Date(originalDate);
+            newDate.setDate(newDate.getDate() + 7); // Add 7 days
+            
+            for (const schedule of schedules) {
+              const copyResult = await scheduleShift({
+                staffId: schedule.staff.id,
+                branchId: selectedBranchForWeek,
+                date: newDate,
+                shiftStart: new Date(schedule.shiftStart),
+                shiftEnd: new Date(schedule.shiftEnd),
+              });
+              
+              if (copyResult.success) {
+                copiedCount++;
+              }
+            }
+          }
+          
+          if (copiedCount > 0) {
+            toast.success(`Copied ${copiedCount} schedules from previous week`);
+            loadWeeklySchedule(selectedBranchForWeek); // Refresh the weekly view
+          } else {
+            toast.info("No schedules found to copy from previous week");
+          }
+        } else {
+          toast.error("Failed to load previous week's schedule");
+        }
+      } catch {
+        toast.error("Failed to copy previous week's schedule");
+      }
+    });
+  };
+
+  const handleAutoFill = async () => {
+    if (!selectedBranchForWeek) {
+      toast.error("Please select a branch first");
+      return;
+    }
+
+    const branch = branches.find(b => b.id === selectedBranchForWeek);
+    if (!branch) return;
+
+    const requiredStaff = branch.requiredStaff || 5;
+    const branchStaff = allStaff.filter(staff => staff.branchId === selectedBranchForWeek);
+    
+    if (branchStaff.length < requiredStaff) {
+      toast.error(`Not enough staff in branch. Required: ${requiredStaff}, Available: ${branchStaff.length}`);
+      return;
+    }
+
+    startTransition(async () => {
+      const dateObj = new Date(autoFillDate);
+      let scheduledCount = 0;
+
+      // Schedule staff based on roles and required count
+      const staffToSchedule = branchStaff.slice(0, requiredStaff);
+      
+      for (const staff of staffToSchedule) {
+        // Assign different shifts based on role
+        let shiftTemplate = shiftTemplates.full;
+        if (staff.role === 'KITCHEN') shiftTemplate = shiftTemplates.morning;
+        if (staff.role === 'SERVICE') shiftTemplate = shiftTemplates.evening;
+        if (staff.role === 'MANAGER') shiftTemplate = shiftTemplates.full;
+
+        const shiftStart = new Date(dateObj);
+        const [startHour, startMin] = shiftTemplate.start.split(":").map(Number);
+        shiftStart.setHours(startHour, startMin, 0, 0);
+
+        const shiftEnd = new Date(dateObj);
+        const [endHour, endMin] = shiftTemplate.end.split(":").map(Number);
+        shiftEnd.setHours(endHour, endMin, 0, 0);
+
+        const result = await scheduleShift({
+          staffId: staff.id,
+          branchId: selectedBranchForWeek,
+          date: dateObj,
+          shiftStart,
+          shiftEnd,
+        });
+
+        if (result.success) {
+          scheduledCount++;
+        }
+      }
+
+      if (scheduledCount > 0) {
+        toast.success(`Auto-filled ${scheduledCount} staff schedules`);
+        setIsAutoFillOpen(false);
+        if (selectedBranchForWeek) loadWeeklySchedule(selectedBranchForWeek);
+      } else {
+        toast.error("Failed to auto-fill schedules");
+      }
+    });
+  };
+
+  const handleOldAddSchedule = async () => {
+    if (!scheduleForm.staffId || !scheduleForm.date) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Find the selected staff member to get their branch
+    const selectedStaff = allStaff.find(staff => staff.id === scheduleForm.staffId);
+    if (!selectedStaff) {
+      toast.error("Selected staff member not found");
       return;
     }
 
@@ -265,7 +480,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
     startTransition(async () => {
       const result = await scheduleShift({
         staffId: scheduleForm.staffId,
-        branchId: scheduleForm.branchId,
+        branchId: selectedStaff.branchId,
         date: dateObj,
         shiftStart,
         shiftEnd,
@@ -276,10 +491,11 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
         setIsScheduleOpen(false);
         setScheduleForm({
           staffId: "",
-          branchId: "",
           date: format(new Date(), "yyyy-MM-dd"),
           shiftStart: "09:00",
           shiftEnd: "17:00",
+          shiftTemplate: "",
+          selectedStaff: [],
         });
       } else {
         toast.error(result.error || "Failed to schedule shift");
@@ -434,7 +650,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <TabsList className="h-9">
             <TabsTrigger value="overview" className="text-xs px-3">Branch Overview</TabsTrigger>
-            <TabsTrigger value="schedule" className="text-xs px-3">Today's Schedule</TabsTrigger>
+            <TabsTrigger value="schedule" className="text-xs px-3">Todays Schedule</TabsTrigger>
             <TabsTrigger value="weekly" className="text-xs px-3" onClick={() => {
               if (selectedBranchForWeek) loadWeeklySchedule(selectedBranchForWeek);
             }}>
@@ -447,10 +663,16 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
             </TabsTrigger>
           </TabsList>
 
-          <Button variant="outline" size="sm" className="h-8" onClick={() => setIsScheduleOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Schedule
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setIsAddStaffOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Staff
+            </Button>
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setIsScheduleOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Schedule
+            </Button>
+          </div>
         </div>
 
         <TabsContent value="overview" className="mt-6">
@@ -502,7 +724,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-primary" />
-                    Today's Schedule
+                    Today&apos;s Schedule
                   </CardTitle>
                   <CardDescription>Staff schedules for today</CardDescription>
                 </div>
@@ -637,6 +859,24 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                       ))}
                     </SelectContent>
                   </Select>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-xs"
+                    onClick={handleCopyPreviousWeek}
+                    disabled={!selectedBranchForWeek || isPending}
+                  >
+                    Copy Previous Week
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-xs"
+                    onClick={() => setIsAutoFillOpen(true)}
+                    disabled={!selectedBranchForWeek || isPending}
+                  >
+                    Auto-Fill Day
+                  </Button>
                   <div className="flex items-center gap-1">
                     <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => {
                       const newWeek = subWeeks(weekStart, 1);
@@ -818,42 +1058,89 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
 
       {/* Add Schedule Dialog */}
       <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Schedule Shift</DialogTitle>
-            <DialogDescription>Add a new shift for a staff member</DialogDescription>
+            <DialogDescription>
+              {isBulkMode ? "Schedule multiple staff members for the same shift" : "Add a new shift for a staff member"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Mode Toggle */}
+            <div className="flex items-center space-x-2">
+              <Button
+                type="button"
+                variant={!isBulkMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsBulkMode(false)}
+              >
+                Single Staff
+              </Button>
+              <Button
+                type="button"
+                variant={isBulkMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsBulkMode(true)}
+              >
+                Bulk Schedule
+              </Button>
+            </div>
+
+            {/* Shift Template Selection */}
             <div className="space-y-2">
-              <Label>Staff Member</Label>
-              <Select value={scheduleForm.staffId} onValueChange={(v) => setScheduleForm(prev => ({ ...prev, staffId: v }))}>
+              <Label>Shift Template (Optional)</Label>
+              <Select value={scheduleForm.shiftTemplate} onValueChange={handleShiftTemplateChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select staff" />
+                  <SelectValue placeholder="Choose a preset or set custom times" />
                 </SelectTrigger>
                 <SelectContent>
+                  {Object.entries(shiftTemplates).map(([key, template]) => (
+                    <SelectItem key={key} value={key}>
+                      {template.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Staff Selection */}
+            {!isBulkMode ? (
+              <div className="space-y-2">
+                <Label>Staff Member</Label>
+                <Select value={scheduleForm.staffId} onValueChange={(v) => setScheduleForm(prev => ({ ...prev, staffId: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select staff" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allStaff.map((staff) => (
+                      <SelectItem key={staff.id} value={staff.id}>
+                        {staff.firstName} {staff.lastName} ({staff.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Select Staff Members ({scheduleForm.selectedStaff.length} selected)</Label>
+                <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2">
                   {allStaff.map((staff) => (
-                    <SelectItem key={staff.id} value={staff.id}>
-                      {staff.firstName} {staff.lastName} ({staff.role})
-                    </SelectItem>
+                    <div key={staff.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`staff-${staff.id}`}
+                        checked={scheduleForm.selectedStaff.includes(staff.id)}
+                        onChange={(e) => handleStaffSelection(staff.id, e.target.checked)}
+                        className="rounded"
+                      />
+                      <label htmlFor={`staff-${staff.id}`} className="text-sm flex-1 cursor-pointer">
+                        {staff.firstName} {staff.lastName} ({staff.role})
+                      </label>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Branch</Label>
-              <Select value={scheduleForm.branchId} onValueChange={(v) => setScheduleForm(prev => ({ ...prev, branchId: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Date</Label>
               <Input
@@ -890,6 +1177,50 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Auto-Fill Dialog */}
+      <Dialog open={isAutoFillOpen} onOpenChange={setIsAutoFillOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Auto-Fill Schedule</DialogTitle>
+            <DialogDescription>
+              Automatically schedule staff based on branch requirements and roles
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={autoFillDate}
+                onChange={(e) => setAutoFillDate(e.target.value)}
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>This will automatically schedule staff based on:</p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Branch required staff count</li>
+                <li>Staff roles (Kitchen → Morning, Service → Evening, Manager → Full Day)</li>
+                <li>Available staff in the selected branch</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAutoFillOpen(false)}>Cancel</Button>
+            <Button onClick={handleAutoFill} disabled={isPending}>
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Auto-Fill Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Staff Form */}
+      <AddStaffForm 
+        open={isAddStaffOpen} 
+        onOpenChange={setIsAddStaffOpen} 
+        branches={branches} 
+      />
     </div>
   );
 }

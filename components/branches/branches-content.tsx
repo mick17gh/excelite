@@ -63,7 +63,7 @@ export function BranchesContent({ branches, branchList }: BranchesContentProps) 
   const { formatCurrency } = useCurrency();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [_selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
 
   // Set currency based on first branch
@@ -79,7 +79,7 @@ export function BranchesContent({ branches, branchList }: BranchesContentProps) 
   });
 
   const totalRevenue = branches.reduce((sum, b) => sum + b.revenue, 0);
-  const totalTarget = branches.reduce((sum, b) => sum + b.target, 0);
+  const _totalTarget = branches.reduce((sum, b) => sum + b.target, 0);
   const totalTransactions = branches.reduce((sum, b) => sum + b.transactions, 0);
   const avgPerformance =
     branches.reduce((sum, b) => sum + b.performance, 0) / branches.length;

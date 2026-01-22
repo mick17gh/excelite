@@ -23,7 +23,11 @@ export interface UpdateTargetInput {
 
 export async function createTarget(input: CreateTargetInput) {
   try {
-    const session = await auth.api.getSession({ headers: new Headers() });
+    const session = await auth.api.getSession({
+      headers: {
+        cookie: (await (await import('next/headers')).cookies()).toString()
+      }
+    });
     if (!session || !session.user || !session.user.id) {
       return { success: false, error: "Unauthorized" };
     }
@@ -52,7 +56,14 @@ export async function createTarget(input: CreateTargetInput) {
 
     revalidatePath("/dashboard/branches");
     revalidatePath("/dashboard/targets");
-    return { success: true, data: target };
+    return { 
+      success: true, 
+      data: {
+        ...target,
+        targetValue: Number(target.targetValue),
+        currentValue: Number(target.currentValue)
+      }
+    };
   } catch (error) {
     console.error("[createTarget] Error:", error);
     return { success: false, error: "Failed to create target" };
@@ -61,12 +72,21 @@ export async function createTarget(input: CreateTargetInput) {
 
 export async function updateTarget(input: UpdateTargetInput) {
   try {
-    const session = await auth.api.getSession({ headers: new Headers() });
+    const session = await auth.api.getSession({
+      headers: {
+        cookie: (await (await import('next/headers')).cookies()).toString()
+      }
+    });
     if (!session || !session.user || !session.user.id) {
       return { success: false, error: "Unauthorized" };
     }
 
-    const updateData: any = {};
+    const updateData: {
+      targetValue?: number;
+      isActive?: boolean;
+      periodStart?: Date;
+      periodEnd?: Date;
+    } = {};
     if (input.targetValue !== undefined) updateData.targetValue = input.targetValue;
     if (input.isActive !== undefined) updateData.isActive = input.isActive;
     if (input.periodStart) updateData.periodStart = input.periodStart;
@@ -88,7 +108,14 @@ export async function updateTarget(input: UpdateTargetInput) {
 
     revalidatePath("/dashboard/branches");
     revalidatePath("/dashboard/targets");
-    return { success: true, data: target };
+    return { 
+      success: true, 
+      data: {
+        ...target,
+        targetValue: Number(target.targetValue),
+        currentValue: Number(target.currentValue)
+      }
+    };
   } catch (error) {
     console.error("[updateTarget] Error:", error);
     return { success: false, error: "Failed to update target" };
@@ -97,7 +124,11 @@ export async function updateTarget(input: UpdateTargetInput) {
 
 export async function deleteTarget(id: string) {
   try {
-    const session = await auth.api.getSession({ headers: new Headers() });
+    const session = await auth.api.getSession({
+      headers: {
+        cookie: (await (await import('next/headers')).cookies()).toString()
+      }
+    });
     if (!session || !session.user || !session.user.id) {
       return { success: false, error: "Unauthorized" };
     }

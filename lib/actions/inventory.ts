@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { InventoryCategory, UnitType, StockMovementType } from "@/lib/generated/prisma/client";
-import { logCreate, logAdjustment, logTransfer } from "@/lib/services/audit";
+import { logCreate, logTransfer } from "@/lib/services/audit";
 
 export interface CreateInventoryItemInput {
   name: string;
@@ -48,7 +48,17 @@ export async function createInventoryItem(input: CreateInventoryItemInput) {
     });
 
     revalidatePath("/dashboard/inventory");
-    return { success: true, data: item };
+    return { 
+      success: true, 
+      data: {
+        ...item,
+        unitCost: Number(item.unitCost),
+        currentStock: Number(item.currentStock),
+        minStock: Number(item.minStock),
+        maxStock: Number(item.maxStock),
+        reorderPoint: Number(item.reorderPoint)
+      }
+    };
   } catch (error) {
     console.error("[createInventoryItem] Error:", error);
     return { success: false, error: "Failed to create inventory item" };
@@ -64,7 +74,17 @@ export async function updateInventoryItem(input: UpdateInventoryItemInput) {
     });
 
     revalidatePath("/dashboard/inventory");
-    return { success: true, data: item };
+    return { 
+      success: true, 
+      data: {
+        ...item,
+        unitCost: Number(item.unitCost),
+        currentStock: Number(item.currentStock),
+        minStock: Number(item.minStock),
+        maxStock: Number(item.maxStock),
+        reorderPoint: Number(item.reorderPoint)
+      }
+    };
   } catch (error) {
     console.error("[updateInventoryItem] Error:", error);
     return { success: false, error: "Failed to update inventory item" };

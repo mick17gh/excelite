@@ -206,19 +206,13 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
   }, [filteredTickets]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] gap-4">
+    <div className="flex flex-col h-full gap-4">
       {/* Fixed Header */}
       <div className="flex flex-col gap-4 shrink-0">
-        {/* Title and Controls */}
+        {/* Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <ChefHat className="h-6 w-6 text-primary" />
-              <h2 className="text-2xl font-bold tracking-tight">
-                Kitchen Display System
-              </h2>
-              {isRefreshing && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
-            </div>
+          <div className="flex items-center gap-2">
+            {isRefreshing && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
           
           <div className="flex flex-wrap items-center gap-3">

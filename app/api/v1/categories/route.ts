@@ -9,18 +9,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
 
-  const categories = await db.menuItem.findMany({
+  const categories = await db.category.findMany({
     where: {
       deletedAt: null,
       isActive: true,
     },
-    select: { category: true },
-    distinct: ["category"],
-    orderBy: { category: "asc" },
+    orderBy: { name: "asc" },
   });
 
   return NextResponse.json({
-    data: categories.map((c) => c.category),
+    data: categories.map((c) => ({ id: c.id, name: c.name })),
   });
 }
 

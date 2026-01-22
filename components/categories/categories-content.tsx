@@ -35,6 +35,7 @@ import { createCategory, updateCategory, deleteCategory } from "@/lib/actions/ca
 import { EmptyState } from "@/components/ui/empty-state";
 
 interface Category {
+  id: string;
   name: string;
   itemCount: number;
 }
@@ -97,7 +98,7 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
     setIsSubmitting(true);
     try {
       const result = await updateCategory({
-        id: editingCategory.name,
+        id: editingCategory.id,
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
       });
@@ -118,7 +119,7 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
     }
   };
 
-  const handleDelete = async (categoryName: string, itemCount: number) => {
+  const handleDelete = async (categoryId: string, categoryName: string, itemCount: number) => {
     if (itemCount > 0) {
       toast.error(`Cannot delete category. ${itemCount} menu item(s) are using it.`);
       return;
@@ -128,7 +129,7 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
       return;
     }
 
-    const result = await deleteCategory(categoryName);
+    const result = await deleteCategory(categoryId);
     if (result.success) {
       toast.success("Category deleted successfully");
       router.refresh();
@@ -230,7 +231,7 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
               </TableHeader>
               <TableBody>
                 {initialCategories.map((category) => (
-                  <TableRow key={category.name}>
+                  <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{category.itemCount} items</Badge>
@@ -248,7 +249,7 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(category.name, category.itemCount)}
+                          onClick={() => handleDelete(category.id, category.name, category.itemCount)}
                           disabled={category.itemCount > 0}
                         >
                           <Trash2 className="h-4 w-4" />

@@ -5,9 +5,7 @@ import { DateRange } from "react-day-picker";
 import { subDays } from "date-fns";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
-import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
-import { CurrencyCode } from "@/lib/currency";
 import { getDashboardData } from "@/lib/actions/transactions";
 import { getBranchPerformance } from "@/lib/actions/branches";
 
@@ -273,15 +271,15 @@ export function DashboardWrapper({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="">
         <div>
-          <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-            Executive Dashboard
+          <h1 className="text-xl font-bold tracking-tight md:text-xl">
+            Welcome to your Dashboard
             {isPending && (
               <span className="ml-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
             )}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Real-time overview of your restaurant operations
           </p>
         </div>

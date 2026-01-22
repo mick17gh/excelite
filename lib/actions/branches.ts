@@ -15,6 +15,7 @@ export interface CreateBranchInput {
   email?: string;
   timezone: string;
   openingDate?: Date;
+  requiredStaff?: number;
   isActive: boolean;
 }
 
@@ -30,6 +31,7 @@ export interface UpdateBranchInput {
   phone?: string;
   email?: string;
   timezone?: string;
+  requiredStaff?: number;
   isActive?: boolean;
 }
 
@@ -48,6 +50,7 @@ export async function createBranch(input: CreateBranchInput) {
         email: input.email,
         timezone: input.timezone,
         openingDate: input.openingDate,
+        requiredStaff: input.requiredStaff || 5,
         isActive: input.isActive,
       },
     });
@@ -113,7 +116,21 @@ export async function getBranchById(id: string) {
         staff: true,
       },
     });
-    return { success: true, data: branch };
+
+    if (!branch) {
+      return { success: false, error: "Branch not found" };
+    }
+
+    // Convert Decimal fields to numbers for staff data
+    const convertedBranch = {
+      ...branch,
+      staff: branch.staff.map(staff => ({
+        ...staff,
+        hourlyRate: Number(staff.hourlyRate)
+      }))
+    };
+
+    return { success: true, data: convertedBranch };
   } catch (error) {
     console.error("[getBranchById] Error:", error);
     return { success: false, error: "Failed to fetch branch" };
@@ -166,7 +183,7 @@ export async function getBranchPerformance(startDate?: Date, endDate?: Date) {
       );
       const target = branch.targets[0]?.targetValue
         ? Number(branch.targets[0].targetValue)
-        : 100000;
+        : 0;
       const performancePercent = target > 0 ? (revenue / target) * 100 : 0;
 
       let status: "good" | "warning" | "critical" = "good";
@@ -248,7 +265,13 @@ export async function setTarget(input: SetTargetInput) {
     });
 
     revalidatePath("/dashboard/branches");
-    return { success: true, data: target };
+    return { 
+      success: true, 
+      data: {
+        ...target,
+        targetValue: Number(target.targetValue)
+      }
+    };
   } catch (error) {
     console.error("[setTarget] Error:", error);
     return { success: false, error: "Failed to set target" };

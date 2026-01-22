@@ -32,7 +32,7 @@ import { toast } from "sonner";
 
 const navigation = [
   {
-    name: "Executive Dashboard",
+    name: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
@@ -47,7 +47,7 @@ const navigation = [
     icon: Receipt,
   },
   {
-    name: "Branch Performance",
+    name: "Branches",
     href: "/dashboard/branches",
     icon: Building2,
   },
@@ -154,7 +154,7 @@ export function Sidebar({ className }: SidebarProps) {
       )}
     >
       {/* Blue gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-600/5 pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-b from-blue-500/5 via-transparent to-blue-600/5 pointer-events-none" />
       
       <div className={cn(
         "flex items-center relative z-10 py-0",
@@ -162,7 +162,7 @@ export function Sidebar({ className }: SidebarProps) {
       )}>
         {!collapsed ? (
           <Link href="/dashboard" className="flex items-center gap-2 flex-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary shadow-lg shadow-primary/25 flex-shrink-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary shadow-lg shadow-primary/25 shrink-0">
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-bold text-sidebar-foreground truncate">
@@ -178,7 +178,7 @@ export function Sidebar({ className }: SidebarProps) {
           variant="ghost"
           size="icon"
           className={cn(
-            "h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground flex-shrink-0",
+            "h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground shrink-0",
             collapsed && "absolute top-2 right-2"
           )}
           onClick={() => setCollapsed(!collapsed)}
@@ -215,7 +215,7 @@ export function Sidebar({ className }: SidebarProps) {
               >
                 <item.icon
                   className={cn(
-                    "h-5 w-5 flex-shrink-0",
+                    "h-5 w-5 shrink-0",
                     isActive && "text-blue-600 dark:text-blue-400"
                   )}
                 />
@@ -244,7 +244,7 @@ export function Sidebar({ className }: SidebarProps) {
                 )}
                 title={collapsed ? item.name : undefined}
               >
-                <item.icon className={cn("h-5 w-5 flex-shrink-0", isActive && "text-blue-600 dark:text-blue-400")} />
+                <item.icon className={cn("h-5 w-5 shrink-0", isActive && "text-blue-600 dark:text-blue-400")} />
                 {!collapsed && <span className="truncate">{item.name}</span>}
               </Link>
             );
@@ -259,9 +259,9 @@ export function Sidebar({ className }: SidebarProps) {
             title={collapsed ? "Sign Out" : undefined}
           >
             {isSigningOut ? (
-              <Loader2 className="h-5 w-5 flex-shrink-0 animate-spin" />
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
             ) : (
-              <LogOut className="h-5 w-5 flex-shrink-0" />
+              <LogOut className="h-5 w-5 shrink-0" />
             )}
             {!collapsed && <span>{isSigningOut ? "Signing out..." : "Sign Out"}</span>}
           </button>

@@ -99,7 +99,7 @@ export function AlertsWidget({ alerts, loading = false }: AlertsWidgetProps) {
     <Card className="chart-card rounded-xl h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between py-3 px-4 shrink-0">
         <CardTitle className="flex items-center gap-2 text-base">
-          <div className="p-1.5 rounded-lg bg-gradient-to-br from-red-100 to-orange-100 dark:from-red-900/30 dark:to-orange-900/30">
+          <div className="p-1.5 rounded-lg bg-linear-to-br from-red-100 to-orange-100 dark:from-red-900/30 dark:to-orange-900/30">
             <Bell className="h-4 w-4 text-red-600 dark:text-red-400" />
           </div>
           Alerts
@@ -136,7 +136,7 @@ export function AlertsWidget({ alerts, loading = false }: AlertsWidgetProps) {
                       getSeverityColor(alert.severity)
                     )}
                   >
-                    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-background/60">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/60">
                       <Icon className="h-3 w-3" />
                     </div>
                     <div className="flex-1 min-w-0">

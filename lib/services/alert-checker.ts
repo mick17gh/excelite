@@ -320,10 +320,10 @@ export async function checkStaffShortage(): Promise<{ created: number }> {
     for (const branch of branches) {
       const totalStaff = branch.staff.length;
       const onDuty = branch.staff.filter((s) => s.dutyStatus === "ON_DUTY").length;
-      const required = Math.ceil(totalStaff * 0.6);
+      const required = branch.requiredStaff || 5;
 
-      // Alert if less than 50% of required staff on duty
-      if (required > 0 && onDuty < required * 0.5) {
+      // Alert if less than 80% of required staff on duty
+      if (required > 0 && onDuty < required * 0.8) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 

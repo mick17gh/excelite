@@ -9,7 +9,7 @@ export const metadata = {
 
 export default async function MenuPage() {
   const [itemsResult, categoriesResult] = await Promise.all([
-    getMenuItems(),
+    getMenuItems(undefined, true), // Include inactive items to debug
     getMenuCategories(),
   ]);
 

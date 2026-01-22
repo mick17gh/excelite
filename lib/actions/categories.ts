@@ -17,12 +17,13 @@ export interface UpdateCategoryInput {
 export async function createCategory(input: CreateCategoryInput) {
   try {
     // Check if category already exists (case-insensitive)
-    const existing = await db.menuItem.findFirst({
+    const existing = await db.category.findFirst({
       where: {
-        category: {
+        name: {
           equals: input.name,
           mode: "insensitive",
         },
+        deletedAt: null,
       },
     });
 
@@ -30,14 +31,26 @@ export async function createCategory(input: CreateCategoryInput) {
       return { success: false, error: "Category already exists" };
     }
 
-    // Categories are stored as strings in menu items
-    // We'll create a menu item with this category to "register" it
-    // Or we could create a separate Category model, but for now we'll just return success
-    // The category will be created when the first menu item uses it
+    // Create the category in the database
+    const category = await db.category.create({
+      data: {
+        name: input.name.trim(),
+        description: input.description?.trim(),
+        isActive: true,
+      },
+    });
 
     revalidatePath("/dashboard/menu");
     revalidatePath("/dashboard/categories");
-    return { success: true, data: { name: input.name, description: input.description } };
+    return { 
+      success: true, 
+      data: { 
+        id: category.id,
+        name: category.name, 
+        description: category.description,
+        itemCount: 0 
+      } 
+    };
   } catch (error) {
     console.error("[createCategory] Error:", error);
     return { success: false, error: "Failed to create category" };
@@ -46,66 +59,91 @@ export async function createCategory(input: CreateCategoryInput) {
 
 export async function updateCategory(input: UpdateCategoryInput) {
   try {
-    // Update all menu items with the old category name to the new one
-    // First, get the old category name
-    const categories = await getCategories();
-    const oldCategory = categories.data?.find((c) => c.name === input.id);
+    // Find the category to update
+    const category = await db.category.findFirst({
+      where: {
+        id: input.id,
+        deletedAt: null,
+      },
+    });
     
-    if (!oldCategory) {
+    if (!category) {
       return { success: false, error: "Category not found" };
     }
 
-    if (input.name && input.name !== oldCategory.name) {
-      // Check if new name already exists
-      const existing = await db.menuItem.findFirst({
+    // Check if new name already exists (if name is being changed)
+    if (input.name && input.name !== category.name) {
+      const existing = await db.category.findFirst({
         where: {
-          category: {
+          name: {
             equals: input.name,
             mode: "insensitive",
           },
+          deletedAt: null,
+          id: { not: input.id },
         },
       });
 
       if (existing) {
         return { success: false, error: "Category name already exists" };
       }
-
-      // Update all menu items with this category
-      await db.menuItem.updateMany({
-        where: {
-          category: oldCategory.name,
-        },
-        data: {
-          category: input.name,
-        },
-      });
     }
+
+    // Update the category
+    const updatedCategory = await db.category.update({
+      where: { id: input.id },
+      data: {
+        ...(input.name && { name: input.name.trim() }),
+        ...(input.description !== undefined && { description: input.description?.trim() }),
+      },
+    });
 
     revalidatePath("/dashboard/menu");
     revalidatePath("/dashboard/categories");
-    return { success: true, data: { name: input.name || oldCategory.name } };
+    return { success: true, data: { name: updatedCategory.name } };
   } catch (error) {
     console.error("[updateCategory] Error:", error);
     return { success: false, error: "Failed to update category" };
   }
 }
 
-export async function deleteCategory(categoryName: string) {
+export async function deleteCategory(categoryId: string) {
   try {
-    // Check if any menu items use this category
-    const itemsWithCategory = await db.menuItem.count({
+    // Find the category first
+    const category = await db.category.findFirst({
       where: {
-        category: categoryName,
+        id: categoryId,
         deletedAt: null,
       },
+      include: {
+        _count: {
+          select: {
+            menuItems: {
+              where: {
+                deletedAt: null,
+              }
+            }
+          }
+        }
+      }
     });
 
-    if (itemsWithCategory > 0) {
+    if (!category) {
+      return { success: false, error: "Category not found" };
+    }
+
+    if (category._count.menuItems > 0) {
       return {
         success: false,
-        error: `Cannot delete category. ${itemsWithCategory} menu item(s) are using it.`,
+        error: `Cannot delete category. ${category._count.menuItems} menu item(s) are using it.`,
       };
     }
+
+    // Soft delete the category
+    await db.category.update({
+      where: { id: categoryId },
+      data: { deletedAt: new Date() }
+    });
 
     revalidatePath("/dashboard/menu");
     revalidatePath("/dashboard/categories");
@@ -118,29 +156,31 @@ export async function deleteCategory(categoryName: string) {
 
 export async function getCategories() {
   try {
-    const items = await db.menuItem.findMany({
-      where: { deletedAt: null, isActive: true },
-      select: { category: true },
-      distinct: ["category"],
-      orderBy: { category: "asc" },
+    const categories = await db.category.findMany({
+      where: { 
+        deletedAt: null,
+        isActive: true 
+      },
+      include: {
+        _count: {
+          select: {
+            menuItems: {
+              where: {
+                deletedAt: null,
+                isActive: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { name: "asc" },
     });
 
-    // Count items per category
-    const categoriesWithCounts = await Promise.all(
-      items.map(async (item) => {
-        const count = await db.menuItem.count({
-          where: {
-            category: item.category,
-            deletedAt: null,
-            isActive: true,
-          },
-        });
-        return {
-          name: item.category,
-          itemCount: count,
-        };
-      })
-    );
+    const categoriesWithCounts = categories.map(category => ({
+      id: category.id,
+      name: category.name,
+      itemCount: category._count.menuItems,
+    }));
 
     return {
       success: true,

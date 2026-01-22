@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { StaffContent } from "@/components/staff/staff-content";
-import { getStaff, getStaffSummary } from "@/lib/actions/staff";
+import { getStaff, getStaffSummary, getSchedules } from "@/lib/actions/staff";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
@@ -9,36 +9,76 @@ export const metadata = {
 };
 
 export default async function StaffPage() {
-  const [branchesResult, staffResult, summaryResult] = await Promise.all([
+  const today = new Date();
+  const [branchesResult, staffResult, , schedulesResult] = await Promise.all([
     getBranches(),
     getStaff(),
     getStaffSummary(),
+    getSchedules(undefined, today, today),
   ]);
 
   const branchList = branchesResult.data || [];
-  const rawStaff = staffResult.data || [];
-  const schedule = rawStaff.map((staff: { id: string; employeeId: string; firstName: string; lastName: string; role: string; branch: { name: string }; dutyStatus: string }) => ({
-    id: staff.id,
-    employeeId: staff.employeeId,
-    name: `${staff.firstName} ${staff.lastName}`,
-    role: staff.role,
-    branchName: staff.branch?.name || "Unknown",
-    shiftStart: "09:00",
-    shiftEnd: "17:00",
-    status: staff.dutyStatus === "ON_DUTY" ? "on-duty" : "off-duty",
+  const rawStaffData = staffResult.data || [];
+  const todaySchedules = schedulesResult.data || [];
+  
+  // Convert Decimal fields to numbers for client component compatibility
+  const rawStaff = rawStaffData.map((staff: {
+    id: string;
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+    role: string;
+    hourlyRate: number | string;
+    hireDate: Date;
+    branchId: string;
+    isActive: boolean;
+    dutyStatus: string;
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
+    branch: { id: string; name: string; code: string } | null;
+  }) => ({
+    ...staff,
+    hourlyRate: Number(staff.hourlyRate)
   }));
-  const rawSummaryData = summaryResult.data;
-  const rawSummary = rawSummaryData && !Array.isArray(rawSummaryData) 
-    ? rawSummaryData 
-    : { totalStaff: 0, onDuty: 0, lateArrivals: 0, absences: 0 };
-  const summary = branchList.map((branch: { id: string; name: string }) => ({
-    branchId: branch.id,
-    branchName: branch.name,
-    totalStaff: Math.floor(rawSummary.totalStaff / Math.max(branchList.length, 1)),
-    onDuty: Math.floor(rawSummary.onDuty / Math.max(branchList.length, 1)),
-    required: 5,
-    status: "adequate" as const,
-  }));
+  
+  // Create a map of staff schedules for today
+  const scheduleMap = new Map<string, { staffId: string; shiftStart: Date; shiftEnd: Date }>();
+  todaySchedules.forEach((schedule: { staffId: string; shiftStart: Date; shiftEnd: Date }) => {
+    scheduleMap.set(schedule.staffId, schedule);
+  });
+  
+  const schedule = rawStaff.map((staff) => {
+    const todaySchedule = scheduleMap.get(staff.id);
+    return {
+      id: staff.id,
+      employeeId: staff.employeeId,
+      name: `${staff.firstName} ${staff.lastName}`,
+      role: staff.role,
+      branchName: staff.branch?.name || "Unknown",
+      shiftStart: todaySchedule ? new Date(todaySchedule.shiftStart).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : "Not Scheduled",
+      shiftEnd: todaySchedule ? new Date(todaySchedule.shiftEnd).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : "Not Scheduled",
+      status: staff.dutyStatus,
+      hasSchedule: !!todaySchedule,
+    };
+  });
+  const summary = branchList.map((branch: { id: string; name: string; requiredStaff?: number }) => {
+    const branchStaff = rawStaff.filter((staff: { branchId: string }) => staff.branchId === branch.id);
+    const onDutyCount = branchStaff.filter((staff: { dutyStatus: string }) => staff.dutyStatus === "ON_DUTY").length;
+    const required = branch.requiredStaff || 5;
+    const status = onDutyCount >= required ? "adequate" : onDutyCount >= required * 0.8 ? "warning" : "understaffed";
+    
+    return {
+      branchId: branch.id,
+      branchName: branch.name,
+      totalStaff: branchStaff.length,
+      onDuty: onDutyCount,
+      required,
+      status: status as "adequate" | "understaffed" | "overstaffed",
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -56,6 +96,7 @@ export default async function StaffPage() {
           summary={summary}
           schedule={schedule}
           branches={branchList}
+          allStaff={rawStaff}
         />
       </Suspense>
     </div>

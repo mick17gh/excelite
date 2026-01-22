@@ -129,6 +129,44 @@ export async function getUsers() {
   }
 }
 
+export async function getUsersByBranch(branchId: string) {
+  try {
+    const users = await db.user.findMany({
+      where: { 
+        deletedAt: null,
+        branchId: branchId,
+        isActive: true
+      },
+      include: {
+        branch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const formattedUsers = users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      branchId: user.branchId,
+      branchName: user.branch?.name || null,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    }));
+
+    return { success: true, data: formattedUsers };
+  } catch (error) {
+    console.error("[getUsersByBranch] Error:", error);
+    return { success: false, error: "Failed to fetch users for branch", data: [] };
+  }
+}
+
 export async function getUserById(id: string) {
   try {
     const user = await db.user.findUnique({

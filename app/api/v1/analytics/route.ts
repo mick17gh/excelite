@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
             items: {
               include: {
                 menuItem: {
-                  select: { id: true, name: true, category: true },
+                  include: { category: true },
                 },
               },
             },
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
             if (!productData[id]) {
               productData[id] = {
                 name: item.menuItem?.name || "Unknown",
-                category: item.menuItem?.category || "Unknown",
+                category: item.menuItem?.category?.name || "Unknown",
                 quantity: 0,
                 revenue: 0,
               };

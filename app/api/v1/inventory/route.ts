@@ -139,17 +139,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create movement record
-    const movement = await db.stockMovement.create({
-      data: {
-        branchId,
-        itemId,
-        movementType: type,
-        quantity: Math.abs(quantity),
-        unitCost: unitCost || item.unitCost,
-        reference,
-      },
-    });
+    // Create movement record for outbound types
+    let movementId: string | null = null;
+    if (type !== "INBOUND") {
+      const movement = await db.outboundStock.create({
+        data: {
+          branchId,
+          itemId,
+          movementType: type as "OUTBOUND_SALE" | "OUTBOUND_WASTE" | "OUTBOUND_TRANSFER" | "ADJUSTMENT_DAMAGE" | "ADJUSTMENT_LOSS",
+          quantity: Math.abs(quantity),
+          reason,
+          reference,
+        },
+      });
+      movementId = movement.id;
+    }
 
     // Update inventory stock
     await db.inventoryItem.update({
@@ -164,9 +168,10 @@ export async function POST(request: NextRequest) {
     if (type === "OUTBOUND_WASTE") {
       await db.wasteLog.create({
         data: {
-          branchId,
-          itemId,
+          branch: { connect: { id: branchId } },
+          item: { connect: { id: itemId } },
           quantity: Math.abs(quantity),
+          unitCost: unitCost || item.unitCost,
           reason: reason || "API recorded waste",
           totalCost: Math.abs(quantity) * Number(item.unitCost),
           wasteDate: new Date(),
@@ -176,7 +181,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        movementId: movement.id,
+        movementId,
         itemId,
         type,
         quantity: Math.abs(quantity),

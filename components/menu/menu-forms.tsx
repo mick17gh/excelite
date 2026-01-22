@@ -46,6 +46,7 @@ interface MenuItem {
   id: string;
   name: string;
   sku: string;
+  categoryId?: string | null;
   category: string;
   price: number;
   cost: number;
@@ -54,10 +55,16 @@ interface MenuItem {
   isActive: boolean;
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 interface MenuFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item?: MenuItem | null;
+  categories?: CategoryOption[];
 }
 
 interface InventoryItemOption {
@@ -85,31 +92,17 @@ const unitOptions: { value: UnitType; label: string }[] = [
   { value: "PIECE", label: "Piece" },
   { value: "BOX", label: "Box" },
   { value: "CASE", label: "Case" },
-  { value: "DOZEN", label: "Dozen" },
+  { value: "PACK", label: "Pack" },
 ];
 
-const categories = [
-  "Appetizers",
-  "Main Course",
-  "Desserts",
-  "Beverages",
-  "Salads",
-  "Soups",
-  "Sides",
-  "Breakfast",
-  "Lunch",
-  "Dinner",
-  "Specials",
-  "Kids Menu",
-];
 
-export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "item">) {
+export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<MenuFormProps, "item">) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
-    category: "Main Course",
+    categoryId: categories.length > 0 ? categories[0].id : "",
     price: "",
     cost: "",
     description: "",
@@ -237,7 +230,7 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
       const result = await createMenuItem({
         name: formData.name,
         sku: formData.sku,
-        category: formData.category,
+        categoryId: formData.categoryId,
         price: parseFloat(formData.price),
         cost: calculatedCost ?? parseFloat(formData.cost),
         description: formData.description || undefined,
@@ -252,7 +245,7 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
         setFormData({
           name: "",
           sku: "",
-          category: "Main Course",
+          categoryId: categories.length > 0 ? categories[0].id : "",
           price: "",
           cost: "",
           description: "",
@@ -370,19 +363,25 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
                 <Label htmlFor="category">
                   Category <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
-                >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                {categories.length > 0 ? (
+                  <select
+                    id="category"
+                    value={formData.categoryId}
+                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    required
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-muted-foreground p-3 border rounded-md bg-muted/50">
+                    No categories available. Please create categories first in the Categories page.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="isActive">Status</Label>
@@ -579,13 +578,13 @@ export function AddMenuItemForm({ open, onOpenChange }: Omit<MenuFormProps, "ite
   );
 }
 
-export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
+export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: MenuFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: item?.name || "",
     sku: item?.sku || "",
-    category: item?.category || "Main Course",
+    categoryId: item?.categoryId || (categories.length > 0 ? categories[0].id : ""),
     price: item?.price.toString() || "",
     cost: item?.cost.toString() || "",
     description: item?.description || "",
@@ -604,7 +603,7 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
       setFormData({
         name: item.name,
         sku: item.sku,
-        category: item.category,
+        categoryId: item?.categoryId || (categories.length > 0 ? categories[0].id : ""),
         price: item.price.toString(),
         cost: item.cost.toString(),
         description: item.description || "",
@@ -613,7 +612,7 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
       });
       setImagePreview(item.imageUrl || null);
     }
-  }, [item]);
+  }, [item, categories]);
 
   // Load inventory items and existing ingredients when section opens
   useEffect(() => {
@@ -758,7 +757,7 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
         id: item.id,
         name: formData.name,
         sku: formData.sku,
-        category: formData.category,
+        categoryId: formData.categoryId,
         price: parseFloat(formData.price),
         cost: calculatedCost ?? parseFloat(formData.cost),
         description: formData.description || undefined,
@@ -878,19 +877,25 @@ export function EditMenuItemForm({ open, onOpenChange, item }: MenuFormProps) {
                 <Label htmlFor="edit-category">
                   Category <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  id="edit-category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
-                >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                {categories.length > 0 ? (
+                  <select
+                    id="edit-category"
+                    value={formData.categoryId}
+                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    required
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-muted-foreground p-3 border rounded-md bg-muted/50">
+                    No categories available. Please create categories first.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-isActive">Status</Label>

@@ -7,7 +7,7 @@ import { UnitType } from "@/lib/generated/prisma/client";
 export interface CreateMenuItemInput {
   name: string;
   sku: string;
-  category: string;
+  categoryId: string;
   price: number;
   cost: number;
   description?: string;
@@ -20,7 +20,7 @@ export interface UpdateMenuItemInput {
   id: string;
   name?: string;
   sku?: string;
-  category?: string;
+  categoryId?: string;
   price?: number;
   cost?: number;
   description?: string;
@@ -59,7 +59,7 @@ export async function createMenuItem(input: CreateMenuItemInput) {
       data: {
         name: input.name,
         sku: input.sku,
-        category: input.category,
+        categoryId: input.categoryId,
         price: input.price,
         cost: calculatedCost,
         description: input.description,
@@ -75,11 +75,22 @@ export async function createMenuItem(input: CreateMenuItemInput) {
           },
         }),
       },
+      include: {
+        category: true,
+      },
     });
 
     revalidatePath("/dashboard/menu");
     revalidatePath("/pos");
-    return { success: true, data: item };
+    return { 
+      success: true, 
+      data: {
+        ...item,
+        category: item.category?.name || "",
+        price: Number(item.price),
+        cost: Number(item.cost)
+      }
+    };
   } catch (error) {
     console.error("[createMenuItem] Error:", error);
     return { success: false, error: "Failed to create menu item" };
@@ -138,7 +149,7 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
       data: {
         ...(updateData.name && { name: updateData.name }),
         ...(updateData.sku && { sku: updateData.sku }),
-        ...(updateData.category && { category: updateData.category }),
+        ...(updateData.categoryId && { categoryId: updateData.categoryId }),
         ...(updateData.price !== undefined && { price: updateData.price }),
         ...(calculatedCost !== undefined && { cost: calculatedCost }),
         ...(updateData.description !== undefined && { description: updateData.description }),
@@ -149,7 +160,14 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
 
     revalidatePath("/dashboard/menu");
     revalidatePath("/pos");
-    return { success: true, data: item };
+    return { 
+      success: true, 
+      data: {
+        ...item,
+        price: Number(item.price),
+        cost: Number(item.cost)
+      }
+    };
   } catch (error) {
     console.error("[updateMenuItem] Error:", error);
     return { success: false, error: "Failed to update menu item" };
@@ -172,16 +190,19 @@ export async function deleteMenuItem(id: string) {
   }
 }
 
-export async function getMenuItems(category?: string, includeInactive = false) {
+export async function getMenuItems(categoryId?: string, includeInactive = false) {
   try {
     const items = await db.menuItem.findMany({
       where: {
         deletedAt: null,
-        ...(category && { category }),
+        ...(categoryId && { categoryId }),
         ...(!includeInactive && { isActive: true }),
       },
+      include: {
+        category: true,
+      },
       orderBy: [
-        { category: "asc" },
+        { category: { name: "asc" } },
         { name: "asc" },
       ],
     });
@@ -191,7 +212,8 @@ export async function getMenuItems(category?: string, includeInactive = false) {
       id: item.id,
       name: item.name,
       sku: item.sku,
-      category: item.category,
+      categoryId: item.categoryId,
+      category: item.category?.name || "",
       price: Number(item.price),
       cost: Number(item.cost),
       isActive: item.isActive,
@@ -237,16 +259,14 @@ export async function getMenuItemById(id: string) {
 
 export async function getMenuCategories() {
   try {
-    const items = await db.menuItem.findMany({
+    const categories = await db.category.findMany({
       where: { deletedAt: null, isActive: true },
-      select: { category: true },
-      distinct: ["category"],
-      orderBy: { category: "asc" },
+      orderBy: { name: "asc" },
     });
 
     return {
       success: true,
-      data: items.map((item) => item.category),
+      data: categories.map((cat) => ({ id: cat.id, name: cat.name })),
     };
   } catch (error) {
     console.error("[getMenuCategories] Error:", error);
@@ -260,6 +280,7 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
     const item = await db.menuItem.findUnique({
       where: { id: menuItemId, deletedAt: null },
       include: {
+        category: true,
         ingredients: {
           include: {
             inventoryItem: true,
@@ -278,7 +299,8 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
         id: item.id,
         name: item.name,
         sku: item.sku,
-        category: item.category,
+        categoryId: item.categoryId,
+        category: item.category?.name || "",
         price: Number(item.price),
         cost: Number(item.cost),
         description: item.description,

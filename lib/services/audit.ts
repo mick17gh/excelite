@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { AuditAction } from "@/lib/generated/prisma/client";
+import { AuditAction, Prisma } from "@/lib/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
@@ -51,8 +51,8 @@ export async function createAuditLog(input: AuditLogInput) {
         action: input.action,
         entityType: input.entityType,
         entityId: input.entityId,
-        oldValues: input.oldValues || null,
-        newValues: input.newValues || null,
+        oldValues: input.oldValues as Prisma.InputJsonValue | undefined,
+        newValues: input.newValues as Prisma.InputJsonValue | undefined,
         ipAddress,
         userAgent,
       },

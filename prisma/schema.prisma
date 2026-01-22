@@ -196,6 +196,19 @@ model Account {
   @@map("account")
 }
 
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+  @@index([identifier])
+}
+
+
 // ============================================
 // CORE BUSINESS MODELS
 // ============================================
@@ -211,12 +224,13 @@ model Branch {
   currency    String    @default("GHS")
   phone       String?
   email       String?
-  timezone    String    @default("Africa/Accra")
-  isActive    Boolean   @default(true)
-  openingDate DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  timezone      String    @default("Africa/Accra")
+  isActive      Boolean   @default(true)
+  openingDate   DateTime?
+  requiredStaff Int       @default(5)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   // Relations
   users              User[]
@@ -302,7 +316,7 @@ model MenuItem {
   id          String    @id @default(cuid())
   name        String
   sku         String    @unique
-  category    String
+  categoryId  String?
   price       Decimal   @db.Decimal(10, 2)
   cost        Decimal   @db.Decimal(10, 2)
   isActive    Boolean   @default(true)
@@ -313,12 +327,13 @@ model MenuItem {
   deletedAt   DateTime?
 
   // Relations
+  category    Category? @relation(fields: [categoryId], references: [id])
   saleItems   SaleItem[]
   posItems    PosOrderItem[]
   ingredients MenuItemIngredient[]
   manualLines ManualEntryLine[]
 
-  @@index([category])
+  @@index([categoryId])
   @@index([isActive])
   @@map("menu_item")
 }
@@ -395,6 +410,26 @@ model Transaction {
   @@index([transactionDate])
   @@index([branchId, transactionDate])
   @@map("transaction")
+}
+
+// ============================================
+// MENU CATEGORIES
+// ============================================
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  menuItems MenuItem[]
+
+  @@index([name])
+  @@map("category")
 }
 
 // ============================================

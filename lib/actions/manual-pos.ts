@@ -51,7 +51,16 @@ export async function createManualEntryBatchWithLines(
 
     revalidatePath("/dashboard/sales");
     revalidatePath("/dashboard");
-    return { success: true, data: batch };
+    return { 
+      success: true, 
+      data: {
+        ...batch,
+        lines: batch.lines.map(line => ({
+          ...line,
+          totalRevenue: Number(line.totalRevenue)
+        }))
+      }
+    };
   } catch (error) {
     console.error("[createManualEntryBatchWithLines] Error:", error);
     return {
