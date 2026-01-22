@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,6 +27,7 @@ import {
   Save,
   Loader2,
   X,
+  Calculator,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -32,6 +40,11 @@ import {
   updateNotificationPreferences,
   type NotificationPreferences,
 } from "@/lib/actions/settings";
+import {
+  getBranchTaxRate,
+  updateBranchTaxSettings,
+} from "@/lib/actions/tax";
+import { getBranches } from "@/lib/actions/branches";
 
 interface UserData {
   id: string;
@@ -85,14 +98,24 @@ export function SettingsContent() {
     staffShortageAlerts: true,
   });
 
+  // Tax configuration
+  const [branches, setBranches] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [selectedBranch, setSelectedBranch] = useState<string>("");
+  const [taxSettings, setTaxSettings] = useState({
+    taxRate: 12.5,
+    taxName: "VAT",
+    taxEnabled: true,
+  });
+
   // Load user data on mount
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [userResult, sessionsResult] = await Promise.all([
+        const [userResult, sessionsResult, branchesResult] = await Promise.all([
           getCurrentUser(),
           getActiveSessions(),
+          getBranches(),
         ]);
         
         if (userResult.success && userResult.data) {
@@ -107,6 +130,13 @@ export function SettingsContent() {
         if (sessionsResult.success && sessionsResult.data) {
           setSessions(sessionsResult.data);
         }
+
+        if (branchesResult.success && branchesResult.data) {
+          setBranches(branchesResult.data);
+          if (branchesResult.data.length > 0) {
+            setSelectedBranch(branchesResult.data[0].id);
+          }
+        }
       } catch (error) {
         console.error("Failed to load settings data:", error);
         toast.error("Failed to load settings");
@@ -117,6 +147,26 @@ export function SettingsContent() {
     
     loadData();
   }, []);
+
+  // Load tax settings when branch changes
+  useEffect(() => {
+    if (selectedBranch) {
+      loadTaxSettings(selectedBranch);
+    }
+  }, [selectedBranch]);
+
+  const loadTaxSettings = async (branchId: string) => {
+    try {
+      const settings = await getBranchTaxRate(branchId);
+      setTaxSettings({
+        taxRate: settings.rate,
+        taxName: settings.name,
+        taxEnabled: settings.enabled,
+      });
+    } catch (error) {
+      console.error("Failed to load tax settings:", error);
+    }
+  };
 
   const handleSaveProfile = () => {
     startTransition(async () => {
@@ -193,6 +243,23 @@ export function SettingsContent() {
     });
   };
 
+  const handleSaveTaxSettings = () => {
+    if (!selectedBranch) {
+      toast.error("Please select a branch");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateBranchTaxSettings(selectedBranch, taxSettings);
+      
+      if (result.success) {
+        toast.success("Tax settings updated successfully");
+      } else {
+        toast.error(result.error || "Failed to update tax settings");
+      }
+    });
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -253,6 +320,10 @@ export function SettingsContent() {
         <TabsTrigger value="appearance" className="text-xs">
           <Palette className="mr-1.5 h-3.5 w-3.5" />
           Appearance
+        </TabsTrigger>
+        <TabsTrigger value="tax" className="text-xs">
+          <Calculator className="mr-1.5 h-3.5 w-3.5" />
+          Tax Config
         </TabsTrigger>
       </TabsList>
 
@@ -545,13 +616,103 @@ export function SettingsContent() {
               <div className="space-y-0.5">
                 <Label className="text-sm">System Theme</Label>
                 <p className="text-xs text-muted-foreground">
-                  Follow your system's theme preference
+                  Follow your system&apos;s theme preference
                 </p>
               </div>
               <Switch
                 checked={theme === "system"}
                 onCheckedChange={(checked) => setTheme(checked ? "system" : "light")}
               />
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="tax">
+        <Card className="chart-card rounded-xl">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calculator className="h-4 w-4" />
+              Tax Configuration
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Configure tax settings for each branch
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 pt-0 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="branch-select" className="text-xs">Select Branch</Label>
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select a branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name} ({branch.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="tax-name" className="text-xs">Tax Name</Label>
+                <Input
+                  id="tax-name"
+                  value={taxSettings.taxName}
+                  onChange={(e) => setTaxSettings({ ...taxSettings, taxName: e.target.value })}
+                  placeholder="e.g., VAT, GST, Sales Tax"
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tax-rate" className="text-xs">Tax Rate (%)</Label>
+                <Input
+                  id="tax-rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={taxSettings.taxRate}
+                  onChange={(e) => setTaxSettings({ ...taxSettings, taxRate: parseFloat(e.target.value) || 0 })}
+                  className="h-9"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Enable Tax</Label>
+                <p className="text-xs text-muted-foreground">
+                  Apply tax to all transactions in this branch
+                </p>
+              </div>
+              <Switch
+                checked={taxSettings.taxEnabled}
+                onCheckedChange={(checked) => setTaxSettings({ ...taxSettings, taxEnabled: checked })}
+              />
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-3">
+              <p className="text-xs font-medium mb-1">Preview</p>
+              <p className="text-xs text-muted-foreground">
+                {taxSettings.taxEnabled 
+                  ? `${taxSettings.taxName} (${taxSettings.taxRate}%) will be applied to all transactions`
+                  : "Tax is disabled for this branch"}
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleSaveTaxSettings} disabled={isPending || !selectedBranch}>
+                {isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Save Tax Settings
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -81,7 +81,11 @@ export async function updateApiKey(input: UpdateApiKeyInput) {
       return { success: false, error: "Unauthorized" };
     }
 
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      scopes?: string;
+      isActive?: boolean;
+    } = {};
     if (input.name) updateData.name = input.name;
     if (input.scopes) updateData.scopes = input.scopes.join(",");
     if (input.isActive !== undefined) updateData.isActive = input.isActive;

@@ -457,55 +457,6 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
     });
   };
 
-  const handleOldAddSchedule = async () => {
-    if (!scheduleForm.staffId || !scheduleForm.date) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    // Find the selected staff member to get their branch
-    const selectedStaff = allStaff.find(staff => staff.id === scheduleForm.staffId);
-    if (!selectedStaff) {
-      toast.error("Selected staff member not found");
-      return;
-    }
-
-    const dateObj = new Date(scheduleForm.date);
-    const [startHour, startMin] = scheduleForm.shiftStart.split(":").map(Number);
-    const [endHour, endMin] = scheduleForm.shiftEnd.split(":").map(Number);
-
-    const shiftStart = new Date(dateObj);
-    shiftStart.setHours(startHour, startMin, 0, 0);
-
-    const shiftEnd = new Date(dateObj);
-    shiftEnd.setHours(endHour, endMin, 0, 0);
-
-    startTransition(async () => {
-      const result = await scheduleShift({
-        staffId: scheduleForm.staffId,
-        branchId: selectedStaff.branchId,
-        date: dateObj,
-        shiftStart,
-        shiftEnd,
-      });
-
-      if (result.success) {
-        toast.success("Shift scheduled successfully");
-        setIsScheduleOpen(false);
-        setScheduleForm({
-          staffId: "",
-          date: format(new Date(), "yyyy-MM-dd"),
-          shiftStart: "09:00",
-          shiftEnd: "17:00",
-          shiftTemplate: "",
-          selectedStaff: [],
-        });
-      } else {
-        toast.error(result.error || "Failed to schedule shift");
-      }
-    });
-  };
-
   const handleClockIn = async (staffId: string) => {
     setClockingStaffId(staffId);
     startTransition(async () => {

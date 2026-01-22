@@ -45,7 +45,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
-import { getTransactions } from "@/lib/actions/transactions";
+import { createTransaction, getTransactions } from "@/lib/actions/transactions";
+import { SalesChannel } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
 
 interface Branch {
@@ -83,6 +84,7 @@ interface Transaction {
   time: string;
   status: string;
 }
+
 
 interface TransactionsContentProps {
   branches: Branch[];
@@ -199,10 +201,9 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
     setIsSubmitting(true);
 
     try {
-      const { createTransaction } = await import("@/lib/actions/transactions");
       const result = await createTransaction({
         branchId: selectedBranch,
-        channel: channel as any,
+        channel: channel as SalesChannel,
         paymentMethod,
         tip: 0,
         customerCount,

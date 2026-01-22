@@ -251,7 +251,7 @@ export function ReportsContent({ branches }: ReportsContentProps) {
 
     return (
       <Dialog open={!!viewingReport} onOpenChange={() => setViewingReport(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0">
+        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b shrink-0">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
@@ -264,91 +264,95 @@ export function ReportsContent({ branches }: ReportsContentProps) {
             </p>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 px-6 py-4">
-            <div className="space-y-6">
-              {/* Summary Section */}
-              {summary && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-3">Summary</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {Object.entries(summary).map(([key, value]) => (
-                      <div key={key} className="rounded-lg border p-3">
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {key.replace(/([A-Z])/g, " $1").trim()}
-                        </p>
-                        <p className="text-sm font-semibold mt-1">
-                          {typeof value === "number"
-                            ? key.toLowerCase().includes("revenue") ||
-                              key.toLowerCase().includes("cost") ||
-                              key.toLowerCase().includes("profit") ||
-                              key.toLowerCase().includes("value")
-                              ? formatCurrency(value)
-                              : key.toLowerCase().includes("percentage") ||
-                                key.toLowerCase().includes("utilization")
-                              ? `${value}%`
-                              : value.toLocaleString()
-                            : String(value)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Array data sections */}
-              {Object.entries(data).map(([key, value]) => {
-                if (!Array.isArray(value) || value.length === 0) return null;
-                
-                return (
-                  <div key={key}>
-                    <h3 className="text-sm font-semibold mb-3 capitalize">
-                      {key.replace(/([A-Z])/g, " $1").trim()}
-                    </h3>
-                    <div className="rounded-lg border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            {Object.keys(value[0]).map((col) => (
-                              <th key={col} className="px-3 py-2 text-left text-xs font-medium capitalize">
-                                {col.replace(/([A-Z])/g, " $1").trim()}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {value.slice(0, 10).map((row, index) => (
-                            <tr key={index} className="border-t">
-                              {Object.entries(row as Record<string, unknown>).map(([col, val]) => (
-                                <td key={col} className="px-3 py-2 text-xs">
-                                  {typeof val === "number"
-                                    ? col.toLowerCase().includes("revenue") ||
-                                      col.toLowerCase().includes("cost") ||
-                                      col.toLowerCase().includes("value") ||
-                                      col.toLowerCase().includes("pay")
-                                      ? formatCurrency(val)
-                                      : col.toLowerCase().includes("percentage")
-                                      ? `${val}%`
-                                      : val.toLocaleString()
-                                    : String(val)}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {value.length > 10 && (
-                        <p className="text-xs text-muted-foreground text-center py-2 border-t">
-                          Showing 10 of {value.length} items
-                        </p>
-                      )}
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full px-6 py-4">
+              <div className="space-y-6 pr-4">
+                {/* Summary Section */}
+                {summary && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3">Summary</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {Object.entries(summary).map(([key, value]) => (
+                        <div key={key} className="rounded-lg border p-3">
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {key.replace(/([A-Z])/g, " $1").trim()}
+                          </p>
+                          <p className="text-sm font-semibold mt-1">
+                            {typeof value === "number"
+                              ? key.toLowerCase().includes("revenue") ||
+                                key.toLowerCase().includes("cost") ||
+                                key.toLowerCase().includes("profit") ||
+                                key.toLowerCase().includes("value")
+                                ? formatCurrency(value)
+                                : key.toLowerCase().includes("percentage") ||
+                                  key.toLowerCase().includes("utilization")
+                                ? `${value}%`
+                                : value.toLocaleString()
+                              : String(value)}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
+                )}
 
-          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t shrink-0">
+                {/* Array data sections */}
+                {Object.entries(data).map(([key, value]) => {
+                  if (!Array.isArray(value) || value.length === 0) return null;
+                  
+                  return (
+                    <div key={key}>
+                      <h3 className="text-sm font-semibold mb-3 capitalize">
+                        {key.replace(/([A-Z])/g, " $1").trim()}
+                      </h3>
+                      <div className="rounded-lg border overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="bg-muted/50">
+                              <tr>
+                                {Object.keys(value[0]).map((col) => (
+                                  <th key={col} className="px-3 py-2 text-left text-xs font-medium capitalize whitespace-nowrap">
+                                    {col.replace(/([A-Z])/g, " $1").trim()}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {value.map((row, index) => (
+                                <tr key={index} className="border-t">
+                                  {Object.entries(row as Record<string, unknown>).map(([col, val]) => (
+                                    <td key={col} className="px-3 py-2 text-xs whitespace-nowrap">
+                                      {typeof val === "number"
+                                        ? col.toLowerCase().includes("revenue") ||
+                                          col.toLowerCase().includes("cost") ||
+                                          col.toLowerCase().includes("value") ||
+                                          col.toLowerCase().includes("pay")
+                                          ? formatCurrency(val)
+                                          : col.toLowerCase().includes("percentage")
+                                          ? `${val}%`
+                                          : val.toLocaleString()
+                                        : String(val)}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {value.length > 20 && (
+                          <p className="text-xs text-muted-foreground text-center py-2 border-t bg-muted/30">
+                            Showing all {value.length} items
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t shrink-0 bg-background">
             <Button
               variant="outline"
               size="sm"

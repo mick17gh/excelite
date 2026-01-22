@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -615,13 +615,6 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     }
   }, [item, categories]);
 
-  // Load inventory items and existing ingredients when section opens
-  useEffect(() => {
-    if (isIngredientsOpen && item) {
-      loadData();
-    }
-  }, [isIngredientsOpen, item]);
-
   // Calculate cost when ingredients change
   useEffect(() => {
     if (ingredients.length > 0) {
@@ -636,7 +629,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     }
   }, [ingredients, inventoryItems]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!item) return;
     setIsLoadingIngredients(true);
     try {
@@ -665,7 +658,14 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     } finally {
       setIsLoadingIngredients(false);
     }
-  };
+  }, [item]);
+
+  // Load inventory items and existing ingredients when section opens
+  useEffect(() => {
+    if (isIngredientsOpen && item) {
+      loadData();
+    }
+  }, [isIngredientsOpen, item, loadData]);
 
   const addIngredient = () => {
     setIngredients([
