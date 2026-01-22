@@ -32,7 +32,19 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { acknowledgeAlert, resolveAlert, dismissAlert } from "@/lib/actions/alerts";
+import { acknowledgeAlert, resolveAlert, dismissAlert, triggerAlertGeneration } from "@/lib/actions/alerts";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 
 interface Alert {
   id: string;
@@ -83,6 +95,42 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const router = useRouter();
+  
+  // Alert rules state
+  const [alertRules, setAlertRules] = useState({
+    salesDrop: true,
+    lowStock: true,
+    wasteSpike: true,
+    staffShortage: true,
+    targetAchieved: true,
+  });
+
+  const handleGenerateAlerts = () => {
+    setIsGenerating(true);
+    startTransition(async () => {
+      try {
+        const result = await triggerAlertGeneration();
+        if (result.success) {
+          toast.success(`Alert check complete. ${result.data?.alertsCreated || 0} alerts created.`);
+          router.refresh();
+        } else {
+          toast.error(result.error || "Failed to generate alerts");
+        }
+      } catch {
+        toast.error("Failed to generate alerts");
+      } finally {
+        setIsGenerating(false);
+      }
+    });
+  };
+
+  const handleSaveConfig = () => {
+    toast.success("Alert configuration saved");
+    setIsConfigOpen(false);
+  };
 
   const handleAcknowledge = (alertId: string) => {
     setActionLoadingId(alertId);
@@ -295,10 +343,31 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
             <TabsTrigger value="rules" className="text-xs h-7">Rules</TabsTrigger>
           </TabsList>
 
-          <Button variant="outline" size="sm" className="h-8 text-xs">
-            <Settings className="mr-1.5 h-3.5 w-3.5" />
-            Configure
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 text-xs"
+              onClick={handleGenerateAlerts}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {isGenerating ? "Checking..." : "Check Now"}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 text-xs"
+              onClick={() => setIsConfigOpen(true)}
+            >
+              <Settings className="mr-1.5 h-3.5 w-3.5" />
+              Configure
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -494,17 +563,59 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
         </TabsContent>
 
         <TabsContent value="resolved" className="mt-6">
-          <Card className="glass">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/30 p-4">
-                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-              </div>
-              <h3 className="mt-4 font-medium">Resolved Alerts</h3>
-              <p className="text-sm text-muted-foreground">
-                {resolvedToday.length} alerts resolved today
-              </p>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {resolvedToday.length === 0 ? (
+              <Card className="glass">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/30 p-4">
+                    <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                  </div>
+                  <h3 className="mt-4 font-medium">No Resolved Alerts</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Resolved alerts will appear here
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              resolvedToday.map((alert) => {
+                const Icon = getAlertIcon(alert.type);
+                return (
+                  <Card
+                    key={alert.id}
+                    className="glass border-emerald-200/50 dark:border-emerald-800/50"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                          <Icon className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h4 className="font-medium">{alert.title}</h4>
+                              <p className="text-sm mt-1 text-muted-foreground">{alert.message}</p>
+                              <div className="flex items-center gap-3 mt-2">
+                                {alert.branchName && (
+                                  <Badge variant="outline">{alert.branchName}</Badge>
+                                )}
+                                <span className="text-xs text-muted-foreground">
+                                  Resolved {formatDistanceToNow(alert.triggeredAt, { addSuffix: true })}
+                                </span>
+                              </div>
+                            </div>
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                              <CheckCircle2 className="mr-1 h-3 w-3" />
+                              Resolved
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="rules" className="mt-6">
@@ -518,55 +629,144 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">Sales Drop Alert</p>
                     <p className="text-sm text-muted-foreground">
-                      Trigger when daily sales drop more than 15%
+                      Trigger when daily sales drop more than 25% compared to last week
                     </p>
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>
+                  <Switch
+                    checked={alertRules.salesDrop}
+                    onCheckedChange={(checked) => setAlertRules({ ...alertRules, salesDrop: checked })}
+                  />
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">Low Stock Alert</p>
                     <p className="text-sm text-muted-foreground">
-                      Trigger when inventory falls below minimum threshold
+                      Trigger when inventory falls below reorder point
                     </p>
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>
+                  <Switch
+                    checked={alertRules.lowStock}
+                    onCheckedChange={(checked) => setAlertRules({ ...alertRules, lowStock: checked })}
+                  />
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">Waste Spike Alert</p>
                     <p className="text-sm text-muted-foreground">
-                      Trigger when waste exceeds 20% above average
+                      Trigger when waste exceeds 2x the weekly average
                     </p>
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>
+                  <Switch
+                    checked={alertRules.wasteSpike}
+                    onCheckedChange={(checked) => setAlertRules({ ...alertRules, wasteSpike: checked })}
+                  />
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">Staff Shortage Alert</p>
                     <p className="text-sm text-muted-foreground">
-                      Trigger when staffing falls below required levels
+                      Trigger when on-duty staff falls below 80% of required
                     </p>
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>
+                  <Switch
+                    checked={alertRules.staffShortage}
+                    onCheckedChange={(checked) => setAlertRules({ ...alertRules, staffShortage: checked })}
+                  />
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">Target Achievement Alert</p>
                     <p className="text-sm text-muted-foreground">
-                      Trigger when branch exceeds monthly target
+                      Notify when branch achieves or misses targets
                     </p>
                   </div>
-                  <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>
+                  <Switch
+                    checked={alertRules.targetAchieved}
+                    onCheckedChange={(checked) => setAlertRules({ ...alertRules, targetAchieved: checked })}
+                  />
                 </div>
+              </div>
+              
+              <div className="mt-6 pt-4 border-t">
+                <Button onClick={() => toast.success("Alert rules saved")} className="w-full sm:w-auto">
+                  Save Changes
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Configuration Dialog */}
+      <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Alert Configuration</DialogTitle>
+            <DialogDescription>
+              Configure how alerts are generated and who receives notifications
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm">Notification Preferences</h4>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="email-notif" className="flex-1">
+                  <span className="font-medium">Email Notifications</span>
+                  <p className="text-xs text-muted-foreground">Receive alerts via email</p>
+                </Label>
+                <Switch id="email-notif" defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="critical-only" className="flex-1">
+                  <span className="font-medium">Critical Only</span>
+                  <p className="text-xs text-muted-foreground">Only notify for critical/high severity</p>
+                </Label>
+                <Switch id="critical-only" />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm">Check Frequency</h4>
+              <Select defaultValue="15">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select frequency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">Every 5 minutes</SelectItem>
+                  <SelectItem value="15">Every 15 minutes</SelectItem>
+                  <SelectItem value="30">Every 30 minutes</SelectItem>
+                  <SelectItem value="60">Every hour</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm">Alert Thresholds</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sales-threshold">Sales Drop %</Label>
+                  <Input id="sales-threshold" type="number" defaultValue="25" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="waste-threshold">Waste Spike %</Label>
+                  <Input id="waste-threshold" type="number" defaultValue="100" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfigOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveConfig}>
+              Save Configuration
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

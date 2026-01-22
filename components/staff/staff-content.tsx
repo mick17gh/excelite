@@ -47,11 +47,13 @@ import {
   Loader2,
   CalendarDays,
   DollarSign,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { scheduleShift, clockIn, clockOut, getWeeklySchedule, getTimesheetData } from "@/lib/actions/staff";
 import { AddStaffForm } from "./staff-forms";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 
 interface StaffSummary {
@@ -170,6 +172,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
   
   // Add staff dialog state
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   const totalStaff = summary.reduce((sum, s) => sum + s.totalStaff, 0);
   const totalOnDuty = summary.reduce((sum, s) => sum + s.onDuty, 0);
@@ -664,6 +667,10 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
           </TabsList>
 
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setIsBulkImportOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import CSV
+            </Button>
             <Button variant="outline" size="sm" className="h-8" onClick={() => setIsAddStaffOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add Staff
@@ -1220,6 +1227,15 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
         open={isAddStaffOpen} 
         onOpenChange={setIsAddStaffOpen} 
         branches={branches} 
+      />
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={isBulkImportOpen}
+        onOpenChange={setIsBulkImportOpen}
+        type="staff"
+        branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+        onSuccess={() => window.location.reload()}
       />
     </div>
   );

@@ -169,13 +169,53 @@ export async function getTargets(branchId?: string, targetType?: string) {
       ],
     });
 
+    // Calculate current values from actual sales data
+    const targetsWithCurrentValues = await Promise.all(
+      targets.map(async (target) => {
+        let currentValue = 0;
+
+        // Get sales within the target period for this branch
+        const sales = await db.sale.findMany({
+          where: {
+            branchId: target.branchId,
+            deletedAt: null,
+            saleDate: {
+              gte: target.periodStart,
+              lte: target.periodEnd,
+            },
+          },
+        });
+
+        switch (target.targetType) {
+          case "REVENUE":
+            currentValue = sales.reduce((sum, s) => sum + Number(s.total), 0);
+            break;
+          case "TRANSACTIONS":
+            currentValue = sales.length;
+            break;
+          case "AVERAGE_TICKET":
+            const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
+            currentValue = sales.length > 0 ? totalRevenue / sales.length : 0;
+            break;
+          case "CUSTOMERS":
+            currentValue = sales.reduce((sum, s) => sum + (s.customerCount || 1), 0);
+            break;
+          default:
+            // For any unknown type, default to counting transactions
+            currentValue = sales.length;
+        }
+
+        return {
+          ...target,
+          targetValue: Number(target.targetValue),
+          currentValue: Math.round(currentValue * 100) / 100,
+        };
+      })
+    );
+
     return {
       success: true,
-      data: targets.map((t) => ({
-        ...t,
-        targetValue: Number(t.targetValue),
-        currentValue: Number(t.currentValue),
-      })),
+      data: targetsWithCurrentValues,
     };
   } catch (error) {
     console.error("[getTargets] Error:", error);
@@ -202,12 +242,43 @@ export async function getTargetById(id: string) {
       return { success: false, error: "Target not found" };
     }
 
+    // Calculate current value from actual sales data
+    const sales = await db.sale.findMany({
+      where: {
+        branchId: target.branchId,
+        deletedAt: null,
+        saleDate: {
+          gte: target.periodStart,
+          lte: target.periodEnd,
+        },
+      },
+    });
+
+    let currentValue = 0;
+    switch (target.targetType) {
+      case "REVENUE":
+        currentValue = sales.reduce((sum, s) => sum + Number(s.total), 0);
+        break;
+      case "TRANSACTIONS":
+        currentValue = sales.length;
+        break;
+      case "AVERAGE_TICKET":
+        const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
+        currentValue = sales.length > 0 ? totalRevenue / sales.length : 0;
+        break;
+      case "CUSTOMERS":
+        currentValue = sales.reduce((sum, s) => sum + (s.customerCount || 1), 0);
+        break;
+      default:
+        currentValue = sales.length;
+    }
+
     return {
       success: true,
       data: {
         ...target,
         targetValue: Number(target.targetValue),
-        currentValue: Number(target.currentValue),
+        currentValue: Math.round(currentValue * 100) / 100,
       },
     };
   } catch (error) {

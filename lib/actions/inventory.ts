@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { InventoryCategory, UnitType, StockMovementType } from "@/lib/generated/prisma/client";
+import { InventoryCategory, UnitType, StockMovementType, TransferStatus } from "@/lib/generated/prisma/client";
 import { logCreate, logTransfer } from "@/lib/services/audit";
 
 export interface CreateInventoryItemInput {
@@ -11,6 +11,7 @@ export interface CreateInventoryItemInput {
   category: InventoryCategory;
   unit: UnitType;
   unitCost: number;
+  currentStock?: number;
   minStock: number;
   maxStock: number;
   reorderPoint: number;
@@ -42,7 +43,7 @@ export async function createInventoryItem(input: CreateInventoryItemInput) {
         maxStock: input.maxStock,
         reorderPoint: input.reorderPoint,
         branchId: input.branchId,
-        currentStock: 0,
+        currentStock: input.currentStock ?? 0,
         isActive: true,
       },
     });
@@ -202,7 +203,15 @@ export async function recordInbound(input: RecordInboundInput) {
     );
 
     revalidatePath("/dashboard/inventory");
-    return { success: true, data: inbound };
+    return { 
+      success: true, 
+      data: {
+        ...inbound,
+        quantity: Number(inbound.quantity),
+        unitCost: Number(inbound.unitCost),
+        totalCost: Number(inbound.totalCost),
+      }
+    };
   } catch (error) {
     console.error("[recordInbound] Error:", error);
     return { success: false, error: "Failed to record inbound stock" };
@@ -243,7 +252,13 @@ export async function recordOutbound(input: RecordOutboundInput) {
     });
 
     revalidatePath("/dashboard/inventory");
-    return { success: true, data: outbound };
+    return { 
+      success: true, 
+      data: {
+        ...outbound,
+        quantity: Number(outbound.quantity),
+      }
+    };
   } catch (error) {
     console.error("[recordOutbound] Error:", error);
     return { success: false, error: "Failed to record outbound stock" };
@@ -308,7 +323,15 @@ export async function recordWaste(input: RecordWasteInput) {
     });
 
     revalidatePath("/dashboard/inventory");
-    return { success: true, data: wasteLog };
+    return { 
+      success: true, 
+      data: {
+        ...wasteLog,
+        quantity: Number(wasteLog.quantity),
+        unitCost: Number(wasteLog.unitCost),
+        totalCost: Number(wasteLog.totalCost),
+      }
+    };
   } catch (error) {
     console.error("[recordWaste] Error:", error);
     return { success: false, error: "Failed to record waste" };
@@ -349,7 +372,7 @@ export async function transferStock(input: TransferStockInput) {
         transferDate: new Date(),
         approvedBy: input.approvedBy,
         notes: input.notes,
-        status: "COMPLETED",
+        status: TransferStatus.COMPLETED,
       },
     });
 
@@ -401,7 +424,15 @@ export async function transferStock(input: TransferStockInput) {
     );
 
     revalidatePath("/dashboard/inventory");
-    return { success: true, data: transfer };
+    return { 
+      success: true, 
+      data: {
+        ...transfer,
+        quantity: Number(transfer.quantity),
+        unitCost: Number(transfer.unitCost),
+        totalCost: Number(transfer.totalCost),
+      }
+    };
   } catch (error) {
     console.error("[transferStock] Error:", error);
     return { success: false, error: "Failed to transfer stock" };
@@ -449,6 +480,92 @@ export async function createSupplier(input: CreateSupplierInput) {
   } catch (error) {
     console.error("[createSupplier] Error:", error);
     return { success: false, error: "Failed to create supplier" };
+  }
+}
+
+export async function getInboundRecords(branchId?: string) {
+  try {
+    const records = await db.inboundStock.findMany({
+      where: branchId ? { branchId } : {},
+      include: {
+        item: { select: { name: true, sku: true } },
+        supplier: { select: { name: true } },
+        branch: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    return {
+      success: true,
+      data: records.map(record => ({
+        ...record,
+        quantity: Number(record.quantity),
+        unitCost: Number(record.unitCost),
+        totalCost: Number(record.totalCost),
+      })),
+    };
+  } catch (error) {
+    console.error("[getInboundRecords] Error:", error);
+    return { success: false, error: "Failed to fetch inbound records" };
+  }
+}
+
+export async function getOutboundRecords(branchId?: string) {
+  try {
+    const records = await db.outboundStock.findMany({
+      where: branchId ? { branchId } : {},
+      include: {
+        item: { select: { name: true, sku: true } },
+        branch: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    return {
+      success: true,
+      data: records.map(record => ({
+        ...record,
+        quantity: Number(record.quantity),
+      })),
+    };
+  } catch (error) {
+    console.error("[getOutboundRecords] Error:", error);
+    return { success: false, error: "Failed to fetch outbound records" };
+  }
+}
+
+export async function getTransferRecords(branchId?: string) {
+  try {
+    const records = await db.transferLog.findMany({
+      where: branchId ? { 
+        OR: [
+          { fromBranchId: branchId },
+          { toBranchId: branchId }
+        ]
+      } : {},
+      include: {
+        item: { select: { name: true, sku: true } },
+        fromBranch: { select: { name: true } },
+        toBranch: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    return {
+      success: true,
+      data: records.map(record => ({
+        ...record,
+        quantity: Number(record.quantity),
+        unitCost: Number(record.unitCost),
+        totalCost: Number(record.totalCost),
+      })),
+    };
+  } catch (error) {
+    console.error("[getTransferRecords] Error:", error);
+    return { success: false, error: "Failed to fetch transfer records" };
   }
 }
 

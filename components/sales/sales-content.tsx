@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownRight,
+  Loader2,
 } from "lucide-react";
 import { RevenueChart } from "@/components/dashboard/charts/revenue-chart";
 import { SalesByChannelChart } from "@/components/dashboard/charts/sales-by-channel";
@@ -27,6 +28,7 @@ import { subDays } from "date-fns";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
+import { getSalesAnalyticsData } from "@/lib/actions/transactions";
 import {
   Bar,
   BarChart,
@@ -50,13 +52,13 @@ interface SalesContentProps {
 }
 
 export function SalesContent({
-  revenueData,
-  salesByChannel,
-  salesByDaypart,
-  topItems,
-  worstItems,
+  revenueData: initialRevenueData,
+  salesByChannel: initialSalesByChannel,
+  salesByDaypart: initialSalesByDaypart,
+  topItems: initialTopItems,
+  worstItems: initialWorstItems,
   branches,
-  hourlyData,
+  hourlyData: initialHourlyData,
 }: SalesContentProps) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
@@ -65,12 +67,48 @@ export function SalesContent({
   const [selectedBranches, setSelectedBranches] = useState<string[]>(
     branches.map((b) => b.id)
   );
+  const [isPending, startTransition] = useTransition();
+
+  // State for dynamic data
+  const [revenueData, setRevenueData] = useState(initialRevenueData);
+  const [salesByChannel, setSalesByChannel] = useState(initialSalesByChannel);
+  const [salesByDaypart, setSalesByDaypart] = useState(initialSalesByDaypart);
+  const [topItems, setTopItems] = useState(initialTopItems);
+  const [worstItems, setWorstItems] = useState(initialWorstItems);
+  const [hourlyData, setHourlyData] = useState(initialHourlyData);
 
   const { formatCurrency } = useCurrency();
   
   // Set currency based on first selected branch
   const firstBranchId = selectedBranches.length > 0 ? selectedBranches[0] : null;
   useBranchCurrency(firstBranchId, branches);
+
+  // Refetch data when filters change
+  const fetchData = useCallback(async () => {
+    if (!dateRange?.from || !dateRange?.to) return;
+    
+    startTransition(async () => {
+      const result = await getSalesAnalyticsData(
+        selectedBranches.length > 0 ? selectedBranches : undefined,
+        dateRange.from,
+        dateRange.to
+      );
+      
+      if (result.success && result.data) {
+        setRevenueData(result.data.revenueData);
+        setSalesByChannel(result.data.salesByChannel);
+        setSalesByDaypart(result.data.salesByDaypart);
+        setTopItems(result.data.topItems);
+        setWorstItems(result.data.worstItems);
+        setHourlyData(result.data.hourlyData);
+      }
+    });
+  }, [dateRange, selectedBranches]);
+
+  // Refetch when date range or selected branches change
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const totalRevenue = revenueData.reduce((sum, d) => sum + d.revenue, 0);
   const avgDailyRevenue = revenueData.length > 0 ? totalRevenue / revenueData.length : 0;
@@ -97,6 +135,9 @@ export function SalesContent({
             onSelect={setDateRange}
             currentRange={dateRange}
           />
+          {isPending && (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          )}
         </div>
         <Button
           variant="outline"

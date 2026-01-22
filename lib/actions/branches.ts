@@ -37,21 +37,38 @@ export interface UpdateBranchInput {
 
 export async function createBranch(input: CreateBranchInput) {
   try {
+    // Input validation
+    if (!input.name?.trim()) {
+      return { success: false, error: "Branch name is required" };
+    }
+    if (!input.code?.trim()) {
+      return { success: false, error: "Branch code is required" };
+    }
+    if (!input.address?.trim()) {
+      return { success: false, error: "Branch address is required" };
+    }
+    if (!input.city?.trim()) {
+      return { success: false, error: "City is required" };
+    }
+    if (input.requiredStaff && input.requiredStaff < 1) {
+      return { success: false, error: "Required staff must be at least 1" };
+    }
+
     const branch = await db.branch.create({
       data: {
-        name: input.name,
-        code: input.code,
-        address: input.address,
-        city: input.city,
-        state: input.state,
-        country: input.country,
-        currency: input.currency,
-        phone: input.phone,
-        email: input.email,
-        timezone: input.timezone,
+        name: input.name.trim(),
+        code: input.code.trim().toUpperCase(),
+        address: input.address.trim(),
+        city: input.city.trim(),
+        state: input.state?.trim(),
+        country: input.country?.trim() || "GH",
+        currency: input.currency?.trim() || "GHS",
+        timezone: input.timezone?.trim() || "Africa/Accra",
+        phone: input.phone?.trim(),
+        email: input.email?.trim(),
         openingDate: input.openingDate,
         requiredStaff: input.requiredStaff || 5,
-        isActive: input.isActive,
+        isActive: input.isActive ?? true,
       },
     });
 

@@ -25,7 +25,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -40,13 +39,13 @@ import {
   X,
   CheckCircle2,
   Search,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { getTransactions } from "@/lib/actions/transactions";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 interface Branch {
@@ -92,7 +91,6 @@ interface TransactionsContentProps {
 
 export function TransactionsContent({ branches, menuItems }: TransactionsContentProps) {
   const { formatCurrency, formatCurrencyShort } = useCurrency();
-  const router = useRouter();
   const [selectedBranch, setSelectedBranch] = useState<string>(branches[0]?.id || "");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [channel, setChannel] = useState<string>("DINE_IN");
@@ -101,6 +99,7 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Auto-set currency based on selected branch
@@ -196,6 +195,9 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
       return;
     }
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
       const { createTransaction } = await import("@/lib/actions/transactions");
       const result = await createTransaction({
@@ -241,6 +243,8 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
     } catch (error) {
       console.error("Error creating transaction:", error);
       toast.error("Failed to record transaction");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -462,11 +466,15 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
 
                   <Button
                     onClick={handleSubmitSale}
-                    disabled={cart.length === 0}
+                    disabled={cart.length === 0 || isSubmitting}
                     className="w-full h-10"
                   >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Complete Sale ({formatCurrency(grandTotal)})
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    {isSubmitting ? "Processing..." : `Complete Sale (${formatCurrency(grandTotal)})`}
                   </Button>
                 </div>
               </div>
@@ -541,7 +549,7 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
       {/* Recent Transactions */}
       <Card className="chart-card rounded-xl">
         <CardHeader className="py-3 px-4">
-          <CardTitle className="text-base">Today's Transactions</CardTitle>
+          <CardTitle className="text-base">Today&apos;s Transactions</CardTitle>
           <CardDescription className="text-xs">
             {format(new Date(), "EEEE, MMMM d, yyyy")}
           </CardDescription>

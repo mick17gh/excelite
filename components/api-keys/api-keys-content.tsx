@@ -22,6 +22,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -38,12 +44,13 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  BookOpen,
+  Code,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { createApiKey, deleteApiKey, updateApiKey, type ApiScope } from "@/lib/actions/api-keys";
 import { formatDistanceToNow } from "date-fns";
-import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
@@ -172,8 +179,21 @@ export function ApiKeysContent({ apiKeys, branches }: ApiKeysContentProps) {
 
   return (
     <div className="space-y-4">
-      {/* Summary Cards - Compact */}
-      <div className="grid gap-2 sm:gap-3 grid-cols-3">
+      <Tabs defaultValue="keys" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="keys" className="flex items-center gap-2">
+            <Key className="h-4 w-4" />
+            API Keys
+          </TabsTrigger>
+          <TabsTrigger value="docs" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Documentation
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="keys" className="space-y-4">
+          {/* Summary Cards - Compact */}
+          <div className="grid gap-2 sm:gap-3 grid-cols-3">
         <Card className="kpi-card rounded-xl">
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
@@ -353,17 +373,268 @@ export function ApiKeysContent({ apiKeys, branches }: ApiKeysContentProps) {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="docs" className="space-y-6">
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Code className="h-5 w-5" />
+                API Documentation
+              </CardTitle>
+              <CardDescription>
+                Learn how to integrate with the Dinelytix API using your API keys
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Base URL */}
+              <div>
+                <h3 className="font-semibold mb-2">Base URL</h3>
+                <div className="bg-muted p-3 rounded-lg">
+                  <code className="text-sm font-mono">{process.env.NEXT_PUBLIC_APP_URL}/api/v1</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-2 h-6 w-6 p-0"
+                    onClick={() => copyToClipboard(`${process.env.NEXT_PUBLIC_APP_URL}/api/v1`)}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Authentication */}
+              <div>
+                <h3 className="font-semibold mb-2">Authentication</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Include your API key using either method:
+                </p>
+                
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Option 1: x-api-key Header (Recommended)</h4>
+                    <div className="bg-muted p-3 rounded-lg">
+                      <code className="text-sm font-mono">x-api-key: YOUR_API_KEY</code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-2 h-6 w-6 p-0"
+                        onClick={() => copyToClipboard("x-api-key: YOUR_API_KEY")}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Option 2: Authorization Bearer</h4>
+                    <div className="bg-muted p-3 rounded-lg">
+                      <code className="text-sm font-mono">Authorization: Bearer YOUR_API_KEY</code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-2 h-6 w-6 p-0"
+                        onClick={() => copyToClipboard("Authorization: Bearer YOUR_API_KEY")}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Available Endpoints */}
+              <div>
+                <h3 className="font-semibold mb-3">Available Endpoints</h3>
+                <div className="space-y-4">
+                  {/* Menu Endpoints */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Badge variant="outline">menu:read</Badge>
+                      Menu Items
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">GET</Badge>
+                        <code>/menu</code>
+                        <span className="text-muted-foreground">- Get all menu items</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">GET</Badge>
+                        <code>/menu/{"{id}"}</code>
+                        <span className="text-muted-foreground">- Get specific menu item</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Categories Endpoints */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Badge variant="outline">categories:read</Badge>
+                      Categories
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">GET</Badge>
+                        <code>/categories</code>
+                        <span className="text-muted-foreground">- Get all categories</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Branches Endpoints */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Badge variant="outline">branches:read</Badge>
+                      Branches
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">GET</Badge>
+                        <code>/branches</code>
+                        <span className="text-muted-foreground">- Get all branches</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Inventory Endpoints */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Badge variant="outline">inventory:read</Badge>
+                      Inventory
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">GET</Badge>
+                        <code>/inventory</code>
+                        <span className="text-muted-foreground">- Get inventory items</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">GET</Badge>
+                        <code>/inventory/stock-levels</code>
+                        <span className="text-muted-foreground">- Get stock levels</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sales Endpoints */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Badge variant="outline">sales:read</Badge>
+                      Sales (Restricted)
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">GET</Badge>
+                        <code>/sales/summary</code>
+                        <span className="text-muted-foreground">- Get sales summary</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Code Examples */}
+              <div>
+                <h3 className="font-semibold mb-3">Code Examples</h3>
+                <div className="space-y-4">
+                  {/* JavaScript Example */}
+                  <div>
+                    <h4 className="font-medium mb-2">JavaScript (fetch)</h4>
+                    <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
+                      <pre>{`// Get menu items
+fetch('${process.env.NEXT_PUBLIC_APP_URL}/api/v1/menu', {
+  headers: {
+    'x-api-key': 'YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  }
+})
+.then(response => response.json())
+.then(data => console.log(data));`}</pre>
+                    </div>
+                  </div>
+
+                  {/* cURL Example */}
+                  <div>
+                    <h4 className="font-medium mb-2">cURL</h4>
+                    <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
+                      <pre>{`curl -X GET "${process.env.NEXT_PUBLIC_APP_URL}/api/v1/menu" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "Content-Type: application/json"`}</pre>
+                    </div>
+                  </div>
+
+                  {/* Python Example */}
+                  <div>
+                    <h4 className="font-medium mb-2">Python (requests)</h4>
+                    <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
+                      <pre>{`import requests
+
+headers = {
+    'x-api-key': 'YOUR_API_KEY',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get(
+    '${process.env.NEXT_PUBLIC_APP_URL}/api/v1/menu',
+    headers=headers
+)
+
+data = response.json()
+print(data)`}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Response Format */}
+              <div>
+                <h3 className="font-semibold mb-3">Response Format</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  All API responses follow this standard format:
+                </p>
+                <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
+                  <pre>{`{
+  "success": true,
+  "data": [...],
+  "error": null,
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 100
+  }
+}`}</pre>
+                </div>
+              </div>
+
+              {/* Rate Limits */}
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">Rate Limits</p>
+                    <p className="text-amber-700 dark:text-amber-300">
+                      API requests are limited to 1000 requests per hour per API key. 
+                      Contact support if you need higher limits.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Create API Key Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Create API Key</DialogTitle>
             <DialogDescription>
               Generate a new API key for external integrations. The key will be shown only once.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto flex-1">
             <div className="space-y-2">
               <Label htmlFor="name">
                 Key Name <span className="text-destructive">*</span>
@@ -469,7 +740,7 @@ export function ApiKeysContent({ apiKeys, branches }: ApiKeysContentProps) {
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
                 <p className="text-xs text-red-800 dark:text-red-200">
-                  This is the only time you'll see this key. Store it securely.
+                  This is the only time you&apos;ll see this key. Store it securely.
                 </p>
               </div>
             </div>

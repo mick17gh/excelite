@@ -29,107 +29,142 @@ import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { Role } from "@/lib/generated/prisma/client";
+import { hasPermission, type Permission } from "@/lib/permissions";
 
-const navigation = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  permission?: Permission;
+}
+
+const navigation: NavItem[] = [
   {
     name: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+    permission: "dashboard:view",
   },
   {
     name: "Manual POS Entry",
     href: "/dashboard/transactions/manual",
     icon: Receipt,
+    permission: "transactions:manual",
   },
   {
     name: "Transactions",
     href: "/dashboard/transactions",
     icon: Receipt,
+    permission: "transactions:view",
   },
   {
     name: "Branches",
     href: "/dashboard/branches",
     icon: Building2,
+    permission: "branches:view",
   },
   {
     name: "Sales Analytics",
     href: "/dashboard/sales",
     icon: TrendingUp,
+    permission: "sales:view",
   },
   {
     name: "Inventory",
     href: "/dashboard/inventory",
     icon: Package,
+    permission: "inventory:view",
   },
   {
     name: "Menu Management",
     href: "/dashboard/menu",
     icon: UtensilsCrossed,
+    permission: "menu:view",
   },
   {
     name: "Categories",
     href: "/dashboard/categories",
     icon: Tag,
+    permission: "categories:view",
   },
   {
     name: "Branch Targets",
     href: "/dashboard/targets",
     icon: Target,
+    permission: "targets:view",
   },
   {
     name: "Staff",
     href: "/dashboard/staff",
     icon: Users,
+    permission: "staff:view",
   },
   {
     name: "Alerts",
     href: "/dashboard/alerts",
     icon: Bell,
+    permission: "alerts:view",
   },
   {
     name: "Reports",
     href: "/dashboard/reports",
     icon: FileText,
+    permission: "reports:view",
   },
   {
     name: "API Keys",
     href: "/dashboard/api-keys",
     icon: Key,
+    permission: "api-keys:view",
   },
   {
     name: "Kitchen (KDS)",
     href: "/kitchen",
     icon: Users,
+    permission: "kitchen:access",
   },
   {
     name: "POS",
     href: "/pos",
     icon: Receipt,
+    permission: "pos:access",
   },
 ];
 
-const bottomNavigation = [
+const bottomNavigation: NavItem[] = [
   {
     name: "User Management",
     href: "/dashboard/users",
     icon: UserCog,
+    permission: "users:view",
   },
   {
     name: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
+    permission: "settings:view",
   },
 ];
 
 interface SidebarProps {
   className?: string;
+  userRole?: Role;
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, userRole = "CASHIER" }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // Filter navigation items based on user permissions
+  const filteredNavigation = navigation.filter(
+    (item) => !item.permission || hasPermission(userRole, item.permission)
+  );
+  const filteredBottomNavigation = bottomNavigation.filter(
+    (item) => !item.permission || hasPermission(userRole, item.permission)
+  );
 
   const handleSignOut = async () => {
     try {
@@ -195,7 +230,7 @@ export function Sidebar({ className }: SidebarProps) {
 
       <ScrollArea className="flex-1 px-3 py-4 overflow-y-auto">
         <nav className="space-y-1 min-w-0">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             // Use exact matching to prevent parent routes from being active when on child routes
             // Exception: /dashboard only matches exact
             const isActive = pathname === item.href;
@@ -229,7 +264,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className="px-3 pb-4">
         <Separator className="mb-4 bg-sidebar-border" />
         <nav className="space-y-1">
-          {bottomNavigation.map((item) => {
+          {filteredBottomNavigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link

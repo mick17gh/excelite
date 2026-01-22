@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -36,7 +36,6 @@ import {
   updateMenuItem, 
   getInventoryItemsForIngredients,
   getMenuItemWithIngredients,
-  calculateRecipeCost,
 } from "@/lib/actions/menu";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -110,6 +109,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
     isActive: true,
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
@@ -170,7 +170,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
     setIngredients(updated);
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -188,34 +188,10 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
       return;
     }
 
-    // Show preview immediately
+    // Store file and show preview
+    setSelectedFile(file);
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
-
-    // Upload to DigitalOcean Spaces
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "products");
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Upload failed");
-      }
-
-      const data = await response.json();
-      setFormData((prev) => ({ ...prev, imageUrl: data.url }));
-      toast.success("Image uploaded successfully");
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to upload image");
-      setImagePreview(null);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -223,6 +199,28 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
     setIsSubmitting(true);
 
     try {
+      let imageUrl = formData.imageUrl;
+
+      // Upload image if a file is selected
+      if (selectedFile) {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", selectedFile);
+        uploadFormData.append("folder", "products");
+
+        const uploadResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: uploadFormData,
+        });
+
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.error || "Failed to upload image");
+        }
+
+        const uploadData = await uploadResponse.json();
+        imageUrl = uploadData.url;
+      }
+
       const validIngredients = ingredients.filter(
         (ing) => ing.inventoryItemId && ing.quantity > 0
       );
@@ -232,9 +230,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
         sku: formData.sku,
         categoryId: formData.categoryId,
         price: parseFloat(formData.price),
-        cost: calculatedCost ?? parseFloat(formData.cost),
+        cost: calculatedCost ?? (formData.cost ? parseFloat(formData.cost) : undefined),
         description: formData.description || undefined,
-        imageUrl: formData.imageUrl || undefined,
+        imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
         ingredients: validIngredients.length > 0 ? validIngredients : undefined,
       });
@@ -253,6 +251,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
           isActive: true,
         });
         setImagePreview(null);
+        setSelectedFile(null);
         setIngredients([]);
         setCalculatedCost(null);
         router.refresh();
@@ -261,7 +260,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
       }
     } catch (error) {
       console.error("Error creating menu item:", error);
-      toast.error("Failed to create menu item");
+      toast.error(error instanceof Error ? error.message : "Failed to create menu item");
     } finally {
       setIsSubmitting(false);
     }
@@ -298,6 +297,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                         className="absolute top-1 right-1 h-6 w-6"
                         onClick={() => {
                           setImagePreview(null);
+                          setSelectedFile(null);
                           setFormData({ ...formData, imageUrl: "" });
                         }}
                       >
@@ -592,6 +592,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     isActive: item?.isActive ?? true,
   });
   const [imagePreview, setImagePreview] = useState<string | null>(item?.imageUrl || null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
@@ -694,7 +695,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     setIngredients(updated);
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -712,34 +713,10 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
       return;
     }
 
-    // Show preview immediately
+    // Store file and show preview
+    setSelectedFile(file);
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
-
-    // Upload to DigitalOcean Spaces
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "products");
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Upload failed");
-      }
-
-      const data = await response.json();
-      setFormData((prev) => ({ ...prev, imageUrl: data.url }));
-      toast.success("Image uploaded successfully");
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to upload image");
-      setImagePreview(null);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -749,6 +726,28 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     setIsSubmitting(true);
 
     try {
+      let imageUrl = formData.imageUrl;
+
+      // Upload image if a new file is selected
+      if (selectedFile) {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", selectedFile);
+        uploadFormData.append("folder", "products");
+
+        const uploadResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: uploadFormData,
+        });
+
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.error || "Failed to upload image");
+        }
+
+        const uploadData = await uploadResponse.json();
+        imageUrl = uploadData.url;
+      }
+
       const validIngredients = ingredients.filter(
         (ing) => ing.inventoryItemId && ing.quantity > 0
       );
@@ -759,9 +758,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
         sku: formData.sku,
         categoryId: formData.categoryId,
         price: parseFloat(formData.price),
-        cost: calculatedCost ?? parseFloat(formData.cost),
+        cost: calculatedCost ?? (formData.cost ? parseFloat(formData.cost) : undefined),
         description: formData.description || undefined,
-        imageUrl: formData.imageUrl || undefined,
+        imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
         ingredients: validIngredients,
       });
@@ -775,7 +774,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
       }
     } catch (error) {
       console.error("Error updating menu item:", error);
-      toast.error("Failed to update menu item");
+      toast.error(error instanceof Error ? error.message : "Failed to update menu item");
     } finally {
       setIsSubmitting(false);
     }
@@ -793,7 +792,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-6">
+          <div className="grid gap-6 mb-2">
             {/* Image Upload Section */}
             <div className="space-y-3">
               <Label>Product Image</Label>
@@ -814,6 +813,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                         className="absolute top-1 right-1 h-6 w-6"
                         onClick={() => {
                           setImagePreview(null);
+                          setSelectedFile(null);
                           setFormData({ ...formData, imageUrl: "" });
                         }}
                       >

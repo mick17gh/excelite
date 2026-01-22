@@ -9,7 +9,8 @@ export type ReportId =
   | "sales-report"
   | "inventory-report"
   | "waste-variance"
-  | "staff-report";
+  | "staff-report"
+  | "manual-entries";
 
 export interface GenerateReportInput {
   reportId: ReportId;
@@ -451,6 +452,116 @@ export async function generateReportData(input: GenerateReportInput): Promise<Re
               ...item,
               cost: Math.round(item.cost * 100) / 100,
             })),
+        },
+      };
+    }
+
+    case "manual-entries": {
+      const [manualBatches, manualSales] = await Promise.all([
+        db.manualEntryBatch.findMany({
+          where: {
+            ...branchFilter,
+            periodStart: { lte: input.endDate },
+            periodEnd: { gte: input.startDate },
+          },
+          include: {
+            lines: true,
+            branch: true,
+            createdByUser: { select: { name: true, email: true } },
+          },
+          orderBy: { periodStart: "desc" },
+        }),
+        // Also get any sales created from manual entries (they have MAN- prefix)
+        db.sale.findMany({
+          where: {
+            deletedAt: null,
+            ...branchFilter,
+            saleNumber: { startsWith: "MAN-" },
+            saleDate: { gte: input.startDate, lte: input.endDate },
+          },
+          include: { branch: true },
+        }),
+      ]);
+
+      // Calculate totals from manual entry lines
+      let totalRevenue = 0;
+      let totalTransactions = 0;
+      const byChannel: Record<string, { revenue: number; transactions: number }> = {};
+      const byBranch: Record<string, { revenue: number; transactions: number; batches: number }> = {};
+
+      manualBatches.forEach((batch) => {
+        const branchName = batch.branch?.name || "Unknown";
+        if (!byBranch[branchName]) {
+          byBranch[branchName] = { revenue: 0, transactions: 0, batches: 0 };
+        }
+        byBranch[branchName].batches += 1;
+
+        batch.lines.forEach((line) => {
+          const revenue = Number(line.totalRevenue);
+          const txCount = line.transactionCount;
+          totalRevenue += revenue;
+          totalTransactions += txCount;
+          byBranch[branchName].revenue += revenue;
+          byBranch[branchName].transactions += txCount;
+
+          if (!byChannel[line.channel]) {
+            byChannel[line.channel] = { revenue: 0, transactions: 0 };
+          }
+          byChannel[line.channel].revenue += revenue;
+          byChannel[line.channel].transactions += txCount;
+        });
+      });
+
+      // Daily breakdown from sales records
+      const dailyData: Record<string, { revenue: number; transactions: number }> = {};
+      manualSales.forEach((sale) => {
+        const dateKey = sale.saleDate.toISOString().split("T")[0];
+        if (!dailyData[dateKey]) {
+          dailyData[dateKey] = { revenue: 0, transactions: 0 };
+        }
+        dailyData[dateKey].revenue += Number(sale.total);
+        dailyData[dateKey].transactions += sale.customerCount || 1;
+      });
+
+      return {
+        success: true,
+        data: {
+          ...baseResult,
+          reportName: "Manual Entries Report",
+          summary: {
+            totalBatches: manualBatches.length,
+            totalRevenue: Math.round(totalRevenue * 100) / 100,
+            totalTransactions,
+            averageTicket: totalTransactions > 0 ? Math.round((totalRevenue / totalTransactions) * 100) / 100 : 0,
+          },
+          byChannel: Object.entries(byChannel).map(([channel, data]) => ({
+            channel,
+            revenue: Math.round(data.revenue * 100) / 100,
+            transactions: data.transactions,
+            percentage: totalRevenue > 0 ? Math.round((data.revenue / totalRevenue) * 1000) / 10 : 0,
+          })),
+          byBranch: Object.entries(byBranch).map(([branch, data]) => ({
+            branch,
+            batches: data.batches,
+            revenue: Math.round(data.revenue * 100) / 100,
+            transactions: data.transactions,
+          })),
+          dailyBreakdown: Object.entries(dailyData)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, data]) => ({
+              date,
+              revenue: Math.round(data.revenue * 100) / 100,
+              transactions: data.transactions,
+            })),
+          recentBatches: manualBatches.slice(0, 10).map((batch) => ({
+            branch: batch.branch?.name || "Unknown",
+            periodStart: batch.periodStart.toISOString().split("T")[0],
+            periodEnd: batch.periodEnd.toISOString().split("T")[0],
+            lineCount: batch.lines.length,
+            totalRevenue: Math.round(batch.lines.reduce((s, l) => s + Number(l.totalRevenue), 0) * 100) / 100,
+            createdBy: batch.createdByUser?.name || "System",
+            createdAt: batch.createdAt.toISOString().split("T")[0],
+          })),
         },
       };
     }

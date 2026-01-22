@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { getBranchById } from "@/lib/actions/branches";
-import { getTransactions } from "@/lib/actions/transactions";
+import { getTransactions, getSales } from "@/lib/actions/transactions";
 import { getInventoryItems } from "@/lib/actions/inventory";
 import { getStaffByBranch } from "@/lib/actions/staff";
 import { getUsersByBranch } from "@/lib/actions/users";
@@ -23,6 +23,7 @@ export default async function BranchDetailsPage({
   const [
     branchResult,
     transactionsResult,
+    salesResult,
     inventoryResult,
     staffResult,
     usersResult,
@@ -30,6 +31,7 @@ export default async function BranchDetailsPage({
   ] = await Promise.all([
     getBranchById(id),
     getTransactions(id),
+    getSales(id),
     getInventoryItems(id),
     getStaffByBranch(id),
     getUsersByBranch(id),
@@ -42,6 +44,7 @@ export default async function BranchDetailsPage({
 
   const branch = branchResult.data;
   const rawTransactions = transactionsResult.data || [];
+  const rawSales = salesResult.data || [];
   const rawInventory = inventoryResult.data || [];
   const staff = staffResult.data || [];
   const users = usersResult.data || [];
@@ -51,6 +54,14 @@ export default async function BranchDetailsPage({
   const transactions = rawTransactions.map((t: any) => ({
     ...t,
     amount: Number(t.amount),
+  }));
+  
+  // Convert sales data (includes manual POS entries)
+  const sales = rawSales.map((s: any) => ({
+    ...s,
+    total: Number(s.total),
+    subtotal: Number(s.subtotal),
+    tax: Number(s.tax),
   }));
   
   const inventory = rawInventory.map((item: any) => ({
@@ -68,6 +79,7 @@ export default async function BranchDetailsPage({
         <BranchDetailsContent
           branch={branch}
           transactions={transactions}
+          sales={sales}
           inventory={inventory}
           staff={staff}
           users={users}

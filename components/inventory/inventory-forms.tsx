@@ -861,6 +861,7 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
     category: "FOOD",
     unit: "KG",
     unitCost: "",
+    currentStock: "",
     minStock: "",
     maxStock: "",
     reorderPoint: "",
@@ -878,6 +879,7 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
         category: formData.category as InventoryCategory,
         unit: formData.unit as UnitType,
         unitCost: parseFloat(formData.unitCost),
+        currentStock: formData.currentStock ? parseFloat(formData.currentStock) : 0,
         minStock: parseFloat(formData.minStock),
         maxStock: parseFloat(formData.maxStock),
         reorderPoint: parseFloat(formData.reorderPoint),
@@ -893,6 +895,7 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
           category: "FOOD",
           unit: "KG",
           unitCost: "",
+          currentStock: "",
           minStock: "",
           maxStock: "",
           reorderPoint: "",
@@ -994,7 +997,18 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="currentStock">Initial Stock</Label>
+                <Input
+                  id="currentStock"
+                  type="number"
+                  step="0.01"
+                  placeholder="0"
+                  value={formData.currentStock}
+                  onChange={(e) => setFormData({ ...formData, currentStock: e.target.value })}
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="minStock">Min Stock</Label>
                 <Input

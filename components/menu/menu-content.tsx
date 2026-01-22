@@ -30,9 +30,11 @@ import {
   Package,
   DollarSign,
   TrendingUp,
+  Upload,
 } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
 import { AddMenuItemForm, EditMenuItemForm } from "@/components/menu/menu-forms";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { deleteMenuItem } from "@/lib/actions/menu";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -68,6 +70,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   const filteredItems = items.filter((item) => {
@@ -208,10 +211,16 @@ export function MenuContent({ items, categories }: MenuContentProps) {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={() => setIsAddOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Menu Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import CSV
+          </Button>
+          <Button onClick={() => setIsAddOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Menu Item
+          </Button>
+        </div>
       </div>
 
       {/* Content Tabs */}
@@ -457,6 +466,14 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           categories={categories}
         />
       )}
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={isBulkImportOpen}
+        onOpenChange={setIsBulkImportOpen}
+        type="menu"
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

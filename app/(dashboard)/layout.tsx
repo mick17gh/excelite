@@ -1,14 +1,23 @@
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { Role } from "@/lib/generated/prisma/client";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  const userRole = (session?.user?.role as Role) || "CASHIER";
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar className="hidden md:flex" />
+      <Sidebar className="hidden md:flex" userRole={userRole} />
       <div className="flex flex-1 flex-col overflow-hidden relative">
         {/* Gradient mesh background */}
         <div className="absolute inset-0 gradient-mesh pointer-events-none" />

@@ -36,10 +36,18 @@ export interface CreatePosOrderInput {
 export async function createPosOrder(input: CreatePosOrderInput) {
   try {
     const orderNumber = generateOrderNumber();
+    
+    // Fetch branch tax settings
+    const branch = await db.branch.findUnique({
+      where: { id: input.branchId },
+      select: { taxRate: true, taxEnabled: true },
+    });
+    const taxRate = branch?.taxEnabled ? Number(branch?.taxRate || 12.5) / 100 : 0;
+    
     const subtotal = input.items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
     const discount = input.discount || 0;
     const subtotalAfterDiscount = subtotal - discount;
-    const tax = subtotalAfterDiscount * 0.125;
+    const tax = subtotalAfterDiscount * taxRate;
     const total = subtotalAfterDiscount + tax;
 
     const order = await db.posOrder.create({

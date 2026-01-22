@@ -50,6 +50,13 @@ export async function createTransaction(input: CreateTransactionInput) {
     const transactionRef = generateTransactionRef();
     const saleNumber = generateSaleNumber();
 
+    // Fetch branch tax settings
+    const branch = await db.branch.findUnique({
+      where: { id: input.branchId },
+      select: { taxRate: true, taxEnabled: true },
+    });
+    const taxRate = branch?.taxEnabled ? Number(branch?.taxRate || 12.5) / 100 : 0;
+
     // Calculate totals
     let subtotal = 0;
     const saleItems: Array<{
@@ -74,7 +81,7 @@ export async function createTransaction(input: CreateTransactionInput) {
       });
     }
 
-    const tax = subtotal * 0.125; // 12.5% VAT for Ghana
+    const tax = subtotal * taxRate;
     const total = subtotal + tax;
     const amount = total + (input.tip || 0);
 
@@ -141,13 +148,14 @@ export async function createTransaction(input: CreateTransactionInput) {
       ...sale,
       subtotal: Number(sale.subtotal),
       tax: Number(sale.tax),
+      discount: Number(sale.discount || 0),
       total: Number(sale.total),
       items: sale.items.map((item) => ({
         ...item,
         unitPrice: Number(item.unitPrice),
         unitCost: Number(item.unitCost),
         total: Number(item.total),
-        discount: Number(item.discount),
+        discount: Number(item.discount || 0),
       })),
     };
     
@@ -252,17 +260,18 @@ export async function getTransactions(branchId?: string, date?: Date) {
         ...t.sale,
         subtotal: Number(t.sale.subtotal),
         tax: Number(t.sale.tax),
+        discount: Number(t.sale.discount || 0),
         total: Number(t.sale.total),
         items: t.sale.items.map((item) => ({
           ...item,
           unitPrice: Number(item.unitPrice),
           unitCost: Number(item.unitCost),
           total: Number(item.total),
-          discount: Number(item.discount),
+          discount: Number(item.discount || 0),
           menuItem: {
             ...item.menuItem,
             price: Number(item.menuItem.price),
-            cost: Number(item.menuItem.cost),
+            cost: Number(item.menuItem.cost || 0),
           },
         })),
       } : null,
@@ -305,17 +314,18 @@ export async function getSales(branchId?: string, startDate?: Date, endDate?: Da
       ...sale,
       subtotal: Number(sale.subtotal),
       tax: Number(sale.tax),
+      discount: Number(sale.discount || 0),
       total: Number(sale.total),
       items: sale.items.map((item) => ({
         ...item,
         unitPrice: Number(item.unitPrice),
         unitCost: Number(item.unitCost),
         total: Number(item.total),
-        discount: Number(item.discount),
+        discount: Number(item.discount || 0),
         menuItem: {
           ...item.menuItem,
           price: Number(item.menuItem.price),
-          cost: Number(item.menuItem.cost),
+          cost: Number(item.menuItem.cost || 0),
         },
       })),
     }));
@@ -663,6 +673,128 @@ export async function getHourlySalesData(branchId?: string, days: number = 1) {
   } catch (error) {
     console.error("[getHourlySalesData] Error:", error);
     return { success: false, error: "Failed to fetch hourly sales data", data: [] };
+  }
+}
+
+// Combined function to fetch sales analytics data with date range and multiple branches
+export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Date, endDate?: Date) {
+  try {
+    const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+    const effectiveEndDate = endDate || new Date();
+
+    // Fetch sales for all selected branches
+    const sales = await db.sale.findMany({
+      where: {
+        deletedAt: null,
+        saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
+        ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
+      },
+      include: {
+        items: {
+          include: {
+            menuItem: true,
+          },
+        },
+      },
+    });
+
+    // Calculate revenue data by date
+    const revenueByDate = new Map<string, { revenue: number; target: number }>();
+    const currentDate = new Date(effectiveStartDate);
+    while (currentDate <= effectiveEndDate) {
+      const dateStr = currentDate.toISOString().split("T")[0];
+      revenueByDate.set(dateStr, { revenue: 0, target: 0 });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    for (const sale of sales) {
+      const dateStr = new Date(sale.saleDate).toISOString().split("T")[0];
+      const existing = revenueByDate.get(dateStr);
+      if (existing) {
+        existing.revenue += Number(sale.total);
+      }
+    }
+
+    const revenueData = Array.from(revenueByDate.entries()).map(([date, data]) => ({
+      date,
+      revenue: Math.round(data.revenue * 100) / 100,
+      target: data.target,
+    }));
+
+    // Calculate sales by channel
+    const channelMap = new Map<string, number>();
+    for (const sale of sales) {
+      const channel = sale.channel || "DINE_IN";
+      channelMap.set(channel, (channelMap.get(channel) || 0) + Number(sale.total));
+    }
+    const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
+    const salesByChannel = Array.from(channelMap.entries()).map(([channel, revenue]) => ({
+      channel,
+      revenue: Math.round(revenue * 100) / 100,
+      percentage: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0,
+    }));
+
+    // Calculate sales by daypart
+    const daypartMap = new Map<string, { revenue: number; transactions: number }>();
+    for (const sale of sales) {
+      const daypart = sale.dayPart || "LUNCH";
+      const existing = daypartMap.get(daypart) || { revenue: 0, transactions: 0 };
+      existing.revenue += Number(sale.total);
+      existing.transactions += 1;
+      daypartMap.set(daypart, existing);
+    }
+    const salesByDaypart = Array.from(daypartMap.entries()).map(([daypart, data]) => ({
+      daypart,
+      revenue: Math.round(data.revenue * 100) / 100,
+      transactions: data.transactions,
+    }));
+
+    // Calculate top/worst menu items
+    const itemMap = new Map<string, { name: string; quantity: number; revenue: number }>();
+    for (const sale of sales) {
+      for (const item of sale.items) {
+        const name = item.menuItem?.name || "Unknown";
+        const existing = itemMap.get(name) || { name, quantity: 0, revenue: 0 };
+        existing.quantity += item.quantity;
+        existing.revenue += Number(item.total);
+        itemMap.set(name, existing);
+      }
+    }
+    const sortedItems = Array.from(itemMap.values()).sort((a, b) => b.revenue - a.revenue);
+    const topItems = sortedItems.slice(0, 5);
+    const worstItems = sortedItems.slice(-5).reverse();
+
+    // Calculate hourly data
+    const hourlyMap = new Map<number, { transactions: number; revenue: number }>();
+    for (let h = 0; h < 24; h++) {
+      hourlyMap.set(h, { transactions: 0, revenue: 0 });
+    }
+    for (const sale of sales) {
+      const hour = new Date(sale.saleDate).getHours();
+      const existing = hourlyMap.get(hour)!;
+      existing.transactions += 1;
+      existing.revenue += Number(sale.total);
+    }
+    const hourlyData = Array.from(hourlyMap.entries()).map(([hour, data]) => ({
+      hour: `${hour.toString().padStart(2, "0")}:00`,
+      transactions: data.transactions,
+      revenue: Math.round(data.revenue * 100) / 100,
+    }));
+
+    return {
+      success: true,
+      data: {
+        revenueData,
+        salesByChannel,
+        salesByDaypart,
+        topItems,
+        worstItems,
+        hourlyData,
+      },
+    };
+  } catch (error) {
+    console.error("[getSalesAnalyticsData] Error:", error);
+    return { success: false, error: "Failed to fetch sales analytics data" };
   }
 }
 

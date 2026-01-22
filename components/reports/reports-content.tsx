@@ -90,6 +90,14 @@ const reportTypes: ReportType[] = [
     frequency: "Daily",
   },
   {
+    id: "manual-entries",
+    name: "Manual Entries Report",
+    description: "Summary of all manual POS entries including revenue by channel and branch",
+    icon: FileText,
+    category: "Sales",
+    frequency: "Weekly",
+  },
+  {
     id: "inventory-report",
     name: "Inventory Status Report",
     description: "Current stock levels, low stock alerts, and inventory valuation",

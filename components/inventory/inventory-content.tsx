@@ -34,6 +34,7 @@ import {
   Trash2,
   Download,
   MoreHorizontal,
+  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,6 +51,7 @@ import {
   TransferForm,
   AddInventoryItemForm,
 } from "@/components/inventory/inventory-forms";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -77,12 +79,57 @@ interface Branch {
   currency?: string | null;
 }
 
+interface InboundRecord {
+  id: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  invoiceNumber: string | null;
+  deliveryDate: Date;
+  createdAt: Date;
+  item: { name: string; sku: string };
+  supplier: { name: string };
+  branch: { name: string };
+}
+
+interface OutboundRecord {
+  id: string;
+  quantity: number;
+  movementType: string;
+  reason: string | null;
+  createdAt: Date;
+  item: { name: string; sku: string };
+  branch: { name: string };
+}
+
+interface TransferRecord {
+  id: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  transferDate: Date;
+  status: string;
+  createdAt: Date;
+  item: { name: string; sku: string };
+  fromBranch: { name: string };
+  toBranch: { name: string };
+}
+
 interface InventoryContentProps {
   items: InventoryItem[];
   branches: Branch[];
+  inboundRecords?: InboundRecord[];
+  outboundRecords?: OutboundRecord[];
+  transferRecords?: TransferRecord[];
 }
 
-export function InventoryContent({ items, branches }: InventoryContentProps) {
+export function InventoryContent({ 
+  items, 
+  branches, 
+  inboundRecords = [], 
+  outboundRecords = [], 
+  transferRecords = [] 
+}: InventoryContentProps) {
   const { formatCurrency } = useCurrency();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -99,6 +146,7 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
   const [isWasteOpen, setIsWasteOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   const filteredItems = items.filter((item) => {
     const matchesSearch =
@@ -267,6 +315,10 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
             >
               <Download className="mr-1.5 h-3.5 w-3.5" />
               Export
+            </Button>
+            <Button variant="outline" size="sm" className="h-8" onClick={() => setIsBulkImportOpen(true)}>
+              <Upload className="mr-1.5 h-3.5 w-3.5" />
+              Import CSV
             </Button>
             <Button size="sm" className="h-8" onClick={() => setIsAddItemOpen(true)}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -438,9 +490,43 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
               <CardTitle>Recent Inbound Stock</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Inbound stock records will be displayed here. Use the "Record Inbound" button to add new deliveries.
-              </p>
+              {inboundRecords.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Unit Cost</TableHead>
+                      <TableHead>Total Cost</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inboundRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{record.item.name}</p>
+                            <p className="text-sm text-muted-foreground">{record.item.sku}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{record.supplier.name}</TableCell>
+                        <TableCell>{record.quantity}</TableCell>
+                        <TableCell>{formatCurrency(record.unitCost)}</TableCell>
+                        <TableCell>{formatCurrency(record.totalCost)}</TableCell>
+                        <TableCell>{record.invoiceNumber || "-"}</TableCell>
+                        <TableCell>{new Date(record.createdAt).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground">
+                  No inbound stock records found. Use the (Record Inbound) button to add new deliveries.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -451,9 +537,45 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
               <CardTitle>Recent Outbound Stock</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Outbound stock records including sales, waste, and adjustments will be displayed here.
-              </p>
+              {outboundRecords.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {outboundRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{record.item.name}</p>
+                            <p className="text-sm text-muted-foreground">{record.item.sku}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {record.movementType.replace('OUTBOUND_', '').replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{record.quantity}</TableCell>
+                        <TableCell>{record.reason || "-"}</TableCell>
+                        <TableCell>{record.branch.name}</TableCell>
+                        <TableCell>{new Date(record.createdAt).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground">
+                  No outbound stock records found. Records will appear here when items are sold, wasted, or adjusted.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -464,9 +586,47 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
               <CardTitle>Stock Transfers</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Inter-branch transfers will be displayed here. Use the "Transfer" button to initiate a new transfer.
-              </p>
+              {transferRecords.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>To</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Total Cost</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transferRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{record.item.name}</p>
+                            <p className="text-sm text-muted-foreground">{record.item.sku}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{record.fromBranch.name}</TableCell>
+                        <TableCell>{record.toBranch.name}</TableCell>
+                        <TableCell>{record.quantity}</TableCell>
+                        <TableCell>{formatCurrency(record.totalCost)}</TableCell>
+                        <TableCell>
+                          <Badge variant={record.status === 'COMPLETED' ? 'default' : 'secondary'}>
+                            {record.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{new Date(record.transferDate).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground">
+                  No transfer records found. Use the transfer button to initiate inter-branch transfers.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -501,6 +661,15 @@ export function InventoryContent({ items, branches }: InventoryContentProps) {
         open={isAddItemOpen}
         onOpenChange={setIsAddItemOpen}
         branches={branches}
+      />
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={isBulkImportOpen}
+        onOpenChange={setIsBulkImportOpen}
+        type="inventory"
+        branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+        onSuccess={() => window.location.reload()}
       />
     </div>
   );

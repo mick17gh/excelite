@@ -56,6 +56,17 @@ interface Transaction {
   transactionDate: Date;
 }
 
+interface Sale {
+  id: string;
+  saleNumber: string;
+  total: number;
+  subtotal: number;
+  tax: number;
+  channel: string;
+  dayPart: string;
+  saleDate: Date;
+}
+
 interface InventoryItem {
   id: string;
   name: string;
@@ -98,6 +109,7 @@ interface User {
 interface BranchDetailsContentProps {
   branch: Branch;
   transactions: Transaction[];
+  sales: Sale[];
   inventory: InventoryItem[];
   staff: StaffMember[];
   users: User[];
@@ -107,6 +119,7 @@ interface BranchDetailsContentProps {
 export function BranchDetailsContent({
   branch,
   transactions,
+  sales,
   inventory,
   staff,
   users,
@@ -116,7 +129,8 @@ export function BranchDetailsContent({
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const totalRevenue = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  // Use sales data for accurate revenue (includes manual POS entries)
+  const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
   const totalInventoryValue = inventory.reduce(
     (sum, item) => sum + Number(item.currentStock) * Number(item.unitCost),
     0

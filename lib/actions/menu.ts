@@ -9,7 +9,7 @@ export interface CreateMenuItemInput {
   sku: string;
   categoryId: string;
   price: number;
-  cost: number;
+  cost?: number;
   description?: string;
   imageUrl?: string;
   isActive?: boolean;
@@ -37,6 +37,23 @@ export interface IngredientInput {
 
 export async function createMenuItem(input: CreateMenuItemInput) {
   try {
+    // Input validation
+    if (!input.name?.trim()) {
+      return { success: false, error: "Menu item name is required" };
+    }
+    if (!input.sku?.trim()) {
+      return { success: false, error: "SKU is required" };
+    }
+    if (!input.categoryId?.trim()) {
+      return { success: false, error: "Category is required" };
+    }
+    if (input.price <= 0) {
+      return { success: false, error: "Price must be greater than 0" };
+    }
+    if (input.cost !== undefined && input.cost < 0) {
+      return { success: false, error: "Cost cannot be negative" };
+    }
+
     // Check if SKU already exists
     const existing = await db.menuItem.findUnique({
       where: { sku: input.sku },
@@ -57,12 +74,12 @@ export async function createMenuItem(input: CreateMenuItemInput) {
 
     const item = await db.menuItem.create({
       data: {
-        name: input.name,
-        sku: input.sku,
+        name: input.name.trim(),
+        sku: input.sku.trim().toUpperCase(),
         categoryId: input.categoryId,
         price: input.price,
-        cost: calculatedCost,
-        description: input.description,
+        cost: calculatedCost ?? null,
+        description: input.description?.trim(),
         imageUrl: input.imageUrl,
         isActive: input.isActive ?? true,
         ...(input.ingredients && input.ingredients.length > 0 && {
@@ -88,7 +105,7 @@ export async function createMenuItem(input: CreateMenuItemInput) {
         ...item,
         category: item.category?.name || "",
         price: Number(item.price),
-        cost: Number(item.cost)
+        cost: item.cost ? Number(item.cost) : null
       }
     };
   } catch (error) {
@@ -165,7 +182,7 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
       data: {
         ...item,
         price: Number(item.price),
-        cost: Number(item.cost)
+        cost: item.cost ? Number(item.cost) : null
       }
     };
   } catch (error) {
@@ -248,7 +265,7 @@ export async function getMenuItemById(id: string) {
       data: {
         ...item,
         price: Number(item.price),
-        cost: Number(item.cost),
+        cost: item.cost ? Number(item.cost) : null,
       },
     };
   } catch (error) {
@@ -302,7 +319,7 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
         categoryId: item.categoryId,
         category: item.category?.name || "",
         price: Number(item.price),
-        cost: Number(item.cost),
+        cost: item.cost ? Number(item.cost) : null,
         description: item.description,
         imageUrl: item.imageUrl,
         isActive: item.isActive,

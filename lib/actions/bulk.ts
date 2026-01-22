@@ -4,20 +4,17 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { logCreate, logUpdate, logDelete } from "@/lib/services/audit";
 import { InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
+import type {
+  BulkMenuItemInput,
+  BulkInventoryItemInput,
+  BulkCategoryInput,
+  BulkSupplierInput,
+  BulkStaffInput,
+} from "@/lib/utils/bulk-import";
 
 // =====================================
 // MENU BULK OPERATIONS
 // =====================================
-
-export interface BulkMenuItemInput {
-  name: string;
-  sku?: string;
-  categoryId: string;
-  price: number;
-  cost?: number;
-  description?: string;
-  isActive?: boolean;
-}
 
 export async function bulkCreateMenuItems(items: BulkMenuItemInput[]) {
   try {
@@ -32,6 +29,41 @@ export async function bulkCreateMenuItems(items: BulkMenuItemInput[]) {
       isActive: item.isActive ?? true,
       cost: item.cost ?? 0,
     }));
+
+    // Get all categories to map names to IDs
+    const allCategories = await db.category.findMany({
+      where: { deletedAt: null },
+      select: { id: true, name: true },
+    });
+
+    const categoryNameToId = new Map(allCategories.map((c) => [c.name.toLowerCase(), c.id]));
+    const categoryIdSet = new Set(allCategories.map((c) => c.id));
+
+    // Map category names to IDs and validate
+    const itemsWithValidCategories = itemsWithSkus.map((item) => {
+      let categoryId = item.categoryId;
+      
+      // If categoryId is not a valid ID, try to find by name
+      if (!categoryIdSet.has(categoryId)) {
+        const mappedId = categoryNameToId.get(categoryId.toLowerCase());
+        if (mappedId) {
+          categoryId = mappedId;
+        }
+      }
+      
+      return { ...item, categoryId };
+    });
+
+    // Validate all categories exist
+    const invalidCategories = itemsWithValidCategories.filter((i) => !categoryIdSet.has(i.categoryId));
+
+    if (invalidCategories.length > 0) {
+      const invalidCategoryNames = [...new Set(invalidCategories.map((i) => i.categoryId))];
+      return {
+        success: false,
+        error: `Invalid categories: ${invalidCategoryNames.join(", ")}. Please ensure all categories exist before importing menu items.`,
+      };
+    }
 
     // Check for duplicate SKUs
     const existingSkus = await db.menuItem.findMany({
@@ -52,7 +84,7 @@ export async function bulkCreateMenuItems(items: BulkMenuItemInput[]) {
     }
 
     const result = await db.menuItem.createMany({
-      data: itemsWithSkus,
+      data: itemsWithValidCategories,
     });
 
     // Log bulk creation
@@ -202,19 +234,6 @@ export async function bulkUpdateMenuPrices(
 // =====================================
 // INVENTORY BULK OPERATIONS
 // =====================================
-
-export interface BulkInventoryItemInput {
-  name: string;
-  sku?: string;
-  category: string;
-  unit: string;
-  unitCost: number;
-  currentStock?: number;
-  minStock?: number;
-  maxStock?: number;
-  reorderPoint?: number;
-  branchId: string;
-}
 
 export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) {
   try {
@@ -406,57 +425,186 @@ export async function bulkDeleteInventoryItems(ids: string[]) {
 }
 
 // =====================================
-// IMPORT/EXPORT UTILITIES
+// CATEGORY BULK OPERATIONS
 // =====================================
 
-export interface ParsedCSVRow {
-  [key: string]: string;
+export async function bulkCreateCategories(items: BulkCategoryInput[]) {
+  try {
+    if (!items || items.length === 0) {
+      return { success: false, error: "No categories provided" };
+    }
+
+    // Filter out duplicates within the import
+    const uniqueNames = new Set<string>();
+    const uniqueItems = items.filter((item) => {
+      const normalized = item.name.toLowerCase().trim();
+      if (uniqueNames.has(normalized)) return false;
+      uniqueNames.add(normalized);
+      return true;
+    });
+
+    // Check for existing categories
+    const existingCategories = await db.category.findMany({
+      where: {
+        name: { in: uniqueItems.map((i) => i.name.trim()), mode: "insensitive" },
+        deletedAt: null,
+      },
+      select: { name: true },
+    });
+
+    const existingNames = new Set(existingCategories.map((c) => c.name.toLowerCase()));
+    const newItems = uniqueItems.filter((i) => !existingNames.has(i.name.toLowerCase().trim()));
+
+    if (newItems.length === 0) {
+      return { success: false, error: "All categories already exist" };
+    }
+
+    const result = await db.category.createMany({
+      data: newItems.map((item) => ({
+        name: item.name.trim(),
+        description: item.description?.trim(),
+        isActive: true,
+      })),
+    });
+
+    await logCreate("Category", "BULK", {
+      action: "BULK_CREATE",
+      count: result.count,
+    });
+
+    revalidatePath("/dashboard/categories");
+    revalidatePath("/dashboard/menu");
+    return { success: true, created: result.count, skipped: items.length - result.count };
+  } catch (error) {
+    console.error("[bulkCreateCategories] Error:", error);
+    return { success: false, error: "Failed to create categories" };
+  }
 }
 
-export function parseMenuCSV(rows: ParsedCSVRow[]): BulkMenuItemInput[] {
-  return rows.map((row) => ({
-    name: row.name || row.Name || "",
-    sku: row.sku || row.SKU || undefined,
-    categoryId: row.categoryId || row.CategoryId || row.category || row.Category || "",
-    price: parseFloat(row.price || row.Price || "0"),
-    cost: row.cost || row.Cost ? parseFloat(row.cost || row.Cost) : undefined,
-    description: row.description || row.Description || undefined,
-    isActive: row.isActive === "false" ? false : true,
-  })).filter((item) => item.name && item.price > 0);
+// =====================================
+// SUPPLIER BULK OPERATIONS
+// =====================================
+
+export async function bulkCreateSuppliers(items: BulkSupplierInput[]) {
+  try {
+    if (!items || items.length === 0) {
+      return { success: false, error: "No suppliers provided" };
+    }
+
+    // Generate codes for items without one
+    const itemsWithCodes = items.map((item, index) => ({
+      ...item,
+      code: item.code || `SUP-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`,
+    }));
+
+    // Check for duplicate codes
+    const existingCodes = await db.supplier.findMany({
+      where: {
+        code: { in: itemsWithCodes.map((i) => i.code) },
+        deletedAt: null,
+      },
+      select: { code: true },
+    });
+
+    const existingCodeSet = new Set(existingCodes.map((s) => s.code));
+    const newItems = itemsWithCodes.filter((i) => !existingCodeSet.has(i.code));
+
+    if (newItems.length === 0) {
+      return { success: false, error: "All supplier codes already exist" };
+    }
+
+    const result = await db.supplier.createMany({
+      data: newItems.map((item) => ({
+        name: item.name.trim(),
+        code: item.code,
+        contactName: item.contactName?.trim(),
+        email: item.email?.trim(),
+        phone: item.phone?.trim(),
+        address: item.address?.trim(),
+        isActive: true,
+      })),
+    });
+
+    await logCreate("Supplier", "BULK", {
+      action: "BULK_CREATE",
+      count: result.count,
+    });
+
+    revalidatePath("/dashboard/inventory");
+    return { success: true, created: result.count, skipped: items.length - result.count };
+  } catch (error) {
+    console.error("[bulkCreateSuppliers] Error:", error);
+    return { success: false, error: "Failed to create suppliers" };
+  }
 }
 
-export function parseInventoryCSV(rows: ParsedCSVRow[], defaultBranchId: string): BulkInventoryItemInput[] {
-  return rows.map((row) => ({
-    name: row.name || row.Name || "",
-    sku: row.sku || row.SKU || undefined,
-    category: row.category || row.Category || "General",
-    unit: row.unit || row.Unit || "unit",
-    unitCost: parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0"),
-    currentStock: row.currentStock || row["Current Stock"]
-      ? parseFloat(row.currentStock || row["Current Stock"])
-      : undefined,
-    minStock: row.minStock || row["Min Stock"]
-      ? parseFloat(row.minStock || row["Min Stock"])
-      : undefined,
-    maxStock: row.maxStock || row["Max Stock"]
-      ? parseFloat(row.maxStock || row["Max Stock"])
-      : undefined,
-    reorderPoint: row.reorderPoint || row["Reorder Point"]
-      ? parseFloat(row.reorderPoint || row["Reorder Point"])
-      : undefined,
-    branchId: row.branchId || row["Branch ID"] || defaultBranchId,
-  })).filter((item) => item.name && item.branchId);
-}
+// =====================================
+// STAFF BULK OPERATIONS
+// =====================================
 
-// Get template for CSV import
-export function getMenuCSVTemplate(): string {
-  const headers = ["name", "sku", "category", "price", "cost", "description", "isActive"];
-  const example = ["Grilled Chicken", "GC-001", "Main Course", "25.99", "12.50", "Delicious grilled chicken breast", "true"];
-  return [headers.join(","), example.join(",")].join("\n");
-}
+export async function bulkCreateStaff(items: BulkStaffInput[]) {
+  try {
+    if (!items || items.length === 0) {
+      return { success: false, error: "No staff members provided" };
+    }
 
-export function getInventoryCSVTemplate(): string {
-  const headers = ["name", "sku", "category", "unit", "unitCost", "currentStock", "minStock", "maxStock", "reorderPoint"];
-  const example = ["Chicken Breast", "CB-001", "Proteins", "kg", "8.50", "50", "10", "100", "20"];
-  return [headers.join(","), example.join(",")].join("\n");
+    // Generate employee IDs for items without one
+    const itemsWithIds = items.map((item, index) => ({
+      ...item,
+      employeeId: item.employeeId || `EMP-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`,
+    }));
+
+    // Check for duplicate employee IDs
+    const existingIds = await db.staff.findMany({
+      where: {
+        employeeId: { in: itemsWithIds.map((i) => i.employeeId) },
+        deletedAt: null,
+      },
+      select: { employeeId: true },
+    });
+
+    const existingIdSet = new Set(existingIds.map((s) => s.employeeId));
+    const newItems = itemsWithIds.filter((i) => !existingIdSet.has(i.employeeId));
+
+    if (newItems.length === 0) {
+      return { success: false, error: "All employee IDs already exist" };
+    }
+
+    // Validate roles
+    const validRoles = ["MANAGER", "KITCHEN", "SERVICE", "CASHIER", "DELIVERY"];
+    const invalidRoles = newItems.filter((i) => !validRoles.includes(i.role.toUpperCase()));
+    if (invalidRoles.length > 0) {
+      return { 
+        success: false, 
+        error: `Invalid roles: ${invalidRoles.map((i) => i.role).join(", ")}. Valid roles: ${validRoles.join(", ")}` 
+      };
+    }
+
+    const result = await db.staff.createMany({
+      data: newItems.map((item) => ({
+        employeeId: item.employeeId,
+        firstName: item.firstName.trim(),
+        lastName: item.lastName.trim(),
+        email: item.email?.trim(),
+        phone: item.phone?.trim(),
+        role: item.role.toUpperCase() as "MANAGER" | "KITCHEN" | "SERVICE" | "CASHIER" | "DELIVERY",
+        hourlyRate: item.hourlyRate,
+        hireDate: new Date(),
+        branchId: item.branchId,
+        isActive: true,
+        dutyStatus: "OFF_DUTY",
+      })),
+    });
+
+    await logCreate("Staff", "BULK", {
+      action: "BULK_CREATE",
+      count: result.count,
+    });
+
+    revalidatePath("/dashboard/staff");
+    return { success: true, created: result.count, skipped: items.length - result.count };
+  } catch (error) {
+    console.error("[bulkCreateStaff] Error:", error);
+    return { success: false, error: "Failed to create staff members" };
+  }
 }

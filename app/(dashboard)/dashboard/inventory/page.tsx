@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { InventoryContent } from "@/components/inventory/inventory-content";
-import { getInventoryItems, getSuppliers } from "@/lib/actions/inventory";
+import { getInventoryItems, getSuppliers, getInboundRecords, getOutboundRecords, getTransferRecords } from "@/lib/actions/inventory";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
@@ -9,14 +9,20 @@ export const metadata = {
 };
 
 export default async function InventoryPage() {
-  const [branchesResult, inventoryResult, suppliersResult] = await Promise.all([
+  const [branchesResult, inventoryResult, suppliersResult, inboundResult, outboundResult, transferResult] = await Promise.all([
     getBranches(),
     getInventoryItems(),
     getSuppliers(),
+    getInboundRecords(),
+    getOutboundRecords(),
+    getTransferRecords(),
   ]);
 
   const branchList = branchesResult.data || [];
   const rawItems = inventoryResult.data || [];
+  const inboundRecords = inboundResult.data || [];
+  const outboundRecords = outboundResult.data || [];
+  const transferRecords = transferResult.data || [];
   const items = rawItems.map((item: { id: string; name: string; sku: string; category: string; unit: string; currentStock: { toNumber?: () => number } | number; minStock: { toNumber?: () => number } | number; maxStock: { toNumber?: () => number } | number; reorderPoint: { toNumber?: () => number } | number; unitCost: { toNumber?: () => number } | number; branchId: string; branch: { name: string } }) => {
     const currentStock = typeof item.currentStock === 'object' && item.currentStock.toNumber ? item.currentStock.toNumber() : Number(item.currentStock);
     const minStock = typeof item.minStock === 'object' && item.minStock.toNumber ? item.minStock.toNumber() : Number(item.minStock);
@@ -26,7 +32,7 @@ export default async function InventoryPage() {
     let status: "critical" | "low" | "normal" | "overstock" = "normal";
     if (currentStock <= minStock) status = "critical";
     else if (currentStock <= reorderPoint) status = "low";
-    else if (currentStock >= maxStock) status = "overstock";
+    else if (currentStock > maxStock) status = "overstock";
     
     return {
       id: item.id,
@@ -57,7 +63,13 @@ export default async function InventoryPage() {
       </div>
 
       <Suspense fallback={<InventoryLoadingSkeleton />}>
-        <InventoryContent items={items} branches={branchList} />
+        <InventoryContent 
+          items={items} 
+          branches={branchList} 
+          inboundRecords={inboundRecords}
+          outboundRecords={outboundRecords}
+          transferRecords={transferRecords}
+        />
       </Suspense>
     </div>
   );

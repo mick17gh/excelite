@@ -39,7 +39,8 @@ import {
   ChefHat,
   Send,
 } from "lucide-react";
-import { createPosOrder, sendToKitchen, getKitchenStations } from "@/lib/actions/pos";
+import { createPosOrder, sendToKitchen, getKitchenStations, completeOrder } from "@/lib/actions/pos";
+import { getBranchTaxRate } from "@/lib/actions/tax";
 import { OrderType, SalesChannel } from "@/lib/generated/prisma/client";
 import { useEffect, useCallback } from "react";
 import { useCurrency } from "@/contexts/currency-context";
@@ -161,8 +162,6 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
 
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = cart.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
-  const tax = cartSubtotal * 0.125;
-  const total = cartSubtotal + tax;
 
   const addToCart = (item: MenuItem) => {
     setCart((prev) => {
@@ -205,7 +204,15 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
   const [sendingToKitchen, setSendingToKitchen] = useState(false);
   const [autoSendToKitchen, setAutoSendToKitchen] = useState(true);
   
-  // Load kitchen stations when branch changes
+  // Tax settings state
+  const [taxSettings, setTaxSettings] = useState<{ rate: number; name: string; enabled: boolean }>({ rate: 12.5, name: "VAT", enabled: true });
+
+  // Calculate tax and total after taxSettings is declared
+  const taxRate = taxSettings.enabled ? taxSettings.rate / 100 : 0;
+  const tax = cartSubtotal * taxRate;
+  const total = cartSubtotal + tax;
+
+  // Load kitchen stations and tax settings when branch changes
   const loadKitchenStations = useCallback(async (branchId: string) => {
     if (!branchId) return;
     const result = await getKitchenStations(branchId);
@@ -216,12 +223,19 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
       }
     }
   }, [selectedStation]);
+
+  const loadTaxSettings = useCallback(async (branchId: string) => {
+    if (!branchId) return;
+    const settings = await getBranchTaxRate(branchId);
+    setTaxSettings(settings);
+  }, []);
   
   useEffect(() => {
     if (branchId) {
       loadKitchenStations(branchId);
+      loadTaxSettings(branchId);
     }
-  }, [branchId, loadKitchenStations]);
+  }, [branchId, loadKitchenStations, loadTaxSettings]);
 
   const submitOrder = () => {
     if (!branchId) return toast.error("Select a branch");
@@ -231,6 +245,7 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
 
   const handlePaymentComplete = async (paymentData: PaymentData) => {
     startTransition(async () => {
+      // First create the POS order
       const result = await createPosOrder({
         branchId,
         type: orderType,
@@ -246,12 +261,30 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
         sendToKitchen: autoSendToKitchen && kitchenStations.length > 0,
         stationId: selectedStation || undefined,
       });
-      if (!result.success) {
+      if (!result.success || !result.data) {
         toast.error(result.error || "Failed to create order");
         setIsPaymentOpen(false);
         return;
       }
-      setCompletedOrder(result.data);
+
+      // Complete the order to create Transaction + Sale records for reporting
+      const completeResult = await completeOrder({
+        orderId: result.data.id,
+        paymentMethod: paymentData.paymentMethod,
+        amountReceived: paymentData.amountPaid,
+        tip: 0,
+        createSale: true, // This creates Transaction + Sale records
+      });
+
+      if (!completeResult.success) {
+        console.error("Failed to complete order:", completeResult.error);
+        // Order was created but completion failed - still show success but log error
+      }
+
+      setCompletedOrder({
+        ...result.data,
+        change: completeResult.data?.change || paymentData.change,
+      });
       setIsPaymentOpen(false);
       setIsReceiptOpen(true);
       
@@ -569,7 +602,7 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
                   <span>{formatCurrency(cartSubtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">VAT (12.5%)</span>
+                  <span className="text-muted-foreground">{taxSettings.name} ({taxSettings.rate}%)</span>
                   <span>{formatCurrency(tax)}</span>
                 </div>
                 <Separator />
@@ -680,6 +713,8 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
         total={total}
         subtotal={cartSubtotal}
         tax={tax}
+        taxName={taxSettings.name}
+        taxRate={taxSettings.rate}
         onComplete={handlePaymentComplete}
         isProcessing={isPending}
       />

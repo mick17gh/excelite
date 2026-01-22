@@ -28,11 +28,13 @@ import {
   Trash2,
   Tag,
   Package,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { createCategory, updateCategory, deleteCategory } from "@/lib/actions/categories";
 import { EmptyState } from "@/components/ui/empty-state";
+import { BulkImportDialog } from "@/components/bulk-import-dialog";
 
 interface Category {
   id: string;
@@ -47,6 +49,7 @@ interface CategoriesContentProps {
 export function CategoriesContent({ categories: initialCategories }: CategoriesContentProps) {
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -193,10 +196,16 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
       {/* Actions */}
       <div className="flex items-center justify-between">
         <div className="flex-1" />
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Category
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import CSV
+          </Button>
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Category
+          </Button>
+        </div>
       </div>
 
       {/* Categories Table */}
@@ -350,6 +359,14 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={isBulkImportOpen}
+        onOpenChange={setIsBulkImportOpen}
+        type="category"
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

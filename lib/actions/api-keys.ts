@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { randomBytes } from "crypto";
+import { cookies } from "next/headers";
 
 export type ApiScope = 
   | "menu:read"
@@ -37,7 +38,11 @@ function generateApiKey(): string {
 
 export async function createApiKey(input: CreateApiKeyInput) {
   try {
-    const session = await auth.api.getSession({ headers: new Headers() });
+    const session = await auth.api.getSession({
+      headers: {
+        cookie: (await cookies()).toString()
+      }
+    });
     if (!session || !session.user || !session.user.id) {
       return { success: false, error: "Unauthorized" };
     }
@@ -67,7 +72,11 @@ export async function createApiKey(input: CreateApiKeyInput) {
 
 export async function updateApiKey(input: UpdateApiKeyInput) {
   try {
-    const session = await auth.api.getSession({ headers: new Headers() });
+    const session = await auth.api.getSession({
+      headers: {
+        cookie: (await cookies()).toString()
+      }
+    });
     if (!session || !session.user || !session.user.id) {
       return { success: false, error: "Unauthorized" };
     }
@@ -92,7 +101,11 @@ export async function updateApiKey(input: UpdateApiKeyInput) {
 
 export async function deleteApiKey(id: string) {
   try {
-    const session = await auth.api.getSession({ headers: new Headers() });
+    const session = await auth.api.getSession({
+      headers: {
+        cookie: (await cookies()).toString()
+      }
+    });
     if (!session || !session.user || !session.user.id) {
       return { success: false, error: "Unauthorized" };
     }

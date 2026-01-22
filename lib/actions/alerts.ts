@@ -148,6 +148,28 @@ export async function createAlert(input: CreateAlertInput) {
   }
 }
 
+export async function triggerAlertGeneration() {
+  try {
+    const { runAlertChecks } = await import("@/lib/services/alert-checker");
+    const result = await runAlertChecks();
+    
+    revalidatePath("/dashboard/alerts");
+    revalidatePath("/dashboard");
+    
+    return { 
+      success: true, 
+      data: {
+        checked: result.checked,
+        alertsCreated: result.alertsCreated,
+        errors: result.errors
+      }
+    };
+  } catch (error) {
+    console.error("[triggerAlertGeneration] Error:", error);
+    return { success: false, error: "Failed to generate alerts" };
+  }
+}
+
 export async function checkAndGenerateAlerts() {
   try {
     // Check for low stock items

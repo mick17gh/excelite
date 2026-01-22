@@ -34,10 +34,12 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
   bulkCreateMenuItems,
+} from "@/lib/actions/bulk";
+import {
   parseMenuCSV,
   getMenuCSVTemplate,
-  BulkMenuItemInput,
-} from "@/lib/actions/bulk";
+  type BulkMenuItemInput,
+} from "@/lib/utils/bulk-import";
 
 interface MenuImportDialogProps {
   open: boolean;

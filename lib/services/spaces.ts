@@ -5,8 +5,9 @@ import { randomUUID } from "crypto";
 
 // DigitalOcean Spaces is S3-compatible
 const spacesClient = new S3Client({
-  endpoint: process.env.DO_SPACES_ENDPOINT || `https://${process.env.DO_SPACES_REGION}.digitaloceanspaces.com`,
-  region: process.env.DO_SPACES_REGION || "nyc3",
+  endpoint: process.env.DO_SPACES_ENDPOINT || `https://${process.env.DO_SPACES_REGION || "sfo3"}.digitaloceanspaces.com`,
+  region: process.env.DO_SPACES_REGION || "sfo3",
+  forcePathStyle: false,
   credentials: {
     accessKeyId: process.env.DO_SPACES_KEY || "",
     secretAccessKey: process.env.DO_SPACES_SECRET || "",
@@ -78,7 +79,7 @@ export async function uploadImageToSpaces(
     // Return CDN URL or Spaces URL
     const imageUrl = CDN_URL
       ? `${CDN_URL}/${key}`
-      : `https://${BUCKET_NAME}.${process.env.DO_SPACES_REGION || "nyc3"}.digitaloceanspaces.com/${key}`;
+      : `https://${BUCKET_NAME}.${process.env.DO_SPACES_REGION || "sfo3"}.digitaloceanspaces.com/${key}`;
 
     return { success: true, url: imageUrl };
   } catch (error) {

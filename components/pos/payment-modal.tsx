@@ -23,6 +23,8 @@ interface PaymentModalProps {
   total: number;
   subtotal?: number;
   tax?: number;
+  taxName?: string;
+  taxRate?: number;
   onComplete: (paymentData: PaymentData) => void;
   isProcessing?: boolean;
 }
@@ -50,6 +52,8 @@ export function PaymentModal({
   total,
   subtotal,
   tax,
+  taxName = "VAT",
+  taxRate = 12.5,
   onComplete,
   isProcessing = false,
 }: PaymentModalProps) {
@@ -110,7 +114,7 @@ export function PaymentModal({
                 <span>{formatCurrency(displaySubtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">VAT (12.5%)</span>
+                <span className="text-muted-foreground">{taxName} ({taxRate}%)</span>
                 <span>{formatCurrency(displayTax)}</span>
               </div>
               <Separator />

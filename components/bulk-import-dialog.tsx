@@ -42,15 +42,24 @@ import { toast } from "sonner";
 import {
   bulkCreateMenuItems,
   bulkCreateInventoryItems,
+  bulkCreateCategories,
+  bulkCreateSuppliers,
+  bulkCreateStaff,
+} from "@/lib/actions/bulk";
+import {
   parseMenuCSV,
   parseInventoryCSV,
+  parseCategoryCSV,
+  parseSupplierCSV,
+  parseStaffCSV,
   getMenuCSVTemplate,
   getInventoryCSVTemplate,
-  type BulkMenuItemInput,
-  type BulkInventoryItemInput,
-} from "@/lib/actions/bulk";
+  getCategoryCSVTemplate,
+  getSupplierCSVTemplate,
+  getStaffCSVTemplate,
+} from "@/lib/utils/bulk-import";
 
-type ImportType = "menu" | "inventory";
+type ImportType = "menu" | "inventory" | "category" | "supplier" | "staff";
 
 interface BulkImportDialogProps {
   open: boolean;
@@ -101,7 +110,26 @@ export function BulkImportDialog({
   };
 
   const downloadTemplate = () => {
-    const template = type === "menu" ? getMenuCSVTemplate() : getInventoryCSVTemplate();
+    let template: string;
+    switch (type) {
+      case "menu":
+        template = getMenuCSVTemplate();
+        break;
+      case "inventory":
+        template = getInventoryCSVTemplate();
+        break;
+      case "category":
+        template = getCategoryCSVTemplate();
+        break;
+      case "supplier":
+        template = getSupplierCSVTemplate();
+        break;
+      case "staff":
+        template = getStaffCSVTemplate();
+        break;
+      default:
+        template = "";
+    }
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -135,16 +163,31 @@ export function BulkImportDialog({
   const validateRow = (row: Record<string, string>, index: number): ParsedRow => {
     const errors: string[] = [];
 
-    if (type === "menu") {
-      if (!row.name && !row.Name) errors.push("Name is required");
-      const price = parseFloat(row.price || row.Price || "0");
-      if (isNaN(price) || price <= 0) errors.push("Valid price is required");
-      if (!row.category && !row.Category) errors.push("Category is required");
-    } else {
-      if (!row.name && !row.Name) errors.push("Name is required");
-      const unitCost = parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0");
-      if (isNaN(unitCost) || unitCost < 0) errors.push("Valid unit cost is required");
-      if (!row.unit && !row.Unit) errors.push("Unit is required");
+    switch (type) {
+      case "menu":
+        if (!row.name && !row.Name) errors.push("Name is required");
+        const price = parseFloat(row.price || row.Price || "0");
+        if (isNaN(price) || price <= 0) errors.push("Valid price is required");
+        if (!row.category && !row.Category) errors.push("Category is required");
+        break;
+      case "inventory":
+        if (!row.name && !row.Name) errors.push("Name is required");
+        const unitCost = parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0");
+        if (isNaN(unitCost) || unitCost < 0) errors.push("Valid unit cost is required");
+        if (!row.unit && !row.Unit) errors.push("Unit is required");
+        break;
+      case "category":
+        if (!row.name && !row.Name) errors.push("Name is required");
+        break;
+      case "supplier":
+        if (!row.name && !row.Name) errors.push("Name is required");
+        break;
+      case "staff":
+        if (!row.firstName && !row["First Name"]) errors.push("First name is required");
+        if (!row.lastName && !row["Last Name"]) errors.push("Last name is required");
+        const hourlyRate = parseFloat(row.hourlyRate || row["Hourly Rate"] || "0");
+        if (isNaN(hourlyRate) || hourlyRate < 0) errors.push("Valid hourly rate is required");
+        break;
     }
 
     return {
@@ -192,7 +235,7 @@ export function BulkImportDialog({
       return;
     }
 
-    if (type === "inventory" && !selectedBranch) {
+    if ((type === "inventory" || type === "staff") && !selectedBranch) {
       toast.error("Please select a branch");
       return;
     }
@@ -200,16 +243,26 @@ export function BulkImportDialog({
     startTransition(async () => {
       try {
         let result;
+        const rowData = validRows.map((r) => r.data as Record<string, string>);
 
-        if (type === "menu") {
-          const items = parseMenuCSV(validRows.map((r) => r.data as Record<string, string>));
-          result = await bulkCreateMenuItems(items);
-        } else {
-          const items = parseInventoryCSV(
-            validRows.map((r) => r.data as Record<string, string>),
-            selectedBranch
-          );
-          result = await bulkCreateInventoryItems(items);
+        switch (type) {
+          case "menu":
+            result = await bulkCreateMenuItems(parseMenuCSV(rowData));
+            break;
+          case "inventory":
+            result = await bulkCreateInventoryItems(parseInventoryCSV(rowData, selectedBranch));
+            break;
+          case "category":
+            result = await bulkCreateCategories(parseCategoryCSV(rowData));
+            break;
+          case "supplier":
+            result = await bulkCreateSuppliers(parseSupplierCSV(rowData));
+            break;
+          case "staff":
+            result = await bulkCreateStaff(parseStaffCSV(rowData, selectedBranch));
+            break;
+          default:
+            result = { success: false, error: "Unknown import type" };
         }
 
         if (result.success) {
@@ -236,10 +289,10 @@ export function BulkImportDialog({
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            Import {type === "menu" ? "Menu Items" : "Inventory Items"}
+            Import {type === "menu" ? "Menu Items" : type === "inventory" ? "Inventory Items" : type === "category" ? "Categories" : type === "supplier" ? "Suppliers" : "Staff Members"}
           </DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk import {type === "menu" ? "menu items" : "inventory items"}
+            Upload a CSV file to bulk import {type === "menu" ? "menu items" : type === "inventory" ? "inventory items" : type === "category" ? "categories" : type === "supplier" ? "suppliers" : "staff members"}
           </DialogDescription>
         </DialogHeader>
 
@@ -283,10 +336,20 @@ export function BulkImportDialog({
                 CSV Format
               </h4>
               <p className="text-sm text-muted-foreground">
-                {type === "menu" ? (
-                  <>Required columns: <code>name</code>, <code>category</code>, <code>price</code>. Optional: <code>sku</code>, <code>cost</code>, <code>description</code>, <code>isActive</code></>
-                ) : (
-                  <>Required columns: <code>name</code>, <code>unit</code>, <code>unitCost</code>. Optional: <code>sku</code>, <code>category</code>, <code>currentStock</code>, <code>minStock</code>, <code>maxStock</code>, <code>reorderPoint</code></>
+                {type === "menu" && (
+                  <>Required: <code>name</code>, <code>category</code>, <code>price</code>. Optional: <code>sku</code>, <code>cost</code>, <code>description</code>, <code>isActive</code></>
+                )}
+                {type === "inventory" && (
+                  <>Required: <code>name</code>, <code>unit</code>, <code>unitCost</code>. Optional: <code>sku</code>, <code>category</code>, <code>currentStock</code>, <code>minStock</code>, <code>maxStock</code></>
+                )}
+                {type === "category" && (
+                  <>Required: <code>name</code>. Optional: <code>description</code></>
+                )}
+                {type === "supplier" && (
+                  <>Required: <code>name</code>. Optional: <code>code</code>, <code>contactName</code>, <code>email</code>, <code>phone</code>, <code>address</code></>
+                )}
+                {type === "staff" && (
+                  <>Required: <code>firstName</code>, <code>lastName</code>, <code>hourlyRate</code>. Optional: <code>employeeId</code>, <code>email</code>, <code>phone</code>, <code>role</code></>
                 )}
               </p>
             </div>
@@ -309,7 +372,7 @@ export function BulkImportDialog({
                   </Badge>
                 )}
               </div>
-              {type === "inventory" && (
+              {(type === "inventory" || type === "staff") && (
                 <div className="flex items-center gap-2">
                   <Label className="text-sm">Branch:</Label>
                   <Select value={selectedBranch} onValueChange={setSelectedBranch}>
@@ -333,16 +396,30 @@ export function BulkImportDialog({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12">#</TableHead>
-                    <TableHead>Name</TableHead>
-                    {type === "menu" ? (
+                    <TableHead>{type === "staff" ? "Name" : "Name"}</TableHead>
+                    {type === "menu" && (
                       <>
                         <TableHead>Category</TableHead>
                         <TableHead>Price</TableHead>
                       </>
-                    ) : (
+                    )}
+                    {type === "inventory" && (
                       <>
                         <TableHead>Unit</TableHead>
                         <TableHead>Unit Cost</TableHead>
+                      </>
+                    )}
+                    {type === "category" && <TableHead>Description</TableHead>}
+                    {type === "supplier" && (
+                      <>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Contact</TableHead>
+                      </>
+                    )}
+                    {type === "staff" && (
+                      <>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Hourly Rate</TableHead>
                       </>
                     )}
                     <TableHead>Status</TableHead>
@@ -354,17 +431,35 @@ export function BulkImportDialog({
                     <TableRow key={index} className={!row.isValid ? "bg-destructive/5" : ""}>
                       <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="font-medium">
-                        {String(row.data.name || row.data.Name || "-")}
+                        {type === "staff" 
+                          ? `${String(row.data.firstName || row.data["First Name"] || "")} ${String(row.data.lastName || row.data["Last Name"] || "")}`
+                          : String(row.data.name || row.data.Name || "-")}
                       </TableCell>
-                      {type === "menu" ? (
+                      {type === "menu" && (
                         <>
                           <TableCell>{String(row.data.category || row.data.Category || "-")}</TableCell>
                           <TableCell>{String(row.data.price || row.data.Price || "-")}</TableCell>
                         </>
-                      ) : (
+                      )}
+                      {type === "inventory" && (
                         <>
                           <TableCell>{String(row.data.unit || row.data.Unit || "-")}</TableCell>
                           <TableCell>{String(row.data.unitCost || row.data["Unit Cost"] || row.data.cost || "-")}</TableCell>
+                        </>
+                      )}
+                      {type === "category" && (
+                        <TableCell>{String(row.data.description || row.data.Description || "-")}</TableCell>
+                      )}
+                      {type === "supplier" && (
+                        <>
+                          <TableCell>{String(row.data.code || row.data.Code || "-")}</TableCell>
+                          <TableCell>{String(row.data.contactName || row.data["Contact Name"] || row.data.contact || "-")}</TableCell>
+                        </>
+                      )}
+                      {type === "staff" && (
+                        <>
+                          <TableCell>{String(row.data.role || row.data.Role || "-")}</TableCell>
+                          <TableCell>{String(row.data.hourlyRate || row.data["Hourly Rate"] || "-")}</TableCell>
                         </>
                       )}
                       <TableCell>
@@ -446,7 +541,7 @@ export function BulkImportDialog({
               </Button>
               <Button
                 onClick={handleImport}
-                disabled={isPending || validCount === 0 || (type === "inventory" && !selectedBranch)}
+                disabled={isPending || validCount === 0 || ((type === "inventory" || type === "staff") && !selectedBranch)}
               >
                 {isPending ? (
                   <>
