@@ -67,11 +67,11 @@ export const auth = betterAuth({
     database: prismaAdapter(db, {
         provider: "postgresql",
     }),
-    trustedOrigins: [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        process.env.NEXT_PUBLIC_APP_URL || "",
-    ].filter(Boolean),
+    // trustedOrigins: [
+    //     "http://localhost:3000",
+    //     "http://127.0.0.1:3000",
+    //     process.env.NEXT_PUBLIC_APP_URL || "",
+    // ].filter(Boolean),
     emailAndPassword: {   
         enabled: true,
         autoSignIn: true,
