@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+
 export const metadata: Metadata = {
   title: "Dinelytix - Smart Intelligence for Modern Restaurants",
   description: "Executive Restaurant Analytics & Operations Platform providing CEO-level visibility into multi-branch restaurant operations",
