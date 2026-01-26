@@ -4,18 +4,50 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { AlertType, AlertSeverity, AlertStatus } from "@/lib/generated/prisma/client";
 
-export async function getAlerts(branchId?: string, status?: AlertStatus) {
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  error?: string;
+}
+
+export async function getAlerts(
+  branchId?: string,
+  status?: AlertStatus,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const alerts = await db.alert.findMany({
-      where: {
-        ...(branchId && { branchId }),
-        ...(status && { status }),
-      },
-      include: {
-        branch: true,
-      },
-      orderBy: { triggeredAt: "desc" },
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+    const skip = (page - 1) * pageSize;
+
+    const where = {
+      ...(branchId && { branchId }),
+      ...(status && { status }),
+    };
+
+    const [alerts, totalItems] = await Promise.all([
+      db.alert.findMany({
+        where,
+        include: {
+          branch: true,
+        },
+        orderBy: { triggeredAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      db.alert.count({ where }),
+    ]);
 
     const formattedAlerts = alerts.map((alert) => ({
       id: alert.id,
@@ -29,10 +61,19 @@ export async function getAlerts(branchId?: string, status?: AlertStatus) {
       resolvedAt: alert.resolvedAt,
     }));
 
-    return { success: true, data: formattedAlerts };
+    return {
+      success: true,
+      data: formattedAlerts,
+      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
+    };
   } catch (error) {
     console.error("[getAlerts] Error:", error);
-    return { success: false, error: "Failed to fetch alerts", data: [] };
+    return {
+      success: false,
+      error: "Failed to fetch alerts",
+      data: [],
+      pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+    };
   }
 }
 

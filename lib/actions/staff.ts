@@ -4,6 +4,23 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { StaffRole, DutyStatus } from "@/lib/generated/prisma/client";
 
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  error?: string;
+}
+
 export interface CreateStaffInput {
   firstName: string;
   lastName: string;
@@ -103,18 +120,32 @@ export async function deleteStaff(id: string) {
   }
 }
 
-export async function getStaff(branchId?: string) {
+export async function getStaff(
+  branchId?: string,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const staff = await db.staff.findMany({
-      where: {
-        deletedAt: null,
-        ...(branchId && { branchId }),
-      },
-      include: {
-        branch: true,
-      },
-      orderBy: { lastName: "asc" },
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+    const skip = (page - 1) * pageSize;
+
+    const where = {
+      deletedAt: null,
+      ...(branchId && { branchId }),
+    };
+
+    const [staff, totalItems] = await Promise.all([
+      db.staff.findMany({
+        where,
+        include: {
+          branch: true,
+        },
+        orderBy: { lastName: "asc" },
+        skip,
+        take: pageSize,
+      }),
+      db.staff.count({ where }),
+    ]);
 
     // Convert Decimal fields to plain numbers
     const convertedStaff = staff.map((s) => ({
@@ -136,10 +167,19 @@ export async function getStaff(branchId?: string) {
       branch: s.branch,
     }));
 
-    return { success: true, data: convertedStaff };
+    return {
+      success: true,
+      data: convertedStaff,
+      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
+    };
   } catch (error) {
     console.error("[getStaff] Error:", error);
-    return { success: false, error: "Failed to fetch staff", data: [] };
+    return {
+      success: false,
+      error: "Failed to fetch staff",
+      data: [],
+      pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+    };
   }
 }
 

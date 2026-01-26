@@ -107,18 +107,49 @@ export async function deleteInventoryItem(id: string) {
   }
 }
 
-export async function getInventoryItems(branchId?: string) {
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  error?: string;
+}
+
+export async function getInventoryItems(
+  branchId?: string,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const items = await db.inventoryItem.findMany({
-      where: {
-        deletedAt: null,
-        ...(branchId && { branchId }),
-      },
-      include: {
-        branch: true,
-      },
-      orderBy: { name: "asc" },
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 10;
+    const skip = (page - 1) * pageSize;
+
+    const where = {
+      deletedAt: null,
+      ...(branchId && { branchId }),
+    };
+
+    const [items, totalItems] = await Promise.all([
+      db.inventoryItem.findMany({
+        where,
+        include: {
+          branch: true,
+        },
+        orderBy: { name: "asc" },
+        skip,
+        take: pageSize,
+      }),
+      db.inventoryItem.count({ where }),
+    ]);
 
     // Convert Decimal fields to plain numbers
     const convertedItems = items.map((item) => ({
@@ -141,10 +172,24 @@ export async function getInventoryItems(branchId?: string) {
       branch: item.branch,
     }));
 
-    return { success: true, data: convertedItems };
+    return {
+      success: true,
+      data: convertedItems,
+      pagination: {
+        page,
+        pageSize,
+        totalItems,
+        totalPages: Math.ceil(totalItems / pageSize),
+      },
+    };
   } catch (error) {
     console.error("[getInventoryItems] Error:", error);
-    return { success: false, error: "Failed to fetch inventory items", data: [] };
+    return {
+      success: false,
+      error: "Failed to fetch inventory items",
+      data: [],
+      pagination: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 },
+    };
   }
 }
 
@@ -483,18 +528,30 @@ export async function createSupplier(input: CreateSupplierInput) {
   }
 }
 
-export async function getInboundRecords(branchId?: string) {
+export async function getInboundRecords(
+  branchId?: string,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const records = await db.inboundStock.findMany({
-      where: branchId ? { branchId } : {},
-      include: {
-        item: { select: { name: true, sku: true } },
-        supplier: { select: { name: true } },
-        branch: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+    const skip = (page - 1) * pageSize;
+    const where = branchId ? { branchId } : {};
+
+    const [records, totalItems] = await Promise.all([
+      db.inboundStock.findMany({
+        where,
+        include: {
+          item: { select: { name: true, sku: true } },
+          supplier: { select: { name: true } },
+          branch: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      db.inboundStock.count({ where }),
+    ]);
 
     return {
       success: true,
@@ -504,24 +561,37 @@ export async function getInboundRecords(branchId?: string) {
         unitCost: Number(record.unitCost),
         totalCost: Number(record.totalCost),
       })),
+      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
     };
   } catch (error) {
     console.error("[getInboundRecords] Error:", error);
-    return { success: false, error: "Failed to fetch inbound records" };
+    return { success: false, error: "Failed to fetch inbound records", data: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } };
   }
 }
 
-export async function getOutboundRecords(branchId?: string) {
+export async function getOutboundRecords(
+  branchId?: string,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const records = await db.outboundStock.findMany({
-      where: branchId ? { branchId } : {},
-      include: {
-        item: { select: { name: true, sku: true } },
-        branch: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+    const skip = (page - 1) * pageSize;
+    const where = branchId ? { branchId } : {};
+
+    const [records, totalItems] = await Promise.all([
+      db.outboundStock.findMany({
+        where,
+        include: {
+          item: { select: { name: true, sku: true } },
+          branch: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      db.outboundStock.count({ where }),
+    ]);
 
     return {
       success: true,
@@ -529,30 +599,43 @@ export async function getOutboundRecords(branchId?: string) {
         ...record,
         quantity: Number(record.quantity),
       })),
+      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
     };
   } catch (error) {
     console.error("[getOutboundRecords] Error:", error);
-    return { success: false, error: "Failed to fetch outbound records" };
+    return { success: false, error: "Failed to fetch outbound records", data: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } };
   }
 }
 
-export async function getTransferRecords(branchId?: string) {
+export async function getTransferRecords(
+  branchId?: string,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const records = await db.transferLog.findMany({
-      where: branchId ? { 
-        OR: [
-          { fromBranchId: branchId },
-          { toBranchId: branchId }
-        ]
-      } : {},
-      include: {
-        item: { select: { name: true, sku: true } },
-        fromBranch: { select: { name: true } },
-        toBranch: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+    const skip = (page - 1) * pageSize;
+    const where = branchId ? { 
+      OR: [
+        { fromBranchId: branchId },
+        { toBranchId: branchId }
+      ]
+    } : {};
+
+    const [records, totalItems] = await Promise.all([
+      db.transferLog.findMany({
+        where,
+        include: {
+          item: { select: { name: true, sku: true } },
+          fromBranch: { select: { name: true } },
+          toBranch: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      db.transferLog.count({ where }),
+    ]);
 
     return {
       success: true,
@@ -562,10 +645,11 @@ export async function getTransferRecords(branchId?: string) {
         unitCost: Number(record.unitCost),
         totalCost: Number(record.totalCost),
       })),
+      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
     };
   } catch (error) {
     console.error("[getTransferRecords] Error:", error);
-    return { success: false, error: "Failed to fetch transfer records" };
+    return { success: false, error: "Failed to fetch transfer records", data: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } };
   }
 }
 

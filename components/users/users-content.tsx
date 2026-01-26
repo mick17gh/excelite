@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { AddUserForm, EditUserForm } from "@/components/users/user-forms";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface User {
   id: string;
@@ -70,18 +71,36 @@ export function UsersContent({ users, branches }: UsersContentProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" && user.isActive) ||
-      (statusFilter === "inactive" && !user.isActive);
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && user.isActive) ||
+        (statusFilter === "inactive" && !user.isActive);
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, searchQuery, roleFilter, statusFilter]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter, statusFilter]);
+
+  // Paginated users
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(startIndex, startIndex + pageSize);
+  }, [filteredUsers, currentPage, pageSize]);
 
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => u.isActive).length;
@@ -231,7 +250,7 @@ export function UsersContent({ users, branches }: UsersContentProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {paginatedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -308,6 +327,19 @@ export function UsersContent({ users, branches }: UsersContentProps) {
               ))}
             </TableBody>
           </Table>
+          {filteredUsers.length > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredUsers.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </CardContent>
       </Card>
 

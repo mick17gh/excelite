@@ -235,18 +235,66 @@ export async function bulkUpdateMenuPrices(
 // INVENTORY BULK OPERATIONS
 // =====================================
 
+// Map human-readable category names to InventoryCategory enum values
+function mapToInventoryCategory(category: string): InventoryCategory {
+  const categoryMap: Record<string, InventoryCategory> = {
+    food: InventoryCategory.FOOD,
+    beverage: InventoryCategory.BEVERAGE,
+    beverages: InventoryCategory.BEVERAGE,
+    packaging: InventoryCategory.PACKAGING,
+    cleaning: InventoryCategory.CLEANING,
+    equipment: InventoryCategory.EQUIPMENT,
+    other: InventoryCategory.OTHER,
+  };
+  const normalized = category.toLowerCase().trim();
+  return categoryMap[normalized] || InventoryCategory.OTHER;
+}
+
+// Map human-readable unit names to UnitType enum values
+function mapToUnitType(unit: string): UnitType {
+  const unitMap: Record<string, UnitType> = {
+    kg: UnitType.KG,
+    kilogram: UnitType.KG,
+    kilograms: UnitType.KG,
+    gram: UnitType.GRAM,
+    grams: UnitType.GRAM,
+    g: UnitType.GRAM,
+    liter: UnitType.LITER,
+    litre: UnitType.LITER,
+    liters: UnitType.LITER,
+    litres: UnitType.LITER,
+    l: UnitType.LITER,
+    ml: UnitType.ML,
+    milliliter: UnitType.ML,
+    milliliters: UnitType.ML,
+    piece: UnitType.PIECE,
+    pieces: UnitType.PIECE,
+    pcs: UnitType.PIECE,
+    box: UnitType.BOX,
+    boxes: UnitType.BOX,
+    case: UnitType.CASE,
+    cases: UnitType.CASE,
+    pack: UnitType.PACK,
+    packs: UnitType.PACK,
+    roll: UnitType.PIECE,
+    rolls: UnitType.PIECE,
+  };
+  const normalized = unit.toLowerCase().trim();
+  return unitMap[normalized] || UnitType.PIECE;
+}
+
 export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) {
   try {
     if (!items || items.length === 0) {
       return { success: false, error: "No items provided" };
     }
 
-    // Generate SKUs for items without one
+    // Generate SKUs for items without one and map enum values
     const itemsWithDefaults = items.map((item, index) => ({
       ...item,
       sku: item.sku || `INV-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`,
-      category: item.category as InventoryCategory,
-      unit: item.unit as UnitType,
+      category: mapToInventoryCategory(item.category),
+      unit: mapToUnitType(item.unit),
       currentStock: item.currentStock ?? 0,
       minStock: item.minStock ?? 10,
       maxStock: item.maxStock ?? 100,

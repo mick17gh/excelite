@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,7 @@ import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { EmptyState } from "@/components/ui/empty-state";
 import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface InventoryItem {
   id: string;
@@ -141,6 +142,10 @@ export function InventoryContent({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Auto-select user's branch if they're restricted
   useEffect(() => {
@@ -161,18 +166,32 @@ export function InventoryContent({
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
-  const filteredItems = items.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || item.status === statusFilter;
-    const matchesCategory =
-      categoryFilter === "all" || item.category === categoryFilter;
-    const matchesBranch =
-      branchFilter === "all" || item.branchId === branchFilter;
-    return matchesSearch && matchesStatus && matchesCategory && matchesBranch;
-  });
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesSearch =
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus =
+        statusFilter === "all" || item.status === statusFilter;
+      const matchesCategory =
+        categoryFilter === "all" || item.category === categoryFilter;
+      const matchesBranch =
+        branchFilter === "all" || item.branchId === branchFilter;
+      return matchesSearch && matchesStatus && matchesCategory && matchesBranch;
+    });
+  }, [items, searchQuery, statusFilter, categoryFilter, branchFilter]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, categoryFilter, branchFilter]);
+
+  // Paginated items
+  const totalPages = Math.ceil(filteredItems.length / pageSize);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredItems.slice(startIndex, startIndex + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
 
   const categories = [...new Set(items.map((i) => i.category))];
 
@@ -449,7 +468,7 @@ export function InventoryContent({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredItems.map((item) => (
+                    paginatedItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <div>
@@ -493,6 +512,19 @@ export function InventoryContent({
                   )}
                 </TableBody>
               </Table>
+              {filteredItems.length > 0 && (
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredItems.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ import { deleteMenuItem } from "@/lib/actions/menu";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface MenuItem {
   id: string;
@@ -72,18 +73,36 @@ export function MenuContent({ items, categories }: MenuContentProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const filteredItems = items.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "active" && item.isActive) ||
-      (statusFilter === "inactive" && !item.isActive);
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesSearch =
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+      const matchesStatus = statusFilter === "all" || 
+        (statusFilter === "active" && item.isActive) ||
+        (statusFilter === "inactive" && !item.isActive);
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [items, searchQuery, categoryFilter, statusFilter]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, categoryFilter, statusFilter]);
+
+  // Paginated items
+  const totalPages = Math.ceil(filteredItems.length / pageSize);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredItems.slice(startIndex, startIndex + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
@@ -233,7 +252,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
 
         <TabsContent value="grid" className="mt-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredItems.map((item) => (
+            {paginatedItems.map((item) => (
               <Card
                 key={item.id}
                 className="glass transition-smooth hover:card-shadow-hover overflow-hidden"
@@ -319,6 +338,19 @@ export function MenuContent({ items, categories }: MenuContentProps) {
               </CardContent>
             </Card>
           )}
+          {filteredItems.length > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredItems.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="list" className="mt-6">
@@ -338,7 +370,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredItems.map((item) => (
+                  {paginatedItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -407,6 +439,19 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                   ))}
                 </TableBody>
               </Table>
+              {filteredItems.length > 0 && (
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredItems.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>

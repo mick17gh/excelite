@@ -4,6 +4,23 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { UnitType } from "@/lib/generated/prisma/client";
 
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  error?: string;
+}
+
 export interface CreateMenuItemInput {
   name: string;
   sku: string;
@@ -207,22 +224,37 @@ export async function deleteMenuItem(id: string) {
   }
 }
 
-export async function getMenuItems(categoryId?: string, includeInactive = false) {
+export async function getMenuItems(
+  categoryId?: string,
+  includeInactive = false,
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const items = await db.menuItem.findMany({
-      where: {
-        deletedAt: null,
-        ...(categoryId && { categoryId }),
-        ...(!includeInactive && { isActive: true }),
-      },
-      include: {
-        category: true,
-      },
-      orderBy: [
-        { category: { name: "asc" } },
-        { name: "asc" },
-      ],
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+    const skip = (page - 1) * pageSize;
+
+    const where = {
+      deletedAt: null,
+      ...(categoryId && { categoryId }),
+      ...(!includeInactive && { isActive: true }),
+    };
+
+    const [items, totalItems] = await Promise.all([
+      db.menuItem.findMany({
+        where,
+        include: {
+          category: true,
+        },
+        orderBy: [
+          { category: { name: "asc" } },
+          { name: "asc" },
+        ],
+        skip,
+        take: pageSize,
+      }),
+      db.menuItem.count({ where }),
+    ]);
 
     // Convert Decimal fields to plain numbers for client components
     const convertedItems = items.map((item) => ({
@@ -243,10 +275,16 @@ export async function getMenuItems(categoryId?: string, includeInactive = false)
     return {
       success: true,
       data: convertedItems,
+      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
     };
   } catch (error) {
     console.error("[getMenuItems] Error:", error);
-    return { success: false, error: "Failed to fetch menu items", data: [] };
+    return {
+      success: false,
+      error: "Failed to fetch menu items",
+      data: [],
+      pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+    };
   }
 }
 

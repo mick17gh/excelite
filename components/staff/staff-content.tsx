@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,7 @@ import { AddStaffForm } from "./staff-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface StaffSummary {
   branchId: string;
@@ -136,6 +137,10 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
   // Schedule dialog state
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
@@ -191,12 +196,26 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
   // const totalRequired = summary.reduce((sum, s) => sum + s.required, 0);
   const understaffedBranches = summary.filter((s) => s.status === "understaffed").length;
 
-  const filteredSchedule = schedule.filter((staff) => {
-    const matchesBranch = branchFilter === "all" || 
-      branches.find((b) => b.name === staff.branchName)?.id === branchFilter;
-    const matchesStatus = statusFilter === "all" || staff.status === statusFilter;
-    return matchesBranch && matchesStatus;
-  });
+  const filteredSchedule = useMemo(() => {
+    return schedule.filter((staff) => {
+      const matchesBranch = branchFilter === "all" || 
+        branches.find((b) => b.name === staff.branchName)?.id === branchFilter;
+      const matchesStatus = statusFilter === "all" || staff.status === statusFilter;
+      return matchesBranch && matchesStatus;
+    });
+  }, [schedule, branchFilter, statusFilter, branches]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [branchFilter, statusFilter]);
+
+  // Paginated schedule
+  const totalPages = Math.ceil(filteredSchedule.length / pageSize);
+  const paginatedSchedule = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredSchedule.slice(startIndex, startIndex + pageSize);
+  }, [filteredSchedule, currentPage, pageSize]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -740,7 +759,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSchedule.map((staff) => (
+                  {paginatedSchedule.map((staff) => (
                     <TableRow key={staff.id}>
                       <TableCell className="py-2">
                         <div>
@@ -798,6 +817,19 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                   ))}
                 </TableBody>
               </Table>
+              {filteredSchedule.length > 0 && (
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredSchedule.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>

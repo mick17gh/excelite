@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Alert {
   id: string;
@@ -98,6 +99,10 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const router = useRouter();
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   
   // Alert rules state
   const [alertRules, setAlertRules] = useState({
@@ -195,17 +200,31 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
     });
   };
 
-  const filteredAlerts = alerts.filter((alert) => {
-    const matchesSearch =
-      alert.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      alert.message.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSeverity =
-      severityFilter === "all" || alert.severity === severityFilter;
-    const matchesType = typeFilter === "all" || alert.type === typeFilter;
-    const matchesBranch =
-      branchFilter === "all" || alert.branchName === branches.find((b) => b.id === branchFilter)?.name;
-    return matchesSearch && matchesSeverity && matchesType && matchesBranch;
-  });
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      const matchesSearch =
+        alert.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        alert.message.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSeverity =
+        severityFilter === "all" || alert.severity === severityFilter;
+      const matchesType = typeFilter === "all" || alert.type === typeFilter;
+      const matchesBranch =
+        branchFilter === "all" || alert.branchName === branches.find((b) => b.id === branchFilter)?.name;
+      return matchesSearch && matchesSeverity && matchesType && matchesBranch;
+    });
+  }, [alerts, searchQuery, severityFilter, typeFilter, branchFilter, branches]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, severityFilter, typeFilter, branchFilter]);
+
+  // Paginated alerts
+  const totalPages = Math.ceil(filteredAlerts.length / pageSize);
+  const paginatedAlerts = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAlerts.slice(startIndex, startIndex + pageSize);
+  }, [filteredAlerts, currentPage, pageSize]);
 
   const activeAlerts = alerts.filter((a) => a.status !== "resolved" && a.status !== "dismissed");
   const criticalAlerts = alerts.filter((a) => a.severity === "critical");
@@ -436,7 +455,7 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
                 </CardContent>
               </Card>
             ) : (
-              filteredAlerts.map((alert) => {
+              paginatedAlerts.map((alert) => {
                 const Icon = getAlertIcon(alert.type);
                 return (
                   <Card
@@ -521,6 +540,19 @@ export function AlertsContent({ alerts: initialAlerts, branches }: AlertsContent
                   </Card>
                 );
               })
+            )}
+            {filteredAlerts.length > 0 && (
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredAlerts.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+              />
             )}
           </div>
         </TabsContent>

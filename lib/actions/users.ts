@@ -5,6 +5,23 @@ import { revalidatePath } from "next/cache";
 import { Role } from "@/lib/generated/prisma/client";
 import bcrypt from "bcryptjs";
 
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+  success: boolean;
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  error?: string;
+}
+
 export interface CreateUserInput {
   name: string;
   email: string;
@@ -101,15 +118,28 @@ export async function deleteUser(id: string) {
   }
 }
 
-export async function getUsers() {
+export async function getUsers(
+  pagination?: PaginationParams
+): Promise<PaginatedResult<any>> {
   try {
-    const users = await db.user.findMany({
-      where: { deletedAt: null },
-      include: {
-        branch: true,
-      },
-      orderBy: { name: "asc" },
-    });
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 20;
+    const skip = (page - 1) * pageSize;
+
+    const where = { deletedAt: null };
+
+    const [users, totalItems] = await Promise.all([
+      db.user.findMany({
+        where,
+        include: {
+          branch: true,
+        },
+        orderBy: { name: "asc" },
+        skip,
+        take: pageSize,
+      }),
+      db.user.count({ where }),
+    ]);
 
     const formattedUsers = users.map((user) => ({
       id: user.id,
@@ -122,10 +152,19 @@ export async function getUsers() {
       createdAt: user.createdAt,
     }));
 
-    return { success: true, data: formattedUsers };
+    return {
+      success: true,
+      data: formattedUsers,
+      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
+    };
   } catch (error) {
     console.error("[getUsers] Error:", error);
-    return { success: false, error: "Failed to fetch users", data: [] };
+    return {
+      success: false,
+      error: "Failed to fetch users",
+      data: [],
+      pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+    };
   }
 }
 
