@@ -490,7 +490,7 @@ model Supplier {
 model InventoryItem {
   id              String            @id @default(cuid())
   name            String
-  sku             String            @unique
+  sku             String
   category        InventoryCategory
   unit            UnitType
   unitCost        Decimal           @db.Decimal(10, 2)
@@ -517,6 +517,7 @@ model InventoryItem {
   @@index([branchId])
   @@index([category])
   @@index([currentStock])
+  @@index([sku])
   @@map("inventory_item")
 }
 
