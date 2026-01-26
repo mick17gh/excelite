@@ -29,11 +29,8 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  experimental: {
-    // @ts-expect-error – supported by Next.js runtime but missing in types
-    outputFileTracingIncludes: {
-      "/*": ["lib/generated/prisma/**/*"],
-    },
+  outputFileTracingIncludes: {
+    "/*": ["lib/generated/prisma/**/*"],
   },
 };
 
