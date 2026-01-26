@@ -1,0 +1,15 @@
+node_modules
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vscode
+.idea
+coverage
+.nyc_output
+.cache
+dist
+build
+.next/cache
+# Don't ignore the generated Prisma client
+!lib/generated/prisma
