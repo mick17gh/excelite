@@ -286,7 +286,7 @@ export function BulkImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             Import {type === "menu" ? "Menu Items" : type === "inventory" ? "Inventory Items" : type === "category" ? "Categories" : type === "supplier" ? "Suppliers" : "Staff Members"}
@@ -358,8 +358,8 @@ export function BulkImportDialog({
 
         {/* Step: Preview */}
         {step === "preview" && (
-          <div className="flex-1 flex flex-col min-h-0 py-4">
-            <div className="flex items-center justify-between mb-4">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden py-4">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <div className="flex items-center gap-4">
                 <Badge variant="outline" className="gap-1">
                   <CheckCircle2 className="h-3 w-3 text-emerald-500" />
@@ -391,7 +391,7 @@ export function BulkImportDialog({
               )}
             </div>
 
-            <ScrollArea className="flex-1 border rounded-lg">
+            <ScrollArea className="flex-1 border rounded-lg overflow-auto" style={{ maxHeight: "calc(85vh - 280px)" }}>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -528,7 +528,7 @@ export function BulkImportDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 mt-4">
           {step === "upload" && (
             <Button variant="outline" onClick={() => handleClose(false)}>
               Cancel

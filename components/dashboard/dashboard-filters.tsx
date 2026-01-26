@@ -4,6 +4,8 @@ import { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { DatePresets } from "@/components/dashboard/date-presets";
 import { BranchSelector } from "@/components/dashboard/branch-selector";
+import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
+import { useEffect } from "react";
 
 interface Branch {
   id: string;
@@ -27,13 +29,29 @@ export function DashboardFilters({
   dateRange,
   onDateRangeChange,
 }: DashboardFiltersProps) {
+  const { canViewAllBranches, userBranchId, isLoading } = useBranchRestrictions();
+  
+  // Filter branches based on user permissions
+  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  
+  // Auto-select user's branch if they're restricted
+  useEffect(() => {
+    if (!isLoading && !canViewAllBranches && userBranchId) {
+      // Only set if not already set to the user's branch
+      if (selectedBranches.length !== 1 || selectedBranches[0] !== userBranchId) {
+        onBranchChange([userBranchId]);
+      }
+    }
+  }, [isLoading, canViewAllBranches, userBranchId, selectedBranches, onBranchChange]);
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <BranchSelector
-        branches={branches}
+        branches={availableBranches}
         selectedBranches={selectedBranches}
         onSelectionChange={onBranchChange}
         className="w-full sm:w-[200px]"
+        restrictedToSingleBranch={!canViewAllBranches}
       />
       <DateRangePicker
         date={dateRange}

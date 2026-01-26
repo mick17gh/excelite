@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,7 @@ import { scheduleShift, clockIn, clockOut, getWeeklySchedule, getTimesheetData }
 import { AddStaffForm } from "./staff-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
+import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 
 interface StaffSummary {
   branchId: string;
@@ -146,10 +147,21 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
     selectedStaff: [] as string[],
   });
   
+  // Branch restrictions
+  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  
   // Weekly schedule state
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>({});
   const [selectedBranchForWeek, setSelectedBranchForWeek] = useState<string>("");
+  
+  // Auto-select user's branch if they're restricted
+  useEffect(() => {
+    if (!authLoading && !canViewAllBranches && userBranchId) {
+      setSelectedBranchForWeek(userBranchId);
+    }
+  }, [authLoading, canViewAllBranches, userBranchId]);
   const [loadingWeek, setLoadingWeek] = useState(false);
   
   // Timesheet state
@@ -802,10 +814,14 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                   <CardDescription>View and manage weekly shifts</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Select value={selectedBranchForWeek} onValueChange={(v) => {
+                  <Select 
+                  value={selectedBranchForWeek} 
+                  onValueChange={(v) => {
                     setSelectedBranchForWeek(v);
                     loadWeeklySchedule(v);
-                  }}>
+                  }}
+                  disabled={!canViewAllBranches}
+                >
                     <SelectTrigger className="w-40 h-8 text-xs">
                       <SelectValue placeholder="Select Branch" />
                     </SelectTrigger>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,7 @@ import {
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
+import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { EmptyState } from "@/components/ui/empty-state";
 import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
 
@@ -131,10 +132,22 @@ export function InventoryContent({
   transferRecords = [] 
 }: InventoryContentProps) {
   const { formatCurrency } = useCurrency();
+  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+  
+  // Filter branches based on user permissions
+  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
+
+  // Auto-select user's branch if they're restricted
+  useEffect(() => {
+    if (!authLoading && !canViewAllBranches && userBranchId) {
+      setBranchFilter(userBranchId);
+    }
+  }, [authLoading, canViewAllBranches, userBranchId]);
 
   // Set currency based on selected branch filter
   const selectedBranchId = branchFilter !== "all" ? branchFilter : null;

@@ -470,19 +470,44 @@ export async function getRevenueData(branchId?: string, startDate?: Date, endDat
     // Calculate days between dates
     const days = Math.ceil((effectiveEndDate.getTime() - effectiveStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-    const sales = await db.sale.findMany({
-      where: {
-        deletedAt: null,
-        saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
-        ...(branchId && { branchId }),
-      },
-    });
+    // Fetch sales and targets in parallel
+    const [sales, targets] = await Promise.all([
+      db.sale.findMany({
+        where: {
+          deletedAt: null,
+          saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
+          ...(branchId && { branchId }),
+        },
+      }),
+      db.target.findMany({
+        where: {
+          isActive: true,
+          targetType: "REVENUE",
+          periodStart: { lte: effectiveEndDate },
+          periodEnd: { gte: effectiveStartDate },
+          ...(branchId && { branchId }),
+        },
+      }),
+    ]);
 
     // Group sales by date
     const salesByDate: Record<string, number> = {};
     for (const sale of sales) {
       const dateKey = sale.saleDate.toISOString().split("T")[0];
       salesByDate[dateKey] = (salesByDate[dateKey] || 0) + Number(sale.total);
+    }
+
+    // Calculate daily target from monthly/period targets
+    let dailyTarget = 0;
+    if (targets.length > 0) {
+      // Sum all targets and divide by period days to get daily target
+      const totalTarget = targets.reduce((sum, t) => sum + Number(t.targetValue), 0);
+      const targetDays = targets.reduce((sum, t) => {
+        const start = new Date(Math.max(t.periodStart.getTime(), effectiveStartDate.getTime()));
+        const end = new Date(Math.min(t.periodEnd.getTime(), effectiveEndDate.getTime()));
+        return sum + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      }, 0);
+      dailyTarget = targetDays > 0 ? totalTarget / targetDays : 0;
     }
 
     // Generate data for each day in the range
@@ -495,7 +520,7 @@ export async function getRevenueData(branchId?: string, startDate?: Date, endDat
       data.push({
         date: monthDay,
         revenue: salesByDate[dateKey] || 0,
-        target: 50000, // Default target
+        target: dailyTarget,
       });
     }
 
@@ -549,7 +574,16 @@ export async function getKPIData(branchIds?: string[], startDate?: Date, endDate
     const revenueGrowth = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
 
     const transactionCount = currentSales.length;
+    const prevTransactionCount = prevSales.length;
+    const transactionChange = prevTransactionCount > 0 
+      ? ((transactionCount - prevTransactionCount) / prevTransactionCount) * 100 
+      : 0;
+
     const averageTicket = transactionCount > 0 ? totalRevenue / transactionCount : 0;
+    const prevAverageTicket = prevTransactionCount > 0 ? prevRevenue / prevTransactionCount : 0;
+    const averageTicketChange = prevAverageTicket > 0 
+      ? ((averageTicket - prevAverageTicket) / prevAverageTicket) * 100 
+      : 0;
 
     // Calculate COGS from sale items
     let totalCogs = 0;
@@ -558,10 +592,47 @@ export async function getKPIData(branchIds?: string[], startDate?: Date, endDate
         totalCogs += Number(item.unitCost) * item.quantity;
       }
     }
+    
+    // Calculate previous period COGS
+    const prevSalesWithItems = await db.sale.findMany({
+      where: {
+        deletedAt: null,
+        saleDate: { gte: prevStartDate, lte: prevEndDate },
+        ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
+      },
+      include: { items: true },
+    });
+    let prevCogs = 0;
+    for (const sale of prevSalesWithItems) {
+      for (const item of sale.items) {
+        prevCogs += Number(item.unitCost) * item.quantity;
+      }
+    }
+    
     const cogsPercentage = totalRevenue > 0 ? (totalCogs / totalRevenue) * 100 : 0;
+    const prevCogsPercentage = prevRevenue > 0 ? (prevCogs / prevRevenue) * 100 : 0;
+    const cogsChange = prevCogsPercentage > 0 
+      ? cogsPercentage - prevCogsPercentage 
+      : 0;
+    
     const profitMargin = 100 - cogsPercentage;
+    const prevProfitMargin = 100 - prevCogsPercentage;
+    const profitMarginChange = prevProfitMargin > 0 
+      ? profitMargin - prevProfitMargin 
+      : 0;
 
+    // Previous period waste for comparison
+    const prevWaste = await db.wasteLog.findMany({
+      where: {
+        wasteDate: { gte: prevStartDate, lte: prevEndDate },
+        ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
+      },
+    });
     const wasteTotal = currentWaste.reduce((sum, w) => sum + Number(w.totalCost), 0);
+    const prevWasteTotal = prevWaste.reduce((sum, w) => sum + Number(w.totalCost), 0);
+    const wasteChange = prevWasteTotal > 0 
+      ? ((wasteTotal - prevWasteTotal) / prevWasteTotal) * 100 
+      : 0;
 
     return {
       success: true,
@@ -569,11 +640,15 @@ export async function getKPIData(branchIds?: string[], startDate?: Date, endDate
         totalRevenue,
         revenueGrowth,
         cogsPercentage,
+        cogsChange,
         profitMargin,
+        profitMarginChange,
         transactionCount,
+        transactionChange,
         averageTicket,
+        averageTicketChange,
         wasteTotal,
-        wasteChange: -5.2, // Placeholder
+        wasteChange,
       },
     };
   } catch (error) {
@@ -585,9 +660,13 @@ export async function getKPIData(branchIds?: string[], startDate?: Date, endDate
         totalRevenue: 0,
         revenueGrowth: 0,
         cogsPercentage: 0,
+        cogsChange: 0,
         profitMargin: 0,
+        profitMarginChange: 0,
         transactionCount: 0,
+        transactionChange: 0,
         averageTicket: 0,
+        averageTicketChange: 0,
         wasteTotal: 0,
         wasteChange: 0,
       },
@@ -682,21 +761,35 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
     const effectiveStartDate = startDate || new Date(new Date().setDate(new Date().getDate() - 30));
     const effectiveEndDate = endDate || new Date();
 
-    // Fetch sales for all selected branches
-    const sales = await db.sale.findMany({
-      where: {
-        deletedAt: null,
-        saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
-        ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
-      },
-      include: {
-        items: {
-          include: {
-            menuItem: true,
+    // Calculate previous period for comparison
+    const periodLength = effectiveEndDate.getTime() - effectiveStartDate.getTime();
+    const prevEndDate = new Date(effectiveStartDate.getTime() - 1);
+    const prevStartDate = new Date(prevEndDate.getTime() - periodLength);
+
+    // Fetch current and previous period sales in parallel
+    const [sales, prevSales] = await Promise.all([
+      db.sale.findMany({
+        where: {
+          deletedAt: null,
+          saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
+          ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
+        },
+        include: {
+          items: {
+            include: {
+              menuItem: true,
+            },
           },
         },
-      },
-    });
+      }),
+      db.sale.findMany({
+        where: {
+          deletedAt: null,
+          saleDate: { gte: prevStartDate, lte: prevEndDate },
+          ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
+        },
+      }),
+    ]);
 
     // Calculate revenue data by date
     const revenueByDate = new Map<string, { revenue: number; target: number }>();
@@ -781,6 +874,32 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
       revenue: Math.round(data.revenue * 100) / 100,
     }));
 
+    // Calculate comparison metrics (reuse totalRevenue from above)
+    const prevTotalRevenue = prevSales.reduce((sum, s) => sum + Number(s.total), 0);
+    const revenueChange = prevTotalRevenue > 0 
+      ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 
+      : 0;
+
+    const totalTransactions = sales.length;
+    const prevTotalTransactions = prevSales.length;
+    const transactionChange = prevTotalTransactions > 0 
+      ? ((totalTransactions - prevTotalTransactions) / prevTotalTransactions) * 100 
+      : 0;
+
+    const avgTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+    const prevAvgTicket = prevTotalTransactions > 0 ? prevTotalRevenue / prevTotalTransactions : 0;
+    const avgTicketChange = prevAvgTicket > 0 
+      ? ((avgTicket - prevAvgTicket) / prevAvgTicket) * 100 
+      : 0;
+
+    const days = Math.ceil((effectiveEndDate.getTime() - effectiveStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const avgDailyRevenue = days > 0 ? totalRevenue / days : 0;
+    const prevDays = Math.ceil((prevEndDate.getTime() - prevStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const prevAvgDailyRevenue = prevDays > 0 ? prevTotalRevenue / prevDays : 0;
+    const avgDailyChange = prevAvgDailyRevenue > 0 
+      ? ((avgDailyRevenue - prevAvgDailyRevenue) / prevAvgDailyRevenue) * 100 
+      : 0;
+
     return {
       success: true,
       data: {
@@ -790,6 +909,15 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
         topItems,
         worstItems,
         hourlyData,
+        // Comparison metrics for KPI cards
+        totalRevenue,
+        revenueChange,
+        totalTransactions,
+        transactionChange,
+        avgTicket,
+        avgTicketChange,
+        avgDailyRevenue,
+        avgDailyChange,
       },
     };
   } catch (error) {

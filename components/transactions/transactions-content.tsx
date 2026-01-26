@@ -45,6 +45,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
+import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { createTransaction, getTransactions } from "@/lib/actions/transactions";
 import { SalesChannel } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
@@ -93,7 +94,24 @@ interface TransactionsContentProps {
 
 export function TransactionsContent({ branches, menuItems }: TransactionsContentProps) {
   const { formatCurrency, formatCurrencyShort } = useCurrency();
-  const [selectedBranch, setSelectedBranch] = useState<string>(branches[0]?.id || "");
+  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+  
+  // Filter branches based on user permissions
+  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  
+  // Initialize with user's branch if restricted, otherwise first available branch
+  const [selectedBranch, setSelectedBranch] = useState<string>("");
+  
+  // Auto-select user's branch if they're restricted
+  useEffect(() => {
+    if (!authLoading) {
+      if (!canViewAllBranches && userBranchId) {
+        setSelectedBranch(userBranchId);
+      } else if (availableBranches.length > 0 && !selectedBranch) {
+        setSelectedBranch(availableBranches[0].id);
+      }
+    }
+  }, [authLoading, canViewAllBranches, userBranchId, availableBranches]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [channel, setChannel] = useState<string>("DINE_IN");
   const [paymentMethod, setPaymentMethod] = useState<string>("Card");
@@ -274,12 +292,16 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
     <div className="space-y-4">
       {/* Header Controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+        <Select 
+          value={selectedBranch} 
+          onValueChange={setSelectedBranch}
+          disabled={!canViewAllBranches}
+        >
           <SelectTrigger className="w-full sm:w-[180px] h-9">
             <SelectValue placeholder="Select branch" />
           </SelectTrigger>
           <SelectContent>
-            {branches.map((branch) => (
+            {availableBranches.map((branch) => (
               <SelectItem key={branch.id} value={branch.id}>
                 {branch.name}
               </SelectItem>

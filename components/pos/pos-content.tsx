@@ -45,6 +45,7 @@ import { OrderType, SalesChannel } from "@/lib/generated/prisma/client";
 import { useEffect, useCallback } from "react";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
+import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PaymentModal, type PaymentData } from "@/components/pos/payment-modal";
 import { ReceiptModal } from "@/components/pos/receipt-modal";
@@ -97,13 +98,29 @@ const orderTypes = [
 
 export function PosContent({ branches, menuItems, recentOrders }: PosContentProps) {
   const { formatCurrency } = useCurrency();
-  const [branchId, setBranchId] = useState<string>(branches[0]?.id || "");
+  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+  
+  // Filter branches based on user permissions
+  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  
+  const [branchId, setBranchId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [orderType, setOrderType] = useState<OrderType>("DINE_IN");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [isPending, startTransition] = useTransition();
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
+
+  // Auto-select user's branch if they're restricted
+  useEffect(() => {
+    if (!authLoading) {
+      if (!canViewAllBranches && userBranchId) {
+        setBranchId(userBranchId);
+      } else if (availableBranches.length > 0 && !branchId) {
+        setBranchId(availableBranches[0].id);
+      }
+    }
+  }, [authLoading, canViewAllBranches, userBranchId, availableBranches]);
 
   // Auto-set currency based on selected branch
   useBranchCurrency(branchId, branches);

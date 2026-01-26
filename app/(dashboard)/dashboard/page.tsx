@@ -60,9 +60,13 @@ export default async function ExecutiveDashboard() {
     totalRevenue: 0,
     revenueGrowth: 0,
     cogsPercentage: 0,
+    cogsChange: 0,
     profitMargin: 0,
+    profitMarginChange: 0,
     transactionCount: 0,
+    transactionChange: 0,
     averageTicket: 0,
+    averageTicketChange: 0,
     wasteTotal: 0,
     wasteChange: 0,
   };

@@ -23,6 +23,7 @@ import { DatePresets } from "@/components/dashboard/date-presets";
 import { BranchSelector } from "@/components/dashboard/branch-selector";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
+import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { DateRange } from "react-day-picker";
 import { subDays } from "date-fns";
 import { Download } from "lucide-react";
@@ -76,8 +77,27 @@ export function SalesContent({
   const [topItems, setTopItems] = useState(initialTopItems);
   const [worstItems, setWorstItems] = useState(initialWorstItems);
   const [hourlyData, setHourlyData] = useState(initialHourlyData);
+  
+  // State for comparison metrics
+  const [revenueChange, setRevenueChange] = useState(0);
+  const [transactionChange, setTransactionChange] = useState(0);
+  const [avgTicketChange, setAvgTicketChange] = useState(0);
+  const [avgDailyChange, setAvgDailyChange] = useState(0);
 
   const { formatCurrency } = useCurrency();
+  const { canViewAllBranches, userBranchId, isLoading } = useBranchRestrictions();
+  
+  // Filter branches based on user permissions
+  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  
+  // Auto-select user's branch if they're restricted
+  useEffect(() => {
+    if (!isLoading && !canViewAllBranches && userBranchId) {
+      if (selectedBranches.length !== 1 || selectedBranches[0] !== userBranchId) {
+        setSelectedBranches([userBranchId]);
+      }
+    }
+  }, [isLoading, canViewAllBranches, userBranchId]);
   
   // Set currency based on first selected branch
   const firstBranchId = selectedBranches.length > 0 ? selectedBranches[0] : null;
@@ -101,6 +121,11 @@ export function SalesContent({
         setTopItems(result.data.topItems);
         setWorstItems(result.data.worstItems);
         setHourlyData(result.data.hourlyData);
+        // Update comparison metrics
+        setRevenueChange(result.data.revenueChange || 0);
+        setTransactionChange(result.data.transactionChange || 0);
+        setAvgTicketChange(result.data.avgTicketChange || 0);
+        setAvgDailyChange(result.data.avgDailyChange || 0);
       }
     });
   }, [dateRange, selectedBranches]);
@@ -121,10 +146,11 @@ export function SalesContent({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <BranchSelector
-            branches={branches}
+            branches={availableBranches}
             selectedBranches={selectedBranches}
             onSelectionChange={setSelectedBranches}
             className="w-full sm:w-[200px]"
+            restrictedToSingleBranch={!canViewAllBranches}
           />
           <DateRangePicker
             date={dateRange}
@@ -164,10 +190,12 @@ export function SalesContent({
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium text-muted-foreground truncate">Total Revenue</p>
                 <p className="text-base font-bold mt-0.5 truncate">{formatCurrency(totalRevenue)}</p>
-                <div className="flex items-center text-[11px] text-emerald-600 mt-0.5">
-                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                  <span>8.5%</span>
-                </div>
+                {revenueChange !== 0 && (
+                  <div className={`flex items-center text-[11px] mt-0.5 ${revenueChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {revenueChange >= 0 ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
+                    <span>{Math.abs(revenueChange).toFixed(1)}%</span>
+                  </div>
+                )}
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
                 <DollarSign className="h-4 w-4" />
@@ -182,10 +210,12 @@ export function SalesContent({
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Daily</p>
                 <p className="text-base font-bold mt-0.5 truncate">{formatCurrency(avgDailyRevenue)}</p>
-                <div className="flex items-center text-[11px] text-emerald-600 mt-0.5">
-                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                  <span>5.2%</span>
-                </div>
+                {avgDailyChange !== 0 && (
+                  <div className={`flex items-center text-[11px] mt-0.5 ${avgDailyChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {avgDailyChange >= 0 ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
+                    <span>{Math.abs(avgDailyChange).toFixed(1)}%</span>
+                  </div>
+                )}
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
                 <TrendingUp className="h-4 w-4" />
@@ -200,10 +230,12 @@ export function SalesContent({
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium text-muted-foreground truncate">Transactions</p>
                 <p className="text-base font-bold mt-0.5">{totalTransactions.toLocaleString()}</p>
-                <div className="flex items-center text-[11px] text-emerald-600 mt-0.5">
-                  <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                  <span>12.3%</span>
-                </div>
+                {transactionChange !== 0 && (
+                  <div className={`flex items-center text-[11px] mt-0.5 ${transactionChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {transactionChange >= 0 ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
+                    <span>{Math.abs(transactionChange).toFixed(1)}%</span>
+                  </div>
+                )}
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
                 <ShoppingCart className="h-4 w-4" />
@@ -218,10 +250,12 @@ export function SalesContent({
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Ticket</p>
                 <p className="text-base font-bold mt-0.5 truncate">{formatCurrency(avgTicket)}</p>
-                <div className="flex items-center text-[11px] text-red-600 mt-0.5">
-                  <ArrowDownRight className="h-3 w-3 mr-0.5" />
-                  <span>2.1%</span>
-                </div>
+                {avgTicketChange !== 0 && (
+                  <div className={`flex items-center text-[11px] mt-0.5 ${avgTicketChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {avgTicketChange >= 0 ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
+                    <span>{Math.abs(avgTicketChange).toFixed(1)}%</span>
+                  </div>
+                )}
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
                 <Receipt className="h-4 w-4" />

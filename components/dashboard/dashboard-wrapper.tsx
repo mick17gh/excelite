@@ -77,9 +77,13 @@ interface KPIData {
   totalRevenue: number;
   revenueGrowth: number;
   cogsPercentage: number;
+  cogsChange: number;
   profitMargin: number;
+  profitMarginChange: number;
   transactionCount: number;
+  transactionChange: number;
   averageTicket: number;
+  averageTicketChange: number;
   wasteTotal: number;
   wasteChange: number;
 }
@@ -201,9 +205,13 @@ export function DashboardWrapper({
         totalRevenue: 0,
         revenueGrowth: 0,
         cogsPercentage: 0,
+        cogsChange: 0,
         profitMargin: 0,
+        profitMarginChange: 0,
         transactionCount: 0,
+        transactionChange: 0,
         averageTicket: 0,
+        averageTicketChange: 0,
         wasteTotal: 0,
         wasteChange: 0,
       };
@@ -223,9 +231,13 @@ export function DashboardWrapper({
       totalRevenue,
       revenueGrowth: kpiData.revenueGrowth,
       cogsPercentage: kpiData.cogsPercentage,
+      cogsChange: kpiData.cogsChange,
       profitMargin: kpiData.profitMargin,
+      profitMarginChange: kpiData.profitMarginChange,
       transactionCount: totalTransactions,
+      transactionChange: kpiData.transactionChange,
       averageTicket,
+      averageTicketChange: kpiData.averageTicketChange,
       wasteTotal: totalWaste,
       wasteChange: kpiData.wasteChange,
     };

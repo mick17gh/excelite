@@ -61,9 +61,13 @@ interface DashboardContentProps {
     totalRevenue: number;
     revenueGrowth: number;
     cogsPercentage: number;
+    cogsChange: number;
     profitMargin: number;
+    profitMarginChange: number;
     transactionCount: number;
+    transactionChange: number;
     averageTicket: number;
+    averageTicketChange: number;
     wasteTotal: number;
     wasteChange: number;
   };
@@ -105,40 +109,40 @@ export function DashboardContent({
         <KPICard
           title="Growth"
           value={kpiData.revenueGrowth}
-          change={2.1}
-          trend="up"
+          change={kpiData.revenueGrowth !== 0 ? kpiData.revenueGrowth : undefined}
+          trend={kpiData.revenueGrowth >= 0 ? "up" : "down"}
           format="percentage"
           icon={TrendingUp}
         />
         <KPICard
           title="COGS %"
           value={kpiData.cogsPercentage}
-          change={-1.2}
-          trend="down"
+          change={kpiData.cogsChange !== 0 ? kpiData.cogsChange : undefined}
+          trend={kpiData.cogsChange <= 0 ? "up" : "down"}
           format="percentage"
           icon={Percent}
         />
         <KPICard
           title="Profit Margin"
           value={kpiData.profitMargin}
-          change={0.8}
-          trend="up"
+          change={kpiData.profitMarginChange !== 0 ? kpiData.profitMarginChange : undefined}
+          trend={kpiData.profitMarginChange >= 0 ? "up" : "down"}
           format="percentage"
           icon={DollarSign}
         />
         <KPICard
           title="Transactions"
           value={kpiData.transactionCount}
-          change={5.4}
-          trend="up"
+          change={kpiData.transactionChange !== 0 ? kpiData.transactionChange : undefined}
+          trend={kpiData.transactionChange >= 0 ? "up" : "down"}
           format="number"
           icon={ShoppingCart}
         />
         <KPICard
           title="Avg. Ticket"
           value={kpiData.averageTicket}
-          change={3.2}
-          trend="up"
+          change={kpiData.averageTicketChange !== 0 ? kpiData.averageTicketChange : undefined}
+          trend={kpiData.averageTicketChange >= 0 ? "up" : "down"}
           format="currency"
           icon={Receipt}
         />
