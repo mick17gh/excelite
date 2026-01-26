@@ -111,16 +111,18 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
   const [isPending, startTransition] = useTransition();
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
 
-  // Auto-select user's branch if they're restricted
+  // Auto-select user's branch if they're restricted, or first available branch
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && availableBranches.length > 0 && !branchId) {
       if (!canViewAllBranches && userBranchId) {
+        // Restricted users get their assigned branch
         setBranchId(userBranchId);
-      } else if (availableBranches.length > 0 && !branchId) {
+      } else {
+        // Managers and admins get the first available branch
         setBranchId(availableBranches[0].id);
       }
     }
-  }, [authLoading, canViewAllBranches, userBranchId, availableBranches]);
+  }, [authLoading, canViewAllBranches, userBranchId, availableBranches, branchId]);
 
   // Auto-set currency based on selected branch
   useBranchCurrency(branchId, branches);

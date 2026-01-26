@@ -289,18 +289,49 @@ export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) 
       return { success: false, error: "No items provided" };
     }
 
-    // Generate SKUs for items without one and map enum values
-    const itemsWithDefaults = items.map((item, index) => ({
-      ...item,
-      sku: item.sku || `INV-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`,
-      category: mapToInventoryCategory(item.category),
-      unit: mapToUnitType(item.unit),
-      currentStock: item.currentStock ?? 0,
-      minStock: item.minStock ?? 10,
-      maxStock: item.maxStock ?? 100,
-      reorderPoint: item.reorderPoint ?? 20,
-      isActive: true,
+    // Check for existing items with same SKU and branch combination
+    const skuBranchPairs = items.map(item => ({
+      sku: item.sku || `INV-${Date.now().toString(36).toUpperCase()}`,
+      branchId: item.branchId
     }));
+
+    const existingItems = await db.inventoryItem.findMany({
+      where: {
+        OR: skuBranchPairs.map(pair => ({
+          sku: pair.sku,
+          branchId: pair.branchId
+        }))
+      },
+      select: { sku: true, branchId: true }
+    });
+
+    const existingSkuBranchSet = new Set(
+      existingItems.map(item => `${item.sku}-${item.branchId}`)
+    );
+
+    // Filter out items that already exist and generate unique SKUs for duplicates
+    const itemsWithDefaults = items
+      .map((item, index) => {
+        let sku = item.sku || `INV-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`;
+        const skuBranchKey = `${sku}-${item.branchId}`;
+        
+        // If this SKU-branch combination already exists, generate a new unique SKU
+        if (existingSkuBranchSet.has(skuBranchKey)) {
+          sku = `${sku}-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
+        }
+
+        return {
+          ...item,
+          sku,
+          category: mapToInventoryCategory(item.category),
+          unit: mapToUnitType(item.unit),
+          currentStock: item.currentStock ?? 0,
+          minStock: item.minStock ?? 10,
+          maxStock: item.maxStock ?? 100,
+          reorderPoint: item.reorderPoint ?? 20,
+          isActive: true,
+        };
+      });
 
     const result = await db.inventoryItem.createMany({
       data: itemsWithDefaults,

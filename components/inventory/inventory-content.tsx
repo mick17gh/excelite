@@ -167,7 +167,7 @@ export function InventoryContent({
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       const matchesSearch =
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.sku.toLowerCase().includes(searchQuery.toLowerCase());
@@ -179,6 +179,18 @@ export function InventoryContent({
         branchFilter === "all" || item.branchId === branchFilter;
       return matchesSearch && matchesStatus && matchesCategory && matchesBranch;
     });
+    
+    console.log('Filter Debug:', {
+      totalItems: items.length,
+      searchQuery,
+      statusFilter,
+      categoryFilter,
+      branchFilter,
+      filteredCount: filtered.length,
+      sampleFiltered: filtered.slice(0, 3).map(i => ({ name: i.name, sku: i.sku, branchId: i.branchId }))
+    });
+    
+    return filtered;
   }, [items, searchQuery, statusFilter, categoryFilter, branchFilter]);
 
   // Reset to page 1 when filters change
@@ -192,6 +204,16 @@ export function InventoryContent({
     const startIndex = (currentPage - 1) * pageSize;
     return filteredItems.slice(startIndex, startIndex + pageSize);
   }, [filteredItems, currentPage, pageSize]);
+
+  // Debug logging
+  console.log('Inventory Pagination Debug:', {
+    totalItems: items.length,
+    filteredItems: filteredItems.length,
+    currentPage,
+    pageSize,
+    totalPages,
+    paginatedItems: paginatedItems.length
+  });
 
   const categories = [...new Set(items.map((i) => i.category))];
 
@@ -512,19 +534,17 @@ export function InventoryContent({
                   )}
                 </TableBody>
               </Table>
-              {filteredItems.length > 0 && (
-                <TablePagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={filteredItems.length}
-                  pageSize={pageSize}
-                  onPageChange={setCurrentPage}
-                  onPageSizeChange={(size) => {
-                    setPageSize(size);
-                    setCurrentPage(1);
-                  }}
-                />
-              )}
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredItems.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+              />
             </CardContent>
           </Card>
         </TabsContent>

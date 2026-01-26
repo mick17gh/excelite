@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { addDays, format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { createManualEntryBatchWithLines } from "@/lib/actions/manual-pos";
 import { SalesChannel } from "@/lib/generated/prisma/client";
+import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 
 interface Branch {
   id: string;
@@ -39,11 +40,29 @@ interface ManualTransactionsContentProps {
 }
 
 export function ManualTransactionsContent({ branches }: ManualTransactionsContentProps) {
-  const [branchId, setBranchId] = useState<string>(branches[0]?.id || "");
+  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+  
+  // Filter branches based on user permissions
+  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  
+  const [branchId, setBranchId] = useState<string>("");
   const [periodStart, setPeriodStart] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [periodEnd, setPeriodEnd] = useState<string>(
     format(addDays(new Date(), 6), "yyyy-MM-dd")
   );
+
+  // Auto-select user's branch if they're restricted, or first available branch
+  useEffect(() => {
+    if (!authLoading && availableBranches.length > 0 && !branchId) {
+      if (!canViewAllBranches && userBranchId) {
+        // Restricted users get their assigned branch
+        setBranchId(userBranchId);
+      } else {
+        // Managers and admins get the first available branch
+        setBranchId(availableBranches[0].id);
+      }
+    }
+  }, [authLoading, canViewAllBranches, userBranchId, availableBranches, branchId]);
   const [lines, setLines] = useState<ManualLineForm[]>([
     {
       id: "line-1",
@@ -188,7 +207,7 @@ export function ManualTransactionsContent({ branches }: ManualTransactionsConten
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
                 <SelectContent>
-                  {branches.map((branch) => (
+                  {availableBranches.map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name}
                     </SelectItem>

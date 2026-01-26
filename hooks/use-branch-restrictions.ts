@@ -6,7 +6,7 @@ import { authClient } from "@/lib/auth-client";
 const ROLE_CAN_VIEW_ALL_BRANCHES: Record<string, boolean> = {
   CEO: true,
   SENIOR_MANAGEMENT: true,
-  BRANCH_MANAGER: false,
+  BRANCH_MANAGER: true,
   FINANCE_OPS: true,
   CASHIER: false,
 };
