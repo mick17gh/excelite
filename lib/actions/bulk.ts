@@ -333,18 +333,32 @@ export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) 
         };
       });
 
+    console.log(`[bulkCreateInventoryItems] Processing ${items.length} items`);
+    console.log(`[bulkCreateInventoryItems] After processing: ${itemsWithDefaults.length} items ready for import`);
+
     const result = await db.inventoryItem.createMany({
       data: itemsWithDefaults,
     });
 
+    console.log(`[bulkCreateInventoryItems] Successfully created ${result.count} items`);
+
     await logCreate("InventoryItem", "BULK", {
       action: "BULK_CREATE",
       count: result.count,
+      inputCount: items.length,
+      processedCount: itemsWithDefaults.length,
       branches: [...new Set(items.map((i) => i.branchId))],
     });
 
     revalidatePath("/dashboard/inventory");
-    return { success: true, created: result.count };
+    return { 
+      success: true, 
+      created: result.count,
+      inputCount: items.length,
+      message: result.count < items.length ? 
+        `Created ${result.count} items out of ${items.length} provided. Some items may have been filtered due to validation issues.` :
+        `Successfully created all ${result.count} items.`
+    };
   } catch (error) {
     console.error("[bulkCreateInventoryItems] Error:", error);
     return { success: false, error: "Failed to create inventory items" };

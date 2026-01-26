@@ -212,7 +212,11 @@ export function InventoryContent({
     currentPage,
     pageSize,
     totalPages,
-    paginatedItems: paginatedItems.length
+    paginatedItems: paginatedItems.length,
+    searchQuery,
+    statusFilter,
+    categoryFilter,
+    branchFilter
   });
 
   const categories = [...new Set(items.map((i) => i.category))];

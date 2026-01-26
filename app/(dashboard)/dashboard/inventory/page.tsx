@@ -11,7 +11,7 @@ export const metadata = {
 export default async function InventoryPage() {
   const [branchesResult, inventoryResult, suppliersResult, inboundResult, outboundResult, transferResult] = await Promise.all([
     getBranches(),
-    getInventoryItems(),
+    getInventoryItems(undefined, { page: 1, pageSize: 1000 }),
     getSuppliers(),
     getInboundRecords(),
     getOutboundRecords(),
