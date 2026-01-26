@@ -11,5 +11,3 @@ coverage
 dist
 build
 .next/cache
-# Don't ignore the generated Prisma client
-!lib/generated/prisma
