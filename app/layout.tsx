@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   keywords: ["restaurant analytics", "restaurant management", "sales analytics", "inventory management", "staff management"],
 };
 
+
 export default function RootLayout({
   children,
 }: Readonly<{
