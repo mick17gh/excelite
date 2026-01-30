@@ -31,13 +31,13 @@ export function FloatingChatWidget({ defaultOpen = false }: FloatingChatWidgetPr
   }, [isAnimating]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-3 pointer-events-none">
       {/* Chat Window */}
       <div
         className={cn(
           'transition-all duration-300 ease-in-out origin-bottom-right',
           isOpen
-            ? 'opacity-100 scale-100 translate-y-0'
+            ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 scale-95 translate-y-4 pointer-events-none'
         )}
       >
@@ -53,7 +53,7 @@ export function FloatingChatWidget({ defaultOpen = false }: FloatingChatWidgetPr
         onClick={toggleChat}
         size="lg"
         className={cn(
-          'h-14 w-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110',
+          'h-14 w-14 rounded-full shadow-lg transition-all duration-300 hover:scale-110 pointer-events-auto',
           isOpen
             ? 'bg-muted text-muted-foreground hover:bg-muted/80'
             : 'bg-primary text-primary-foreground hover:bg-primary/90'
