@@ -14,7 +14,10 @@ export default async function UsersPage() {
     getUsers(),
   ]);
 
-  const branchList = branchesResult.data || [];
+  const branchList = (branchesResult.data || []).map((branch: any) => ({
+    ...branch,
+    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+  }));
   const rawUsers = usersResult.data || [];
   const users = rawUsers.map((user: { id: string; name: string; email: string; role: string; branchName?: string | null; isActive: boolean; createdAt: Date }) => ({
     id: user.id,

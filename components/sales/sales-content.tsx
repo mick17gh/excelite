@@ -320,15 +320,17 @@ export function SalesContent({
                     />
                     <Tooltip
                       content={({ active, payload, label }) => {
-                        if (!active || !payload) return null;
+                        if (!active || !payload || !payload.length) return null;
+                        const transactions = payload[0]?.value || 0;
+                        const revenue = payload[1]?.value || 0;
                         return (
                           <div className="rounded-lg border bg-background p-3 shadow-lg">
                             <p className="text-sm font-medium">{label}</p>
                             <p className="text-sm text-muted-foreground">
-                              Transactions: {payload[0]?.value}
+                              Transactions: {transactions}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Revenue: {formatCurrency(payload[1]?.value as number)}
+                              Revenue: {formatCurrency(Number(revenue) || 0)}
                             </p>
                           </div>
                         );

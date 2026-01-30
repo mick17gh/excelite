@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
+import { FloatingChatWidget } from "@/components/chat";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { Role } from "@/lib/generated/prisma/client";
@@ -28,6 +29,9 @@ export default async function DashboardLayout({
         
         <Header />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10">{children}</main>
+        
+        {/* AI Chat Widget */}
+        <FloatingChatWidget />
       </div>
     </div>
   );

@@ -161,6 +161,7 @@ model User {
   auditLogs          AuditLog[]         @relation("AuditUser")
   posOrders          PosOrder[]
   manualEntryBatches ManualEntryBatch[]
+  chatSessions       ChatSession[]
 
   @@index([email])
   @@index([role])
@@ -875,6 +876,94 @@ model Alert {
   @@index([status])
   @@index([triggeredAt])
   @@map("alert")
+}
+
+// ============================================
+// AI CHAT SYSTEM
+// ============================================
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  provider  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("chat_session")
+}
+
+model ChatMessage {
+  id           String   @id @default(cuid())
+  sessionId    String
+  role         String   // 'user' | 'assistant' | 'system'
+  content      String
+  provider     String?
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  cost         Decimal? @db.Decimal(10, 6)
+  latencyMs    Int?
+  cached       Boolean  @default(false)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("chat_message")
+}
+
+model ChatAuditLog {
+  id               String   @id @default(cuid())
+  userId           String
+  sessionId        String?
+  query            String
+  queryHash        String
+  intent           String?
+  provider         String
+  model            String
+  templatesUsed    String[]
+  entitiesAccessed String[]
+  branchesAccessed String[]
+  inputTokens      Int
+  outputTokens     Int
+  totalCost        Decimal  @db.Decimal(10, 6)
+  latencyMs        Int
+  cached           Boolean  @default(false)
+  blocked          Boolean  @default(false)
+  blockReason      String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([provider])
+  @@index([blocked])
+  @@map("chat_audit_log")
+}
+
+model ChatMetric {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  provider     String
+  model        String
+  totalQueries Int      @default(0)
+  totalTokens  Int      @default(0)
+  totalCost    Decimal  @default(0) @db.Decimal(12, 4)
+  avgLatencyMs Int      @default(0)
+  cacheHits    Int      @default(0)
+  cacheMisses  Int      @default(0)
+
+  @@unique([date, provider, model])
+  @@index([date])
+  @@map("chat_metric")
 }
 
 // ============================================

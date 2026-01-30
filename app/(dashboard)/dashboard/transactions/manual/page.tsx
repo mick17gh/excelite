@@ -9,7 +9,10 @@ export const metadata = {
 
 export default async function ManualTransactionsPage() {
   const branchesResult = await getBranches();
-  const branchList = branchesResult.data || [];
+  const branchList = (branchesResult.data || []).map((branch: any) => ({
+    ...branch,
+    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+  }));
 
   return (
     <div className="space-y-6">

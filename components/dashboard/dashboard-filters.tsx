@@ -6,6 +6,7 @@ import { DatePresets } from "@/components/dashboard/date-presets";
 import { BranchSelector } from "@/components/dashboard/branch-selector";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { useEffect } from "react";
+import { useIsMounted } from "@/hooks/use-is-mounted";
 
 interface Branch {
   id: string;
@@ -29,6 +30,7 @@ export function DashboardFilters({
   dateRange,
   onDateRangeChange,
 }: DashboardFiltersProps) {
+  const mounted = useIsMounted();
   const { canViewAllBranches, userBranchId, isLoading } = useBranchRestrictions();
   
   // Filter branches based on user permissions
@@ -44,14 +46,18 @@ export function DashboardFilters({
     }
   }, [isLoading, canViewAllBranches, userBranchId, selectedBranches, onBranchChange]);
 
+  // Show consistent placeholder during SSR and initial hydration
+  const showRestricted = mounted ? !canViewAllBranches : false;
+  const displayBranches = mounted ? availableBranches : branches;
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <BranchSelector
-        branches={availableBranches}
+        branches={displayBranches}
         selectedBranches={selectedBranches}
         onSelectionChange={onBranchChange}
         className="w-full sm:w-[200px]"
-        restrictedToSingleBranch={!canViewAllBranches}
+        restrictedToSingleBranch={showRestricted}
       />
       <DateRangePicker
         date={dateRange}

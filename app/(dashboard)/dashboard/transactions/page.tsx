@@ -14,7 +14,10 @@ export default async function TransactionsPage() {
     getMenuItems(),
   ]);
 
-  const branchList = branchesResult.data || [];
+  const branchList = (branchesResult.data || []).map((branch: any) => ({
+    ...branch,
+    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+  }));
   const rawMenuItems = menuItemsResult.data || [];
   const menuItems = rawMenuItems.map((item: any) => ({
     id: item.id,

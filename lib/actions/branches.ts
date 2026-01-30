@@ -117,7 +117,12 @@ export async function getBranches() {
       where: { deletedAt: null },
       orderBy: { name: "asc" },
     });
-    return { success: true, data: branches };
+    // Serialize Decimal fields to numbers for client components
+    const serializedBranches = branches.map(branch => ({
+      ...branch,
+      taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+    }));
+    return { success: true, data: serializedBranches };
   } catch (error) {
     console.error("[getBranches] Error:", error);
     return { success: false, error: "Failed to fetch branches", data: [] };

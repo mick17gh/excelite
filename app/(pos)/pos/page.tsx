@@ -16,8 +16,11 @@ export default async function PosPage() {
     listPosOrders(),
   ]);
 
-  // Data is already converted to plain objects with numbers in server actions
-  const branches = branchesResult.data || [];
+  // Serialize Decimal fields for client components
+  const branches = (branchesResult.data || []).map((branch) => {
+    const { taxRate, ...rest } = branch;
+    return { ...rest, taxRate: taxRate ? Number(taxRate) : 0 };
+  });
   const menuItems = menuItemsResult.data || [];
   const orders = ordersResult.data || [];
 

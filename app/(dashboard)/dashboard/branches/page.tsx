@@ -13,7 +13,10 @@ export default async function BranchesPage() {
     getBranchPerformance(),
   ]);
 
-  const branchList = branchesResult.data || [];
+  const branchList = (branchesResult.data || []).map((branch: any) => ({
+    ...branch,
+    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+  }));
   const branchData = performanceResult.data || [];
 
   return (

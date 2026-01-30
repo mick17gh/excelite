@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useIsMounted } from "@/hooks/use-is-mounted";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,11 +94,14 @@ interface TransactionsContentProps {
 }
 
 export function TransactionsContent({ branches, menuItems }: TransactionsContentProps) {
+  const mounted = useIsMounted();
   const { formatCurrency, formatCurrencyShort } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
   
-  // Filter branches based on user permissions
-  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
+  // Filter branches based on user permissions (use all branches until mounted to prevent hydration mismatch)
+  const availableBranches = mounted 
+    ? filterBranchesForUser(branches, canViewAllBranches, userBranchId)
+    : branches;
   
   // Initialize with user's branch if restricted, otherwise first available branch
   const [selectedBranch, setSelectedBranch] = useState<string>("");
@@ -125,13 +129,14 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   // Auto-set currency based on selected branch
   useBranchCurrency(selectedBranch, branches);
 
-  // Fetch transactions when branch changes
+  // Fetch today's transactions when branch changes
   useEffect(() => {
     const fetchTransactions = async () => {
       if (!selectedBranch) return;
       setIsLoading(true);
       try {
-        const result = await getTransactions(selectedBranch);
+        const today = new Date();
+        const result = await getTransactions(selectedBranch, today);
         if (result.success && result.data) {
           const formatted = result.data.map((t: any) => ({
             id: t.id,
@@ -240,8 +245,8 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
         toast.success("Transaction recorded successfully!");
         setCart([]);
         setIsNewSaleOpen(false);
-        // Refresh transactions
-        const refreshResult = await getTransactions(selectedBranch);
+        // Refresh today's transactions
+        const refreshResult = await getTransactions(selectedBranch, new Date());
         if (refreshResult.success && refreshResult.data) {
           const formatted = refreshResult.data.map((t: any) => ({
             id: t.id,
@@ -295,7 +300,7 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
         <Select 
           value={selectedBranch} 
           onValueChange={setSelectedBranch}
-          disabled={!canViewAllBranches}
+          disabled={mounted ? !canViewAllBranches : false}
         >
           <SelectTrigger className="w-full sm:w-[180px] h-9">
             <SelectValue placeholder="Select branch" />

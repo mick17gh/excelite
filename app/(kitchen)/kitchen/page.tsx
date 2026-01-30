@@ -15,7 +15,10 @@ export default async function KitchenPage() {
     listKitchenTickets(),
   ]);
 
-  const branches = branchesResult.data || [];
+  const branches = (branchesResult.data || []).map((branch) => {
+    const { taxRate, ...rest } = branch;
+    return { ...rest, taxRate: taxRate ? Number(taxRate) : 0 };
+  });
   const stations = stationsResult.data || [];
   const tickets = ticketsResult.data || [];
 
