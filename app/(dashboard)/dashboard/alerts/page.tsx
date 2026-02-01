@@ -15,10 +15,13 @@ export default async function AlertsPage() {
   ]);
 
   const alerts = alertsResult.data || [];
-  const branchList = (branchesResult.data || []).map((branch: any) => ({
-    ...branch,
-    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-  }));
+  const branchList = (branchesResult.data || []).map((branch: any) => {
+    const { taxRate, ...rest } = branch;
+    return {
+      ...rest,
+      taxRate: taxRate ? Number(taxRate) : 0,
+    };
+  });
 
   return (
     <div className="space-y-6">

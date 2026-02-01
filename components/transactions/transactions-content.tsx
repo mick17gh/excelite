@@ -48,6 +48,7 @@ import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { createTransaction, getTransactions } from "@/lib/actions/transactions";
+import { getBranchTaxRate } from "@/lib/actions/tax";
 import { SalesChannel } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +57,9 @@ interface Branch {
   name: string;
   code: string;
   currency?: string | null;
+  taxRate?: number;
+  taxName?: string | null;
+  taxEnabled?: boolean;
 }
 
 interface MenuItem {
@@ -125,9 +129,20 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [taxSettings, setTaxSettings] = useState<{ rate: number; name: string; enabled: boolean }>({ rate: 0, name: "Tax", enabled: false });
 
   // Auto-set currency based on selected branch
   useBranchCurrency(selectedBranch, branches);
+
+  // Load tax settings when branch changes
+  useEffect(() => {
+    const loadTaxSettings = async () => {
+      if (!selectedBranch) return;
+      const settings = await getBranchTaxRate(selectedBranch);
+      setTaxSettings(settings);
+    };
+    loadTaxSettings();
+  }, [selectedBranch]);
 
   // Fetch today's transactions when branch changes
   useEffect(() => {
@@ -206,7 +221,8 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const tax = cartTotal * 0.125;
+  const taxRate = taxSettings.enabled ? taxSettings.rate / 100 : 0;
+  const tax = cartTotal * taxRate;
   const grandTotal = cartTotal + tax;
 
   const handleSubmitSale = async () => {
@@ -321,7 +337,7 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
               New Transaction
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[85vh] p-0 gap-0 flex flex-col">
+          <DialogContent className="max-w-4xl h-[85vh] p-0 gap-0 flex flex-col">
             <DialogHeader className="p-4 pb-3 border-b shrink-0">
               <DialogTitle>New Sale Transaction</DialogTitle>
               <DialogDescription>
@@ -329,9 +345,9 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2">
               {/* Menu Items */}
-              <div className="border-r flex flex-col overflow-hidden">
+              <div className="border-r flex flex-col min-h-0">
                 <div className="p-3 border-b shrink-0">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -343,7 +359,7 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
                     />
                   </div>
                 </div>
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 h-0">
                   <div className="p-3 space-y-3">
                     {categories.map((category) => {
                       const items = filteredMenuItems.filter((i) => i.category === category);
@@ -374,63 +390,65 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
               </div>
 
               {/* Cart */}
-              <div className="flex flex-col overflow-hidden">
+              <div className="flex flex-col min-h-0">
                 <div className="p-3 border-b shrink-0">
                   <h3 className="font-semibold text-sm">Current Order ({cart.length} items)</h3>
                 </div>
-                <ScrollArea className="flex-1 p-3">
-                  {cart.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                      <p className="text-sm">No items in cart</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {cart.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-lg"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-xs truncate">{item.menuItem}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {formatCurrency(item.unitPrice)} each
-                            </p>
+                <ScrollArea className="flex-1 h-0">
+                  <div className="p-3">
+                    {cart.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">No items in cart</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {cart.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-lg"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-xs truncate">{item.menuItem}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {formatCurrency(item.unitPrice)} each
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              >
+                                -
+                              </Button>
+                              <span className="w-6 text-center text-xs">{item.quantity}</span>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              >
+                                +
+                              </Button>
+                              <span className="w-14 text-right font-medium text-xs">
+                                {formatCurrency(item.total)}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
+                                onClick={() => removeFromCart(item.id)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            >
-                              -
-                            </Button>
-                            <span className="w-6 text-center text-xs">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            >
-                              +
-                            </Button>
-                            <span className="w-14 text-right font-medium text-xs">
-                              {formatCurrency(item.total)}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-destructive"
-                              onClick={() => removeFromCart(item.id)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </ScrollArea>
 
                 {/* Cart Footer */}
@@ -441,10 +459,12 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
                         <span className="text-muted-foreground">Subtotal</span>
                         <span>{formatCurrency(cartTotal)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tax (12.5%)</span>
-                        <span>{formatCurrency(tax)}</span>
-                      </div>
+                      {taxSettings.enabled && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">{taxSettings.name} ({taxSettings.rate}%)</span>
+                          <span>{formatCurrency(tax)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-bold">
                         <span>Total</span>
                         <span>{formatCurrency(grandTotal)}</span>

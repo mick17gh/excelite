@@ -38,10 +38,13 @@ export default async function ExecutiveDashboard() {
     getKPIData(),
   ]);
 
-  const branches = (branchesResult.data || []).map(branch => ({
-    ...branch,
-    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-  }));
+  const branches = (branchesResult.data || []).map((branch: any) => {
+    const { taxRate, ...rest } = branch;
+    return {
+      ...rest,
+      taxRate: taxRate ? Number(taxRate) : 0,
+    };
+  });
   const branchPerformance = branchPerformanceResult.data || [];
   const revenueData = revenueDataResult.data || [];
   const salesByChannel = salesByChannelResult.data || [];

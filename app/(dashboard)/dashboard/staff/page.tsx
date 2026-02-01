@@ -17,10 +17,13 @@ export default async function StaffPage() {
     getSchedules(undefined, today, today),
   ]);
 
-  const branchList = (branchesResult.data || []).map((branch: any) => ({
-    ...branch,
-    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-  }));
+  const branchList = (branchesResult.data || []).map((branch: any) => {
+    const { taxRate, ...rest } = branch;
+    return {
+      ...rest,
+      taxRate: taxRate ? Number(taxRate) : 0,
+    };
+  });
   const rawStaffData = staffResult.data || [];
   const todaySchedules = schedulesResult.data || [];
   

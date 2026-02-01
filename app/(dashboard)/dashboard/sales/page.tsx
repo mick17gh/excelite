@@ -31,10 +31,13 @@ export default async function SalesPage() {
     getHourlySalesData(),
   ]);
 
-  const branches = (branchesResult.data || []).map((branch: any) => ({
-    ...branch,
-    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-  }));
+  const branches = (branchesResult.data || []).map((branch: any) => {
+    const { taxRate, ...rest } = branch;
+    return {
+      ...rest,
+      taxRate: taxRate ? Number(taxRate) : 0,
+    };
+  });
   const revenueData = revenueResult.data || [];
   const salesByChannel = channelResult.data || [];
   const salesByDaypart = daypartResult.data || [];

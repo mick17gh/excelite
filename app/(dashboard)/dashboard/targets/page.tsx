@@ -15,10 +15,13 @@ export default async function TargetsPage() {
   ]);
 
   const targets = targetsResult.data || [];
-  const branches = (branchesResult.data || []).map((branch: any) => ({
-    ...branch,
-    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-  }));
+  const branches = (branchesResult.data || []).map((branch: any) => {
+    const { taxRate, ...rest } = branch;
+    return {
+      ...rest,
+      taxRate: taxRate ? Number(taxRate) : 0,
+    };
+  });
 
   return (
     <div className="space-y-6">
