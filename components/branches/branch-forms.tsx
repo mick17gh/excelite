@@ -245,7 +245,7 @@ export function AddBranchForm({ open, onOpenChange }: AddBranchFormProps) {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="osu@dinelytix.com"
+                  placeholder="osu@servstack.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required

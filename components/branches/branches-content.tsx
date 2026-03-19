@@ -57,9 +57,11 @@ interface BranchListItem {
 interface BranchesContentProps {
   branches: Branch[];
   branchList: BranchListItem[];
+  currentCount: number;
+  maxBranches: number;
 }
 
-export function BranchesContent({ branches, branchList }: BranchesContentProps) {
+export function BranchesContent({ branches, branchList, currentCount, maxBranches }: BranchesContentProps) {
   const { formatCurrency } = useCurrency();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -227,9 +229,13 @@ export function BranchesContent({ branches, branchList }: BranchesContentProps) 
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => setIsAddBranchOpen(true)}>
+          <Button
+            onClick={() => setIsAddBranchOpen(true)}
+            disabled={currentCount >= maxBranches}
+            title={currentCount >= maxBranches ? `Branch limit reached (${currentCount}/${maxBranches}). Upgrade your plan.` : undefined}
+          >
             <Plus className="mr-2 h-4 w-4" />
-            Add Branch
+            {currentCount >= maxBranches ? `Limit Reached (${currentCount}/${maxBranches})` : "Add Branch"}
           </Button>
         </div>
       </div>

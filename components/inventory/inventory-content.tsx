@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -54,7 +54,7 @@ import {
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
-import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
+import { useBranchRestrictions } from "@/hooks/use-branch-restrictions";
 import { EmptyState } from "@/components/ui/empty-state";
 import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -135,24 +135,16 @@ export function InventoryContent({
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
   
-  // Filter branches based on user permissions
-  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
-  
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [branchFilter, setBranchFilter] = useState<string>(() =>
+    !authLoading && !canViewAllBranches && userBranchId ? userBranchId : "all"
+  );
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  // Auto-select user's branch if they're restricted
-  useEffect(() => {
-    if (!authLoading && !canViewAllBranches && userBranchId) {
-      setBranchFilter(userBranchId);
-    }
-  }, [authLoading, canViewAllBranches, userBranchId]);
 
   // Set currency based on selected branch filter
   const selectedBranchId = branchFilter !== "all" ? branchFilter : null;
@@ -180,23 +172,8 @@ export function InventoryContent({
       return matchesSearch && matchesStatus && matchesCategory && matchesBranch;
     });
     
-    console.log('Filter Debug:', {
-      totalItems: items.length,
-      searchQuery,
-      statusFilter,
-      categoryFilter,
-      branchFilter,
-      filteredCount: filtered.length,
-      sampleFiltered: filtered.slice(0, 3).map(i => ({ name: i.name, sku: i.sku, branchId: i.branchId }))
-    });
-    
     return filtered;
   }, [items, searchQuery, statusFilter, categoryFilter, branchFilter]);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, categoryFilter, branchFilter]);
 
   // Paginated items
   const totalPages = Math.ceil(filteredItems.length / pageSize);
@@ -204,20 +181,6 @@ export function InventoryContent({
     const startIndex = (currentPage - 1) * pageSize;
     return filteredItems.slice(startIndex, startIndex + pageSize);
   }, [filteredItems, currentPage, pageSize]);
-
-  // Debug logging
-  console.log('Inventory Pagination Debug:', {
-    totalItems: items.length,
-    filteredItems: filteredItems.length,
-    currentPage,
-    pageSize,
-    totalPages,
-    paginatedItems: paginatedItems.length,
-    searchQuery,
-    statusFilter,
-    categoryFilter,
-    branchFilter
-  });
 
   const categories = [...new Set(items.map((i) => i.category))];
 
@@ -419,11 +382,11 @@ export function InventoryContent({
             <Input
               placeholder="Search items..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               className="pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
             <SelectTrigger className="w-full sm:w-36">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -435,7 +398,7 @@ export function InventoryContent({
               <SelectItem value="overstock">Overstock</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
             <SelectTrigger className="w-full sm:w-36">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -448,7 +411,7 @@ export function InventoryContent({
               ))}
             </SelectContent>
           </Select>
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
+          <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setCurrentPage(1); }}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Branch" />
             </SelectTrigger>
@@ -586,7 +549,7 @@ export function InventoryContent({
                         <TableCell>{formatCurrency(record.unitCost)}</TableCell>
                         <TableCell>{formatCurrency(record.totalCost)}</TableCell>
                         <TableCell>{record.invoiceNumber || "-"}</TableCell>
-                        <TableCell>{new Date(record.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(record.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -635,7 +598,7 @@ export function InventoryContent({
                         <TableCell>{record.quantity}</TableCell>
                         <TableCell>{record.reason || "-"}</TableCell>
                         <TableCell>{record.branch.name}</TableCell>
-                        <TableCell>{new Date(record.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(record.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -686,7 +649,7 @@ export function InventoryContent({
                             {record.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{new Date(record.transferDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(record.transferDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

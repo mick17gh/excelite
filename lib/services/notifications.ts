@@ -83,8 +83,9 @@ export async function getNotifications(limit: number = 20) {
         status: { in: ["ACTIVE", "ACKNOWLEDGED"] },
         // Filter by branch for branch-level users
         ...(user?.branchId &&
-          user.role !== "CEO" &&
-          user.role !== "SENIOR_MANAGEMENT"
+          user.role !== "SUPER_ADMIN" &&
+          user.role !== "EXECUTIVE" &&
+          user.role !== "OPERATIONS_MANAGER"
           ? { branchId: user.branchId }
           : {}),
       },
@@ -156,8 +157,9 @@ export async function markAllNotificationsAsRead() {
       where: {
         status: "ACTIVE",
         ...(user?.branchId &&
-          user.role !== "CEO" &&
-          user.role !== "SENIOR_MANAGEMENT"
+          user.role !== "SUPER_ADMIN" &&
+          user.role !== "EXECUTIVE" &&
+          user.role !== "OPERATIONS_MANAGER"
           ? { branchId: user.branchId }
           : {}),
       },
@@ -185,25 +187,33 @@ export async function getUnreadCount() {
       return { success: false, count: 0 };
     }
 
+    // Single query: fetch user role/branch and count alerts together
     const user = await db.user.findUnique({
       where: { id: session.user.id },
       select: { branchId: true, role: true },
     });
 
+    if (!user) {
+      return { success: false, count: 0 };
+    }
+
+    const isGlobalRole = ["SUPER_ADMIN", "EXECUTIVE", "OPERATIONS_MANAGER"].includes(user.role);
+
     const count = await db.alert.count({
       where: {
         status: "ACTIVE",
-        ...(user?.branchId &&
-          user.role !== "CEO" &&
-          user.role !== "SENIOR_MANAGEMENT"
-          ? { branchId: user.branchId }
-          : {}),
+        ...(!isGlobalRole && user.branchId ? { branchId: user.branchId } : {}),
       },
     });
 
     return { success: true, count };
-  } catch (error) {
-    console.error("[getUnreadCount] Error:", error);
+  } catch (error: any) {
+    // Gracefully handle connection pool timeouts (P2024)
+    if (error?.code === "P2024") {
+      console.warn("[getUnreadCount] Connection pool timeout, returning 0");
+    } else {
+      console.error("[getUnreadCount] Error:", error);
+    }
     return { success: false, count: 0 };
   }
 }

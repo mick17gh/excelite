@@ -1,19 +1,21 @@
 import { Suspense } from "react";
 import { getBranches } from "@/lib/actions/branches";
 import { getMenuItems } from "@/lib/actions/menu";
+import { getCustomers } from "@/lib/actions/customers";
 import { PosContent } from "@/components/pos/pos-content";
 import { listPosOrders } from "@/lib/actions/pos";
 
 export const metadata = {
-  title: "POS | Dinelytix",
+  title: "POS | ServStack",
   description: "Cashier POS for order entry and payments.",
 };
 
 export default async function PosPage() {
-  const [branchesResult, menuItemsResult, ordersResult] = await Promise.all([
+  const [branchesResult, menuItemsResult, ordersResult, customersResult] = await Promise.all([
     getBranches(),
     getMenuItems(),
     listPosOrders(),
+    getCustomers(),
   ]);
 
   // Serialize Decimal fields for client components
@@ -23,6 +25,7 @@ export default async function PosPage() {
   });
   const menuItems = menuItemsResult.data || [];
   const orders = ordersResult.data || [];
+  const customers = customersResult.data || [];
 
   return (
     <div className="h-full">
@@ -34,7 +37,7 @@ export default async function PosPage() {
       </div> */}
 
       <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-muted" />}>
-        <PosContent branches={branches} menuItems={menuItems} recentOrders={orders} />
+        <PosContent branches={branches} menuItems={menuItems} recentOrders={orders} customers={customers} />
       </Suspense>
     </div>
   );

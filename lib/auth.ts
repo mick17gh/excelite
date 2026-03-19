@@ -6,17 +6,23 @@ import { db } from "./db";
 import { sendPasswordResetEmail } from "./services/email";
 
 export const ROLES = {
-    CEO: "CEO",
-    SENIOR_MANAGEMENT: "SENIOR_MANAGEMENT",
+    SUPER_ADMIN: "SUPER_ADMIN",
+    EXECUTIVE: "EXECUTIVE",
+    OPERATIONS_MANAGER: "OPERATIONS_MANAGER",
     BRANCH_MANAGER: "BRANCH_MANAGER",
-    FINANCE_OPS: "FINANCE_OPS",
-    CASHIER: "CASHIER",
+    SUPERVISOR: "SUPERVISOR",
+    STAFF: "STAFF",
+    KITCHEN_STAFF: "KITCHEN_STAFF",
+    AUDITOR: "AUDITOR",
+    DEVELOPER: "DEVELOPER",
+    CALL_CENTER: "CALL_CENTER",
+    WAREHOUSE_STAFF: "WAREHOUSE_STAFF",
 } as const;
 
 export type Role = keyof typeof ROLES;
 
 export const ROLE_PERMISSIONS = {
-    CEO: {
+    SUPER_ADMIN: {
         canViewAllBranches: true,
         canEditData: true,
         canDeleteData: true,
@@ -25,9 +31,18 @@ export const ROLE_PERMISSIONS = {
         canViewAuditLogs: true,
         canManageSettings: true,
     },
-    SENIOR_MANAGEMENT: {
+    EXECUTIVE: {
         canViewAllBranches: true,
-        canEditData: false,
+        canEditData: true,
+        canDeleteData: false,
+        canManageUsers: true,
+        canViewReports: true,
+        canViewAuditLogs: true,
+        canManageSettings: true,
+    },
+    OPERATIONS_MANAGER: {
+        canViewAllBranches: true,
+        canEditData: true,
         canDeleteData: false,
         canManageUsers: false,
         canViewReports: true,
@@ -43,16 +58,61 @@ export const ROLE_PERMISSIONS = {
         canViewAuditLogs: false,
         canManageSettings: false,
     },
-    FINANCE_OPS: {
-        canViewAllBranches: true,
+    SUPERVISOR: {
+        canViewAllBranches: false,
         canEditData: true,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+    },
+    STAFF: {
+        canViewAllBranches: false,
+        canEditData: true,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+    },
+    KITCHEN_STAFF: {
+        canViewAllBranches: false,
+        canEditData: false,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+    },
+    AUDITOR: {
+        canViewAllBranches: true,
+        canEditData: false,
         canDeleteData: false,
         canManageUsers: false,
         canViewReports: true,
         canViewAuditLogs: true,
         canManageSettings: false,
     },
-    CASHIER: {
+    DEVELOPER: {
+        canViewAllBranches: false,
+        canEditData: false,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+    },
+    CALL_CENTER: {
+        canViewAllBranches: true,
+        canEditData: true,
+        canDeleteData: false,
+        canManageUsers: false,
+        canViewReports: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+    },
+    WAREHOUSE_STAFF: {
         canViewAllBranches: false,
         canEditData: true,
         canDeleteData: false,
@@ -136,7 +196,7 @@ export const auth = betterAuth({
 
 export type Session = typeof auth.$Infer.Session;
 
-export function hasPermission(role: Role, permission: keyof typeof ROLE_PERMISSIONS.CEO): boolean {
+export function hasPermission(role: Role, permission: keyof typeof ROLE_PERMISSIONS.SUPER_ADMIN): boolean {
     return ROLE_PERMISSIONS[role]?.[permission] ?? false;
 }
 

@@ -20,7 +20,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     allowedAggregations: ['sum', 'avg', 'count', 'min', 'max'],
     allowedGroupings: ['date', 'branch', 'channel', 'dayPart'],
     timeRanges: ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month', 'this_year', 'ytd'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR],
   },
   {
     entity: 'inventory',
@@ -39,7 +39,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     ],
     allowedAggregations: ['sum', 'avg', 'count', 'min', 'max'],
     allowedGroupings: ['category', 'branch', 'unit'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR, Role.WAREHOUSE_STAFF],
   },
   {
     entity: 'menuItems',
@@ -54,7 +54,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     ],
     allowedAggregations: ['count', 'avg', 'min', 'max'],
     allowedGroupings: ['category', 'isActive'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.CALL_CENTER],
   },
   {
     entity: 'staff',
@@ -69,7 +69,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     ],
     allowedAggregations: ['count'],
     allowedGroupings: ['role', 'dutyStatus', 'branch'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
   },
   {
     entity: 'staffSchedule',
@@ -84,7 +84,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     ],
     allowedAggregations: ['count'],
     allowedGroupings: ['date', 'status', 'branch'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
   },
   {
     entity: 'waste',
@@ -100,7 +100,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     allowedAggregations: ['sum', 'avg', 'count'],
     allowedGroupings: ['item', 'reason', 'date', 'branch'],
     timeRanges: ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR],
   },
   {
     entity: 'targets',
@@ -116,7 +116,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     ],
     allowedAggregations: ['sum', 'avg'],
     allowedGroupings: ['type', 'period', 'branch'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
   },
   {
     entity: 'alerts',
@@ -132,7 +132,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     ],
     allowedAggregations: ['count'],
     allowedGroupings: ['type', 'severity', 'status', 'branch'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
   },
   {
     entity: 'branches',
@@ -146,7 +146,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     ],
     allowedAggregations: ['count'],
     allowedGroupings: ['city', 'isActive'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS, Role.CASHIER],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.SUPERVISOR, Role.STAFF, Role.AUDITOR, Role.CALL_CENTER],
   },
   {
     entity: 'transactions',
@@ -161,7 +161,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     allowedAggregations: ['sum', 'avg', 'count'],
     allowedGroupings: ['date', 'paymentMethod', 'branch', 'isVoided'],
     timeRanges: ['today', 'yesterday', 'this_week', 'last_week', 'this_month'],
-    requiredRole: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRole: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR],
   },
 ];
 

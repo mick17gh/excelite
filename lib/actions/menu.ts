@@ -231,7 +231,7 @@ export async function getMenuItems(
 ): Promise<PaginatedResult<any>> {
   try {
     const page = pagination?.page || 1;
-    const pageSize = pagination?.pageSize || 20;
+    const pageSize = pagination?.pageSize || 1000; // Increased to show all items by default
     const skip = (page - 1) * pageSize;
 
     const where = {
@@ -283,7 +283,7 @@ export async function getMenuItems(
       success: false,
       error: "Failed to fetch menu items",
       data: [],
-      pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+      pagination: { page: 1, pageSize: 1000, totalItems: 0, totalPages: 0 },
     };
   }
 }

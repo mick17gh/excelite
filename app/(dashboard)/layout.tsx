@@ -3,7 +3,9 @@ import { Header } from "@/components/dashboard/header";
 import { FloatingChatWidget } from "@/components/chat";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { Role } from "@/lib/generated/prisma/client";
+import { redirect } from "next/navigation";
+import { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
+import { db } from "@/lib/db";
 
 export default async function DashboardLayout({
   children,
@@ -14,11 +16,19 @@ export default async function DashboardLayout({
     headers: await headers(),
   });
 
-  const userRole = (session?.user?.role as Role) || "CASHIER";
+  const userRole = (session?.user?.role as Role) || "STAFF";
+
+  // Check if organization exists, redirect to onboarding if not
+  const org = await db.organization.findFirst({ select: { tier: true } });
+  if (!org) {
+    redirect("/onboarding");
+  }
+
+  const orgTier: SubscriptionTier = org.tier;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar className="hidden md:flex" userRole={userRole} />
+      <Sidebar className="hidden md:flex" userRole={userRole} orgTier={orgTier} />
       <div className="flex flex-1 flex-col overflow-hidden relative">
         {/* Gradient mesh background */}
         <div className="absolute inset-0 gradient-mesh pointer-events-none" />

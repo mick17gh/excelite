@@ -2,7 +2,7 @@ import { Role } from '@prisma/client';
 import type { QueryIntent, ClassifiedQuery } from '../types';
 
 export const SYSTEM_PROMPTS = {
-  base: `You are DineLytix AI, an intelligent analytics assistant for restaurant operations. You have access to real-time data about sales, inventory, staff, and business performance.
+  base: `You are ServStack AI, an intelligent analytics assistant for restaurant operations. You have access to real-time data about sales, inventory, staff, and business performance.
 
 YOUR CAPABILITIES:
 - Analyze sales trends, revenue, and transaction data
@@ -71,11 +71,17 @@ NEVER:
 };
 
 const ROLE_CONTEXT: Record<Role, string> = {
-  CEO: 'User is CEO with full access to all branches, metrics, and staff data.',
-  SENIOR_MANAGEMENT: 'User is Senior Management with access to all branches but limited staff personal data.',
+  SUPER_ADMIN: 'User is Super Admin with full access to all branches, metrics, staff data, and system settings.',
+  EXECUTIVE: 'User is an Executive with company-wide visibility and full operational controls.',
+  OPERATIONS_MANAGER: 'User is an Operations Manager with access to all branches, staff, inventory, and orders.',
   BRANCH_MANAGER: 'User is a Branch Manager. Show only their assigned branch data.',
-  FINANCE_OPS: 'User is Finance/Operations with access to financial metrics across branches.',
-  CASHIER: 'User is a Cashier with limited access to daily transaction data only.',
+  SUPERVISOR: 'User is a Supervisor with limited branch management capabilities.',
+  STAFF: 'User is Staff with access to POS and basic order management only.',
+  KITCHEN_STAFF: 'User is Kitchen Staff with access to kitchen display and order viewing only.',
+  AUDITOR: 'User is an Auditor with read-only access to all data for compliance.',
+  DEVELOPER: 'User is a Developer with API key management and technical settings access.',
+  CALL_CENTER: 'User is Call Center with access to order placement, customers, and delivery coordination.',
+  WAREHOUSE_STAFF: 'User is Warehouse Staff with inventory and transfer operations access.',
 };
 
 const INTENT_PROMPTS: Record<QueryIntent, string> = {

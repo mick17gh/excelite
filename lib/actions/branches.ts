@@ -117,11 +117,16 @@ export async function getBranches() {
       where: { deletedAt: null },
       orderBy: { name: "asc" },
     });
-    // Serialize Decimal fields to numbers for client components
-    const serializedBranches = branches.map(branch => ({
-      ...branch,
-      taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-    }));
+    // Force plain-object serialization to strip Prisma Decimal wrappers
+    const serializedBranches = branches.map(branch => {
+      const plain = JSON.parse(JSON.stringify(branch));
+      return {
+        ...plain,
+        taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+        latitude: branch.latitude ? Number(branch.latitude) : null,
+        longitude: branch.longitude ? Number(branch.longitude) : null,
+      };
+    });
     return { success: true, data: serializedBranches };
   } catch (error) {
     console.error("[getBranches] Error:", error);
@@ -143,13 +148,17 @@ export async function getBranchById(id: string) {
       return { success: false, error: "Branch not found" };
     }
 
-    // Convert Decimal fields to numbers for staff data
+    // Force plain-object serialization to strip Prisma Decimal wrappers
     const convertedBranch = {
-      ...branch,
-      staff: branch.staff.map(staff => ({
-        ...staff,
-        hourlyRate: Number(staff.hourlyRate)
-      }))
+      ...JSON.parse(JSON.stringify(branch)),
+      taxRate: parseFloat(String(branch.taxRate)),
+      latitude: branch.latitude != null ? parseFloat(String(branch.latitude)) : null,
+      longitude: branch.longitude != null ? parseFloat(String(branch.longitude)) : null,
+      staff: branch.staff.map(s => ({
+        ...JSON.parse(JSON.stringify(s)),
+        hourlyRate: parseFloat(String(s.hourlyRate)),
+      })),
+      users: branch.users.map(u => JSON.parse(JSON.stringify(u))),
     };
 
     return { success: true, data: convertedBranch };

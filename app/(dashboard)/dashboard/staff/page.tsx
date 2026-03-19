@@ -4,7 +4,7 @@ import { getStaff, getStaffSummary, getSchedules } from "@/lib/actions/staff";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "Staff Management | Dinelytix",
+  title: "Staff Management | ServStack",
   description: "Track staff availability and scheduling across all branches",
 };
 

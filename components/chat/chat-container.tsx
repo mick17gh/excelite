@@ -144,7 +144,7 @@ export function ChatContainer({
     return (
       <Card className={`w-72 ${className}`}>
         <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-medium">DineLytix AI</CardTitle>
+          <CardTitle className="text-sm font-medium">ServStack AI</CardTitle>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -173,7 +173,7 @@ export function ChatContainer({
   return (
     <Card className={`flex flex-col h-[600px] max-h-[80vh] ${className}`}>
       <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base font-semibold">DineLytix AI Assistant</CardTitle>
+        <CardTitle className="text-base font-semibold">ServStack AI Assistant</CardTitle>
         <div className="flex items-center gap-2">
           <ProviderSelector value={provider} onChange={setProvider} />
           {minimizable && (

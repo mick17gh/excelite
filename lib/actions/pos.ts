@@ -4,6 +4,40 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, OrderType, SalesChannel } from "@/lib/generated/prisma/client";
 import { logCreate } from "@/lib/services/audit";
+import { createDeliveryRequest } from "@/lib/actions/delivery";
+
+// Helper to serialize Decimal fields from Prisma order objects for client components
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serializePosOrder(order: Record<string, any>) {
+  const plain = JSON.parse(JSON.stringify(order));
+  return {
+    ...plain,
+    subtotal: Number(order.subtotal),
+    tax: Number(order.tax),
+    discount: Number(order.discount),
+    deliveryFee: Number(order.deliveryFee),
+    total: Number(order.total),
+    deliveryLat: order.deliveryLat ? Number(order.deliveryLat) : null,
+    deliveryLng: order.deliveryLng ? Number(order.deliveryLng) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: order.items?.map((item: Record<string, any>) => ({
+      ...JSON.parse(JSON.stringify(item)),
+      unitPrice: Number(item.unitPrice),
+      lineTotal: Number(item.lineTotal),
+      menuItem: item.menuItem ? {
+        ...JSON.parse(JSON.stringify(item.menuItem)),
+        price: Number(item.menuItem.price),
+        cost: item.menuItem.cost ? Number(item.menuItem.cost) : 0,
+      } : null,
+    })) || [],
+    branch: order.branch ? {
+      ...JSON.parse(JSON.stringify(order.branch)),
+      taxRate: Number(order.branch.taxRate),
+      latitude: order.branch.latitude ? Number(order.branch.latitude) : null,
+      longitude: order.branch.longitude ? Number(order.branch.longitude) : null,
+    } : undefined,
+  };
+}
 
 function generateOrderNumber(): string {
   const prefix = "POS";
@@ -22,13 +56,17 @@ export interface CreatePosOrderItemInput {
 export interface CreatePosOrderInput {
   branchId: string;
   cashierId?: string;
+  customerId?: string;
   type: OrderType;
-  sourceChannel: SalesChannel;
   items: CreatePosOrderItemInput[];
   paymentMethod?: string;
   customerName?: string;
   notes?: string;
   discount?: number;
+  deliveryFee?: number;
+  deliveryAddress?: string;
+  deliveryPhone?: string;
+  deliveryNotes?: string;
   sendToKitchen?: boolean; // Automatically create kitchen ticket
   stationId?: string; // Specific kitchen station (optional)
 }
@@ -46,25 +84,33 @@ export async function createPosOrder(input: CreatePosOrderInput) {
     
     const subtotal = input.items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
     const discount = input.discount || 0;
+    const deliveryFee = input.deliveryFee || 0;
     const subtotalAfterDiscount = subtotal - discount;
     const tax = subtotalAfterDiscount * taxRate;
-    const total = subtotalAfterDiscount + tax;
+    const total = subtotalAfterDiscount + tax + deliveryFee;
 
-    const order = await db.posOrder.create({
+    // Create unified Order record with source: POS
+    const order = await db.order.create({
       data: {
         orderNumber,
         branchId: input.branchId,
-        cashierId: input.cashierId,
+        cashierId: input.cashierId || null,
+        customerId: input.customerId || null,
+        customerName: input.customerName || null,
+        source: "POS",
         type: input.type,
-        sourceChannel: input.sourceChannel,
+        status: "NEW",
         subtotal,
         tax,
         discount,
+        deliveryFee,
         total,
-        status: "NEW",
         paymentMethod: input.paymentMethod || null,
-        customerName: input.customerName || null,
+        paymentStatus: "PENDING",
         notes: input.notes || null,
+        deliveryAddress: input.deliveryAddress || null,
+        deliveryPhone: input.deliveryPhone || null,
+        deliveryNotes: input.deliveryNotes || null,
         items: {
           create: input.items.map((it) => ({
             menuItemId: it.menuItemId,
@@ -92,7 +138,6 @@ export async function createPosOrder(input: CreatePosOrderInput) {
     let kitchenTicketId: string | null = null;
     if (input.sendToKitchen) {
       try {
-        // Find the default station for the branch or use the provided one
         let stationId = input.stationId;
         if (!stationId) {
           const defaultStation = await db.kitchenStation.findFirst({
@@ -119,73 +164,30 @@ export async function createPosOrder(input: CreatePosOrderInput) {
         }
       } catch (error) {
         console.warn("[createPosOrder] Failed to create kitchen ticket:", error);
-        // Don't fail the order if kitchen ticket fails
       }
     }
 
     // Create audit log
     await logCreate(
-      "PosOrder",
+      "Order",
       order.id,
       {
         orderNumber,
         branchId: input.branchId,
         total,
         itemCount: input.items.length,
-        channel: input.sourceChannel,
+        source: "POS",
+        type: input.type,
         kitchenTicketId,
       }
     );
 
     revalidatePath("/pos");
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/orders");
     revalidatePath("/kitchen");
-    
-    // Convert Decimal fields to plain numbers to avoid serialization issues
-    const convertedOrder = {
-      id: order.id,
-      orderNumber: order.orderNumber,
-      branchId: order.branchId,
-      cashierId: order.cashierId,
-      type: order.type,
-      sourceChannel: order.sourceChannel,
-      status: order.status,
-      subtotal: Number(order.subtotal),
-      tax: Number(order.tax),
-      discount: Number(order.discount),
-      total: Number(order.total),
-      paymentMethod: order.paymentMethod,
-      customerName: order.customerName,
-      notes: order.notes,
-      openedAt: order.openedAt,
-      closedAt: order.closedAt,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-      branch: order.branch,
-      cashier: order.cashier,
-      items: order.items.map((item) => ({
-        id: item.id,
-        orderId: item.orderId,
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        unitPrice: Number(item.unitPrice),
-        lineTotal: Number(item.lineTotal),
-        notes: item.notes,
-        menuItem: item.menuItem ? {
-          id: item.menuItem.id,
-          name: item.menuItem.name,
-          sku: item.menuItem.sku,
-          categoryId: item.menuItem.categoryId,
-          price: Number(item.menuItem.price),
-          cost: Number(item.menuItem.cost),
-          imageUrl: item.menuItem.imageUrl,
-          description: item.menuItem.description,
-          isActive: item.menuItem.isActive,
-        } : null,
-      })),
-    };
-    
-    return { success: true, data: convertedOrder };
+
+    return { success: true, data: serializePosOrder(order) };
   } catch (error) {
     console.error("[createPosOrder] Error:", error);
     return { success: false, error: "Failed to create POS order" };
@@ -194,8 +196,9 @@ export async function createPosOrder(input: CreatePosOrderInput) {
 
 export async function listPosOrders(branchId?: string, status?: OrderStatus) {
   try {
-    const orders = await db.posOrder.findMany({
+    const orders = await db.order.findMany({
       where: {
+        source: "POS",
         ...(branchId && { branchId }),
         ...(status && { status }),
       },
@@ -207,50 +210,7 @@ export async function listPosOrders(branchId?: string, status?: OrderStatus) {
       take: 50,
     });
 
-    // Convert Decimal fields to plain numbers to avoid serialization issues
-    const convertedOrders = orders.map((order) => ({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      branchId: order.branchId,
-      cashierId: order.cashierId,
-      type: order.type,
-      sourceChannel: order.sourceChannel,
-      status: order.status,
-      subtotal: Number(order.subtotal),
-      tax: Number(order.tax),
-      discount: Number(order.discount),
-      total: Number(order.total),
-      paymentMethod: order.paymentMethod,
-      customerName: order.customerName,
-      notes: order.notes,
-      openedAt: order.openedAt,
-      closedAt: order.closedAt,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-      branch: order.branch,
-      items: order.items.map((item) => ({
-        id: item.id,
-        orderId: item.orderId,
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        unitPrice: Number(item.unitPrice),
-        lineTotal: Number(item.lineTotal),
-        notes: item.notes,
-        menuItem: item.menuItem ? {
-          id: item.menuItem.id,
-          name: item.menuItem.name,
-          sku: item.menuItem.sku,
-          categoryId: item.menuItem.categoryId,
-          price: Number(item.menuItem.price),
-          cost: Number(item.menuItem.cost),
-          imageUrl: item.menuItem.imageUrl,
-          description: item.menuItem.description,
-          isActive: item.menuItem.isActive,
-        } : null,
-      })),
-    }));
-
-    return { success: true, data: convertedOrders };
+    return { success: true, data: orders.map(o => serializePosOrder(o)) };
   } catch (error) {
     console.error("[listPosOrders] Error:", error);
     return { success: false, error: "Failed to fetch POS orders", data: [] };
@@ -259,7 +219,7 @@ export async function listPosOrders(branchId?: string, status?: OrderStatus) {
 
 export async function updatePosOrderStatus(orderId: string, status: OrderStatus) {
   try {
-    const order = await db.posOrder.update({
+    const order = await db.order.update({
       where: { id: orderId },
       data: {
         status,
@@ -268,18 +228,10 @@ export async function updatePosOrderStatus(orderId: string, status: OrderStatus)
     });
 
     revalidatePath("/pos");
+    revalidatePath("/dashboard/orders");
     revalidatePath("/kitchen");
-    
-    // Convert Decimal fields to plain numbers to avoid serialization issues
-    const convertedOrder = {
-      ...order,
-      subtotal: Number(order.subtotal),
-      tax: Number(order.tax),
-      discount: Number(order.discount),
-      total: Number(order.total),
-    };
-    
-    return { success: true, data: convertedOrder };
+
+    return { success: true, data: serializePosOrder(order) };
   } catch (error) {
     console.error("[updatePosOrderStatus] Error:", error);
     return { success: false, error: "Failed to update order status" };
@@ -297,7 +249,7 @@ export interface CompleteOrderInput {
 export async function completeOrder(input: CompleteOrderInput) {
   try {
     // Get the order with items
-    const order = await db.posOrder.findUnique({
+    const order = await db.order.findUnique({
       where: { id: input.orderId },
       include: {
         items: { include: { menuItem: true } },
@@ -312,30 +264,50 @@ export async function completeOrder(input: CompleteOrderInput) {
       return { success: false, error: "Order already completed" };
     }
 
-    // Update order status
-    await db.posOrder.update({
+    // Update order status and payment
+    await db.order.update({
       where: { id: input.orderId },
       data: {
         status: "COMPLETED",
         paymentMethod: input.paymentMethod,
+        paymentStatus: "PAID",
         closedAt: new Date(),
+      },
+    });
+
+    // Create Payment record
+    const paymentRef = `PAY-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    await db.payment.create({
+      data: {
+        orderId: order.id,
+        reference: paymentRef,
+        amount: Number(order.total) + (input.tip || 0),
+        status: "PAID",
+        provider: "pos",
+        paidAt: new Date(),
       },
     });
 
     // Create sale record if requested
     let saleId: string | null = null;
-    if (input.createSale !== false) { // Default to true
-      // Generate sale number
+    if (input.createSale !== false) {
       const saleNumber = `SALE-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 
-      // Determine day part
       const hour = new Date().getHours();
       let dayPart: "BREAKFAST" | "LUNCH" | "DINNER" | "LATE_NIGHT" = "LATE_NIGHT";
       if (hour >= 6 && hour < 11) dayPart = "BREAKFAST";
       else if (hour >= 11 && hour < 15) dayPart = "LUNCH";
       else if (hour >= 15 && hour < 21) dayPart = "DINNER";
 
-      // Create transaction first
+      // Map OrderType to SalesChannel for sale record
+      const channelMap: Record<string, SalesChannel> = {
+        DINE_IN: "DINE_IN",
+        TAKEOUT: "TAKEOUT",
+        DELIVERY: "DELIVERY",
+        APP: "APP",
+      };
+      const channel = channelMap[order.type] || "DINE_IN";
+
       const transactionRef = `TXN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
       const transaction = await db.transaction.create({
         data: {
@@ -349,7 +321,6 @@ export async function completeOrder(input: CompleteOrderInput) {
         },
       });
 
-      // Create sale
       const sale = await db.sale.create({
         data: {
           saleNumber,
@@ -358,7 +329,7 @@ export async function completeOrder(input: CompleteOrderInput) {
           subtotal: order.subtotal,
           tax: order.tax,
           total: order.total,
-          channel: order.sourceChannel || "POS",
+          channel,
           dayPart,
           customerCount: 1,
           saleDate: new Date(),
@@ -376,7 +347,6 @@ export async function completeOrder(input: CompleteOrderInput) {
       });
       saleId = sale.id;
 
-      // Create audit log
       await logCreate(
         "Sale",
         sale.id,
@@ -393,9 +363,27 @@ export async function completeOrder(input: CompleteOrderInput) {
     const totalWithTip = Number(order.total) + (input.tip || 0);
     const change = input.amountReceived - totalWithTip;
 
+    // Auto-create delivery request for DELIVERY orders
+    if (order.type === "DELIVERY") {
+      try {
+        await createDeliveryRequest({
+          orderId: order.id,
+          deliveryAddress: order.deliveryAddress || undefined,
+          deliveryPhone: order.deliveryPhone || undefined,
+          customerName: order.customerName || undefined,
+          fee: Number(order.deliveryFee) || 0,
+          notes: order.deliveryNotes || undefined,
+        });
+      } catch (err) {
+        console.warn("[completeOrder] Failed to create delivery request:", err);
+      }
+    }
+
     revalidatePath("/pos");
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/transactions");
+    revalidatePath("/dashboard/delivery");
 
     return {
       success: true,
@@ -417,22 +405,16 @@ export async function completeOrder(input: CompleteOrderInput) {
   }
 }
 
-// Send specific items to kitchen
+// Send order items to kitchen (used from POS UI)
 export async function sendToKitchen(orderId: string, itemIds?: string[], stationId?: string) {
   try {
-    const order = await db.posOrder.findUnique({
+    const order = await db.order.findUnique({
       where: { id: orderId },
-      include: {
-        items: true,
-        branch: true,
-      },
+      include: { items: true, branch: true },
     });
 
-    if (!order) {
-      return { success: false, error: "Order not found" };
-    }
+    if (!order) return { success: false, error: "Order not found" };
 
-    // Find or determine station
     let targetStationId = stationId;
     if (!targetStationId) {
       const defaultStation = await db.kitchenStation.findFirst({
@@ -441,39 +423,21 @@ export async function sendToKitchen(orderId: string, itemIds?: string[], station
       targetStationId = defaultStation?.id;
     }
 
-    if (!targetStationId) {
-      return { success: false, error: "No kitchen station found" };
-    }
+    if (!targetStationId) return { success: false, error: "No kitchen station found" };
 
-    // Filter items to send
     const itemsToSend = itemIds
       ? order.items.filter((item) => itemIds.includes(item.id))
       : order.items;
 
-    if (itemsToSend.length === 0) {
-      return { success: false, error: "No items to send" };
-    }
+    if (itemsToSend.length === 0) return { success: false, error: "No items to send" };
 
-    // Create kitchen ticket
     const kitchenTicket = await db.kitchenTicket.create({
       data: {
         orderId: order.id,
         stationId: targetStationId,
         status: "NEW",
         items: {
-          create: itemsToSend.map((item) => ({
-            orderItemId: item.id,
-            status: "NEW",
-          })),
-        },
-      },
-      include: {
-        items: {
-          include: {
-            orderItem: {
-              include: { menuItem: true },
-            },
-          },
+          create: itemsToSend.map((item) => ({ orderItemId: item.id, status: "NEW" })),
         },
       },
     });
@@ -483,17 +447,40 @@ export async function sendToKitchen(orderId: string, itemIds?: string[], station
 
     return {
       success: true,
-      data: {
-        ticketId: kitchenTicket.id,
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        stationId: targetStationId,
-        itemCount: itemsToSend.length,
-      },
+      data: { ticketId: kitchenTicket.id, orderId: order.id, orderNumber: order.orderNumber, stationId: targetStationId, itemCount: itemsToSend.length },
     };
   } catch (error) {
     console.error("[sendToKitchen] Error:", error);
     return { success: false, error: "Failed to send order to kitchen" };
+  }
+}
+
+// Create kitchen ticket from order (used from kitchen actions)
+export async function createKitchenTicketFromOrder(orderId: string, stationId: string) {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) return { success: false, error: "Order not found" };
+
+    const ticket = await db.kitchenTicket.create({
+      data: {
+        orderId: order.id,
+        stationId,
+        status: "NEW",
+        items: {
+          create: order.items.map((item) => ({ orderItemId: item.id, status: "NEW" })),
+        },
+      },
+    });
+
+    revalidatePath("/kitchen");
+    return { success: true, data: ticket };
+  } catch (error) {
+    console.error("[createKitchenTicketFromOrder] Error:", error);
+    return { success: false, error: "Failed to create kitchen ticket" };
   }
 }
 
@@ -518,7 +505,7 @@ export async function getKitchenStations(branchId: string) {
 // Cancel/void a POS order
 export async function voidPosOrder(orderId: string, reason: string) {
   try {
-    const order = await db.posOrder.findUnique({
+    const order = await db.order.findUnique({
       where: { id: orderId },
     });
 
@@ -530,7 +517,7 @@ export async function voidPosOrder(orderId: string, reason: string) {
       return { success: false, error: "Cannot void a completed order" };
     }
 
-    await db.posOrder.update({
+    await db.order.update({
       where: { id: orderId },
       data: {
         status: "CANCELLED",

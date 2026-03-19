@@ -30,6 +30,38 @@ export async function createKitchenStation(input: CreateStationInput) {
   }
 }
 
+export async function updateKitchenStation(input: { id: string; name?: string; description?: string; categories?: string; isActive?: boolean }) {
+  try {
+    const station = await db.kitchenStation.update({
+      where: { id: input.id },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.description !== undefined && { description: input.description }),
+        ...(input.categories !== undefined && { categories: input.categories }),
+        ...(input.isActive !== undefined && { isActive: input.isActive }),
+      },
+    });
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/kitchen");
+    return { success: true, data: station };
+  } catch (error) {
+    console.error("[updateKitchenStation] Error:", error);
+    return { success: false, error: "Failed to update kitchen station" };
+  }
+}
+
+export async function deleteKitchenStation(id: string) {
+  try {
+    await db.kitchenStation.delete({ where: { id } });
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/kitchen");
+    return { success: true };
+  } catch (error) {
+    console.error("[deleteKitchenStation] Error:", error);
+    return { success: false, error: "Failed to delete kitchen station" };
+  }
+}
+
 export async function listKitchenStations(branchId?: string) {
   try {
     const stations = await db.kitchenStation.findMany({
@@ -71,7 +103,13 @@ export async function listKitchenTickets(branchId?: string, stationId?: string) 
       take: 100,
     });
 
-    return { success: true, data: tickets };
+    // Serialize to strip Prisma Decimal wrappers from nested Order fields
+    const serialized = tickets.map(ticket => {
+      const plain = JSON.parse(JSON.stringify(ticket));
+      return plain;
+    });
+
+    return { success: true, data: serialized };
   } catch (error) {
     console.error("[listKitchenTickets] Error:", error);
     return { success: false, error: "Failed to fetch tickets", data: [] };

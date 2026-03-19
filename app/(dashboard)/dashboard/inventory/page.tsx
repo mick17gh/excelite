@@ -4,7 +4,7 @@ import { getInventoryItems, getSuppliers, getInboundRecords, getOutboundRecords,
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "Inventory Management | Dinelytix",
+  title: "Inventory Management | ServStack",
   description: "Track and manage inventory across all restaurant branches",
 };
 

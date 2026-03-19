@@ -9,7 +9,7 @@ import { BranchDetailsContent } from "@/components/branches/branch-details-conte
 import { notFound } from "next/navigation";
 
 export const metadata = {
-  title: "Branch Details | Dinelytix",
+  title: "Branch Details | ServStack",
   description: "Comprehensive branch information and analytics",
 };
 

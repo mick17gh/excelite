@@ -3,7 +3,7 @@ import { MenuContent } from "@/components/menu/menu-content";
 import { getMenuItems, getMenuCategories } from "@/lib/actions/menu";
 
 export const metadata = {
-  title: "Menu Management | Dinelytix",
+  title: "Menu Management | ServStack",
   description: "Manage your restaurant menu items and products",
 };
 

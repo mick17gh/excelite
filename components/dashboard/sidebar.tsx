@@ -22,6 +22,12 @@ import {
   Key,
   Tag,
   Target,
+  ShoppingCart,
+  Warehouse,
+  Contact,
+  Truck,
+  ChefHat,
+  Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,14 +35,16 @@ import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { Role } from "@/lib/generated/prisma/client";
+import { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { hasPermission, type Permission } from "@/lib/permissions";
+import { hasFeature, type TierFeatures } from "@/lib/tier-config";
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
   permission?: Permission;
+  featureKey?: keyof TierFeatures;
 }
 
 const navigation: NavItem[] = [
@@ -47,16 +55,36 @@ const navigation: NavItem[] = [
     permission: "dashboard:view",
   },
   {
-    name: "Manual POS Entry",
-    href: "/dashboard/transactions/manual",
-    icon: Receipt,
-    permission: "transactions:manual",
+    name: "Orders",
+    href: "/dashboard/orders",
+    icon: ShoppingCart,
+    permission: "orders:view",
+  },
+  {
+    name: "POS",
+    href: "/pos",
+    icon: Monitor,
+    permission: "pos:access",
+    featureKey: "pos",
+  },
+  {
+    name: "Kitchen (KDS)",
+    href: "/kitchen",
+    icon: ChefHat,
+    permission: "kitchen:access",
+    featureKey: "kitchenDisplay",
   },
   {
     name: "Transactions",
     href: "/dashboard/transactions",
     icon: Receipt,
     permission: "transactions:view",
+  },
+  {
+    name: "Manual POS Entry",
+    href: "/dashboard/transactions/manual",
+    icon: Receipt,
+    permission: "transactions:manual",
   },
   {
     name: "Branches",
@@ -69,12 +97,21 @@ const navigation: NavItem[] = [
     href: "/dashboard/sales",
     icon: TrendingUp,
     permission: "sales:view",
+    featureKey: "salesAnalytics",
   },
   {
     name: "Inventory",
     href: "/dashboard/inventory",
     icon: Package,
     permission: "inventory:view",
+    featureKey: "inventory",
+  },
+  {
+    name: "Warehouse",
+    href: "/dashboard/warehouse",
+    icon: Warehouse,
+    permission: "warehouse:view",
+    featureKey: "warehouse",
   },
   {
     name: "Menu Management",
@@ -89,46 +126,53 @@ const navigation: NavItem[] = [
     permission: "categories:view",
   },
   {
+    name: "Customers",
+    href: "/dashboard/customers",
+    icon: Contact,
+    permission: "customers:view",
+    featureKey: "crm",
+  },
+  {
+    name: "Delivery",
+    href: "/dashboard/delivery",
+    icon: Truck,
+    permission: "delivery:view",
+    featureKey: "delivery",
+  },
+  {
     name: "Branch Targets",
     href: "/dashboard/targets",
     icon: Target,
     permission: "targets:view",
+    featureKey: "targets",
   },
   {
     name: "Staff",
     href: "/dashboard/staff",
     icon: Users,
     permission: "staff:view",
+    featureKey: "staffManagement",
   },
   {
     name: "Alerts",
     href: "/dashboard/alerts",
     icon: Bell,
     permission: "alerts:view",
+    featureKey: "alerts",
   },
   {
     name: "Reports",
     href: "/dashboard/reports",
     icon: FileText,
     permission: "reports:view",
+    featureKey: "advancedReports",
   },
   {
     name: "API Keys",
     href: "/dashboard/api-keys",
     icon: Key,
     permission: "api-keys:view",
-  },
-  {
-    name: "Kitchen (KDS)",
-    href: "/kitchen",
-    icon: Users,
-    permission: "kitchen:access",
-  },
-  {
-    name: "POS",
-    href: "/pos",
-    icon: Receipt,
-    permission: "pos:access",
+    featureKey: "apiAccess",
   },
 ];
 
@@ -150,9 +194,10 @@ const bottomNavigation: NavItem[] = [
 interface SidebarProps {
   className?: string;
   userRole?: Role;
+  orgTier?: SubscriptionTier;
 }
 
-export function Sidebar({ className, userRole = "CASHIER" }: SidebarProps) {
+export function Sidebar({ className, userRole = "STAFF", orgTier = "FREE" }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -160,7 +205,11 @@ export function Sidebar({ className, userRole = "CASHIER" }: SidebarProps) {
 
   // Filter navigation items based on user permissions
   const filteredNavigation = navigation.filter(
-    (item) => !item.permission || hasPermission(userRole, item.permission)
+    (item) => {
+      const hasRole = !item.permission || hasPermission(userRole, item.permission);
+      const hasTier = !item.featureKey || hasFeature(orgTier, item.featureKey);
+      return hasRole && hasTier;
+    }
   );
   const filteredBottomNavigation = bottomNavigation.filter(
     (item) => !item.permission || hasPermission(userRole, item.permission)
@@ -201,7 +250,7 @@ export function Sidebar({ className, userRole = "CASHIER" }: SidebarProps) {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-bold text-sidebar-foreground truncate">
-              Dinelytix
+              ServStack
             </span>
           </Link>
         ) : (

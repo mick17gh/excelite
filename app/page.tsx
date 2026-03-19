@@ -42,7 +42,7 @@ export default function Home() {
               <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-500 shadow-lg shadow-emerald-500/30">
                 <TrendingUp className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold tracking-tight">Dinelytix</span>
+              <span className="text-xl font-bold tracking-tight">ServStack</span>
             </div>
             
             <div className="hidden lg:flex items-center gap-8">
@@ -133,7 +133,7 @@ export default function Home() {
                     <div className="w-3 h-3 rounded-full bg-emerald-400" />
                   </div>
                   <div className="flex-1 text-center">
-                    <span className="text-xs text-muted-foreground font-medium">app.dinelytix.com</span>
+                    <span className="text-xs text-muted-foreground font-medium">app.servstack.com</span>
                   </div>
                 </div>
                 <div className="p-4 md:p-6 bg-linear-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/50">
@@ -267,7 +267,7 @@ export default function Home() {
               <CheckCircle2 className="h-4 w-4" />
               <span>The Solution</span>
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Dinelytix Gives You Complete Visibility</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">ServStack Gives You Complete Visibility</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               One platform to monitor, analyze, and optimize every aspect of your restaurant operations.
             </p>
@@ -406,21 +406,21 @@ export default function Home() {
             <Badge variant="secondary" className="mb-4">Testimonials</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Loved by Restaurant Owners</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              See what our customers have to say about Dinelytix.
+              See what our customers have to say about ServStack.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                quote: "Dinelytix helped us reduce food waste by 32% in just 3 months. The inventory alerts are a game-changer for our 8 branches.",
+                quote: "ServStack helped us reduce food waste by 32% in just 3 months. The inventory alerts are a game-changer for our 8 branches.",
                 author: "Kwame Asante",
                 role: "CEO, Golden Grills Ghana",
                 avatar: "KA",
                 color: "bg-emerald-500",
               },
               {
-                quote: "Before Dinelytix, I spent hours every week compiling reports from each branch. Now I have real-time visibility on my phone.",
+                quote: "Before ServStack, I spent hours every week compiling reports from each branch. Now I have real-time visibility on my phone.",
                 author: "Ama Mensah",
                 role: "Operations Director, Tasty Bites",
                 avatar: "AM",
@@ -492,7 +492,7 @@ export default function Home() {
                 Ready to Grow Your Restaurant Business?
               </h2>
               <p className="text-lg text-emerald-100 mb-8 max-w-2xl mx-auto">
-                Join 100+ restaurant owners who are already using Dinelytix to make smarter decisions and boost profitability.
+                Join 100+ restaurant owners who are already using ServStack to make smarter decisions and boost profitability.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/login">
@@ -519,7 +519,7 @@ export default function Home() {
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-500">
                   <TrendingUp className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-xl font-bold">Dinelytix</span>
+                <span className="text-xl font-bold">ServStack</span>
               </div>
               <p className="text-muted-foreground mb-4 max-w-xs">
                 Smart analytics for modern restaurants. Real-time insights for data-driven decisions.
@@ -552,7 +552,7 @@ export default function Home() {
           
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t">
             <p className="text-sm text-muted-foreground">
-              © 2026 Dinelytix. All rights reserved.
+              © 2026 ServStack. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-foreground transition-colors">Privacy Policy</Link>

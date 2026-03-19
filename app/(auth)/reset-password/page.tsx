@@ -4,8 +4,8 @@ import { TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Reset Password | Dinelytix",
-  description: "Create a new password for your Dinelytix account",
+  title: "Reset Password | ServStack",
+  description: "Create a new password for your ServStack account",
 };
 
 export default function ResetPasswordPage() {
@@ -19,7 +19,7 @@ export default function ResetPasswordPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary shadow-lg">
             <TrendingUp className="h-6 w-6 text-white" />
           </div>
-          <span className="text-2xl font-bold gradient-text">Dinelytix</span>
+          <span className="text-2xl font-bold gradient-text">ServStack</span>
         </div>
 
         <div className="text-center">

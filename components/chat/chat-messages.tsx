@@ -39,7 +39,7 @@ export function ChatMessages({
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center text-muted-foreground max-w-sm">
           <div className="text-4xl mb-4">🤖</div>
-          <h3 className="font-medium mb-2">DineLytix AI Assistant</h3>
+          <h3 className="font-medium mb-2">ServStack AI Assistant</h3>
           <p className="text-sm">
             Ask me about sales, inventory, staff schedules, or get business insights.
           </p>

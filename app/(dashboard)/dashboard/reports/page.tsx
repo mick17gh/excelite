@@ -3,7 +3,7 @@ import { ReportsContent } from "@/components/reports/reports-content";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "Reports | Dinelytix",
+  title: "Reports | ServStack",
   description: "Generate and export comprehensive business reports",
 };
 

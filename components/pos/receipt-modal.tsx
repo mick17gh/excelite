@@ -132,6 +132,12 @@ export function ReceiptModal({ open, onOpenChange, order, onClose }: ReceiptModa
                 <span>Tax (12.5%):</span>
                 <span>{formatCurrency(Number(order.tax))}</span>
               </div>
+              {Number(order.deliveryFee) > 0 && (
+                <div className="flex justify-between">
+                  <span>Delivery Fee:</span>
+                  <span>{formatCurrency(Number(order.deliveryFee))}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
                 <span>TOTAL:</span>
                 <span>{formatCurrency(Number(order.total))}</span>
@@ -204,6 +210,11 @@ function generateReceiptHTML(order: any, formatCurrency: (amount: number) => str
       <span>Tax:</span>
       <span>${formatCurrency(Number(order.tax))}</span>
     </div>
+    ${Number(order.deliveryFee) > 0 ? `
+    <div class="item">
+      <span>Delivery Fee:</span>
+      <span>${formatCurrency(Number(order.deliveryFee))}</span>
+    </div>` : ""}
     <div class="item">
       <span>TOTAL:</span>
       <span>${formatCurrency(Number(order.total))}</span>
@@ -233,6 +244,7 @@ function generateReceiptText(order: any, formatCurrency: (amount: number) => str
     "-".repeat(40),
     `Subtotal:${" ".repeat(25)}${formatCurrency(Number(order.subtotal))}`,
     `Tax (12.5%):${" ".repeat(22)}${formatCurrency(Number(order.tax))}`,
+    Number(order.deliveryFee) > 0 ? `Delivery Fee:${" ".repeat(21)}${formatCurrency(Number(order.deliveryFee))}` : "",
     `TOTAL:${" ".repeat(28)}${formatCurrency(Number(order.total))}`,
     "=".repeat(40),
     "Thank you for your business!",

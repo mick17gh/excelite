@@ -4,7 +4,7 @@ import { getBranches } from "@/lib/actions/branches";
 import { listKitchenStations, listKitchenTickets } from "@/lib/actions/kitchen";
 
 export const metadata = {
-  title: "Kitchen Display System | Dinelytix",
+  title: "Kitchen Display System | ServStack",
   description: "Kitchen station screens with ticket routing and timers.",
 };
 

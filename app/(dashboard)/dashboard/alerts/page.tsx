@@ -4,7 +4,7 @@ import { getAlerts } from "@/lib/actions/alerts";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "Alerts & Insights | Dinelytix",
+  title: "Alerts & Insights | ServStack",
   description: "Smart alerts and automated insights for your restaurant operations",
 };
 

@@ -3,7 +3,7 @@ import { CategoriesContent } from "@/components/categories/categories-content";
 import { getCategories } from "@/lib/actions/categories";
 
 export const metadata = {
-  title: "Category Management | Dinelytix",
+  title: "Category Management | ServStack",
   description: "Manage menu categories",
 };
 

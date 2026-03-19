@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 
 
 export const metadata: Metadata = {
-  title: "Dinelytix - Smart Intelligence for Modern Restaurants",
-  description: "Executive Restaurant Analytics & Operations Platform providing CEO-level visibility into multi-branch restaurant operations",
+  title: "ServStack - The Command Center for Restaurant Growth and Control",
+  description: "The all-in-one restaurant operations platform for multi-branch restaurants. Track sales, manage inventory, optimize operations, and boost profitability.",
   keywords: ["restaurant analytics", "restaurant management", "sales analytics", "inventory management", "staff management"],
 };
 

@@ -1,16 +1,18 @@
 import { Suspense } from "react";
 import { BranchesContent } from "@/components/branches/branches-content";
 import { getBranches, getBranchPerformance } from "@/lib/actions/branches";
+import { getOrganization } from "@/lib/actions/organization";
 
 export const metadata = {
-  title: "Branch Performance | Dinelytix",
+  title: "Branch Performance | ServStack",
   description: "Monitor and analyze performance across all restaurant branches",
 };
 
 export default async function BranchesPage() {
-  const [branchesResult, performanceResult] = await Promise.all([
+  const [branchesResult, performanceResult, orgResult] = await Promise.all([
     getBranches(),
     getBranchPerformance(),
+    getOrganization(),
   ]);
 
   const branchList = (branchesResult.data || []).map((branch: any) => {
@@ -21,6 +23,7 @@ export default async function BranchesPage() {
     };
   });
   const branchData = performanceResult.data || [];
+  const org = orgResult.data;
 
   return (
     <div className="space-y-6">
@@ -34,7 +37,7 @@ export default async function BranchesPage() {
       </div>
 
       <Suspense fallback={<BranchesLoadingSkeleton />}>
-        <BranchesContent branches={branchData} branchList={branchList} />
+        <BranchesContent branches={branchData} branchList={branchList} currentCount={org?.branchCount || 0} maxBranches={org?.maxBranches || 1} />
       </Suspense>
     </div>
   );

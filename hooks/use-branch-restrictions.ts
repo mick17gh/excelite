@@ -4,11 +4,17 @@ import { authClient } from "@/lib/auth-client";
 
 // Client-side role permissions (subset needed for branch restrictions)
 const ROLE_CAN_VIEW_ALL_BRANCHES: Record<string, boolean> = {
-  CEO: true,
-  SENIOR_MANAGEMENT: true,
-  BRANCH_MANAGER: true,
-  FINANCE_OPS: true,
-  CASHIER: false,
+  SUPER_ADMIN: true,
+  EXECUTIVE: true,
+  OPERATIONS_MANAGER: true,
+  BRANCH_MANAGER: false,
+  SUPERVISOR: false,
+  STAFF: false,
+  KITCHEN_STAFF: false,
+  AUDITOR: true,
+  DEVELOPER: false,
+  CALL_CENTER: true,
+  WAREHOUSE_STAFF: false,
 };
 
 export function useBranchRestrictions() {
@@ -17,7 +23,7 @@ export function useBranchRestrictions() {
   // Cast user to access additional fields from better-auth
   const user = session?.user as { role?: string; branchId?: string } | undefined;
   
-  const userRole = user?.role || "CASHIER";
+  const userRole = user?.role || "STAFF";
   const userBranchId = user?.branchId || null;
   
   const canViewAllBranches = ROLE_CAN_VIEW_ALL_BRANCHES[userRole] ?? false;

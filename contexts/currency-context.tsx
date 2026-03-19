@@ -1,13 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import {
   CurrencyCode,
   CurrencyConfig,
   CURRENCIES,
   formatCurrency as formatCurrencyUtil,
   formatCurrencyShort as formatCurrencyShortUtil,
-  getCurrentCurrency,
   setCurrentCurrency as setGlobalCurrency,
   getAllCurrencies,
 } from "@/lib/currency";
@@ -23,21 +22,30 @@ interface CurrencyContextType {
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
-const CURRENCY_STORAGE_KEY = "dinelytix_currency";
+const CURRENCY_STORAGE_KEY = "servstack_currency";
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
-  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>("GHS");
-  const [currency, setCurrencyConfig] = useState<CurrencyConfig>(CURRENCIES.GHS);
-
-  useEffect(() => {
-    // Load saved currency from localStorage on mount
-    const saved = localStorage.getItem(CURRENCY_STORAGE_KEY) as CurrencyCode | null;
-    if (saved && CURRENCIES[saved]) {
-      setCurrencyCode(saved);
-      setCurrencyConfig(CURRENCIES[saved]);
-      setGlobalCurrency(saved);
+  // Use lazy initialization to load from localStorage without triggering effects
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(CURRENCY_STORAGE_KEY) as CurrencyCode | null;
+      if (saved && CURRENCIES[saved]) {
+        setGlobalCurrency(saved);
+        return saved;
+      }
     }
-  }, []);
+    return "GHS";
+  });
+
+  const [currency, setCurrencyConfig] = useState<CurrencyConfig>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(CURRENCY_STORAGE_KEY) as CurrencyCode | null;
+      if (saved && CURRENCIES[saved]) {
+        return CURRENCIES[saved];
+      }
+    }
+    return CURRENCIES.GHS;
+  });
 
   const setCurrency = useCallback((code: CurrencyCode) => {
     if (CURRENCIES[code]) {

@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { createPosOrder, sendToKitchen, getKitchenStations, completeOrder } from "@/lib/actions/pos";
 import { getBranchTaxRate } from "@/lib/actions/tax";
-import { OrderType, SalesChannel } from "@/lib/generated/prisma/client";
+import { OrderType } from "@/lib/generated/prisma/client";
 import { useEffect, useCallback } from "react";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
@@ -76,10 +76,17 @@ interface RecentOrder {
   branch: { name: string };
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+}
+
 interface PosContentProps {
   branches: Branch[];
   menuItems: MenuItem[];
   recentOrders: RecentOrder[];
+  customers: Customer[];
 }
 
 interface CartLine {
@@ -96,7 +103,7 @@ const orderTypes = [
   { value: "APP", label: "App Order", icon: Smartphone, color: "bg-purple-500" },
 ];
 
-export function PosContent({ branches, menuItems, recentOrders }: PosContentProps) {
+export function PosContent({ branches, menuItems, recentOrders, customers }: PosContentProps) {
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
   
@@ -180,7 +187,7 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
   }, [menuItems, search, selectedCategory]);
 
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const cartSubtotal = cart.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
+  const cartSubtotal = Math.round(cart.reduce((s, l) => s + l.unitPrice * l.quantity, 0) * 100) / 100;
 
   const addToCart = (item: MenuItem) => {
     setCart((prev) => {
@@ -228,8 +235,8 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
 
   // Calculate tax and total after taxSettings is declared
   const taxRate = taxSettings.enabled ? taxSettings.rate / 100 : 0;
-  const tax = cartSubtotal * taxRate;
-  const total = cartSubtotal + tax;
+  const tax = Math.round(cartSubtotal * taxRate * 100) / 100;
+  const total = Math.round((cartSubtotal + tax) * 100) / 100;
 
   // Load kitchen stations and tax settings when branch changes
   const loadKitchenStations = useCallback(async (branchId: string) => {
@@ -267,18 +274,22 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
       // First create the POS order
       const result = await createPosOrder({
         branchId,
-        type: orderType,
-        sourceChannel: orderType as unknown as SalesChannel,
+        type: paymentData.orderType as OrderType,
+        customerId: paymentData.customerId,
+        customerName: paymentData.customerName,
         items: cart.map((l) => ({
           menuItemId: l.menuItemId,
           quantity: l.quantity,
           unitPrice: l.unitPrice,
         })),
         paymentMethod: paymentData.paymentMethod,
-        customerName: paymentData.customerName,
         notes: paymentData.notes,
-        sendToKitchen: autoSendToKitchen && kitchenStations.length > 0,
+        sendToKitchen: autoSendToKitchen,
         stationId: selectedStation || undefined,
+        deliveryFee: paymentData.deliveryFee,
+        deliveryAddress: paymentData.deliveryAddress,
+        deliveryPhone: paymentData.deliveryPhone,
+        deliveryNotes: paymentData.deliveryNotes,
       });
       if (!result.success || !result.data) {
         toast.error(result.error || "Failed to create order");
@@ -307,7 +318,7 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
       setIsPaymentOpen(false);
       setIsReceiptOpen(true);
       
-      if (autoSendToKitchen && kitchenStations.length > 0) {
+      if (autoSendToKitchen) {
         toast.success("Order sent to kitchen", {
           description: `Order #${result.data?.orderNumber} sent to kitchen display`,
         });
@@ -736,6 +747,9 @@ export function PosContent({ branches, menuItems, recentOrders }: PosContentProp
         taxRate={taxSettings.rate}
         onComplete={handlePaymentComplete}
         isProcessing={isPending}
+        customers={customers}
+        orderType={orderType}
+        onOrderTypeChange={(t) => setOrderType(t as OrderType)}
       />
 
       {/* Receipt Modal */}

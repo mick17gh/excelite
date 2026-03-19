@@ -97,7 +97,7 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
     }
   };
 
-  const requiresBranch = formData.role === "BRANCH_MANAGER" || formData.role === "CASHIER";
+  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF"].includes(formData.role);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,7 +127,7 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
                 <Input
                   id="email"
                   type="email"
-                  placeholder="kwame.asante@dinelytix.com"
+                  placeholder="kwame.asante@servstack.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
@@ -171,11 +171,17 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CEO">CEO (Full Access)</SelectItem>
-                  <SelectItem value="SENIOR_MANAGEMENT">Senior Management (Read-Only Dashboards)</SelectItem>
-                  <SelectItem value="BRANCH_MANAGER">Branch Manager (Branch Data Entry)</SelectItem>
-                  <SelectItem value="FINANCE_OPS">Finance/Ops (Inventory & Costs)</SelectItem>
-                  <SelectItem value="CASHIER">Cashier (POS Operations)</SelectItem>
+                  <SelectItem value="SUPER_ADMIN">Super Admin (Full Access)</SelectItem>
+                  <SelectItem value="EXECUTIVE">Executive (Strategic Controls)</SelectItem>
+                  <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
+                  <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
+                  <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
+                  <SelectItem value="STAFF">Staff (POS & Orders)</SelectItem>
+                  <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
+                  <SelectItem value="AUDITOR">Auditor (Read-Only)</SelectItem>
+                  <SelectItem value="DEVELOPER">Developer (API Access)</SelectItem>
+                  <SelectItem value="CALL_CENTER">Call Center</SelectItem>
+                  <SelectItem value="WAREHOUSE_STAFF">Warehouse Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -292,7 +298,7 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
 
   if (!user) return null;
 
-  const requiresBranch = formData.role === "BRANCH_MANAGER" || formData.role === "CASHIER";
+  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF"].includes(formData.role);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -336,11 +342,17 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CEO">CEO (Full Access)</SelectItem>
-                  <SelectItem value="SENIOR_MANAGEMENT">Senior Management</SelectItem>
+                  <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                  <SelectItem value="EXECUTIVE">Executive</SelectItem>
+                  <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
                   <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
-                  <SelectItem value="FINANCE_OPS">Finance/Ops</SelectItem>
-                  <SelectItem value="CASHIER">Cashier (POS Operations)</SelectItem>
+                  <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
+                  <SelectItem value="STAFF">Staff</SelectItem>
+                  <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
+                  <SelectItem value="AUDITOR">Auditor</SelectItem>
+                  <SelectItem value="DEVELOPER">Developer</SelectItem>
+                  <SelectItem value="CALL_CENTER">Call Center</SelectItem>
+                  <SelectItem value="WAREHOUSE_STAFF">Warehouse Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>

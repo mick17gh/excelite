@@ -529,12 +529,12 @@ export async function sendAlertNotifications(): Promise<{ sent: number }> {
       return { sent: 0 };
     }
 
-    // Get users who should receive alerts (CEO and Senior Management)
+    // Get users who should receive alerts (Executives and Operations Managers)
     const users = await db.user.findMany({
       where: {
         deletedAt: null,
         isActive: true,
-        role: { in: ["CEO", "SENIOR_MANAGEMENT", "BRANCH_MANAGER"] },
+        role: { in: ["SUPER_ADMIN", "EXECUTIVE", "OPERATIONS_MANAGER", "BRANCH_MANAGER"] },
       },
       select: { email: true, name: true, role: true, branchId: true },
     });
@@ -544,7 +544,7 @@ export async function sendAlertNotifications(): Promise<{ sent: number }> {
     for (const alert of alerts) {
       // Filter users based on role and branch
       const recipients = users.filter((user) => {
-        if (user.role === "CEO" || user.role === "SENIOR_MANAGEMENT") {
+        if (user.role === "SUPER_ADMIN" || user.role === "EXECUTIVE" || user.role === "OPERATIONS_MANAGER") {
           return true; // Always notify
         }
         // Branch managers only get their branch alerts

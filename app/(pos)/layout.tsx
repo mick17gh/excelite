@@ -22,9 +22,9 @@ export default function PosLayout({
           <div className="h-6 w-px bg-border" />
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">D</span>
+              <span className="text-primary-foreground font-bold text-sm">S</span>
             </div>
-            <span className="font-semibold text-lg hidden sm:inline">Dinelytix POS</span>
+            <span className="font-semibold text-lg hidden sm:inline">ServStack POS</span>
           </div>
         </div>
         <div className="flex items-center gap-2">

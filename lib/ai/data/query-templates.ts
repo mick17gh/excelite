@@ -65,7 +65,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 1,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR],
     cacheTTL: 300,
   },
   {
@@ -99,7 +99,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 50,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.AUDITOR],
     cacheTTL: 300,
   },
   {
@@ -131,7 +131,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 10,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 300,
   },
   {
@@ -163,7 +163,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 10,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 300,
   },
   {
@@ -198,7 +198,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 20,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 600,
   },
 
@@ -241,7 +241,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 50,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR, Role.WAREHOUSE_STAFF],
     cacheTTL: 120,
   },
   {
@@ -269,7 +269,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 20,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR, Role.WAREHOUSE_STAFF],
     cacheTTL: 300,
   },
   {
@@ -301,7 +301,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 500,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.FINANCE_OPS],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.AUDITOR],
     cacheTTL: 300,
   },
 
@@ -341,7 +341,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 100,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 60,
   },
   {
@@ -368,7 +368,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 10,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 300,
   },
   {
@@ -404,7 +404,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 100,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 120,
   },
 
@@ -439,7 +439,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 1,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.AUDITOR],
     cacheTTL: 300,
   },
   {
@@ -470,7 +470,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 20,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 300,
   },
 
@@ -511,7 +511,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 50,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 60,
   },
   {
@@ -550,7 +550,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 50,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER],
     cacheTTL: 300,
   },
 
@@ -584,7 +584,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       };
     },
     maxResults: 50,
-    requiredRoles: [Role.CEO, Role.SENIOR_MANAGEMENT, Role.BRANCH_MANAGER, Role.FINANCE_OPS, Role.CASHIER],
+    requiredRoles: [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.BRANCH_MANAGER, Role.SUPERVISOR, Role.STAFF, Role.AUDITOR, Role.CALL_CENTER],
     cacheTTL: 3600,
   },
 ];

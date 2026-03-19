@@ -10,7 +10,7 @@ import {
 } from "@/lib/actions/transactions";
 
 export const metadata = {
-  title: "Sales Analytics | Dinelytix",
+  title: "Sales Analytics | ServStack",
   description: "Detailed sales and revenue analytics across all branches",
 };
 

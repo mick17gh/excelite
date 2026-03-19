@@ -27,10 +27,11 @@ async function main() {
   await prisma.account.deleteMany();
   await prisma.user.deleteMany();
   await prisma.branch.deleteMany();
+  await prisma.organization.deleteMany();
 
-  console.log("� Creating user...");
+  console.log("👤 Creating admin user...");
 
-  // Create single user with specified credentials
+  // Create admin user without organization (will go through onboarding)
   const hashedPassword = await bcrypt.hash("pass1234", 10);
 
   await prisma.user.create({
@@ -38,7 +39,7 @@ async function main() {
       name: "Mike",
       email: "mike17gh@gmail.com",
       emailVerified: true,
-      role: "CEO",
+      role: "SUPER_ADMIN",
       isActive: true,
       accounts: {
         create: {
@@ -51,9 +52,14 @@ async function main() {
   });
 
   console.log("✅ Seed completed successfully!");
-  console.log("\n📋 Test Account:");
+  console.log("\n📋 Admin Account Created:");
   console.log("   Email: mike17gh@gmail.com");
   console.log("   Password: pass1234");
+  console.log("   Role: SUPER_ADMIN");
+  console.log("\n🚀 Next Steps:");
+  console.log("   1. Login with the credentials above");
+  console.log("   2. Complete the onboarding flow");
+  console.log("   3. Set up your organization and first branch");
 }
 
 main()

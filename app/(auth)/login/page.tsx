@@ -3,8 +3,8 @@ import { TrendingUp, BarChart3, Package, Users, Bell } from "lucide-react";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Login | Dinelytix",
-  description: "Sign in to your Dinelytix account",
+  title: "Login | ServStack",
+  description: "Sign in to your ServStack account",
 };
 
 export default function LoginPage() {
@@ -30,14 +30,14 @@ export default function LoginPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg">
                 <TrendingUp className="h-8 w-8" />
               </div>
-              <span className="text-3xl font-bold">Dinelytix</span>
+              <span className="text-3xl font-bold">ServStack</span>
             </div>
             <h1 className="text-4xl font-bold mb-4 leading-tight">
-              Smart Intelligence for Modern Restaurants
+              The Command Center for Restaurant Growth
             </h1>
             <p className="text-lg text-white/80 mb-12">
-              CEO-level visibility into multi-branch restaurant operations including
-              sales, inventory, staff availability, and smart insights.
+              Run all your branches from one platform. Track sales, manage inventory,
+              optimize operations, and boost profitability.
             </p>
             
             {/* Feature highlights */}
@@ -71,7 +71,7 @@ export default function LoginPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary shadow-lg">
               <TrendingUp className="h-6 w-6 text-white" />
             </div>
-            <span className="text-2xl font-bold gradient-text">Dinelytix</span>
+            <span className="text-2xl font-bold gradient-text">ServStack</span>
           </div>
 
           <div className="text-center">

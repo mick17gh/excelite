@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   }
 
   const [orders, total] = await Promise.all([
-    db.posOrder.findMany({
+    db.order.findMany({
       where: whereClause,
       include: {
         branch: {
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       take: Math.min(limit, 500),
       skip: offset,
     }),
-    db.posOrder.count({ where: whereClause }),
+    db.order.count({ where: whereClause }),
   ]);
 
   return NextResponse.json({
@@ -66,12 +66,15 @@ export async function GET(request: NextRequest) {
       orderNumber: order.orderNumber,
       branchId: order.branchId,
       branchName: order.branch?.name,
+      source: order.source,
       orderType: order.type,
       status: order.status,
       subtotal: Number(order.subtotal),
       tax: Number(order.tax),
       discount: Number(order.discount),
+      deliveryFee: Number(order.deliveryFee),
       total: Number(order.total),
+      paymentStatus: order.paymentStatus,
       createdAt: order.createdAt.toISOString(),
       completedAt: order.closedAt?.toISOString() || null,
       items: order.items.map((item) => ({
@@ -168,16 +171,18 @@ export async function POST(request: NextRequest) {
     const total = subtotal + tax;
 
     // Create order
-    const order = await db.posOrder.create({
+    const order = await db.order.create({
       data: {
         orderNumber,
         branchId,
+        source: "POS",
         type: orderType || "DINE_IN",
-        sourceChannel: "DINE_IN",
         status: "NEW",
+        paymentStatus: "PENDING",
         subtotal,
         tax,
         discount: 0,
+        deliveryFee: 0,
         total,
         notes,
         items: {

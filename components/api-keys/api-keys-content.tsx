@@ -383,7 +383,7 @@ export function ApiKeysContent({ apiKeys, branches }: ApiKeysContentProps) {
                 API Documentation
               </CardTitle>
               <CardDescription>
-                Learn how to integrate with the Dinelytix API using your API keys
+                Learn how to integrate with the ServStack API using your API keys
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

@@ -2,16 +2,18 @@ import { Suspense } from "react";
 import { UsersContent } from "@/components/users/users-content";
 import { getBranches } from "@/lib/actions/branches";
 import { getUsers } from "@/lib/actions/users";
+import { getOrganization } from "@/lib/actions/organization";
 
 export const metadata = {
-  title: "User Management | Dinelytix",
+  title: "User Management | ServStack",
   description: "Manage system users and access permissions",
 };
 
 export default async function UsersPage() {
-  const [branchesResult, usersResult] = await Promise.all([
+  const [branchesResult, usersResult, orgResult] = await Promise.all([
     getBranches(),
     getUsers(),
+    getOrganization(),
   ]);
 
   const branchList = (branchesResult.data || []).map((branch: any) => {
@@ -44,7 +46,7 @@ export default async function UsersPage() {
       </div>
 
       <Suspense fallback={<UsersLoadingSkeleton />}>
-        <UsersContent users={users} branches={branchList} />
+        <UsersContent users={users} branches={branchList} currentCount={orgResult.data?.userCount || 0} maxUsers={orgResult.data?.maxUsers || 2} />
       </Suspense>
     </div>
   );

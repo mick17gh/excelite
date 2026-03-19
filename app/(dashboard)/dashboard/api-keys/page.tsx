@@ -4,7 +4,7 @@ import { getApiKeys } from "@/lib/actions/api-keys";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "API Keys | Dinelytix",
+  title: "API Keys | ServStack",
   description: "Manage API keys for external integrations",
 };
 

@@ -11,7 +11,7 @@ import {
 } from "@/lib/actions/transactions";
 
 export const metadata = {
-  title: "Executive Dashboard | Dinelytix",
+  title: "Executive Dashboard | ServStack",
   description: "CEO-level visibility into multi-branch restaurant operations",
 };
 
@@ -38,13 +38,16 @@ export default async function ExecutiveDashboard() {
     getKPIData(),
   ]);
 
-  const branches = (branchesResult.data || []).map((branch: any) => {
-    const { taxRate, ...rest } = branch;
-    return {
-      ...rest,
-      taxRate: taxRate ? Number(taxRate) : 0,
-    };
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const branches = (branchesResult.data || []).map((branch: Record<string, any>) => ({
+    id: branch.id as string,
+    name: branch.name as string,
+    code: branch.code as string,
+    city: branch.city as string,
+    currency: branch.currency as string | undefined,
+    isActive: branch.isActive as boolean,
+    taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+  }));
   const branchPerformance = branchPerformanceResult.data || [];
   const revenueData = revenueDataResult.data || [];
   const salesByChannel = salesByChannelResult.data || [];

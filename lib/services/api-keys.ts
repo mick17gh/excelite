@@ -13,7 +13,15 @@ export type ApiScope =
   | "orders:write"
   | "analytics:read"
   | "staff:read"
-  | "reports:read";
+  | "reports:read"
+  | "customers:read"
+  | "customers:write"
+  | "warehouse:read"
+  | "warehouse:write"
+  | "delivery:read"
+  | "delivery:write"
+  | "payments:read"
+  | "payments:write";
 
 export interface ApiKeyAuthResult {
   ok: boolean;

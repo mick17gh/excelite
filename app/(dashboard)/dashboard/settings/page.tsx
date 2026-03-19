@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import { SettingsContent } from "@/components/settings/settings-content";
 
 export const metadata = {
-  title: "Settings | Dinelytix",
-  description: "Configure your Dinelytix platform settings",
+  title: "Settings | ServStack",
+  description: "Configure your ServStack platform settings",
 };
 
 export default async function SettingsPage() {

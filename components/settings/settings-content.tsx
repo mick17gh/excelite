@@ -28,7 +28,12 @@ import {
   Loader2,
   X,
   Calculator,
+  CreditCard,
+  ChefHat,
 } from "lucide-react";
+import { OrganizationTab } from "./organization-tab";
+import { SubscriptionTab } from "./subscription-tab";
+import { KitchenStationsTab } from "./kitchen-stations-tab";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import {
@@ -271,12 +276,18 @@ export function SettingsContent() {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case "CEO":
+      case "SUPER_ADMIN":
         return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
-      case "SENIOR_MANAGEMENT":
+      case "EXECUTIVE":
         return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      case "OPERATIONS_MANAGER":
+        return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400";
       case "BRANCH_MANAGER":
         return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+      case "AUDITOR":
+        return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+      case "DEVELOPER":
+        return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400";
       default:
         return "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400";
     }
@@ -324,6 +335,18 @@ export function SettingsContent() {
         <TabsTrigger value="tax" className="text-xs">
           <Calculator className="mr-1.5 h-3.5 w-3.5" />
           Tax Config
+        </TabsTrigger>
+        <TabsTrigger value="organization" className="text-xs">
+          <Building2 className="mr-1.5 h-3.5 w-3.5" />
+          Organization
+        </TabsTrigger>
+        <TabsTrigger value="kitchen" className="text-xs">
+          <ChefHat className="mr-1.5 h-3.5 w-3.5" />
+          Kitchen
+        </TabsTrigger>
+        <TabsTrigger value="subscription" className="text-xs">
+          <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+          Subscription
         </TabsTrigger>
       </TabsList>
 
@@ -418,7 +441,7 @@ export function SettingsContent() {
                   {user?.branchName || "All Branches"}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {user?.role === "CEO" || user?.role === "SENIOR_MANAGEMENT"
+                  {user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "OPERATIONS_MANAGER" || user?.role === "AUDITOR"
                     ? "You have access to all branches"
                     : `Assigned to ${user?.branchName}`}
                 </span>
@@ -593,7 +616,7 @@ export function SettingsContent() {
               Appearance Settings
             </CardTitle>
             <CardDescription className="text-xs">
-              Customize how Dinelytix looks on your device
+              Customize how ServStack looks on your device
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0 space-y-3">
@@ -716,6 +739,18 @@ export function SettingsContent() {
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="organization">
+        <OrganizationTab />
+      </TabsContent>
+
+      <TabsContent value="kitchen">
+        <KitchenStationsTab />
+      </TabsContent>
+
+      <TabsContent value="subscription">
+        <SubscriptionTab />
       </TabsContent>
     </Tabs>
   );

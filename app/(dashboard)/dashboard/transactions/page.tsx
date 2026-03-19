@@ -4,7 +4,7 @@ import { getBranches } from "@/lib/actions/branches";
 import { getMenuItems } from "@/lib/actions/menu";
 
 export const metadata = {
-  title: "Transactions | Dinelytix",
+  title: "Transactions | ServStack",
   description: "Record and manage daily transactions",
 };
 

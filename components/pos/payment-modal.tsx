@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { CreditCard, DollarSign, Smartphone, Building2, Loader2, Check, User, FileText } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
+import { CreditCard, DollarSign, Smartphone, Building2, Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, Phone, UtensilsCrossed, Package, Truck } from "lucide-react";
+import { createCustomer } from "@/lib/actions/customers";
 import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+}
 
 interface PaymentModalProps {
   open: boolean;
@@ -27,15 +37,31 @@ interface PaymentModalProps {
   taxRate?: number;
   onComplete: (paymentData: PaymentData) => void;
   isProcessing?: boolean;
+  customers?: Customer[];
+  orderType?: string;
+  onOrderTypeChange?: (type: string) => void;
 }
 
 export interface PaymentData {
   paymentMethod: string;
   amountPaid: number;
   change: number;
+  customerId?: string;
   customerName?: string;
+  orderType: string;
   notes?: string;
+  deliveryAddress?: string;
+  deliveryPhone?: string;
+  deliveryNotes?: string;
+  deliveryFee?: number;
 }
+
+const orderTypeOptions = [
+  { value: "DINE_IN", label: "Dine-in", icon: UtensilsCrossed, color: "bg-emerald-500/10 border-emerald-500 text-emerald-600" },
+  { value: "TAKEOUT", label: "Takeout", icon: Package, color: "bg-amber-500/10 border-amber-500 text-amber-600" },
+  { value: "DELIVERY", label: "Delivery", icon: Truck, color: "bg-blue-500/10 border-blue-500 text-blue-600" },
+  { value: "APP", label: "App Order", icon: Smartphone, color: "bg-purple-500/10 border-purple-500 text-purple-600" },
+];
 
 const paymentMethods = [
   { value: "CASH", label: "Cash", icon: DollarSign, color: "bg-emerald-500/10 border-emerald-500 text-emerald-600" },
@@ -49,40 +75,124 @@ const quickAmounts = [50, 100, 200, 500];
 export function PaymentModal({
   open,
   onOpenChange,
-  total,
+  total: totalProp,
   subtotal,
   tax,
   taxName = "VAT",
   taxRate = 12.5,
   onComplete,
   isProcessing = false,
+  customers = [],
+  orderType: initialOrderType = "DINE_IN",
+  onOrderTypeChange,
 }: PaymentModalProps) {
   const { formatCurrency } = useCurrency();
   const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
   const [amountPaid, setAmountPaid] = useState<string>("");
-  const [customerName, setCustomerName] = useState("");
+  const [localOrderType, setLocalOrderType] = useState(initialOrderType);
   const [notes, setNotes] = useState("");
 
-  // Reset amount when modal opens or payment method changes
+  // Customer combobox state
+  const [customerId, setCustomerId] = useState<string>("walk-in");
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [localCustomers, setLocalCustomers] = useState<Customer[]>(customers);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+
+  // Delivery fields
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryPhone, setDeliveryPhone] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [deliveryFeeStr, setDeliveryFeeStr] = useState("");
+  const deliveryFee = parseFloat(deliveryFeeStr) || 0;
+  const isDelivery = localOrderType === "DELIVERY";
+  const total = Math.round((isDelivery ? totalProp + deliveryFee : totalProp) * 100) / 100;
+
+  const handleOrderTypeChange = (type: string) => {
+    setLocalOrderType(type);
+    onOrderTypeChange?.(type);
+  };
+
+  const selectedCustomerLabel = useMemo(() => {
+    if (customerId === "walk-in") return "Walk-in Customer";
+    const c = localCustomers.find((c) => c.id === customerId);
+    return c ? `${c.name} (${c.phone})` : "Walk-in Customer";
+  }, [customerId, localCustomers]);
+
+  const handleCreateCustomer = async () => {
+    if (!newCustName.trim() || !newCustPhone.trim()) {
+      toast.error("Name and phone are required");
+      return;
+    }
+    setIsCreatingCustomer(true);
+    try {
+      const result = await createCustomer({ name: newCustName.trim(), phone: newCustPhone.trim() });
+      if (result.error) { toast.error(result.error); return; }
+      if (result.data) {
+        const nc = { id: result.data.id, name: result.data.name, phone: result.data.phone };
+        setLocalCustomers((prev) => [nc, ...prev]);
+        setCustomerId(result.data.id);
+        toast.success(`Customer "${result.data.name}" created`);
+        setShowNewCustomer(false);
+        setNewCustName("");
+        setNewCustPhone("");
+        setCustomerOpen(false);
+      }
+    } catch {
+      toast.error("Failed to create customer");
+    } finally {
+      setIsCreatingCustomer(false);
+    }
+  };
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      setAmountPaid(paymentMethod === "CASH" ? "" : total.toFixed(2));
+      setCustomerId("walk-in");
+      setLocalOrderType(initialOrderType);
+      setNotes("");
+      setDeliveryAddress("");
+      setDeliveryPhone("");
+      setDeliveryNotes("");
+      setDeliveryFeeStr("");
+      setShowNewCustomer(false);
+      setLocalCustomers(customers);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Update amount when payment method or total changes
   useEffect(() => {
     if (open) {
       setAmountPaid(paymentMethod === "CASH" ? "" : total.toFixed(2));
     }
-  }, [open, paymentMethod, total]);
+  }, [paymentMethod, total, open]);
 
-  const amountPaidNum = parseFloat(amountPaid) || 0;
-  const change = amountPaidNum - total;
-  const isValidPayment = paymentMethod === "CASH" ? amountPaidNum >= total : true;
+  const amountPaidNum = Math.round((parseFloat(amountPaid) || 0) * 100) / 100;
+  const change = Math.round((amountPaidNum - total) * 100) / 100;
+  const isValidPayment = paymentMethod === "CASH" ? amountPaidNum >= Math.round(total * 100) / 100 : true;
 
   const handleComplete = () => {
     if (!isValidPayment) return;
 
+    const selectedCustomer = localCustomers.find((c) => c.id === customerId);
     onComplete({
       paymentMethod,
       amountPaid: paymentMethod === "CASH" ? amountPaidNum : total,
       change: paymentMethod === "CASH" ? Math.max(0, change) : 0,
-      customerName: customerName.trim() || undefined,
+      customerId: customerId !== "walk-in" ? customerId : undefined,
+      customerName: selectedCustomer?.name || undefined,
+      orderType: localOrderType,
       notes: notes.trim() || undefined,
+      ...(isDelivery ? {
+        deliveryAddress: deliveryAddress.trim() || undefined,
+        deliveryPhone: deliveryPhone.trim() || undefined,
+        deliveryNotes: deliveryNotes.trim() || undefined,
+        deliveryFee: deliveryFee || undefined,
+      } : {}),
     });
   };
 
@@ -107,6 +217,28 @@ export function PaymentModal({
 
         <ScrollArea className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
+            {/* Order Type Selector */}
+            <div className="grid grid-cols-4 gap-2">
+              {orderTypeOptions.map((opt) => {
+                const Icon = opt.icon;
+                const isActive = localOrderType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={cn(
+                      "flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all text-center",
+                      isActive ? opt.color : "border-border hover:border-muted-foreground/30"
+                    )}
+                    onClick={() => handleOrderTypeChange(opt.value)}
+                  >
+                    <Icon className={cn("h-5 w-5", !isActive && "text-muted-foreground")} />
+                    <span className={cn("text-xs font-medium", !isActive && "text-muted-foreground")}>{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Order Summary */}
             <div className="rounded-xl bg-muted/50 p-4 space-y-3">
               <div className="flex justify-between text-sm">
@@ -117,6 +249,12 @@ export function PaymentModal({
                 <span className="text-muted-foreground">{taxName} ({taxRate}%)</span>
                 <span>{formatCurrency(displayTax)}</span>
               </div>
+              {isDelivery && deliveryFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Delivery Fee</span>
+                  <span>{formatCurrency(deliveryFee)}</span>
+                </div>
+              )}
               <Separator />
               <div className="flex justify-between">
                 <span className="font-semibold text-lg">Total</span>
@@ -223,21 +361,110 @@ export function PaymentModal({
               </div>
             )}
 
-            {/* Customer Name */}
+            {/* Customer Selection */}
             <div className="space-y-2">
-              <Label htmlFor="customerName" className="text-sm font-medium flex items-center gap-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                Customer Name
-                <span className="text-muted-foreground font-normal">(optional)</span>
+                Customer
               </Label>
-              <Input
-                id="customerName"
-                placeholder="Enter customer name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="h-11"
-              />
+              <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={customerOpen} className="w-full justify-between h-10 font-normal">
+                    <span className="truncate">{selectedCustomerLabel}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  {!showNewCustomer ? (
+                    <Command>
+                      <CommandInput placeholder="Search customers..." />
+                      <CommandList>
+                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem value="walk-in" onSelect={() => { setCustomerId("walk-in"); setCustomerOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4", customerId === "walk-in" ? "opacity-100" : "opacity-0")} />
+                            Walk-in Customer
+                          </CommandItem>
+                          {localCustomers.map((c) => (
+                            <CommandItem key={c.id} value={`${c.name} ${c.phone}`} onSelect={() => { setCustomerId(c.id); setCustomerOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4", customerId === c.id ? "opacity-100" : "opacity-0")} />
+                              <div className="flex flex-col">
+                                <span>{c.name}</span>
+                                <span className="text-xs text-muted-foreground">{c.phone}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                        <CommandSeparator />
+                        <CommandGroup>
+                          <CommandItem onSelect={() => setShowNewCustomer(true)}>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Add New Customer
+                          </CommandItem>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  ) : (
+                    <div className="p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">New Customer</Label>
+                        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowNewCustomer(false)}>Cancel</Button>
+                      </div>
+                      <Input placeholder="Customer name" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} autoFocus />
+                      <Input placeholder="Phone number" value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} />
+                      <Button size="sm" className="w-full" onClick={handleCreateCustomer} disabled={isCreatingCustomer || !newCustName.trim() || !newCustPhone.trim()}>
+                        {isCreatingCustomer ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserPlus className="mr-2 h-3 w-3" />}
+                        {isCreatingCustomer ? "Creating..." : "Create & Select"}
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
+
+            {/* Delivery Fields */}
+            {isDelivery && (
+              <div className="space-y-3 rounded-xl border p-4 bg-blue-500/5">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-blue-500" />
+                  Delivery Details
+                </Label>
+                <Input
+                  placeholder="Delivery address"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  className="h-10"
+                />
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Delivery phone"
+                      value={deliveryPhone}
+                      onChange={(e) => setDeliveryPhone(e.target.value)}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="w-28">
+                    <Input
+                      placeholder="Del. fee"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={deliveryFeeStr}
+                      onChange={(e) => setDeliveryFeeStr(e.target.value)}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+                <Textarea
+                  placeholder="Delivery notes..."
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+            )}
 
             {/* Notes */}
             <div className="space-y-2">
