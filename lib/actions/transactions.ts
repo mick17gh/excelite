@@ -221,8 +221,14 @@ export async function voidTransaction(transactionId: string, reason: string) {
 
 export async function getTransactions(branchId?: string, date?: Date) {
   try {
-    const startOfDay = date ? new Date(date.setHours(0, 0, 0, 0)) : undefined;
-    const endOfDay = date ? new Date(date.setHours(23, 59, 59, 999)) : undefined;
+    let startOfDay: Date | undefined;
+    let endOfDay: Date | undefined;
+    if (date) {
+      startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+    }
 
     const transactions = await db.transaction.findMany({
       where: {
@@ -236,19 +242,20 @@ export async function getTransactions(branchId?: string, date?: Date) {
           }),
       },
       include: {
-        branch: true,
-        staff: true,
+        branch: { select: { id: true, name: true, code: true } },
+        staff: { select: { id: true, firstName: true, lastName: true } },
         sale: {
           include: {
             items: {
               include: {
-                menuItem: true,
+                menuItem: { select: { id: true, name: true, price: true, cost: true } },
               },
             },
           },
         },
       },
       orderBy: { transactionDate: "desc" },
+      take: 200,
     });
 
     // Convert Decimal types to plain numbers for client serialization

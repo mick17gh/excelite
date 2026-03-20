@@ -106,6 +106,7 @@ interface OrderDetailModalProps {
   order: Order;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRefresh?: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -139,7 +140,7 @@ const TYPE_LABELS: Record<string, string> = {
   APP: "App",
 };
 
-export function OrderDetailModal({ order, open, onOpenChange }: OrderDetailModalProps) {
+export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: OrderDetailModalProps) {
   const { formatCurrency } = useCurrency();
 
   return (
@@ -281,6 +282,7 @@ export function OrderDetailModal({ order, open, onOpenChange }: OrderDetailModal
                 customerPhone={order.customerPhone}
                 customerEmail={null}
                 notifications={order.notifications || []}
+                onNotificationSent={onRefresh}
               />
             </TabsContent>
             <TabsContent value="receipt" className="mt-3">

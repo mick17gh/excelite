@@ -12,7 +12,7 @@ export const metadata = {
 
 export default async function OrdersPage() {
   const [ordersResult, statsResult, branchesResult, menuResult, customersResult] = await Promise.all([
-    getOrders({ pageSize: 200 }),
+    getOrders({ pageSize: 50, page: 1 }),
     getOrderStats(),
     getBranches(),
     getMenuItems(),
@@ -20,6 +20,9 @@ export default async function OrdersPage() {
   ]);
 
   const orders = ordersResult.data || [];
+  const total = ordersResult.total || 0;
+  const page = ordersResult.page || 1;
+  const pageSize = ordersResult.pageSize || 50;
   const stats = statsResult.data;
   const branches = (branchesResult.data || []).map((b: any) => ({
     id: b.id,
@@ -54,6 +57,9 @@ export default async function OrdersPage() {
           menuItems={menuItems}
           customers={customers}
           stats={stats}
+          initialTotal={total}
+          initialPage={page}
+          initialPageSize={pageSize}
         />
       </Suspense>
     </div>

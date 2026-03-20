@@ -95,9 +95,24 @@ interface Transaction {
 interface TransactionsContentProps {
   branches: Branch[];
   menuItems: MenuItem[];
+  initialTransactions?: any[];
 }
 
-export function TransactionsContent({ branches, menuItems }: TransactionsContentProps) {
+function formatTxns(data: any[]): Transaction[] {
+  return data.map((t: any) => ({
+    id: t.id,
+    saleNumber: t.transactionRef,
+    items: t.sale?.items?.length || 0,
+    total: Number(t.amount),
+    channel: t.sale?.channel || "DINE_IN",
+    daypart: t.sale?.daypart || "LUNCH",
+    paymentMethod: t.paymentMethod,
+    time: format(new Date(t.transactionDate), "hh:mm a"),
+    status: t.isVoided ? "voided" : "completed",
+  }));
+}
+
+export function TransactionsContent({ branches, menuItems, initialTransactions }: TransactionsContentProps) {
   const mounted = useIsMounted();
   const { formatCurrency, formatCurrencyShort } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
@@ -125,8 +140,11 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   const [paymentMethod, setPaymentMethod] = useState<string>("Card");
   const [customerCount, setCustomerCount] = useState<number>(1);
   const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>(
+    initialTransactions ? formatTxns(initialTransactions) : []
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [initialFetchDone, setInitialFetchDone] = useState(!!initialTransactions);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [taxSettings, setTaxSettings] = useState<{ rate: number; name: string; enabled: boolean }>({ rate: 0, name: "Tax", enabled: false });
@@ -148,23 +166,16 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
   useEffect(() => {
     const fetchTransactions = async () => {
       if (!selectedBranch) return;
+      // Skip if we already have server-prefetched data for the first branch
+      if (initialFetchDone && selectedBranch === (branches[0]?.id || "")) {
+        setInitialFetchDone(false);
+        return;
+      }
       setIsLoading(true);
       try {
-        const today = new Date();
-        const result = await getTransactions(selectedBranch, today);
+        const result = await getTransactions(selectedBranch, new Date());
         if (result.success && result.data) {
-          const formatted = result.data.map((t: any) => ({
-            id: t.id,
-            saleNumber: t.transactionRef,
-            items: t.sale?.items?.length || 0,
-            total: Number(t.amount),
-            channel: t.sale?.channel || "DINE_IN",
-            daypart: t.sale?.daypart || "LUNCH",
-            paymentMethod: t.paymentMethod,
-            time: format(new Date(t.transactionDate), "hh:mm a"),
-            status: t.isVoided ? "voided" : "completed",
-          }));
-          setTransactions(formatted);
+          setTransactions(formatTxns(result.data));
         }
       } catch (error) {
         console.error("Error fetching transactions:", error);
@@ -264,18 +275,7 @@ export function TransactionsContent({ branches, menuItems }: TransactionsContent
         // Refresh today's transactions
         const refreshResult = await getTransactions(selectedBranch, new Date());
         if (refreshResult.success && refreshResult.data) {
-          const formatted = refreshResult.data.map((t: any) => ({
-            id: t.id,
-            saleNumber: t.transactionRef,
-            items: t.sale?.items?.length || 0,
-            total: Number(t.amount),
-            channel: t.sale?.channel || "DINE_IN",
-            daypart: t.sale?.daypart || "LUNCH",
-            paymentMethod: t.paymentMethod,
-            time: format(new Date(t.transactionDate), "hh:mm a"),
-            status: t.isVoided ? "voided" : "completed",
-          }));
-          setTransactions(formatted);
+          setTransactions(formatTxns(refreshResult.data));
         }
       } else {
         toast.error(result.error || "Failed to record transaction");

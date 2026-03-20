@@ -2,7 +2,8 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { PaymentStatus } from "@/lib/generated/prisma/client";
+import { PaymentStatus, SalesChannel } from "@/lib/generated/prisma/client";
+import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
 
 export interface RecordPaymentInput {
   orderId: string;
@@ -57,10 +58,12 @@ export async function recordPayment(input: RecordPaymentInput) {
       },
     });
 
-    // Update order payment status
+    // Update order payment status and create Transaction + Sale if fully paid
     const order = await db.order.findUnique({
       where: { id: input.orderId },
-      select: { total: true },
+      include: {
+        items: { include: { menuItem: { select: { cost: true } } } },
+      },
     });
 
     if (order) {
@@ -77,10 +80,73 @@ export async function recordPayment(input: RecordPaymentInput) {
             paymentMethod: input.paymentMethod || input.provider || "manual",
           },
         });
+
+        // Create Transaction record
+        const transactionRef = `TXN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        const transaction = await db.transaction.create({
+          data: {
+            transactionRef,
+            branchId: order.branchId,
+            paymentMethod: input.paymentMethod || input.provider || "manual",
+            amount: Number(order.total),
+            tip: 0,
+            transactionDate: new Date(),
+          },
+        });
+
+        // Create Sale record
+        const saleNumber = `SALE-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+        const hour = new Date().getHours();
+        let dayPart: "BREAKFAST" | "LUNCH" | "DINNER" | "LATE_NIGHT" = "LATE_NIGHT";
+        if (hour >= 6 && hour < 11) dayPart = "BREAKFAST";
+        else if (hour >= 11 && hour < 15) dayPart = "LUNCH";
+        else if (hour >= 15 && hour < 21) dayPart = "DINNER";
+
+        const channelMap: Record<string, SalesChannel> = {
+          DINE_IN: "DINE_IN",
+          TAKEOUT: "TAKEOUT",
+          DELIVERY: "DELIVERY",
+          APP: "APP",
+        };
+        const channel = channelMap[order.type] || "DINE_IN";
+
+        await db.sale.create({
+          data: {
+            saleNumber,
+            branchId: order.branchId,
+            transactionId: transaction.id,
+            subtotal: order.subtotal,
+            tax: order.tax,
+            total: order.total,
+            channel,
+            dayPart,
+            customerCount: 1,
+            saleDate: new Date(),
+            items: {
+              create: order.items.map((item) => ({
+                menuItemId: item.menuItemId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                unitCost: item.menuItem?.cost || 0,
+                total: item.lineTotal,
+                discount: 0,
+              })),
+            },
+          },
+        });
+
+        // Auto-send SMS payment receipt
+        try {
+          await sendPaymentReceiptSMS(order.id);
+        } catch (err) {
+          console.warn("[recordPayment] Failed to send payment receipt SMS:", err);
+        }
       }
     }
 
     revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/transactions");
+    revalidatePath("/dashboard");
     return {
       data: {
         id: payment.id,

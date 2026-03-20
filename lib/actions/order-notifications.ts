@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { NotificationType } from "@/lib/generated/prisma/client";
+import { sendSMS } from "@/lib/services/sms";
 
 export interface SendNotificationInput {
   orderId: string;
@@ -43,6 +44,22 @@ export async function getOrderNotifications(orderId: string) {
 
 export async function sendOrderNotification(input: SendNotificationInput) {
   try {
+    let status: "SENT" | "FAILED" | "PENDING" = "PENDING";
+    let sentAt: Date | null = null;
+    let errorMessage: string | null = null;
+
+    // Actually send SMS via MNotify if channel is SMS
+    if (input.channel === "SMS") {
+      const smsResult = await sendSMS(input.recipient, input.message);
+      status = smsResult.success ? "SENT" : "FAILED";
+      sentAt = smsResult.success ? new Date() : null;
+      errorMessage = smsResult.success ? null : smsResult.message;
+    } else {
+      // For other channels (EMAIL, WHATSAPP), mark as pending since not implemented
+      status = "PENDING";
+      errorMessage = "Channel not implemented";
+    }
+
     const notification = await db.orderNotification.create({
       data: {
         orderId: input.orderId,
@@ -51,8 +68,9 @@ export async function sendOrderNotification(input: SendNotificationInput) {
         recipient: input.recipient,
         subject: input.subject || null,
         message: input.message,
-        status: "SENT",
-        sentAt: new Date(),
+        status,
+        sentAt,
+        error: errorMessage,
       },
     });
 

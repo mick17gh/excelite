@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { TransactionsContent } from "@/components/transactions/transactions-content";
 import { getBranches } from "@/lib/actions/branches";
 import { getMenuItems } from "@/lib/actions/menu";
+import { getTransactions } from "@/lib/actions/transactions";
 
 export const metadata = {
   title: "Transactions | ServStack",
@@ -13,6 +14,10 @@ export default async function TransactionsPage() {
     getBranches(),
     getMenuItems(),
   ]);
+
+  const branchList0 = branchesResult.data || [];
+  const firstBranchId = branchList0.length > 0 ? (branchList0[0] as any).id : undefined;
+  const txnResult = firstBranchId ? await getTransactions(firstBranchId, new Date()) : { data: [] };
 
   const branchList = (branchesResult.data || []).map((branch: any) => {
     const { taxRate, ...rest } = branch;
@@ -42,7 +47,7 @@ export default async function TransactionsPage() {
       </div>
 
       <Suspense fallback={<TransactionsLoadingSkeleton />}>
-        <TransactionsContent branches={branchList} menuItems={menuItems} />
+        <TransactionsContent branches={branchList} menuItems={menuItems} initialTransactions={txnResult.data || []} />
       </Suspense>
     </div>
   );

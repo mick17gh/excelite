@@ -9,6 +9,7 @@ import {
   getTopMenuItems,
   getKPIData,
 } from "@/lib/actions/transactions";
+import { getOrganization } from "@/lib/actions/organization";
 
 export const metadata = {
   title: "Executive Dashboard | ServStack",
@@ -26,6 +27,7 @@ export default async function ExecutiveDashboard() {
     alertsResult,
     staffSummaryResult,
     kpiDataResult,
+    orgResult,
   ] = await Promise.all([
     getBranches(),
     getBranchPerformance(),
@@ -36,7 +38,10 @@ export default async function ExecutiveDashboard() {
     getActiveAlerts(),
     getStaffSummary(),
     getKPIData(),
+    getOrganization(),
   ]);
+
+  const organizationName = orgResult.data?.name || "ServStack";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const branches = (branchesResult.data || []).map((branch: Record<string, any>) => ({
@@ -82,6 +87,7 @@ export default async function ExecutiveDashboard() {
 
   return (
     <DashboardWrapper
+      organizationName={organizationName}
       branches={branches}
       revenueData={revenueData}
       salesByChannel={salesByChannel}

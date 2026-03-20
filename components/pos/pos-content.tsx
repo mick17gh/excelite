@@ -100,7 +100,6 @@ const orderTypes = [
   { value: "DINE_IN", label: "Dine-in", icon: UtensilsCrossed, color: "bg-emerald-500" },
   { value: "TAKEOUT", label: "Takeout", icon: Package, color: "bg-amber-500" },
   { value: "DELIVERY", label: "Delivery", icon: Truck, color: "bg-blue-500" },
-  { value: "APP", label: "App Order", icon: Smartphone, color: "bg-purple-500" },
 ];
 
 export function PosContent({ branches, menuItems, recentOrders, customers }: PosContentProps) {
@@ -298,12 +297,15 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
       }
 
       // Complete the order to create Transaction + Sale records for reporting
+      // skipStatusComplete keeps status as IN_PROGRESS when kitchen toggle is on
+      // so the kitchen workflow (bumpTicket) drives the order to COMPLETED
       const completeResult = await completeOrder({
         orderId: result.data.id,
         paymentMethod: paymentData.paymentMethod,
         amountReceived: paymentData.amountPaid,
         tip: 0,
-        createSale: true, // This creates Transaction + Sale records
+        createSale: true,
+        skipStatusComplete: autoSendToKitchen,
       });
 
       if (!completeResult.success) {
@@ -372,55 +374,57 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
             </SelectContent>
           </Select>
 
-          {/* Order Type Buttons */}
-          <div className="flex rounded-lg border bg-muted/50 p-1 gap-1">
-            {orderTypes.map((type) => {
-              const Icon = type.icon;
-              const isActive = orderType === type.value;
-              return (
-                <Button
-                  key={type.value}
-                  variant={isActive ? "default" : "ghost"}
-                  size="sm"
-                  className={cn(
-                    "h-8 px-3 transition-all",
-                    isActive && type.color
-                  )}
-                  onClick={() => setOrderType(type.value as OrderType)}
-                >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {type.label}
-                </Button>
-              );
-            })}
-          </div>
-          
-          {/* Kitchen Station Selector */}
-          {kitchenStations.length > 0 && (
+          {/* Order Type Buttons + Kitchen Toggle on same row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex rounded-lg border bg-muted/50 p-1 gap-1">
+              {orderTypes.map((type) => {
+                const Icon = type.icon;
+                const isActive = orderType === type.value;
+                return (
+                  <Button
+                    key={type.value}
+                    variant={isActive ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-8 px-3 transition-all",
+                      isActive && type.color
+                    )}
+                    onClick={() => setOrderType(type.value as OrderType)}
+                  >
+                    <Icon className="h-4 w-4 mr-2" />
+                    {type.label}
+                  </Button>
+                );
+              })}
+            </div>
+
             <div className="flex items-center gap-2 ml-auto">
               <Button
                 variant={autoSendToKitchen ? "default" : "outline"}
                 size="sm"
                 className={cn("h-8", autoSendToKitchen && "bg-orange-500 hover:bg-orange-600")}
                 onClick={() => setAutoSendToKitchen(!autoSendToKitchen)}
+                title={kitchenStations.length === 0 ? "No kitchen stations configured" : "Toggle auto-send to kitchen"}
               >
                 <ChefHat className="h-4 w-4 mr-1.5" />
-                Auto Kitchen
+                Kitchen
               </Button>
-              <Select value={selectedStation} onValueChange={setSelectedStation}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <SelectValue placeholder="Kitchen Station" />
-                </SelectTrigger>
-                <SelectContent>
-                  {kitchenStations.map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {station.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {kitchenStations.length > 0 && (
+                <Select value={selectedStation} onValueChange={setSelectedStation}>
+                  <SelectTrigger className="w-[130px] h-8 text-xs">
+                    <SelectValue placeholder="Station" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kitchenStations.map((station) => (
+                      <SelectItem key={station.id} value={station.id}>
+                        {station.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Search */}
@@ -707,7 +711,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
                         >
                           {o.status}
                         </Badge>
-                        {o.status === "NEW" && kitchenStations.length > 0 && (
+                        {o.status === "NEW" && (
                           <Button
                             variant="ghost"
                             size="icon"

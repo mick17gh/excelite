@@ -89,6 +89,7 @@ interface KPIData {
 }
 
 interface DashboardWrapperProps {
+  organizationName: string;
   branches: Branch[];
   revenueData: RevenueDataPoint[];
   salesByChannel: SalesChannel[];
@@ -102,6 +103,7 @@ interface DashboardWrapperProps {
 }
 
 export function DashboardWrapper({
+  organizationName,
   branches,
   revenueData: initialRevenueData,
   salesByChannel: initialSalesByChannel,
@@ -282,27 +284,31 @@ export function DashboardWrapper({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight md:text-xl">
-            Welcome to your Dashboard
+      {/* Header Banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 px-6 py-6 text-white shadow-lg">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE4YzEuNjU3IDAgMy0xLjM0MyAzLTNzLTEuMzQzLTMtMy0zLTMgMS4zNDMtMyAzIDEuMzQzIDMgMyAzem0tMjQgMjRjMS42NTcgMCAzLTEuMzQzIDMtM3MtMS4zNDMtMy0zLTMtMyAxLjM0My0zIDMgMS4zNDMgMyAzIDN6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-50" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+              {organizationName}
+            </h1>
             {isPending && (
-              <span className="ml-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-r-transparent" />
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
             )}
-          </h1>
-          <p className="text-muted-foreground text-sm">
+          </div>
+          <p className="mt-1 text-sm text-white/80">
             Real-time overview of your restaurant operations
           </p>
         </div>
-        <DashboardFilters
-          branches={branches}
-          selectedBranches={selectedBranches}
-          onBranchChange={setSelectedBranches}
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-        />
       </div>
+
+      <DashboardFilters
+        branches={branches}
+        selectedBranches={selectedBranches}
+        onBranchChange={setSelectedBranches}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+      />
 
       <DashboardContent
         revenueData={filteredRevenueData}

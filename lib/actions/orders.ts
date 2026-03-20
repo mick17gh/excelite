@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, OrderSource, OrderType, PaymentStatus } from "@/lib/generated/prisma/client";
+import { createDeliveryRequest } from "@/lib/actions/delivery";
 
 // Helper to serialize Decimal fields from raw Prisma order objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,6 +47,8 @@ export interface CreateOrderInput {
   deliveryNotes?: string;
   deliveryFee?: number;
   discount?: number;
+  sendToKitchen?: boolean;
+  stationId?: string;
 }
 
 export interface UpdateOrderStatusInput {
@@ -400,7 +403,51 @@ export async function createOrder(input: CreateOrderInput) {
       },
     });
 
+    // Auto-create kitchen ticket if requested
+    if (input.sendToKitchen) {
+      try {
+        let stationId = input.stationId;
+        if (!stationId) {
+          const defaultStation = await db.kitchenStation.findFirst({
+            where: { branchId: input.branchId, isActive: true },
+          });
+          stationId = defaultStation?.id;
+        }
+        if (stationId) {
+          await db.kitchenTicket.create({
+            data: {
+              orderId: order.id,
+              stationId,
+              status: "NEW",
+              items: {
+                create: order.items.map((item) => ({ orderItemId: item.id, status: "NEW" })),
+              },
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("[createOrder] Failed to create kitchen ticket:", err);
+      }
+    }
+
+    // Auto-create DeliveryRequest for DELIVERY orders
+    if (input.type === "DELIVERY") {
+      try {
+        await createDeliveryRequest({
+          orderId: order.id,
+          deliveryAddress: input.deliveryAddress || undefined,
+          deliveryPhone: input.deliveryPhone || undefined,
+          fee: input.deliveryFee || 0,
+          notes: input.deliveryNotes || undefined,
+        });
+      } catch (err) {
+        console.warn("[createOrder] Failed to create delivery request:", err);
+      }
+    }
+
     revalidatePath("/dashboard/orders");
+    revalidatePath("/kitchen");
+    revalidatePath("/dashboard/delivery");
     return { data: serializeOrder(order) };
   } catch (error) {
     console.error("[createOrder] Error:", error);

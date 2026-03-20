@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { OrderStatus, OrderType, SalesChannel } from "@/lib/generated/prisma/client";
 import { logCreate } from "@/lib/services/audit";
 import { createDeliveryRequest } from "@/lib/actions/delivery";
+import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -244,6 +245,7 @@ export interface CompleteOrderInput {
   amountReceived: number;
   tip?: number;
   createSale?: boolean; // Create a sale record for reporting
+  skipStatusComplete?: boolean; // When true, leave order IN_PROGRESS so kitchen drives it to COMPLETED
 }
 
 export async function completeOrder(input: CompleteOrderInput) {
@@ -265,13 +267,15 @@ export async function completeOrder(input: CompleteOrderInput) {
     }
 
     // Update order status and payment
+    // If skipStatusComplete (kitchen toggle on), leave as IN_PROGRESS so kitchen drives COMPLETED
+    const orderStatus = input.skipStatusComplete ? "IN_PROGRESS" : "COMPLETED";
     await db.order.update({
       where: { id: input.orderId },
       data: {
-        status: "COMPLETED",
+        status: orderStatus,
         paymentMethod: input.paymentMethod,
         paymentStatus: "PAID",
-        closedAt: new Date(),
+        ...(orderStatus === "COMPLETED" ? { closedAt: new Date() } : {}),
       },
     });
 
@@ -362,6 +366,13 @@ export async function completeOrder(input: CompleteOrderInput) {
 
     const totalWithTip = Number(order.total) + (input.tip || 0);
     const change = input.amountReceived - totalWithTip;
+
+    // Auto-send SMS payment receipt if customer has name and phone
+    try {
+      await sendPaymentReceiptSMS(order.id);
+    } catch (err) {
+      console.warn("[completeOrder] Failed to send payment receipt SMS:", err);
+    }
 
     // Auto-create delivery request for DELIVERY orders
     if (order.type === "DELIVERY") {

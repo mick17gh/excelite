@@ -36,6 +36,7 @@ interface NotificationsTabProps {
   customerPhone: string | null;
   customerEmail: string | null;
   notifications: Notification[];
+  onNotificationSent?: () => void;
 }
 
 const CHANNEL_COLORS: Record<string, string> = {
@@ -44,10 +45,10 @@ const CHANNEL_COLORS: Record<string, string> = {
   WHATSAPP: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
 
-export function NotificationsTab({ orderId, customerPhone, customerEmail, notifications }: NotificationsTabProps) {
+export function NotificationsTab({ orderId, customerPhone, customerEmail, notifications, onNotificationSent }: NotificationsTabProps) {
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [type, setType] = useState("ORDER_UPDATE");
+  const [type, setType] = useState("ORDER_CONFIRMED");
   const [channel, setChannel] = useState("SMS");
   const [recipient, setRecipient] = useState(customerPhone || "");
   const [message, setMessage] = useState("");
@@ -72,6 +73,7 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
         toast.success("Notification sent");
         setShowForm(false);
         setMessage("");
+        onNotificationSent?.();
       }
     } catch {
       toast.error("Failed to send notification");
@@ -101,25 +103,22 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
               <Select value={type} onValueChange={setType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ORDER_UPDATE">Order Update</SelectItem>
-                  <SelectItem value="ORDER_CONFIRMATION">Confirmation</SelectItem>
-                  <SelectItem value="DELIVERY_UPDATE">Delivery Update</SelectItem>
-                  <SelectItem value="PAYMENT_CONFIRMATION">Payment</SelectItem>
+                  <SelectItem value="ORDER_PLACED">Order Placed</SelectItem>
+                  <SelectItem value="ORDER_CONFIRMED">Order Confirmed</SelectItem>
+                  <SelectItem value="ORDER_PREPARING">Order Preparing</SelectItem>
+                  <SelectItem value="ORDER_READY">Order Ready</SelectItem>
+                  <SelectItem value="ORDER_DISPATCHED">Order Dispatched</SelectItem>
+                  <SelectItem value="ORDER_DELIVERED">Order Delivered</SelectItem>
+                  <SelectItem value="PAYMENT_RECEIVED">Payment Received</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-1">
               <Label className="text-xs">Channel</Label>
-              <Select value={channel} onValueChange={(v) => {
-                setChannel(v);
-                if (v === "EMAIL") setRecipient(customerEmail || "");
-                else setRecipient(customerPhone || "");
-              }}>
+              <Select value={channel} onValueChange={setChannel}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SMS">SMS</SelectItem>
-                  <SelectItem value="EMAIL">Email</SelectItem>
-                  <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -144,7 +143,7 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
 
       {notifications.length > 0 ? (
         <div className="border rounded-md divide-y">
-          {notifications.map((n) => (
+          {[...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((n) => (
             <div key={n.id} className="px-3 py-2 text-sm">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">

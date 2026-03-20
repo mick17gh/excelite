@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { CreditCard, DollarSign, Smartphone, Building2, Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, Phone, UtensilsCrossed, Package, Truck } from "lucide-react";
+import { CreditCard, DollarSign, Smartphone, Building2, Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, UtensilsCrossed, Package, Truck } from "lucide-react";
 import { createCustomer } from "@/lib/actions/customers";
 import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,6 @@ const orderTypeOptions = [
   { value: "DINE_IN", label: "Dine-in", icon: UtensilsCrossed, color: "bg-emerald-500/10 border-emerald-500 text-emerald-600" },
   { value: "TAKEOUT", label: "Takeout", icon: Package, color: "bg-amber-500/10 border-amber-500 text-amber-600" },
   { value: "DELIVERY", label: "Delivery", icon: Truck, color: "bg-blue-500/10 border-blue-500 text-blue-600" },
-  { value: "APP", label: "App Order", icon: Smartphone, color: "bg-purple-500/10 border-purple-500 text-purple-600" },
 ];
 
 const paymentMethods = [
@@ -218,7 +217,7 @@ export function PaymentModal({
         <ScrollArea className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
             {/* Order Type Selector */}
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {orderTypeOptions.map((opt) => {
                 const Icon = opt.icon;
                 const isActive = localOrderType === opt.value;

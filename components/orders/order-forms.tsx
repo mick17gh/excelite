@@ -23,7 +23,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Plus, Minus, Trash2, Loader2, ChevronsUpDown, Check, UserPlus } from "lucide-react";
+import { Plus, Minus, Trash2, Loader2, ChevronsUpDown, Check, UserPlus, ChefHat } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/actions/orders";
 import { createCustomer } from "@/lib/actions/customers";
@@ -83,6 +84,7 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryPhone, setDeliveryPhone] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [sendToKitchen, setSendToKitchen] = useState(false);
   const { formatCurrency } = useCurrency();
 
   // Customer combobox state
@@ -200,6 +202,7 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
         deliveryAddress: isDelivery ? deliveryAddress : undefined,
         deliveryPhone: isDelivery ? deliveryPhone : undefined,
         deliveryNotes: isDelivery ? deliveryNotes : undefined,
+        sendToKitchen,
       });
 
       if (result.error) {
@@ -229,6 +232,7 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
     setDeliveryAddress("");
     setDeliveryPhone("");
     setDeliveryNotes("");
+    setSendToKitchen(false);
     setShowNewCustomer(false);
     setNewName("");
     setNewPhone("");
@@ -351,10 +355,21 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
                   <SelectItem value="DINE_IN">Dine In</SelectItem>
                   <SelectItem value="TAKEOUT">Takeout</SelectItem>
                   <SelectItem value="DELIVERY">Delivery</SelectItem>
-                  <SelectItem value="APP">App</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Send to Kitchen toggle */}
+          <div className="flex items-center justify-between rounded-lg border px-3 py-2 bg-muted/20">
+            <div className="flex items-center gap-2">
+              <ChefHat className="h-4 w-4 text-orange-500" />
+              <div>
+                <p className="text-sm font-medium">Send to Kitchen</p>
+                <p className="text-xs text-muted-foreground">Create a kitchen ticket for this order</p>
+              </div>
+            </div>
+            <Switch checked={sendToKitchen} onCheckedChange={setSendToKitchen} />
           </div>
 
           {/* Menu Items Search + Cart */}

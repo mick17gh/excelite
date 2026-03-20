@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { OrderStatus } from "@/lib/generated/prisma/client";
+import { sendOrderReadySMS } from "@/lib/services/sms-notifications";
 
 export interface CreateStationInput {
   branchId: string;
@@ -204,7 +205,7 @@ export async function bumpTicket(ticketId: string) {
     });
 
     // Update ticket
-    await db.kitchenTicket.update({
+    const updatedTicket = await db.kitchenTicket.update({
       where: { id: ticketId },
       data: {
         status: nextStatus,
@@ -212,7 +213,30 @@ export async function bumpTicket(ticketId: string) {
       },
     });
 
+    // Sync order status: READY → order READY, COMPLETED → order COMPLETED
+    if (nextStatus === "READY" || nextStatus === "COMPLETED") {
+      await db.order.update({
+        where: { id: updatedTicket.orderId },
+        data: {
+          status: nextStatus,
+          ...(nextStatus === "COMPLETED" ? { closedAt: new Date() } : {}),
+        },
+      }).catch(() => {
+        // Non-fatal: order may already be in this state
+      });
+
+      // Auto-send SMS notification when order is ready
+      if (nextStatus === "READY") {
+        try {
+          await sendOrderReadySMS(updatedTicket.orderId);
+        } catch (err) {
+          console.warn("[bumpTicket] Failed to send order ready SMS:", err);
+        }
+      }
+    }
+
     revalidatePath("/kitchen");
+    revalidatePath("/dashboard/orders");
     return { success: true };
   } catch (error) {
     console.error("[bumpTicket] Error:", error);
@@ -318,14 +342,12 @@ export async function getKitchenStats(branchId?: string) {
   }
 }
 
-// Create kitchen ticket from POS order
+// Create kitchen ticket from order
 export async function createKitchenTicketFromOrder(orderId: string, stationId: string) {
   try {
-    const order = await db.posOrder.findUnique({
+    const order = await db.order.findUnique({
       where: { id: orderId },
-      include: {
-        items: { include: { menuItem: true } },
-      },
+      include: { items: true },
     });
 
     if (!order) {
@@ -344,9 +366,7 @@ export async function createKitchenTicketFromOrder(orderId: string, stationId: s
           })),
         },
       },
-      include: {
-        items: true,
-      },
+      include: { items: true },
     });
 
     revalidatePath("/kitchen");

@@ -77,22 +77,6 @@ export function DateRangePicker({
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Select onValueChange={handlePresetChange}>
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Select range" />
-        </SelectTrigger>
-        <SelectContent>
-          {presets.map((preset) => (
-            <SelectItem
-              key={preset.label}
-              value={preset.days.toString()}
-            >
-              {preset.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
       <Popover>
         <PopoverTrigger asChild>
           <Button
