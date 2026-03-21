@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Role } from '@prisma/client';
+import { Role } from '@/lib/generated/prisma/client';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { chatService } from '@/lib/ai';
