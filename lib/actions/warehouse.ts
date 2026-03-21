@@ -306,7 +306,7 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
               unitCost: whItem.unitCost,
               currentStock: qty,
               minStock: Number(whItem.minStock),
-              maxStock: 1000,
+              maxStock: Number(whItem.reorderPoint) * 5 || 100, // Use 5x reorder point as max, or 100 as fallback
               reorderPoint: Number(whItem.reorderPoint),
               branchId: transfer.toBranchId,
               lastRestockDate: new Date(),

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { InventoryContent } from "@/components/inventory/inventory-content";
-import { getInventoryItems, getSuppliers, getInboundRecords, getOutboundRecords, getTransferRecords } from "@/lib/actions/inventory";
+import { getInventoryItems, getSuppliers, getOutboundRecords, getTransferRecords } from "@/lib/actions/inventory";
+import { getWarehouseTransfers } from "@/lib/actions/warehouse";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
@@ -9,13 +10,13 @@ export const metadata = {
 };
 
 export default async function InventoryPage() {
-  const [branchesResult, inventoryResult, suppliersResult, inboundResult, outboundResult, transferResult] = await Promise.all([
+  const [branchesResult, inventoryResult, suppliersResult, outboundResult, transferResult, warehouseTransfersResult] = await Promise.all([
     getBranches(),
     getInventoryItems(undefined, { page: 1, pageSize: 1000 }),
     getSuppliers(),
-    getInboundRecords(),
     getOutboundRecords(),
     getTransferRecords(),
+    getWarehouseTransfers(),
   ]);
 
   const branchList = (branchesResult.data || []).map((branch: any) => {
@@ -26,9 +27,9 @@ export default async function InventoryPage() {
     };
   });
   const rawItems = inventoryResult.data || [];
-  const inboundRecords = inboundResult.data || [];
   const outboundRecords = outboundResult.data || [];
   const transferRecords = transferResult.data || [];
+  const warehouseTransfers = warehouseTransfersResult.data || [];
   const items = rawItems.map((item: { id: string; name: string; sku: string; category: string; unit: string; currentStock: { toNumber?: () => number } | number; minStock: { toNumber?: () => number } | number; maxStock: { toNumber?: () => number } | number; reorderPoint: { toNumber?: () => number } | number; unitCost: { toNumber?: () => number } | number; branchId: string; branch: { name: string } }) => {
     const currentStock = typeof item.currentStock === 'object' && item.currentStock.toNumber ? item.currentStock.toNumber() : Number(item.currentStock);
     const minStock = typeof item.minStock === 'object' && item.minStock.toNumber ? item.minStock.toNumber() : Number(item.minStock);
@@ -64,7 +65,7 @@ export default async function InventoryPage() {
           Inventory Management
         </h1>
         <p className="text-muted-foreground">
-          Track inbound, outbound, and stock levels across all branches
+          Track stock levels, transfers, and movements across all branches
         </p>
       </div>
 
@@ -72,9 +73,9 @@ export default async function InventoryPage() {
         <InventoryContent 
           items={items} 
           branches={branchList} 
-          inboundRecords={inboundRecords}
           outboundRecords={outboundRecords}
           transferRecords={transferRecords}
+          warehouseTransfers={warehouseTransfers}
         />
       </Suspense>
     </div>

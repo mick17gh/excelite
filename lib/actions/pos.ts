@@ -6,6 +6,7 @@ import { OrderStatus, OrderType, SalesChannel } from "@/lib/generated/prisma/cli
 import { logCreate } from "@/lib/services/audit";
 import { createDeliveryRequest } from "@/lib/actions/delivery";
 import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
+import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -362,6 +363,17 @@ export async function completeOrder(input: CompleteOrderInput) {
           paymentMethod: input.paymentMethod,
         }
       );
+
+      // Deduct branch inventory based on recipes (non-blocking)
+      try {
+        await deductInventoryForSale(
+          order.items.map((item) => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+          order.branchId,
+          order.id
+        );
+      } catch (err) {
+        console.warn("[completeOrder] Inventory deduction failed:", err);
+      }
     }
 
     const totalWithTip = Number(order.total) + (input.tip || 0);

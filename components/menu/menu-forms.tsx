@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { Loader2, Upload, Image as ImageIcon, X, Plus, Trash2, ChevronDown, Package } from "lucide-react";
+import { Combobox } from "@/components/ui/combobox";
 import { 
   createMenuItem, 
   updateMenuItem, 
@@ -138,7 +139,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
   const loadInventoryItems = async () => {
     const result = await getInventoryItemsForIngredients();
     if (result.success && result.data) {
-      setInventoryItems(result.data);
+      setInventoryItems(result.data as InventoryItemOption[]);
     }
   };
 
@@ -491,21 +492,17 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                       <div className="space-y-2">
                         {ingredients.map((ing, index) => (
                           <div key={index} className="flex items-center gap-2 rounded border p-2">
-                            <Select
-                              value={ing.inventoryItemId}
-                              onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
-                            >
-                              <SelectTrigger className="flex-1 h-8 text-xs">
-                                <SelectValue placeholder="Select item" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {inventoryItems.map((item) => (
-                                  <SelectItem key={item.id} value={item.id}>
-                                    {item.name} ({item.sku})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex-1">
+                              <Combobox
+                                options={inventoryItems.map((item) => ({ value: item.id, label: item.name, description: item.sku }))}
+                                value={ing.inventoryItemId}
+                                onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                                placeholder="Select item"
+                                searchPlaceholder="Search items..."
+                                emptyText="No items found"
+                                className="h-8 text-xs"
+                              />
+                            </div>
                             <Input
                               type="number"
                               step="0.001"
@@ -639,7 +636,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
       ]);
       
       if (invResult.success && invResult.data) {
-        setInventoryItems(invResult.data);
+        setInventoryItems(invResult.data as InventoryItemOption[]);
       }
       
       if (ingResult.success && ingResult.data?.ingredients) {
@@ -1006,21 +1003,17 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                       <div className="space-y-2">
                         {ingredients.map((ing, index) => (
                           <div key={index} className="flex items-center gap-2 rounded border p-2">
-                            <Select
-                              value={ing.inventoryItemId}
-                              onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
-                            >
-                              <SelectTrigger className="flex-1 h-8 text-xs">
-                                <SelectValue placeholder="Select item" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {inventoryItems.map((invItem) => (
-                                  <SelectItem key={invItem.id} value={invItem.id}>
-                                    {invItem.name} ({invItem.sku})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex-1">
+                              <Combobox
+                                options={inventoryItems.map((invItem) => ({ value: invItem.id, label: invItem.name, description: invItem.sku }))}
+                                value={ing.inventoryItemId}
+                                onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                                placeholder="Select item"
+                                searchPlaceholder="Search items..."
+                                emptyText="No items found"
+                                className="h-8 text-xs"
+                              />
+                            </div>
                             <Input
                               type="number"
                               step="0.001"

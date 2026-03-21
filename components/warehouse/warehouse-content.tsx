@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { TransferStatus } from "@/lib/generated/prisma/client";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,10 +37,15 @@ import {
   MoreHorizontal,
   CheckCircle2,
   XCircle,
+  TruckIcon,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateTransferStatus } from "@/lib/actions/warehouse";
 import { CreateWarehouseDialog, CreateWarehouseItemDialog, CreateTransferDialog } from "./warehouse-forms";
+import { SupplierReceivingDialog, WastageDialog } from "./warehouse-dialogs";
+import { WarehouseImportDialog } from "./warehouse-import";
 import { useCurrency } from "@/contexts/currency-context";
 
 interface WarehouseData {
@@ -104,12 +109,52 @@ interface WarehouseStats {
   pendingTransfers: number;
 }
 
+interface InboundRecord {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseItemId: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+  supplierId: string;
+  supplierName: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  invoiceNumber: string | null;
+  notes: string | null;
+  receivedBy: string | null;
+  deliveryDate: string;
+  createdAt: string;
+}
+
+interface WastageRecord {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseItemId: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  reason: string | null;
+  notes: string | null;
+  recordedBy: string | null;
+  wasteDate: string;
+  createdAt: string;
+}
+
 interface WarehouseContentProps {
   warehouses: WarehouseData[];
   items: WarehouseItem[];
   transfers: Transfer[];
   branches: Branch[];
   stats: WarehouseStats;
+  inboundRecords: InboundRecord[];
+  wastageRecords: WastageRecord[];
 }
 
 const TRANSFER_STATUS_COLORS: Record<string, string> = {
@@ -119,12 +164,16 @@ const TRANSFER_STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-export function WarehouseContent({ warehouses, items, transfers, branches, stats }: WarehouseContentProps) {
+export function WarehouseContent({ warehouses, items, transfers, branches, stats, inboundRecords, wastageRecords }: WarehouseContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
   const [showCreateWarehouse, setShowCreateWarehouse] = useState(false);
   const [showCreateItem, setShowCreateItem] = useState(false);
   const [showCreateTransfer, setShowCreateTransfer] = useState(false);
+  const [showSupplierReceiving, setShowSupplierReceiving] = useState(false);
+  const [showWastage, setShowWastage] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [selectedWarehouseForImport, setSelectedWarehouseForImport] = useState<{id: string, name: string} | null>(null);
   const { formatCurrency } = useCurrency();
 
   const filteredItems = useMemo(() => {
@@ -211,17 +260,44 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
             <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="transfers">Transfers</TabsTrigger>
+            <TabsTrigger value="receiving">Supplier Receiving</TabsTrigger>
+            <TabsTrigger value="wastage">Wastage</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setShowCreateWarehouse(true)}>
-              <Plus className="mr-2 h-4 w-4" />Warehouse
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowCreateItem(true)}>
-              <Plus className="mr-2 h-4 w-4" />Item
-            </Button>
-            <Button size="sm" onClick={() => setShowCreateTransfer(true)}>
-              <ArrowRightLeft className="mr-2 h-4 w-4" />Transfer
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowCreateWarehouse(true)}>
+                  <WarehouseIcon className="mr-2 h-4 w-4" />New Warehouse
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowCreateItem(true)}>
+                  <Package className="mr-2 h-4 w-4" />New Item
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowCreateTransfer(true)}>
+                  <ArrowRightLeft className="mr-2 h-4 w-4" />Transfer to Branch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowSupplierReceiving(true)}>
+                  <TruckIcon className="mr-2 h-4 w-4" />Receive from Supplier
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowWastage(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />Log Wastage
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  if (warehouses.length > 0) {
+                    setSelectedWarehouseForImport({ id: warehouses[0].id, name: warehouses[0].name });
+                    setShowBulkImport(true);
+                  } else {
+                    toast.error("Please create a warehouse first");
+                  }
+                }}>
+                  <Upload className="mr-2 h-4 w-4" />Bulk Import
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -409,11 +485,121 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Supplier Receiving Tab */}
+        <TabsContent value="receiving">
+          <Card className="rounded-xl">
+            <CardHeader>
+              <CardTitle>Supplier Receiving Records</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Warehouse</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Unit Cost</TableHead>
+                    <TableHead className="text-right">Total Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inboundRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                        No supplier receiving records yet. Use "Receive from Supplier" to record deliveries.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    inboundRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{new Date(record.deliveryDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{record.warehouseName}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{record.itemName}</p>
+                            <p className="text-xs text-muted-foreground">{record.itemSku}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{record.supplierName}</TableCell>
+                        <TableCell className="text-right">{record.quantity} {record.itemUnit}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(record.unitCost)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(record.totalCost)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Wastage Tab */}
+        <TabsContent value="wastage">
+          <Card className="rounded-xl">
+            <CardHeader>
+              <CardTitle>Wastage Records</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Warehouse</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Unit Cost</TableHead>
+                    <TableHead className="text-right">Total Loss</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {wastageRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                        No wastage records yet. Use "Log Wastage" to record waste.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    wastageRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{new Date(record.wasteDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{record.warehouseName}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{record.itemName}</p>
+                            <p className="text-xs text-muted-foreground">{record.itemSku}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{record.reason || "-"}</TableCell>
+                        <TableCell className="text-right">{record.quantity} {record.itemUnit}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(record.unitCost)}</TableCell>
+                        <TableCell className="text-right font-medium text-red-600">{formatCurrency(record.totalCost)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <CreateWarehouseDialog open={showCreateWarehouse} onOpenChange={setShowCreateWarehouse} />
       <CreateWarehouseItemDialog open={showCreateItem} onOpenChange={setShowCreateItem} warehouses={warehouses} />
       <CreateTransferDialog open={showCreateTransfer} onOpenChange={setShowCreateTransfer} warehouses={warehouses} items={items} branches={branches} />
+      <SupplierReceivingDialog open={showSupplierReceiving} onOpenChange={setShowSupplierReceiving} warehouses={warehouses} items={items} />
+      <WastageDialog open={showWastage} onOpenChange={setShowWastage} warehouses={warehouses} items={items} />
+      {selectedWarehouseForImport && (
+        <WarehouseImportDialog 
+          open={showBulkImport} 
+          onOpenChange={setShowBulkImport} 
+          warehouseId={selectedWarehouseForImport.id}
+          warehouseName={selectedWarehouseForImport.name}
+        />
+      )}
     </div>
   );
 }

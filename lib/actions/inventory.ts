@@ -193,76 +193,6 @@ export async function getInventoryItems(
   }
 }
 
-export interface RecordInboundInput {
-  branchId: string;
-  itemId: string;
-  supplierId: string;
-  quantity: number;
-  unitCost: number;
-  invoiceNumber?: string;
-  notes?: string;
-  receivedBy?: string;
-}
-
-export async function recordInbound(input: RecordInboundInput) {
-  try {
-    const totalCost = input.quantity * input.unitCost;
-
-    // Create inbound record
-    const inbound = await db.inboundStock.create({
-      data: {
-        branchId: input.branchId,
-        itemId: input.itemId,
-        supplierId: input.supplierId,
-        quantity: input.quantity,
-        unitCost: input.unitCost,
-        totalCost,
-        invoiceNumber: input.invoiceNumber,
-        notes: input.notes,
-        receivedBy: input.receivedBy,
-        deliveryDate: new Date(),
-      },
-    });
-
-    // Update inventory stock
-    await db.inventoryItem.update({
-      where: { id: input.itemId },
-      data: {
-        currentStock: { increment: input.quantity },
-        lastRestockDate: new Date(),
-      },
-    });
-
-    // Create audit log
-    await logCreate(
-      "InboundStock",
-      inbound.id,
-      {
-        itemId: input.itemId,
-        branchId: input.branchId,
-        quantity: input.quantity,
-        unitCost: input.unitCost,
-        totalCost,
-        supplierId: input.supplierId,
-      }
-    );
-
-    revalidatePath("/dashboard/inventory");
-    return { 
-      success: true, 
-      data: {
-        ...inbound,
-        quantity: Number(inbound.quantity),
-        unitCost: Number(inbound.unitCost),
-        totalCost: Number(inbound.totalCost),
-      }
-    };
-  } catch (error) {
-    console.error("[recordInbound] Error:", error);
-    return { success: false, error: "Failed to record inbound stock" };
-  }
-}
-
 export interface RecordOutboundInput {
   branchId: string;
   itemId: string;
@@ -389,12 +319,11 @@ export interface TransferStockInput {
   itemId: string;
   quantity: number;
   notes?: string;
-  approvedBy?: string;
 }
 
+// Create a branch-to-branch transfer request (starts as PENDING)
 export async function transferStock(input: TransferStockInput) {
   try {
-    // Get item to get unit cost
     const item = await db.inventoryItem.findUnique({
       where: { id: input.itemId },
     });
@@ -403,9 +332,16 @@ export async function transferStock(input: TransferStockInput) {
       return { success: false, error: "Item not found" };
     }
 
+    if (Number(item.currentStock) < input.quantity) {
+      return { success: false, error: `Insufficient stock. Available: ${Number(item.currentStock)} ${item.unit}` };
+    }
+
+    if (input.fromBranchId === input.toBranchId) {
+      return { success: false, error: "Source and destination branches must be different" };
+    }
+
     const totalCost = input.quantity * Number(item.unitCost);
 
-    // Create transfer log
     const transfer = await db.transferLog.create({
       data: {
         fromBranchId: input.fromBranchId,
@@ -415,72 +351,111 @@ export async function transferStock(input: TransferStockInput) {
         unitCost: item.unitCost,
         totalCost,
         transferDate: new Date(),
-        approvedBy: input.approvedBy,
         notes: input.notes,
-        status: TransferStatus.COMPLETED,
+        status: TransferStatus.PENDING,
       },
     });
 
-    // Update source branch stock
-    await db.inventoryItem.updateMany({
-      where: { sku: item.sku, branchId: input.fromBranchId },
-      data: { currentStock: { decrement: input.quantity } },
-    });
-
-    // Find or create item in destination branch
-    const destItem = await db.inventoryItem.findFirst({
-      where: { sku: item.sku, branchId: input.toBranchId },
-    });
-
-    if (destItem) {
-      await db.inventoryItem.update({
-        where: { id: destItem.id },
-        data: { currentStock: { increment: input.quantity } },
-      });
-    } else {
-      await db.inventoryItem.create({
-        data: {
-          name: item.name,
-          sku: `${item.sku}-${input.toBranchId.slice(-4)}`,
-          category: item.category,
-          unit: item.unit,
-          unitCost: item.unitCost,
-          currentStock: input.quantity,
-          minStock: item.minStock,
-          maxStock: item.maxStock,
-          reorderPoint: item.reorderPoint,
-          branchId: input.toBranchId,
-          isActive: true,
-        },
-      });
-    }
-
-    // Create audit log
-    await logTransfer(
-      "InventoryItem",
-      input.itemId,
-      {
-        fromBranchId: input.fromBranchId,
-        toBranchId: input.toBranchId,
-        quantity: input.quantity,
-        totalCost,
-        transferId: transfer.id,
-      }
-    );
-
     revalidatePath("/dashboard/inventory");
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         ...transfer,
         quantity: Number(transfer.quantity),
         unitCost: Number(transfer.unitCost),
         totalCost: Number(transfer.totalCost),
-      }
+      },
     };
   } catch (error) {
     console.error("[transferStock] Error:", error);
-    return { success: false, error: "Failed to transfer stock" };
+    return { success: false, error: "Failed to create transfer request" };
+  }
+}
+
+// Update branch transfer status (PENDING → IN_TRANSIT → COMPLETED / CANCELLED)
+export async function updateBranchTransferStatus(
+  transferId: string,
+  status: TransferStatus,
+  userId?: string
+) {
+  try {
+    const transfer = await db.transferLog.findUnique({
+      where: { id: transferId },
+      include: { item: true },
+    });
+
+    if (!transfer) {
+      return { success: false, error: "Transfer not found" };
+    }
+
+    const data: Record<string, unknown> = { status };
+
+    if (status === "IN_TRANSIT") {
+      data.approvedBy = userId || null;
+    }
+
+    if (status === "COMPLETED") {
+      data.receivedBy = userId || null;
+
+      const qty = Number(transfer.quantity);
+      const item = transfer.item;
+
+      // 1. Deduct from source branch
+      await db.inventoryItem.update({
+        where: { id: item.id },
+        data: { currentStock: { decrement: qty } },
+      });
+
+      // 2. Find or create item in destination branch (use same SKU!)
+      const destItem = await db.inventoryItem.findFirst({
+        where: { sku: item.sku, branchId: transfer.toBranchId, deletedAt: null },
+      });
+
+      if (destItem) {
+        await db.inventoryItem.update({
+          where: { id: destItem.id },
+          data: { currentStock: { increment: qty }, lastRestockDate: new Date() },
+        });
+      } else {
+        await db.inventoryItem.create({
+          data: {
+            name: item.name,
+            sku: item.sku,
+            category: item.category,
+            unit: item.unit,
+            unitCost: item.unitCost,
+            currentStock: qty,
+            minStock: item.minStock,
+            maxStock: item.maxStock,
+            reorderPoint: item.reorderPoint,
+            branchId: transfer.toBranchId,
+            lastRestockDate: new Date(),
+          },
+        });
+      }
+
+      // 3. Audit log
+      await logTransfer(
+        "InventoryItem",
+        item.id,
+        {
+          fromBranchId: transfer.fromBranchId,
+          toBranchId: transfer.toBranchId,
+          quantity: qty,
+          totalCost: Number(transfer.totalCost),
+          transferId: transfer.id,
+        }
+      );
+    }
+
+    await db.transferLog.update({ where: { id: transferId }, data });
+
+    revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/warehouse");
+    return { success: true };
+  } catch (error) {
+    console.error("[updateBranchTransferStatus] Error:", error);
+    return { success: false, error: "Failed to update transfer status" };
   }
 }
 
@@ -528,46 +503,7 @@ export async function createSupplier(input: CreateSupplierInput) {
   }
 }
 
-export async function getInboundRecords(
-  branchId?: string,
-  pagination?: PaginationParams
-): Promise<PaginatedResult<any>> {
-  try {
-    const page = pagination?.page || 1;
-    const pageSize = pagination?.pageSize || 20;
-    const skip = (page - 1) * pageSize;
-    const where = branchId ? { branchId } : {};
-
-    const [records, totalItems] = await Promise.all([
-      db.inboundStock.findMany({
-        where,
-        include: {
-          item: { select: { name: true, sku: true } },
-          supplier: { select: { name: true } },
-          branch: { select: { name: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: pageSize,
-      }),
-      db.inboundStock.count({ where }),
-    ]);
-
-    return {
-      success: true,
-      data: records.map(record => ({
-        ...record,
-        quantity: Number(record.quantity),
-        unitCost: Number(record.unitCost),
-        totalCost: Number(record.totalCost),
-      })),
-      pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
-    };
-  } catch (error) {
-    console.error("[getInboundRecords] Error:", error);
-    return { success: false, error: "Failed to fetch inbound records", data: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } };
-  }
-}
+// getInboundRecords removed - branches track warehouse transfers instead
 
 export async function getOutboundRecords(
   branchId?: string,
@@ -613,7 +549,7 @@ export async function getTransferRecords(
 ): Promise<PaginatedResult<any>> {
   try {
     const page = pagination?.page || 1;
-    const pageSize = pagination?.pageSize || 20;
+    const pageSize = pagination?.pageSize || 100;
     const skip = (page - 1) * pageSize;
     const where = branchId ? { 
       OR: [

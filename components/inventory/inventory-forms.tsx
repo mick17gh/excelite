@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,15 +21,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
-  recordInbound,
   recordOutbound,
   recordWaste,
   transferStock,
   createInventoryItem,
-  getSuppliers,
-  createSupplier,
 } from "@/lib/actions/inventory";
 import { StockMovementType, InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
 
@@ -45,6 +42,7 @@ interface InventoryItem {
   sku: string;
   unit: string;
   currentStock: number;
+  branchId: string;
   branchName: string;
 }
 
@@ -52,303 +50,6 @@ interface Supplier {
   id: string;
   name: string;
   code: string;
-}
-
-// Inbound Stock Form
-interface InboundFormProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  branches: Branch[];
-  items: InventoryItem[];
-}
-
-export function InboundStockForm({ open, onOpenChange, branches, items }: InboundFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
-  const [showNewSupplier, setShowNewSupplier] = useState(false);
-  const [newSupplierName, setNewSupplierName] = useState("");
-  const [formData, setFormData] = useState({
-    branchId: "",
-    itemId: "",
-    supplierId: "",
-    quantity: "",
-    unitCost: "",
-    supplierInvoice: "",
-    notes: "",
-  });
-
-  // Load suppliers when dialog opens
-  useEffect(() => {
-    if (open) {
-      loadSuppliers();
-    }
-  }, [open]);
-
-  const loadSuppliers = async () => {
-    setIsLoadingSuppliers(true);
-    try {
-      const result = await getSuppliers();
-      if (result.success && result.data) {
-        setSuppliers(result.data);
-      }
-    } catch (error) {
-      console.error("Error loading suppliers:", error);
-    } finally {
-      setIsLoadingSuppliers(false);
-    }
-  };
-
-  const handleAddSupplier = async () => {
-    if (!newSupplierName.trim()) {
-      toast.error("Please enter a supplier name");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const code = newSupplierName
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, "")
-        .slice(0, 6) + "-" + Date.now().toString(36).slice(-4).toUpperCase();
-      
-      const result = await createSupplier({
-        name: newSupplierName.trim(),
-        code,
-      });
-
-      if (result.success && result.data) {
-        toast.success("Supplier added successfully");
-        setSuppliers([...suppliers, result.data]);
-        setFormData({ ...formData, supplierId: result.data.id });
-        setNewSupplierName("");
-        setShowNewSupplier(false);
-      } else {
-        toast.error(result.error || "Failed to add supplier");
-      }
-    } catch (error) {
-      console.error("Error adding supplier:", error);
-      toast.error("Failed to add supplier");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.supplierId) {
-      toast.error("Please select a supplier");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const result = await recordInbound({
-        branchId: formData.branchId,
-        itemId: formData.itemId,
-        supplierId: formData.supplierId,
-        quantity: parseFloat(formData.quantity),
-        unitCost: parseFloat(formData.unitCost),
-        invoiceNumber: formData.supplierInvoice || undefined,
-        notes: formData.notes || undefined,
-      });
-
-      if (result.success) {
-        toast.success("Inbound stock recorded successfully");
-        onOpenChange(false);
-        setFormData({
-          branchId: "",
-          itemId: "",
-          supplierId: "",
-          quantity: "",
-          unitCost: "",
-          supplierInvoice: "",
-          notes: "",
-        });
-      } else {
-        toast.error(result.error || "Failed to record inbound stock");
-      }
-    } catch (error) {
-      console.error("Error recording inbound stock:", error);
-      toast.error("Failed to record inbound stock");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Record Inbound Stock</DialogTitle>
-          <DialogDescription>
-            Record a new stock delivery from supplier
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="branch">Branch</Label>
-                <Select
-                  value={formData.branchId}
-                  onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="supplier">Supplier</Label>
-                {showNewSupplier ? (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Supplier name"
-                      value={newSupplierName}
-                      onChange={(e) => setNewSupplierName(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleAddSupplier}
-                      disabled={isSubmitting}
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setShowNewSupplier(false);
-                        setNewSupplierName("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Select
-                      value={formData.supplierId}
-                      onValueChange={(value) => setFormData({ ...formData, supplierId: value })}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder={isLoadingSuppliers ? "Loading..." : "Select supplier"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id}>
-                            {supplier.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      onClick={() => setShowNewSupplier(true)}
-                      title="Add new supplier"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="item">Item</Label>
-              <Select
-                value={formData.itemId}
-                onValueChange={(value) => setFormData({ ...formData, itemId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {items.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} ({item.sku})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="unitCost">Unit Cost (GH₵)</Label>
-                <Input
-                  id="unitCost"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.unitCost}
-                  onChange={(e) => setFormData({ ...formData, unitCost: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="invoice">Supplier Invoice #</Label>
-              <Input
-                id="invoice"
-                placeholder="INV-001234"
-                value={formData.supplierInvoice}
-                onChange={(e) => setFormData({ ...formData, supplierInvoice: e.target.value })}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Additional notes..."
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Record Inbound
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 // Outbound Stock Form
@@ -699,9 +400,22 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
     notes: "",
   });
 
+  // Filter items by selected source branch
+  const branchItems = formData.fromBranchId
+    ? items.filter((item) => item.branchId === formData.fromBranchId && item.currentStock > 0)
+    : [];
+
+  // Filter destination branches (exclude source)
+  const destBranches = branches.filter((b) => b.id !== formData.fromBranchId);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (!formData.fromBranchId || !formData.toBranchId) {
+      toast.error("Please select both source and destination branches");
+      return;
+    }
+
     if (formData.fromBranchId === formData.toBranchId) {
       toast.error("Source and destination branches must be different");
       return;
@@ -719,7 +433,7 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
       });
 
       if (result.success) {
-        toast.success("Transfer initiated successfully");
+        toast.success("Transfer request created (pending approval)");
         onOpenChange(false);
         setFormData({
           fromBranchId: "",
@@ -729,11 +443,11 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
           notes: "",
         });
       } else {
-        toast.error(result.error || "Failed to transfer stock");
+        toast.error(result.error || "Failed to create transfer request");
       }
     } catch (error) {
-      console.error("Error transferring stock:", error);
-      toast.error("Failed to transfer stock");
+      console.error("Error creating transfer:", error);
+      toast.error("Failed to create transfer request");
     } finally {
       setIsSubmitting(false);
     }
@@ -743,9 +457,9 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Transfer Stock</DialogTitle>
+          <DialogTitle>Transfer Stock Between Branches</DialogTitle>
           <DialogDescription>
-            Transfer inventory between branches
+            Create a transfer request. It will need to be approved and marked as received before stock moves.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -755,7 +469,7 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
                 <Label htmlFor="fromBranch">From Branch</Label>
                 <Select
                   value={formData.fromBranchId}
-                  onValueChange={(value) => setFormData({ ...formData, fromBranchId: value })}
+                  onValueChange={(value) => setFormData({ ...formData, fromBranchId: value, itemId: "", quantity: "" })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Source" />
@@ -774,12 +488,13 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
                 <Select
                   value={formData.toBranchId}
                   onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
+                  disabled={!formData.fromBranchId}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Destination" />
                   </SelectTrigger>
                   <SelectContent>
-                    {branches.map((branch) => (
+                    {destBranches.map((branch) => (
                       <SelectItem key={branch.id} value={branch.id}>
                         {branch.name}
                       </SelectItem>
@@ -794,16 +509,21 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
               <Select
                 value={formData.itemId}
                 onValueChange={(value) => setFormData({ ...formData, itemId: value })}
+                disabled={!formData.fromBranchId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select item" />
+                  <SelectValue placeholder={formData.fromBranchId ? "Select item" : "Select source branch first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {items.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} - {item.currentStock} {item.unit} available
-                    </SelectItem>
-                  ))}
+                  {branchItems.length === 0 ? (
+                    <SelectItem value="__none" disabled>No items with stock at this branch</SelectItem>
+                  ) : (
+                    branchItems.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} ({item.sku}) — {item.currentStock} {item.unit}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -814,6 +534,7 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
                 id="quantity"
                 type="number"
                 step="0.01"
+                min="0.01"
                 placeholder="0.00"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
@@ -835,9 +556,9 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !formData.itemId}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Initiate Transfer
+              Create Transfer Request
             </Button>
           </DialogFooter>
         </form>

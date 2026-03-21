@@ -52,6 +52,72 @@ export interface IngredientInput {
   unit: UnitType;
 }
 
+/**
+ * Resolve ingredient IDs: the picker may return warehouse item IDs or branch item IDs.
+ * This ensures every ingredient points to a valid branch InventoryItem (creating one if needed).
+ */
+async function resolveIngredientIds(ingredients: IngredientInput[]): Promise<IngredientInput[]> {
+  if (!ingredients.length) return [];
+
+  const ids = ingredients.map((i) => i.inventoryItemId);
+
+  // Check which IDs are already valid branch InventoryItems
+  const branchItems = await db.inventoryItem.findMany({
+    where: { id: { in: ids }, deletedAt: null },
+    select: { id: true },
+  });
+  const validBranchIds = new Set(branchItems.map((b) => b.id));
+
+  // IDs that aren't branch items are likely warehouse items
+  const warehouseIds = ids.filter((id) => !validBranchIds.has(id));
+  if (warehouseIds.length === 0) return ingredients; // all already branch items
+
+  const warehouseItems = await db.warehouseInventoryItem.findMany({
+    where: { id: { in: warehouseIds } },
+    select: { id: true, name: true, sku: true, category: true, unit: true, unitCost: true, minStock: true, reorderPoint: true },
+  });
+
+  // For each warehouse item, find or create a "template" branch InventoryItem
+  // We pick the first available branch, or create without branch if none exists
+  const warehouseIdToBranchId = new Map<string, string>();
+
+  for (const whItem of warehouseItems) {
+    // Find existing branch item with same SKU (any branch)
+    let branchItem = await db.inventoryItem.findFirst({
+      where: { sku: whItem.sku, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!branchItem) {
+      // Get a branch to attach this item to
+      const branch = await db.branch.findFirst({ where: { isActive: true }, select: { id: true } });
+      if (!branch) continue; // can't create without a branch
+
+      branchItem = await db.inventoryItem.create({
+        data: {
+          name: whItem.name,
+          sku: whItem.sku,
+          category: whItem.category,
+          unit: whItem.unit,
+          unitCost: whItem.unitCost,
+          currentStock: 0,
+          minStock: Number(whItem.minStock),
+          maxStock: 1000,
+          reorderPoint: Number(whItem.reorderPoint),
+          branchId: branch.id,
+        },
+      });
+    }
+
+    warehouseIdToBranchId.set(whItem.id, branchItem.id);
+  }
+
+  return ingredients.map((ing) => ({
+    ...ing,
+    inventoryItemId: warehouseIdToBranchId.get(ing.inventoryItemId) || ing.inventoryItemId,
+  }));
+}
+
 export async function createMenuItem(input: CreateMenuItemInput) {
   try {
     // Input validation
@@ -82,11 +148,13 @@ export async function createMenuItem(input: CreateMenuItemInput) {
 
     // Calculate cost from ingredients if provided
     let calculatedCost = input.cost;
+    let resolvedIngredients: IngredientInput[] = [];
     if (input.ingredients && input.ingredients.length > 0) {
       const costResult = await calculateRecipeCost(input.ingredients);
       if (costResult.success && costResult.cost !== undefined) {
         calculatedCost = costResult.cost;
       }
+      resolvedIngredients = await resolveIngredientIds(input.ingredients);
     }
 
     const item = await db.menuItem.create({
@@ -99,9 +167,9 @@ export async function createMenuItem(input: CreateMenuItemInput) {
         description: input.description?.trim(),
         imageUrl: input.imageUrl,
         isActive: input.isActive ?? true,
-        ...(input.ingredients && input.ingredients.length > 0 && {
+        ...(resolvedIngredients.length > 0 && {
           ingredients: {
-            create: input.ingredients.map((ing) => ({
+            create: resolvedIngredients.map((ing) => ({
               inventoryItemId: ing.inventoryItemId,
               quantity: ing.quantity,
               unit: ing.unit,
@@ -165,10 +233,11 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
         where: { menuItemId: id },
       });
 
-      // Create new ingredients
+      // Create new ingredients (resolve warehouse IDs to branch IDs)
       if (ingredients.length > 0) {
+        const resolvedIngredients = await resolveIngredientIds(ingredients);
         await db.menuItemIngredient.createMany({
-          data: ingredients.map((ing) => ({
+          data: resolvedIngredients.map((ing) => ({
             menuItemId: id,
             inventoryItemId: ing.inventoryItemId,
             quantity: ing.quantity,
@@ -330,6 +399,7 @@ export async function getMenuCategories() {
 }
 
 // Get menu item with its ingredients
+// Returns warehouse item IDs where possible so the edit form dropdown matches
 export async function getMenuItemWithIngredients(menuItemId: string) {
   try {
     const item = await db.menuItem.findUnique({
@@ -348,6 +418,21 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
       return { success: false, error: "Menu item not found" };
     }
 
+    // Resolve branch item SKUs to warehouse item IDs for dropdown matching
+    const skus = item.ingredients.map((ing) => ing.inventoryItem.sku);
+    const warehouseItems = skus.length
+      ? await db.warehouseInventoryItem.findMany({
+          where: { sku: { in: skus }, isActive: true },
+          select: { id: true, sku: true, unitCost: true },
+        })
+      : [];
+    const skuToWarehouseId = new Map<string, { id: string; unitCost: number }>();
+    for (const wh of warehouseItems) {
+      if (!skuToWarehouseId.has(wh.sku)) {
+        skuToWarehouseId.set(wh.sku, { id: wh.id, unitCost: Number(wh.unitCost) });
+      }
+    }
+
     return {
       success: true,
       data: {
@@ -361,16 +446,20 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
         description: item.description,
         imageUrl: item.imageUrl,
         isActive: item.isActive,
-        ingredients: item.ingredients.map((ing) => ({
-          id: ing.id,
-          inventoryItemId: ing.inventoryItemId,
-          inventoryItemName: ing.inventoryItem.name,
-          inventoryItemSku: ing.inventoryItem.sku,
-          quantity: Number(ing.quantity),
-          unit: ing.unit,
-          unitCost: Number(ing.inventoryItem.unitCost),
-          lineCost: Number(ing.quantity) * Number(ing.inventoryItem.unitCost),
-        })),
+        ingredients: item.ingredients.map((ing) => {
+          const whMatch = skuToWarehouseId.get(ing.inventoryItem.sku);
+          return {
+            id: ing.id,
+            // Use warehouse item ID if available, otherwise keep branch item ID
+            inventoryItemId: whMatch?.id || ing.inventoryItemId,
+            inventoryItemName: ing.inventoryItem.name,
+            inventoryItemSku: ing.inventoryItem.sku,
+            quantity: Number(ing.quantity),
+            unit: ing.unit,
+            unitCost: whMatch?.unitCost ?? Number(ing.inventoryItem.unitCost),
+            lineCost: Number(ing.quantity) * (whMatch?.unitCost ?? Number(ing.inventoryItem.unitCost)),
+          };
+        }),
       },
     };
   } catch (error) {
@@ -379,22 +468,33 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
   }
 }
 
-// Calculate recipe cost from ingredients
+// Calculate recipe cost from ingredients (checks warehouse then branch items)
 export async function calculateRecipeCost(ingredients: IngredientInput[]) {
   try {
     if (!ingredients || ingredients.length === 0) {
       return { success: true, cost: 0 };
     }
 
-    const inventoryItemIds = ingredients.map((ing) => ing.inventoryItemId);
-    const inventoryItems = await db.inventoryItem.findMany({
-      where: { id: { in: inventoryItemIds } },
+    const ids = ingredients.map((ing) => ing.inventoryItemId);
+
+    // Try warehouse items first
+    const whItems = await db.warehouseInventoryItem.findMany({
+      where: { id: { in: ids } },
       select: { id: true, unitCost: true },
     });
+    const costMap = new Map(whItems.map((i) => [i.id, Number(i.unitCost)]));
 
-    const costMap = new Map(
-      inventoryItems.map((item) => [item.id, Number(item.unitCost)])
-    );
+    // Fall back to branch items for any IDs not found in warehouse
+    const missingIds = ids.filter((id) => !costMap.has(id));
+    if (missingIds.length > 0) {
+      const branchItems = await db.inventoryItem.findMany({
+        where: { id: { in: missingIds } },
+        select: { id: true, unitCost: true },
+      });
+      for (const item of branchItems) {
+        costMap.set(item.id, Number(item.unitCost));
+      }
+    }
 
     let totalCost = 0;
     for (const ing of ingredients) {
@@ -409,14 +509,12 @@ export async function calculateRecipeCost(ingredients: IngredientInput[]) {
   }
 }
 
-// Get inventory items for ingredient selection
-export async function getInventoryItemsForIngredients(branchId?: string) {
+// Get inventory items for ingredient selection — pulls from warehouse (source of truth)
+export async function getInventoryItemsForIngredients() {
   try {
-    const items = await db.inventoryItem.findMany({
-      where: {
-        isActive: true,
-        ...(branchId && { branchId }),
-      },
+    // Primary source: warehouse inventory items
+    const warehouseItems = await db.warehouseInventoryItem.findMany({
+      where: { isActive: true },
       select: {
         id: true,
         name: true,
@@ -428,9 +526,9 @@ export async function getInventoryItemsForIngredients(branchId?: string) {
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
 
-    // Get unique items (dedupe by sku for cross-branch)
-    const uniqueItems = new Map();
-    for (const item of items) {
+    // Dedupe by SKU (in case multiple warehouses have same SKU)
+    const uniqueItems = new Map<string, { id: string; name: string; sku: string; unit: string; unitCost: number; category: string }>();
+    for (const item of warehouseItems) {
       if (!uniqueItems.has(item.sku)) {
         uniqueItems.set(item.sku, {
           id: item.id,
@@ -441,6 +539,32 @@ export async function getInventoryItemsForIngredients(branchId?: string) {
           category: item.category,
         });
       }
+    }
+
+    // Fallback: also include branch-only items not in warehouse (legacy data)
+    const branchItems = await db.inventoryItem.findMany({
+      where: {
+        isActive: true,
+        deletedAt: null,
+        sku: { notIn: [...uniqueItems.keys()] },
+      },
+      select: { id: true, name: true, sku: true, unit: true, unitCost: true, category: true },
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+    });
+
+    const branchUnique = new Map<string, typeof branchItems[0]>();
+    for (const item of branchItems) {
+      if (!branchUnique.has(item.sku)) branchUnique.set(item.sku, item);
+    }
+    for (const [, item] of branchUnique) {
+      uniqueItems.set(item.sku, {
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        unit: item.unit,
+        unitCost: Number(item.unitCost),
+        category: item.category,
+      });
     }
 
     return {
@@ -459,12 +583,13 @@ export async function addIngredientToMenuItem(
   ingredient: IngredientInput
 ) {
   try {
+    const [resolved] = await resolveIngredientIds([ingredient]);
     await db.menuItemIngredient.create({
       data: {
         menuItemId,
-        inventoryItemId: ingredient.inventoryItemId,
-        quantity: ingredient.quantity,
-        unit: ingredient.unit,
+        inventoryItemId: resolved.inventoryItemId,
+        quantity: resolved.quantity,
+        unit: resolved.unit,
       },
     });
 

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { PaymentStatus, SalesChannel } from "@/lib/generated/prisma/client";
 import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
+import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
 
 export interface RecordPaymentInput {
   orderId: string;
@@ -134,6 +135,17 @@ export async function recordPayment(input: RecordPaymentInput) {
             },
           },
         });
+
+        // Deduct branch inventory based on recipes (non-blocking)
+        try {
+          await deductInventoryForSale(
+            order.items.map((item) => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+            order.branchId,
+            order.id
+          );
+        } catch (err) {
+          console.warn("[recordPayment] Inventory deduction failed:", err);
+        }
 
         // Auto-send SMS payment receipt
         try {

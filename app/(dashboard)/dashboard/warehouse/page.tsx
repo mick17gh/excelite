@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { WarehouseContent } from "@/components/warehouse/warehouse-content";
-import { getWarehouses, getWarehouseInventory, getWarehouseTransfers, getWarehouseStats } from "@/lib/actions/warehouse";
+import { getWarehouses, getWarehouseInventory, getWarehouseTransfers, getWarehouseStats, getWarehouseInboundRecords, getWarehouseWasteLogs } from "@/lib/actions/warehouse";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
@@ -9,16 +9,20 @@ export const metadata = {
 };
 
 export default async function WarehousePage() {
-  const [warehousesResult, transfersResult, statsResult, branchesResult] = await Promise.all([
+  const [warehousesResult, transfersResult, statsResult, branchesResult, inboundResult, wastageResult] = await Promise.all([
     getWarehouses(),
     getWarehouseTransfers(),
     getWarehouseStats(),
     getBranches(),
+    getWarehouseInboundRecords(),
+    getWarehouseWasteLogs(),
   ]);
 
   const warehouses = warehousesResult.data || [];
   const transfers = transfersResult.data || [];
   const stats = statsResult.data;
+  const inboundRecords = inboundResult.data || [];
+  const wastageRecords = wastageResult.data || [];
   const branches = (branchesResult.data || []).map((b: any) => ({
     id: b.id,
     name: b.name,
@@ -48,6 +52,8 @@ export default async function WarehousePage() {
           transfers={transfers}
           branches={branches}
           stats={stats}
+          inboundRecords={inboundRecords}
+          wastageRecords={wastageRecords}
         />
       </Suspense>
     </div>

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { DayPart, SalesChannel } from "@/lib/generated/prisma/client";
 import { logCreate, logVoid } from "@/lib/services/audit";
+import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
 
 function generateTransactionRef(): string {
   const prefix = "TXN";
@@ -133,6 +134,17 @@ export async function createTransaction(input: CreateTransactionInput) {
         itemCount: saleItems.length,
       }
     );
+
+    // Deduct branch inventory based on recipes (non-blocking)
+    try {
+      await deductInventoryForSale(
+        input.items.map((item) => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+        input.branchId,
+        transaction.id
+      );
+    } catch (err) {
+      console.warn("[createTransaction] Inventory deduction failed:", err);
+    }
 
     revalidatePath("/dashboard/transactions");
     revalidatePath("/dashboard");

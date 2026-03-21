@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { createWarehouse, createWarehouseItem, createWarehouseTransfer } from "@/lib/actions/warehouse";
+import { Combobox } from "@/components/ui/combobox";
 
 interface WarehouseData {
   id: string;
@@ -354,25 +355,26 @@ export function CreateTransferDialog({ open, onOpenChange, warehouses, items, br
           </div>
           <div className="grid gap-2">
             <Label>Item *</Label>
-            <Select value={warehouseItemId} onValueChange={setWarehouseItemId}>
-              <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
-              <SelectContent>
-                {filteredItems.map((i) => (
-                  <SelectItem key={i.id} value={i.id}>{i.name} ({i.sku}) — Stock: {i.currentStock}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={filteredItems.map((i) => ({ value: i.id, label: i.name, description: `${i.sku} — Stock: ${i.currentStock}` }))}
+              value={warehouseItemId}
+              onValueChange={setWarehouseItemId}
+              placeholder="Select item"
+              searchPlaceholder="Search items..."
+              emptyText="No items found"
+              disabled={!warehouseId}
+            />
           </div>
           <div className="grid gap-2">
             <Label>To Branch *</Label>
-            <Select value={toBranchId} onValueChange={setToBranchId}>
-              <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={branches.map((b) => ({ value: b.id, label: b.name, description: b.code }))}
+              value={toBranchId}
+              onValueChange={setToBranchId}
+              placeholder="Select branch"
+              searchPlaceholder="Search branches..."
+              emptyText="No branches found"
+            />
           </div>
           <div className="grid gap-2">
             <Label>Quantity *</Label>

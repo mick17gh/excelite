@@ -186,3 +186,49 @@ export function getStaffCSVTemplate(): string {
   ];
   return [headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
 }
+
+// =====================================
+// WAREHOUSE UTILITIES
+// =====================================
+
+import type { InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
+
+export interface BulkWarehouseItemInput {
+  name: string;
+  sku: string;
+  category: InventoryCategory;
+  unit: UnitType;
+  unitCost: number;
+  currentStock?: number;
+  minStock?: number;
+  reorderPoint?: number;
+}
+
+export function parseWarehouseCSV(rows: ParsedCSVRow[]): BulkWarehouseItemInput[] {
+  return rows.map((row) => ({
+    name: row.name || row.Name || "",
+    sku: row.sku || row.SKU || "",
+    category: (row.category || row.Category || "FOOD") as InventoryCategory,
+    unit: (row.unit || row.Unit || "UNIT") as UnitType,
+    unitCost: parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0"),
+    currentStock: row.currentStock || row["Current Stock"]
+      ? parseFloat(row.currentStock || row["Current Stock"])
+      : undefined,
+    minStock: row.minStock || row["Min Stock"]
+      ? parseFloat(row.minStock || row["Min Stock"])
+      : undefined,
+    reorderPoint: row.reorderPoint || row["Reorder Point"]
+      ? parseFloat(row.reorderPoint || row["Reorder Point"])
+      : undefined,
+  })).filter((item) => item.name && item.sku);
+}
+
+export function getWarehouseCSVTemplate(): string {
+  const headers = ["name", "sku", "category", "unit", "unitCost", "currentStock", "minStock", "reorderPoint"];
+  const examples = [
+    ["Chicken Breast", "CHKN-001", "FOOD", "KG", "15.50", "100", "20", "30"],
+    ["Rice", "RICE-001", "FOOD", "KG", "5.00", "500", "100", "150"],
+    ["Cooking Oil", "OIL-001", "FOOD", "LITER", "12.00", "50", "10", "20"],
+  ];
+  return [headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
+}

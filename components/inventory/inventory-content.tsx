@@ -35,6 +35,8 @@ import {
   Download,
   MoreHorizontal,
   Upload,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,13 +47,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import {
-  InboundStockForm,
   OutboundStockForm,
   WasteLogForm,
   TransferForm,
   AddInventoryItemForm,
 } from "@/components/inventory/inventory-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
+import { updateBranchTransferStatus } from "@/lib/actions/inventory";
+import { TransferStatus } from "@/lib/generated/prisma/client";
+import { toast } from "sonner";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { useBranchRestrictions } from "@/hooks/use-branch-restrictions";
@@ -81,19 +85,6 @@ interface Branch {
   currency?: string | null;
 }
 
-interface InboundRecord {
-  id: string;
-  quantity: number;
-  unitCost: number;
-  totalCost: number;
-  invoiceNumber: string | null;
-  deliveryDate: Date;
-  createdAt: Date;
-  item: { name: string; sku: string };
-  supplier: { name: string };
-  branch: { name: string };
-}
-
 interface OutboundRecord {
   id: string;
   quantity: number;
@@ -111,26 +102,57 @@ interface TransferRecord {
   totalCost: number;
   transferDate: Date;
   status: string;
+  notes: string | null;
+  approvedBy: string | null;
+  receivedBy: string | null;
   createdAt: Date;
   item: { name: string; sku: string };
   fromBranch: { name: string };
   toBranch: { name: string };
 }
 
+interface WarehouseTransfer {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseItemId: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+  toBranchId: string;
+  toBranchName: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  status: string;
+  transferDate: string;
+  approvedBy: string | null;
+  receivedBy: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+const TRANSFER_STATUS_COLORS: Record<string, string> = {
+  PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  IN_TRANSIT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+};
+
 interface InventoryContentProps {
   items: InventoryItem[];
   branches: Branch[];
-  inboundRecords?: InboundRecord[];
   outboundRecords?: OutboundRecord[];
   transferRecords?: TransferRecord[];
+  warehouseTransfers?: WarehouseTransfer[];
 }
 
 export function InventoryContent({ 
   items, 
   branches, 
-  inboundRecords = [], 
   outboundRecords = [], 
-  transferRecords = [] 
+  transferRecords = [],
+  warehouseTransfers = []
 }: InventoryContentProps) {
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
@@ -151,7 +173,6 @@ export function InventoryContent({
   useBranchCurrency(selectedBranchId, branches);
   
   // Form states
-  const [isInboundOpen, setIsInboundOpen] = useState(false);
   const [isOutboundOpen, setIsOutboundOpen] = useState(false);
   const [isWasteOpen, setIsWasteOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
@@ -309,9 +330,9 @@ export function InventoryContent({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <TabsList className="h-8">
             <TabsTrigger value="all" className="text-xs h-7">All Items</TabsTrigger>
-            <TabsTrigger value="inbound" className="text-xs h-7">Inbound</TabsTrigger>
+            <TabsTrigger value="warehouse" className="text-xs h-7">From Warehouse</TabsTrigger>
             <TabsTrigger value="outbound" className="text-xs h-7">Outbound</TabsTrigger>
-            <TabsTrigger value="transfers" className="text-xs h-7">Transfers</TabsTrigger>
+            <TabsTrigger value="transfers" className="text-xs h-7">Branch Transfers</TabsTrigger>
           </TabsList>
 
           <div className="flex gap-2">
@@ -341,10 +362,10 @@ export function InventoryContent({
               <Upload className="mr-1.5 h-3.5 w-3.5" />
               Import CSV
             </Button>
-            <Button size="sm" className="h-8" onClick={() => setIsAddItemOpen(true)}>
+            {/* <Button size="sm" className="h-8" onClick={() => setIsAddItemOpen(true)}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Add Item
-            </Button>
+            </Button> */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8">
@@ -353,22 +374,18 @@ export function InventoryContent({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setIsInboundOpen(true)}>
-                  <ArrowDownToLine className="mr-2 h-4 w-4" />
-                  Record Inbound
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsOutboundOpen(true)}>
                   <ArrowUpFromLine className="mr-2 h-4 w-4" />
                   Record Outbound
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setIsWasteOpen(true)}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   Log Waste
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setIsTransferOpen(true)}>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Transfer Stock
+                  Transfer to Branch
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -476,14 +493,14 @@ export function InventoryContent({
                               {item.currentStock} {item.unit}
                             </span>
                             <span className="text-muted-foreground">
-                              / {item.maxStock}
+                              / {item.maxStock > 0 ? item.maxStock : (item.minStock * 3 || 100)}
                             </span>
                           </div>
                           <Progress
                             value={getStockPercentage(
                               item.currentStock,
                               item.minStock,
-                              item.maxStock
+                              item.maxStock > 0 ? item.maxStock : (item.minStock * 3 || 100)
                             )}
                             className={`h-2 ${getStockColor(item.status)}`}
                           />
@@ -516,48 +533,52 @@ export function InventoryContent({
           </Card>
         </TabsContent>
 
-        <TabsContent value="inbound" className="mt-6">
+        <TabsContent value="warehouse" className="mt-6">
           <Card className="glass">
             <CardHeader>
-              <CardTitle>Recent Inbound Stock</CardTitle>
+              <CardTitle>Warehouse to Branch Transfers</CardTitle>
             </CardHeader>
-            <CardContent>
-              {inboundRecords.length > 0 ? (
+            <CardContent className="p-0">
+              {warehouseTransfers.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Unit Cost</TableHead>
-                      <TableHead>Total Cost</TableHead>
-                      <TableHead>Invoice</TableHead>
+                      <TableHead>Warehouse</TableHead>
+                      <TableHead>Branch</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inboundRecords.map((record) => (
+                    {warehouseTransfers.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{record.item.name}</p>
-                            <p className="text-sm text-muted-foreground">{record.item.sku}</p>
+                            <p className="font-medium">{record.itemName}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{record.itemSku}</p>
                           </div>
                         </TableCell>
-                        <TableCell>{record.supplier.name}</TableCell>
-                        <TableCell>{record.quantity}</TableCell>
-                        <TableCell>{formatCurrency(record.unitCost)}</TableCell>
-                        <TableCell>{formatCurrency(record.totalCost)}</TableCell>
-                        <TableCell>{record.invoiceNumber || "-"}</TableCell>
-                        <TableCell>{new Date(record.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
+                        <TableCell>{record.warehouseName}</TableCell>
+                        <TableCell>{record.toBranchName}</TableCell>
+                        <TableCell className="text-right">{record.quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(record.totalCost)}</TableCell>
+                        <TableCell>
+                          <Badge className={TRANSFER_STATUS_COLORS[record.status] || ""}>{record.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{new Date(record.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground">
-                  No inbound stock records found. Use the (Record Inbound) button to add new deliveries.
-                </p>
+                <div className="p-6">
+                  <p className="text-muted-foreground">
+                    No warehouse transfers found. Stock is received from warehouse transfers managed in the Warehouse section.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -615,9 +636,9 @@ export function InventoryContent({
         <TabsContent value="transfers" className="mt-6">
           <Card className="glass">
             <CardHeader>
-              <CardTitle>Stock Transfers</CardTitle>
+              <CardTitle>Branch-to-Branch Transfers</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {transferRecords.length > 0 ? (
                 <Table>
                   <TableHeader>
@@ -625,10 +646,11 @@ export function InventoryContent({
                       <TableHead>Item</TableHead>
                       <TableHead>From</TableHead>
                       <TableHead>To</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Total Cost</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -637,27 +659,65 @@ export function InventoryContent({
                         <TableCell>
                           <div>
                             <p className="font-medium">{record.item.name}</p>
-                            <p className="text-sm text-muted-foreground">{record.item.sku}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{record.item.sku}</p>
                           </div>
                         </TableCell>
                         <TableCell>{record.fromBranch.name}</TableCell>
                         <TableCell>{record.toBranch.name}</TableCell>
-                        <TableCell>{record.quantity}</TableCell>
-                        <TableCell>{formatCurrency(record.totalCost)}</TableCell>
+                        <TableCell className="text-right">{record.quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(record.totalCost)}</TableCell>
                         <TableCell>
-                          <Badge variant={record.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                            {record.status}
-                          </Badge>
+                          <Badge className={TRANSFER_STATUS_COLORS[record.status] || ""}>{record.status}</Badge>
                         </TableCell>
-                        <TableCell>{new Date(record.transferDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{new Date(record.transferDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
+                        <TableCell>
+                          {(record.status === "PENDING" || record.status === "IN_TRANSIT") && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {record.status === "PENDING" && (
+                                  <DropdownMenuItem onClick={async () => {
+                                    const res = await updateBranchTransferStatus(record.id, "IN_TRANSIT" as TransferStatus);
+                                    if (res.success) toast.success("Transfer approved");
+                                    else toast.error(res.error || "Failed");
+                                  }}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />Approve
+                                  </DropdownMenuItem>
+                                )}
+                                {record.status === "IN_TRANSIT" && (
+                                  <DropdownMenuItem onClick={async () => {
+                                    const res = await updateBranchTransferStatus(record.id, "COMPLETED" as TransferStatus);
+                                    if (res.success) toast.success("Transfer completed");
+                                    else toast.error(res.error || "Failed");
+                                  }}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />Mark Received
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem className="text-red-600" onClick={async () => {
+                                  const res = await updateBranchTransferStatus(record.id, "CANCELLED" as TransferStatus);
+                                  if (res.success) toast.success("Transfer cancelled");
+                                  else toast.error(res.error || "Failed");
+                                }}>
+                                  <XCircle className="mr-2 h-4 w-4" />Cancel
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground">
-                  No transfer records found. Use the transfer button to initiate inter-branch transfers.
-                </p>
+                <div className="p-6">
+                  <p className="text-muted-foreground">
+                    No transfer records found. Use the Transfer Stock button to initiate inter-branch transfers.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -665,12 +725,6 @@ export function InventoryContent({
       </Tabs>
 
       {/* Forms */}
-      <InboundStockForm
-        open={isInboundOpen}
-        onOpenChange={setIsInboundOpen}
-        branches={branches}
-        items={items}
-      />
       <OutboundStockForm
         open={isOutboundOpen}
         onOpenChange={setIsOutboundOpen}
