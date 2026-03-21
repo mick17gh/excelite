@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/lib/generated/prisma/client';
 import { db } from '@/lib/db';
 import { createHash } from 'crypto';
 import type { QueryTemplate, QueryParams, QueryResult, PrismaQueryConfig } from '../types';

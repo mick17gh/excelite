@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/lib/generated/prisma/client';
 import type { QueryIntent, ClassifiedQuery } from '../types';
 
 export const SYSTEM_PROMPTS = {

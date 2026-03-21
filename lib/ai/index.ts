@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/lib/generated/prisma/client';
 import { providerFactory } from './providers';
 import { queryClassifier } from './orchestration/classifier';
 import { promptBuilder, getResponseMode } from './orchestration/prompts';

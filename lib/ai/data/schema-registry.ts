@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/lib/generated/prisma/client';
 import type { SchemaEntity } from '../types';
 
 export const SCHEMA_REGISTRY: SchemaEntity[] = [
