@@ -229,6 +229,11 @@ export function getWarehouseCSVTemplate(): string {
     ["Chicken Breast", "CHKN-001", "FOOD", "KG", "15.50", "100", "20", "30"],
     ["Rice", "RICE-001", "FOOD", "KG", "5.00", "500", "100", "150"],
     ["Cooking Oil", "OIL-001", "FOOD", "LITER", "12.00", "50", "10", "20"],
+    ["Soft Drinks", "DRK-001", "BEVERAGE", "CASE", "10.00", "120", "30", "50"],
+    ["Plastic Cups", "CUP-001", "PACKAGING", "PACK", "8.00", "200", "50", "80"],
+    ["Detergent", "CLN-001", "CLEANING", "PIECE", "5.00", "30", "10", "15"],
   ];
-  return [headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
+  const note = "# Valid categories: FOOD, BEVERAGE, PACKAGING, CLEANING, EQUIPMENT, OTHER";
+  const note2 = "# Valid units: KG, GRAM, MG, TON, LITER, ML, CL, GALLON, PIECE, UNIT, ITEM, BOX, CARTON, CASE, PACK, BAG, SACK, CRATE, TRAY, BOTTLE, CAN, JAR, CUP, TABLESPOON, TEASPOON, SLICE, PORTION, SERVING, PLATE";
+  return [note, note2, headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
 }

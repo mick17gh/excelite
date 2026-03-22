@@ -29,6 +29,8 @@ import {
   createInventoryItem,
 } from "@/lib/actions/inventory";
 import { StockMovementType, InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
+import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
+import { INVENTORY_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants/categories";
 
 interface Branch {
   id: string;
@@ -696,11 +698,11 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="KG">Kilogram</SelectItem>
-                    <SelectItem value="LITER">Liter</SelectItem>
-                    <SelectItem value="PIECE">Piece</SelectItem>
-                    <SelectItem value="BOX">Box</SelectItem>
-                    <SelectItem value="CASE">Case</SelectItem>
+                    {UNIT_TYPES.map((unitType) => (
+                      <SelectItem key={unitType} value={unitType}>
+                        {UNIT_LABELS[unitType]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -114,12 +114,37 @@ enum InventoryCategory {
 enum UnitType {
   KG
   GRAM
+  MG
+  TON
   LITER
   ML
+  CL
+  GALLON
   PIECE
+  UNIT
+  ITEM
   BOX
+  CARTON
   CASE
   PACK
+  BAG
+  SACK
+  CRATE
+  TRAY
+  BOTTLE
+  CAN
+  JAR
+  CUP
+  TABLESPOON
+  TEASPOON
+  SLICE
+  PORTION
+  SERVING
+  PLATE
+  DOZEN
+  HALF_DOZEN
+  BUNCH
+  BLOCK
 }
 
 enum TransferStatus {

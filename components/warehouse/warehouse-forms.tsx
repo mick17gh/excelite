@@ -24,6 +24,8 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { createWarehouse, createWarehouseItem, createWarehouseTransfer } from "@/lib/actions/warehouse";
 import { Combobox } from "@/components/ui/combobox";
+import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
+import { INVENTORY_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants/categories";
 
 interface WarehouseData {
   id: string;
@@ -227,12 +229,11 @@ export function CreateWarehouseItemDialog({ open, onOpenChange, warehouses }: Cr
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FOOD">Food</SelectItem>
-                  <SelectItem value="BEVERAGE">Beverage</SelectItem>
-                  <SelectItem value="PACKAGING">Packaging</SelectItem>
-                  <SelectItem value="CLEANING">Cleaning</SelectItem>
-                  <SelectItem value="EQUIPMENT">Equipment</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
+                  {INVENTORY_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {CATEGORY_LABELS[cat]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -241,14 +242,11 @@ export function CreateWarehouseItemDialog({ open, onOpenChange, warehouses }: Cr
               <Select value={unit} onValueChange={setUnit}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="KG">KG</SelectItem>
-                  <SelectItem value="GRAM">Gram</SelectItem>
-                  <SelectItem value="LITER">Liter</SelectItem>
-                  <SelectItem value="ML">ML</SelectItem>
-                  <SelectItem value="PIECE">Piece</SelectItem>
-                  <SelectItem value="BOX">Box</SelectItem>
-                  <SelectItem value="CASE">Case</SelectItem>
-                  <SelectItem value="PACK">Pack</SelectItem>
+                  {UNIT_TYPES.map((unitType) => (
+                    <SelectItem key={unitType} value={unitType}>
+                      {UNIT_LABELS[unitType]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

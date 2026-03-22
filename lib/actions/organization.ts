@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { SubscriptionTier, SubscriptionStatus, Role } from "@/lib/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
+import { TIER_CONFIG } from "@/lib/tier-config";
 
 export interface UpdateOrganizationInput {
   id: string;
@@ -93,7 +94,14 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
 
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name;
-    if (input.tier !== undefined) data.tier = input.tier;
+    if (input.tier !== undefined) {
+      data.tier = input.tier;
+      // Automatically update limits when tier changes
+      const tierLimits = TIER_CONFIG[input.tier];
+      data.maxBranches = tierLimits.maxBranches === Infinity ? 999 : tierLimits.maxBranches;
+      data.maxUsers = tierLimits.maxUsers === Infinity ? 999 : tierLimits.maxUsers;
+      data.maxMenuItems = tierLimits.maxMenuItems;
+    }
     if (input.maxBranches !== undefined) data.maxBranches = input.maxBranches;
     if (input.maxUsers !== undefined) data.maxUsers = input.maxUsers;
     if (input.maxMenuItems !== undefined) data.maxMenuItems = input.maxMenuItems;
@@ -105,6 +113,7 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
     });
 
     revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/branches");
     return { data: org };
   } catch (error) {
     console.error("[updateOrganization] Error:", error);

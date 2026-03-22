@@ -29,7 +29,16 @@ import {
   CheckCircle2,
   Loader2,
   X,
+  Trash2,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { bulkCreateWarehouseItems } from "@/lib/actions/warehouse";
@@ -38,6 +47,8 @@ import {
   getWarehouseCSVTemplate,
   type BulkWarehouseItemInput,
 } from "@/lib/utils/bulk-import";
+import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
+import { INVENTORY_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants/categories";
 
 interface WarehouseImportDialogProps {
   open: boolean;
@@ -49,6 +60,7 @@ interface WarehouseImportDialogProps {
 interface ParsedRow extends BulkWarehouseItemInput {
   _valid: boolean;
   _errors: string[];
+  _index: number;
 }
 
 export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehouseName }: WarehouseImportDialogProps) {
@@ -83,7 +95,7 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
       const parsed = parseWarehouseCSV(rows);
       
       // Validate each row
-      const validatedData: ParsedRow[] = parsed.map((item) => {
+      const validatedData: ParsedRow[] = parsed.map((item, index) => {
         const errors: string[] = [];
         
         if (!item.name || item.name.trim() === "") {
@@ -94,9 +106,13 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
         }
         if (!item.category || item.category.trim() === "") {
           errors.push("Category is required");
+        } else if (!INVENTORY_CATEGORIES.includes(item.category as any)) {
+          errors.push(`Invalid category. Must be one of: ${INVENTORY_CATEGORIES.join(", ")}`);
         }
         if (!item.unit || item.unit.trim() === "") {
           errors.push("Unit is required");
+        } else if (!UNIT_TYPES.includes(item.unit as any)) {
+          errors.push(`Invalid unit. Must be one of: ${UNIT_TYPES.join(", ")}`);
         }
         if (isNaN(item.unitCost) || item.unitCost <= 0) {
           errors.push("Unit cost must be a positive number");
@@ -115,10 +131,31 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
           ...item,
           _valid: errors.length === 0,
           _errors: errors,
+          _index: index,
         };
       });
 
-      setParsedData(validatedData);
+      // Check for duplicate SKUs within the import
+      const skuCounts = new Map<string, number>();
+      validatedData.forEach((item) => {
+        if (item.sku) {
+          skuCounts.set(item.sku, (skuCounts.get(item.sku) || 0) + 1);
+        }
+      });
+
+      // Mark duplicates
+      const finalData = validatedData.map((item) => {
+        if (item.sku && skuCounts.get(item.sku)! > 1) {
+          return {
+            ...item,
+            _valid: false,
+            _errors: [...item._errors, `Duplicate SKU in import: ${item.sku}`],
+          };
+        }
+        return item;
+      });
+
+      setParsedData(finalData);
     } catch (error) {
       console.error("Parse error:", error);
       setParseError("Failed to parse CSV file. Please check the format.");
@@ -175,6 +212,36 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
     a.download = "warehouse_items_template.csv";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const removeRow = (index: number) => {
+    setParsedData((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateRowField = (index: number, field: keyof BulkWarehouseItemInput, value: any) => {
+    setParsedData((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      
+      // Re-validate the row
+      const errors: string[] = [];
+      const item = updated[index];
+      
+      if (!item.name || item.name.trim() === "") errors.push("Name is required");
+      if (!item.sku || item.sku.trim() === "") errors.push("SKU is required");
+      if (!item.category || !INVENTORY_CATEGORIES.includes(item.category as any)) {
+        errors.push("Valid category is required");
+      }
+      if (!item.unit || !UNIT_TYPES.includes(item.unit as any)) {
+        errors.push("Valid unit is required");
+      }
+      if (isNaN(item.unitCost) || item.unitCost <= 0) errors.push("Valid unit cost required");
+      
+      updated[index]._valid = errors.length === 0;
+      updated[index]._errors = errors;
+      
+      return updated;
+    });
   };
 
   const handleImport = () => {
@@ -295,11 +362,12 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
                       <TableHead className="w-[50px]">Status</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>SKU</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Unit</TableHead>
+                      <TableHead className="w-[180px]">Category</TableHead>
+                      <TableHead className="w-[150px]">Unit</TableHead>
                       <TableHead className="text-right">Unit Cost</TableHead>
                       <TableHead className="text-right">Stock</TableHead>
                       <TableHead>Errors</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -314,8 +382,40 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
                         </TableCell>
                         <TableCell className="font-medium">{row.name || "-"}</TableCell>
                         <TableCell className="font-mono text-xs">{row.sku || "-"}</TableCell>
-                        <TableCell>{row.category || "-"}</TableCell>
-                        <TableCell>{row.unit || "-"}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={row.category || ""}
+                            onValueChange={(value) => updateRowField(index, "category", value)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INVENTORY_CATEGORIES.map((cat) => (
+                                <SelectItem key={cat} value={cat} className="text-xs">
+                                  {CATEGORY_LABELS[cat]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={row.unit || ""}
+                            onValueChange={(value) => updateRowField(index, "unit", value)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {UNIT_TYPES.map((unit) => (
+                                <SelectItem key={unit} value={unit} className="text-xs">
+                                  {UNIT_LABELS[unit]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell className="text-right">
                           {isNaN(row.unitCost) ? "-" : `GH₵ ${row.unitCost.toFixed(2)}`}
                         </TableCell>
@@ -324,8 +424,18 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
                         </TableCell>
                         <TableCell>
                           {row._errors.length > 0 && (
-                            <span className="text-xs text-red-600">{row._errors.join(", ")}</span>
+                            <span className="text-xs text-red-600">{row._errors[0]}</span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => removeRow(index)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
