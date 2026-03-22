@@ -389,10 +389,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     "customers:edit",
   ],
 
-  KITCHEN_STAFF: [
-    "kitchen:access",
-    "orders:view",
-  ],
+  KITCHEN_STAFF: ["kitchen:access", "orders:view"],
 
   AUDITOR: [
     "dashboard:view",
@@ -421,9 +418,6 @@ const rolePermissions: Record<Role, Permission[]> = {
 
   CALL_CENTER: [
     "dashboard:view",
-    "branches:view",
-    "menu:view",
-    "categories:view",
     "orders:view",
     "orders:create",
     "orders:edit",
@@ -448,17 +442,26 @@ const rolePermissions: Record<Role, Permission[]> = {
   ],
 };
 
-export function hasPermission(role: Role | undefined | null, permission: Permission): boolean {
+export function hasPermission(
+  role: Role | undefined | null,
+  permission: Permission,
+): boolean {
   if (!role) return false;
   return rolePermissions[role]?.includes(permission) ?? false;
 }
 
-export function hasAnyPermission(role: Role | undefined | null, permissions: Permission[]): boolean {
+export function hasAnyPermission(
+  role: Role | undefined | null,
+  permissions: Permission[],
+): boolean {
   if (!role) return false;
   return permissions.some((p) => hasPermission(role, p));
 }
 
-export function hasAllPermissions(role: Role | undefined | null, permissions: Permission[]): boolean {
+export function hasAllPermissions(
+  role: Role | undefined | null,
+  permissions: Permission[],
+): boolean {
   if (!role) return false;
   return permissions.every((p) => hasPermission(role, p));
 }
@@ -467,7 +470,10 @@ export function getPermissionsForRole(role: Role): Permission[] {
   return rolePermissions[role] || [];
 }
 
-export function canAccessRoute(role: Role | undefined | null, route: string): boolean {
+export function canAccessRoute(
+  role: Role | undefined | null,
+  route: string,
+): boolean {
   if (!role) return false;
 
   const routePermissions: Record<string, Permission[]> = {
@@ -517,16 +523,22 @@ export const roleDisplayNames: Record<Role, string> = {
 };
 
 export const roleDescriptions: Record<Role, string> = {
-  SUPER_ADMIN: "Platform owner with full access to all features and subscription management",
-  ADMIN: "Organization administrator with full operational access (cannot manage subscriptions)",
-  EXECUTIVE: "Company-wide visibility with full operational and strategic controls",
-  OPERATIONS_MANAGER: "Manage all branches, staff, inventory, orders, and warehouse operations",
-  BRANCH_MANAGER: "Manage a specific branch including staff, inventory, orders, and sales",
+  SUPER_ADMIN:
+    "Platform owner with full access to all features and subscription management",
+  ADMIN:
+    "Organization administrator with full operational access (cannot manage subscriptions)",
+  EXECUTIVE:
+    "Company-wide visibility with full operational and strategic controls",
+  OPERATIONS_MANAGER:
+    "Manage all branches, staff, inventory, orders, and warehouse operations",
+  BRANCH_MANAGER:
+    "Manage a specific branch including staff, inventory, orders, and sales",
   SUPERVISOR: "Oversee branch operations with limited management capabilities",
   STAFF: "Dashboard, POS, kitchen (KDS), orders, and customers",
   KITCHEN_STAFF: "Kitchen display access for order preparation",
   AUDITOR: "Read-only access to all data for compliance and auditing",
   DEVELOPER: "API key management and technical settings access",
   CALL_CENTER: "Dashboard, orders, and customers only",
-  WAREHOUSE_STAFF: "Warehouse inventory management and branch transfer operations",
+  WAREHOUSE_STAFF:
+    "Warehouse inventory management and branch transfer operations",
 };
