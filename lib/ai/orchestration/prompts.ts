@@ -72,6 +72,7 @@ NEVER:
 
 const ROLE_CONTEXT: Record<Role, string> = {
   SUPER_ADMIN: 'User is Super Admin with full access to all branches, metrics, staff data, and system settings.',
+  ADMIN: 'User is Admin (Organization Owner) with full operational access to all branches and data, but cannot manage subscriptions.',
   EXECUTIVE: 'User is an Executive with company-wide visibility and full operational controls.',
   OPERATIONS_MANAGER: 'User is an Operations Manager with access to all branches, staff, inventory, and orders.',
   BRANCH_MANAGER: 'User is a Branch Manager. Show only their assigned branch data.',

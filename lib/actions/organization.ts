@@ -2,7 +2,9 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { SubscriptionTier, SubscriptionStatus } from "@/lib/generated/prisma/client";
+import { SubscriptionTier, SubscriptionStatus, Role } from "@/lib/generated/prisma/client";
+import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export interface UpdateOrganizationInput {
   id: string;
@@ -79,6 +81,16 @@ export async function getOrganization(id?: string) {
 
 export async function updateOrganization(input: UpdateOrganizationInput) {
   try {
+    // Check if user is trying to change tier
+    if (input.tier !== undefined) {
+      const session = await auth.api.getSession({ headers: await import("next/headers").then(m => m.headers()) });
+      const user = session?.user;
+      
+      if (!user || !hasPermission(user.role as Role, "subscriptions:manage")) {
+        return { error: "You don't have permission to change subscription tiers" };
+      }
+    }
+
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.tier !== undefined) data.tier = input.tier;
@@ -107,8 +119,8 @@ export async function createOrganization(name: string, tier: SubscriptionTier = 
         name,
         tier,
         status: "ACTIVE",
-        maxBranches: tier === "FREE" ? 1 : tier === "BASIC" ? 3 : tier === "PRO" ? 10 : 999,
-        maxUsers: tier === "FREE" ? 2 : tier === "BASIC" ? 10 : tier === "PRO" ? 50 : 999,
+        maxBranches: tier === "FREE" ? 1 : tier === "PRO" ? 10 : 999,
+        maxUsers: tier === "FREE" ? 2 : tier === "PRO" ? 50 : 999,
       },
     });
 
@@ -146,5 +158,64 @@ export async function getSubscriptionPayments(organizationId: string) {
   } catch (error) {
     console.error("[getSubscriptionPayments] Error:", error);
     return { data: [] };
+  }
+}
+
+export async function getAllOrganizations() {
+  try {
+    // Check if user has permission
+    const session = await auth.api.getSession({ headers: await import("next/headers").then(m => m.headers()) });
+    const user = session?.user;
+    
+    if (!user || !hasPermission(user.role as Role, "subscriptions:manage")) {
+      return { error: "You don't have permission to view all organizations" };
+    }
+
+    const organizations = await db.organization.findMany({
+      include: {
+        _count: { 
+          select: { 
+            users: true, 
+            branches: true, 
+            warehouses: true 
+          } 
+        },
+        subscription: {
+          select: {
+            tier: true,
+            status: true,
+            amount: true,
+            currency: true,
+            nextBillingDate: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return {
+      data: organizations.map((org) => ({
+        id: org.id,
+        name: org.name,
+        tier: org.tier,
+        status: org.status,
+        maxBranches: org.maxBranches,
+        maxUsers: org.maxUsers,
+        userCount: org._count.users,
+        branchCount: org._count.branches,
+        warehouseCount: org._count.warehouses,
+        subscription: org.subscription ? {
+          tier: org.subscription.tier,
+          status: org.subscription.status,
+          amount: Number(org.subscription.amount),
+          currency: org.subscription.currency,
+          nextBillingDate: org.subscription.nextBillingDate?.toISOString() || null,
+        } : null,
+        createdAt: org.createdAt.toISOString(),
+      })),
+    };
+  } catch (error) {
+    console.error("[getAllOrganizations] Error:", error);
+    return { error: "Failed to fetch organizations" };
   }
 }

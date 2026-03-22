@@ -6,19 +6,20 @@ import { QUERY_TEMPLATES, getTemplateById } from './query-templates';
 
 const ROLE_HIERARCHY: Record<Role, number> = {
   SUPER_ADMIN: 10,
-  EXECUTIVE: 9,
-  OPERATIONS_MANAGER: 8,
-  BRANCH_MANAGER: 7,
-  SUPERVISOR: 6,
-  STAFF: 5,
-  KITCHEN_STAFF: 4,
+  ADMIN: 9,
+  EXECUTIVE: 8,
+  OPERATIONS_MANAGER: 7,
+  BRANCH_MANAGER: 6,
+  SUPERVISOR: 5,
+  STAFF: 4,
+  KITCHEN_STAFF: 3,
   AUDITOR: 3,
   DEVELOPER: 2,
   CALL_CENTER: 2,
   WAREHOUSE_STAFF: 2,
 };
 
-const GLOBAL_ACCESS_ROLES: Role[] = [Role.SUPER_ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.AUDITOR];
+const GLOBAL_ACCESS_ROLES: Role[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.EXECUTIVE, Role.OPERATIONS_MANAGER, Role.AUDITOR];
 
 interface UserContext {
   userId: string;

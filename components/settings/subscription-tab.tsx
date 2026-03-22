@@ -45,15 +45,13 @@ interface OrgInfo {
 }
 
 const PLANS = [
-  { tier: "FREE", label: "Free", icon: Zap, price: 0, desc: "For small businesses getting started", features: ["1 Branch", "2 Users", "Basic POS", "Menu Management"] },
-  { tier: "BASIC", label: "Basic", icon: Crown, price: 49, desc: "For growing restaurants", features: ["3 Branches", "10 Users", "Inventory", "Customer CRM", "Analytics"] },
-  { tier: "PRO", label: "Pro", icon: Rocket, price: 149, desc: "For multi-branch operations", features: ["10 Branches", "50 Users", "Warehouse", "Delivery", "WhatsApp Orders", "API Access"] },
-  { tier: "ENTERPRISE", label: "Enterprise", icon: Building, price: 0, desc: "Custom pricing for large chains", features: ["Unlimited Branches", "Unlimited Users", "Priority Support", "Custom Integrations"] },
+  { tier: "FREE", label: "Free", icon: Zap, price: 0, desc: "For small businesses getting started", features: ["1 Branch", "2 Users", "50 Menu Items", "Basic POS", "Inventory"] },
+  { tier: "PRO", label: "Pro", icon: Rocket, price: 149, desc: "For multi-branch operations", features: ["10 Branches", "50 Users", "Unlimited Menu Items", "AI Assistant", "Online Ordering", "API Access"] },
+  { tier: "ENTERPRISE", label: "Enterprise", icon: Building, price: 0, desc: "Custom pricing for large chains", features: ["Unlimited Everything", "WhatsApp Ordering", "Custom Branding", "Priority Support"] },
 ];
 
 const TIER_COLORS: Record<string, string> = {
   FREE: "bg-slate-100 text-slate-700",
-  BASIC: "bg-blue-100 text-blue-700",
   PRO: "bg-purple-100 text-purple-700",
   ENTERPRISE: "bg-amber-100 text-amber-700",
 };

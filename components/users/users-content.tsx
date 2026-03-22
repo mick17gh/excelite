@@ -41,7 +41,7 @@ import {
   UserX,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { AddUserForm, EditUserForm } from "@/components/users/user-forms";
+import { AddUserForm, EditUserForm, ResetPasswordDialog } from "@/components/users/user-forms";
 import { TablePagination } from "@/components/ui/table-pagination";
 
 interface User {
@@ -73,6 +73,7 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [resettingPasswordUser, setResettingPasswordUser] = useState<User | null>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -106,12 +107,13 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
 
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => u.isActive).length;
-  const adminUsers = users.filter((u) => u.role === "SUPER_ADMIN" || u.role === "EXECUTIVE").length;
+  const adminUsers = users.filter((u) => u.role === "SUPER_ADMIN" || u.role === "ADMIN" || u.role === "EXECUTIVE").length;
   const branchManagers = users.filter((u) => u.role === "BRANCH_MANAGER").length;
 
   const getRoleBadge = (role: string) => {
     const colors: Record<string, string> = {
       SUPER_ADMIN: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+      ADMIN: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
       EXECUTIVE: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
       OPERATIONS_MANAGER: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
       BRANCH_MANAGER: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
@@ -125,6 +127,7 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
     };
     const labels: Record<string, string> = {
       SUPER_ADMIN: "Super Admin",
+      ADMIN: "Admin",
       EXECUTIVE: "Executive",
       OPERATIONS_MANAGER: "Ops Manager",
       BRANCH_MANAGER: "Branch Manager",
@@ -228,6 +231,7 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
               <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+              <SelectItem value="ADMIN">Admin</SelectItem>
               <SelectItem value="EXECUTIVE">Executive</SelectItem>
               <SelectItem value="OPERATIONS_MANAGER">Ops Manager</SelectItem>
               <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
@@ -327,7 +331,7 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setResettingPasswordUser(user)}>
                           <Key className="mr-2 h-4 w-4" />
                           Reset Password
                         </DropdownMenuItem>
@@ -383,6 +387,11 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
         onOpenChange={(open) => !open && setEditingUser(null)}
         user={editingUser}
         branches={branches}
+      />
+      <ResetPasswordDialog
+        open={!!resettingPasswordUser}
+        onOpenChange={(open) => !open && setResettingPasswordUser(null)}
+        user={resettingPasswordUser}
       />
     </div>
   );

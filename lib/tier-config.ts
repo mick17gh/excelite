@@ -1,4 +1,8 @@
-import { SubscriptionTier } from "@/lib/generated/prisma/client";
+import { SubscriptionTier, Role } from "@/lib/generated/prisma/client";
+
+export function isSuperAdmin(role: Role | undefined | null): boolean {
+  return role === "SUPER_ADMIN";
+}
 
 export interface TierLimits {
   maxBranches: number;
@@ -46,37 +50,6 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
       inventory: true,
       warehouse: true,
       salesAnalytics: true,
-      advancedReports: true,
-      staffManagement: true,
-      staffScheduling: false,
-      targets: true,
-      alerts: true,
-      apiAccess: true,
-      aiAssistant: false,
-      callCenter: false,
-      onlineOrdering: false,
-      whatsappOrdering: false,
-      delivery: true,
-      crm: true,
-      multiCurrency: false,
-      customBranding: false,
-      auditLogs: false,
-      bulkImport: false,
-      smsNotifications: false,
-      emailNotifications: false,
-    },
-  },
-  BASIC: {
-    maxBranches: 3,
-    maxUsers: 10,
-    maxMenuItems: 200,
-    maxWarehouses: 1,
-    features: {
-      pos: true,
-      kitchenDisplay: true,
-      inventory: true,
-      warehouse: true,
-      salesAnalytics: true,
       advancedReports: false,
       staffManagement: true,
       staffScheduling: false,
@@ -92,9 +65,9 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
       multiCurrency: false,
       customBranding: false,
       auditLogs: false,
-      bulkImport: true,
+      bulkImport: false,
       smsNotifications: false,
-      emailNotifications: true,
+      emailNotifications: false,
     },
   },
   PRO: {
@@ -165,15 +138,29 @@ export function getTierLimits(tier: SubscriptionTier): TierLimits {
   return TIER_CONFIG[tier];
 }
 
-export function hasFeature(tier: SubscriptionTier, feature: keyof TierFeatures): boolean {
+export function hasFeature(
+  tier: SubscriptionTier,
+  feature: keyof TierFeatures,
+  userRole?: Role | null
+): boolean {
+  // SUPER_ADMIN bypasses all tier restrictions
+  if (isSuperAdmin(userRole)) {
+    return true;
+  }
   return TIER_CONFIG[tier].features[feature];
 }
 
 export function isWithinLimit(
   tier: SubscriptionTier,
   resource: "branches" | "users" | "menuItems" | "warehouses",
-  currentCount: number
+  currentCount: number,
+  userRole?: Role | null
 ): boolean {
+  // SUPER_ADMIN bypasses all tier restrictions
+  if (isSuperAdmin(userRole)) {
+    return true;
+  }
+  
   const limits = TIER_CONFIG[tier];
   switch (resource) {
     case "branches":
@@ -191,14 +178,12 @@ export function isWithinLimit(
 
 export const TIER_DISPLAY_NAMES: Record<SubscriptionTier, string> = {
   FREE: "Free",
-  BASIC: "Basic",
   PRO: "Pro",
   ENTERPRISE: "Enterprise",
 };
 
 export const TIER_DESCRIPTIONS: Record<SubscriptionTier, string> = {
-  FREE: "Get started with basic POS and inventory for a single branch",
-  BASIC: "Multi-branch operations with analytics and staff management",
+  FREE: "Get started with essential POS and inventory for a single branch",
   PRO: "Full platform with AI, delivery, online ordering, and advanced reporting",
   ENTERPRISE: "Unlimited scale with WhatsApp ordering, custom branding, and dedicated support",
 };

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { createUser, updateUser } from "@/lib/actions/users";
+import { createUser, updateUser, resetUserPassword } from "@/lib/actions/users";
 import { Role } from "@/lib/generated/prisma/client";
 
 interface Branch {
@@ -171,7 +171,8 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SUPER_ADMIN">Super Admin (Full Access)</SelectItem>
+                  <SelectItem value="SUPER_ADMIN">Super Admin (Platform Owner)</SelectItem>
+                  <SelectItem value="ADMIN">Admin (Organization Owner)</SelectItem>
                   <SelectItem value="EXECUTIVE">Executive (Strategic Controls)</SelectItem>
                   <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
                   <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
@@ -343,6 +344,7 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="EXECUTIVE">Executive</SelectItem>
                   <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
                   <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
@@ -398,6 +400,115 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update User
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Reset Password Dialog
+interface ResetPasswordDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  user: User | null;
+}
+
+export function ResetPasswordDialog({ open, onOpenChange, user }: ResetPasswordDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  useEffect(() => {
+    if (!open) {
+      setFormData({ newPassword: "", confirmPassword: "" });
+    }
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (formData.newPassword !== formData.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    if (formData.newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await resetUserPassword(user!.id, formData.newPassword);
+
+      if (result.success) {
+        toast.success("Password reset successfully");
+        onOpenChange(false);
+      } else {
+        toast.error(result.error || "Failed to reset password");
+      }
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error("Failed to reset password");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Reset Password</DialogTitle>
+          <DialogDescription>
+            Set a new password for {user.name}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.newPassword}
+                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                required
+                minLength={8}
+              />
+              <p className="text-xs text-muted-foreground">
+                Minimum 8 characters
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                required
+                minLength={8}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reset Password
             </Button>
           </DialogFooter>
         </form>

@@ -34,6 +34,7 @@ import {
 import { OrganizationTab } from "./organization-tab";
 import { SubscriptionTab } from "./subscription-tab";
 import { KitchenStationsTab } from "./kitchen-stations-tab";
+import { PlatformAdminTab } from "./platform-admin-tab";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import {
@@ -348,6 +349,12 @@ export function SettingsContent() {
           <CreditCard className="mr-1.5 h-3.5 w-3.5" />
           Subscription
         </TabsTrigger>
+        {user?.role === "SUPER_ADMIN" && (
+          <TabsTrigger value="platform-admin" className="text-xs">
+            <Shield className="mr-1.5 h-3.5 w-3.5" />
+            Platform Admin
+          </TabsTrigger>
+        )}
       </TabsList>
 
       <TabsContent value="profile">
@@ -752,6 +759,12 @@ export function SettingsContent() {
       <TabsContent value="subscription">
         <SubscriptionTab />
       </TabsContent>
+
+      {user?.role === "SUPER_ADMIN" && (
+        <TabsContent value="platform-admin">
+          <PlatformAdminTab />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
