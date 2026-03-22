@@ -34,15 +34,19 @@ import {
   BarChart3,
   Clock,
   FileSpreadsheet,
-  FileType,
   Loader2,
   Eye,
-  X,
+  Building2,
+  Truck,
+  ShoppingCart,
+  UserCircle,
+  Store,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { generateReportData, type ReportId } from "@/lib/actions/reports";
-import { exportToCSV, exportToExcel } from "@/lib/utils/export";
+import { downloadReportCSV, downloadReportXLSX } from "@/lib/utils/report-export";
 import { useCurrency } from "@/contexts/currency-context";
 
 interface Branch {
@@ -99,11 +103,28 @@ const reportTypes: ReportType[] = [
   },
   {
     id: "inventory-report",
-    name: "Inventory Status Report",
-    description: "Current stock levels, low stock alerts, and inventory valuation",
+    name: "Branch Inventory Status",
+    description:
+      "On-hand stock at each branch (retail / kitchen). Hub stock is in warehouse reports.",
     icon: Package,
     category: "Inventory",
     frequency: "Daily",
+  },
+  {
+    id: "warehouse-stock",
+    name: "Warehouse Stock Report",
+    description: "Central hub quantities, valuation, and low-stock lines by warehouse",
+    icon: Building2,
+    category: "Warehouse",
+    frequency: "Daily",
+  },
+  {
+    id: "warehouse-activity",
+    name: "Warehouse Activity",
+    description: "Transfers to branches, inbound receipts, and warehouse waste in the period",
+    icon: Truck,
+    category: "Warehouse",
+    frequency: "Weekly",
   },
   {
     id: "waste-variance",
@@ -120,6 +141,38 @@ const reportTypes: ReportType[] = [
     icon: Users,
     category: "HR",
     frequency: "Weekly",
+  },
+  {
+    id: "orders-overview",
+    name: "Orders Overview",
+    description: "Unified orders by status, source, channel type, and branch with line-level export",
+    icon: ShoppingCart,
+    category: "Orders",
+    frequency: "Daily",
+  },
+  {
+    id: "customer-insights",
+    name: "Customer Insights",
+    description: "Repeat buyers, revenue by customer, and ranking for loyalty follow-ups",
+    icon: UserCircle,
+    category: "Customers",
+    frequency: "Weekly",
+  },
+  {
+    id: "pos-sales-report",
+    name: "POS Terminal Sales",
+    description: "In-venue POS tickets, channels, and top menu items",
+    icon: Store,
+    category: "POS",
+    frequency: "Daily",
+  },
+  {
+    id: "cash-transactions",
+    name: "Payment Transactions",
+    description: "Recorded payments and tips by method (ties to POS / checkout activity)",
+    icon: CreditCard,
+    category: "Finance",
+    frequency: "Daily",
   },
 ];
 
@@ -178,51 +231,15 @@ export function ReportsContent({ branches }: ReportsContentProps) {
   };
 
   const exportReportToCSV = (data: Record<string, unknown>, reportId: ReportId) => {
-    const reportName = data.reportName as string || reportId;
-    const rows: Record<string, unknown>[] = [];
-
-    // Flatten the data for CSV
-    if (data.summary) {
-      rows.push({ section: "Summary", ...data.summary as object });
-    }
-
-    // Add array data
-    const arrayKeys = Object.keys(data).filter((k) => Array.isArray(data[k]));
-    arrayKeys.forEach((key) => {
-      const items = data[key] as Record<string, unknown>[];
-      items.forEach((item, index) => {
-        rows.push({ section: key, index: index + 1, ...item });
-      });
-    });
-
-    exportToCSV(rows, `${reportName.replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd")}`);
+    const reportName = (data.reportName as string) || reportId;
+    const base = `${reportName.replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd")}`;
+    downloadReportCSV(data, base);
   };
 
   const exportReportToExcel = (data: Record<string, unknown>, reportId: ReportId) => {
-    const reportName = data.reportName as string || reportId;
-    const sheets: { name: string; data: Record<string, unknown>[] }[] = [];
-
-    // Summary sheet
-    if (data.summary) {
-      sheets.push({
-        name: "Summary",
-        data: [data.summary as Record<string, unknown>],
-      });
-    }
-
-    // Add array data as separate sheets
-    const arrayKeys = Object.keys(data).filter((k) => Array.isArray(data[k]));
-    arrayKeys.forEach((key) => {
-      const items = data[key] as Record<string, unknown>[];
-      if (items.length > 0) {
-        sheets.push({
-          name: key.replace(/([A-Z])/g, " $1").trim(),
-          data: items,
-        });
-      }
-    });
-
-    exportToExcel(sheets, `${reportName.replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd")}`);
+    const reportName = (data.reportName as string) || reportId;
+    const base = `${reportName.replace(/\s+/g, "_")}_${format(new Date(), "yyyy-MM-dd")}`;
+    downloadReportXLSX(data, base);
   };
 
   const getCategoryColor = (category: string) => {
@@ -239,6 +256,16 @@ export function ReportsContent({ branches }: ReportsContentProps) {
         return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
       case "HR":
         return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400";
+      case "Warehouse":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
+      case "Orders":
+        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400";
+      case "Customers":
+        return "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400";
+      case "POS":
+        return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400";
+      case "Finance":
+        return "bg-lime-100 text-lime-900 dark:bg-lime-900/30 dark:text-lime-400";
       default:
         return "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400";
     }
