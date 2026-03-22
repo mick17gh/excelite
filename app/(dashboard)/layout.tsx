@@ -17,6 +17,10 @@ export default async function DashboardLayout({
   });
 
   const userRole = (session?.user?.role as Role) || "STAFF";
+  
+  if (!session) {
+    redirect("/sign-in");
+  }
 
   // Check if organization exists, redirect to onboarding if not
   const org = await db.organization.findFirst({ select: { tier: true } });
