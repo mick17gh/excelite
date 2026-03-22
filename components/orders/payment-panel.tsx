@@ -32,9 +32,11 @@ interface PaymentPanelProps {
   orderTotal: number;
   paymentStatus: string;
   payments: PaymentItem[];
+  /** Called after a payment is recorded or refunded so the parent can refresh order data */
+  onRefresh?: () => void | Promise<void>;
 }
 
-export function PaymentPanel({ orderId, orderTotal, paymentStatus, payments }: PaymentPanelProps) {
+export function PaymentPanel({ orderId, orderTotal, paymentStatus, payments, onRefresh }: PaymentPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [amount, setAmount] = useState(orderTotal);
@@ -67,6 +69,7 @@ export function PaymentPanel({ orderId, orderTotal, paymentStatus, payments }: P
         toast.success("Payment recorded");
         setShowForm(false);
         setProviderRef("");
+        await onRefresh?.();
       }
     } catch {
       toast.error("Failed to record payment");
@@ -78,7 +81,10 @@ export function PaymentPanel({ orderId, orderTotal, paymentStatus, payments }: P
   const handleRefund = async (paymentId: string) => {
     const result = await refundPayment(paymentId);
     if (result.error) toast.error(result.error);
-    else toast.success("Payment refunded");
+    else {
+      toast.success("Payment refunded");
+      await onRefresh?.();
+    }
   };
 
   return (

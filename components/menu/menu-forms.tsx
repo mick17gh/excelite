@@ -41,6 +41,7 @@ import {
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { UnitType } from "@/lib/generated/prisma/client";
+import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
 
 interface MenuItem {
   id: string;
@@ -84,16 +85,11 @@ interface IngredientRow {
   unitCost?: number;
 }
 
-const unitOptions: { value: UnitType; label: string }[] = [
-  { value: "KG", label: "Kilogram (kg)" },
-  { value: "GRAM", label: "Gram (g)" },
-  { value: "LITER", label: "Liter (L)" },
-  { value: "ML", label: "Milliliter (ml)" },
-  { value: "PIECE", label: "Piece" },
-  { value: "BOX", label: "Box" },
-  { value: "CASE", label: "Case" },
-  { value: "PACK", label: "Pack" },
-];
+// Dynamic unit options from constants
+const unitOptions: { value: UnitType; label: string }[] = UNIT_TYPES.map(unit => ({
+  value: unit,
+  label: UNIT_LABELS[unit]
+}));
 
 
 export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<MenuFormProps, "item">) {
@@ -145,8 +141,8 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
 
   const addIngredient = () => {
     setIngredients([
-      ...ingredients,
       { inventoryItemId: "", quantity: 0, unit: "KG" as UnitType },
+      ...ingredients,
     ]);
   };
 
@@ -488,8 +484,8 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   </div>
 
                   {ingredients.length > 0 && (
-                    <ScrollArea className="max-h-48">
-                      <div className="space-y-2">
+                    <div className="max-h-64 overflow-y-auto border rounded-lg">
+                      <div className="space-y-2 p-2">
                         {ingredients.map((ing, index) => (
                           <div key={index} className="flex items-center gap-2 rounded border p-2">
                             <div className="flex-1">
@@ -539,7 +535,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   )}
 
                   {calculatedCost !== null && (
@@ -666,8 +662,8 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
 
   const addIngredient = () => {
     setIngredients([
-      ...ingredients,
       { inventoryItemId: "", quantity: 0, unit: "KG" as UnitType },
+      ...ingredients,
     ]);
   };
 
@@ -999,8 +995,8 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : ingredients.length > 0 ? (
-                    <ScrollArea className="max-h-48">
-                      <div className="space-y-2">
+                    <div className="max-h-64 overflow-y-auto border rounded-lg">
+                      <div className="space-y-2 p-2">
                         {ingredients.map((ing, index) => (
                           <div key={index} className="flex items-center gap-2 rounded border p-2">
                             <div className="flex-1">
@@ -1050,7 +1046,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-3">
                       No ingredients linked. Add ingredients to auto-calculate recipe cost.

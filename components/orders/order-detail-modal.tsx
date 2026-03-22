@@ -13,6 +13,11 @@ import { useCurrency } from "@/contexts/currency-context";
 import { PaymentPanel } from "./payment-panel";
 import { NotificationsTab } from "./notifications-tab";
 import { ReceiptPanel } from "./receipt-panel";
+import { Button } from "@/components/ui/button";
+import { ChefHat, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { sendOrderToKitchen } from "@/lib/actions/orders";
+import { useState } from "react";
 
 interface OrderItem {
   id: string;
@@ -142,6 +147,26 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: OrderDetailModalProps) {
   const { formatCurrency } = useCurrency();
+  const [isSendingToKitchen, setIsSendingToKitchen] = useState(false);
+
+  const handleSendToKitchen = async () => {
+    setIsSendingToKitchen(true);
+    try {
+      const result = await sendOrderToKitchen({ orderId: order.id });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Order sent to kitchen successfully");
+        if (onRefresh) {
+          onRefresh();
+        }
+      }
+    } catch (error) {
+      toast.error("Failed to send order to kitchen");
+    } finally {
+      setIsSendingToKitchen(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -261,6 +286,26 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
 
           <Separator />
 
+          {/* Send to Kitchen Button */}
+          {(order.status === "NEW" || order.status === "IN_PROGRESS") && (
+            <div className="flex justify-center">
+              <Button
+                onClick={handleSendToKitchen}
+                disabled={isSendingToKitchen}
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                {isSendingToKitchen ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ChefHat className="mr-2 h-4 w-4" />
+                )}
+                {isSendingToKitchen ? "Sending..." : "Send to Kitchen"}
+              </Button>
+            </div>
+          )}
+
+          <Separator />
+
           {/* Tabbed Panels */}
           <Tabs defaultValue="payment" className="w-full">
             <TabsList className="w-full">
@@ -274,6 +319,7 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
                 orderTotal={order.total}
                 paymentStatus={order.paymentStatus}
                 payments={order.payments}
+                onRefresh={onRefresh}
               />
             </TabsContent>
             <TabsContent value="notifications" className="mt-3">

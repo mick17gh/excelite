@@ -21,9 +21,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Plus, Minus, Trash2, Loader2, ChevronsUpDown, Check, UserPlus, ChefHat } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Plus,
+  Minus,
+  Trash2,
+  Loader2,
+  ChevronsUpDown,
+  Check,
+  UserPlus,
+  ChefHat,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/actions/orders";
@@ -68,10 +89,20 @@ interface CreateOrderDialogProps {
   branches: Branch[];
   menuItems: MenuItem[];
   customers: Customer[];
+  /** Called after the order is created; await so the dialog can show loading until the detail view is ready */
+  onOrderCreated?: (orderId: string) => void | Promise<void>;
 }
 
-export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, customers }: CreateOrderDialogProps) {
+export function CreateOrderDialog({
+  open,
+  onOpenChange,
+  branches,
+  menuItems,
+  customers,
+  onOrderCreated,
+}: CreateOrderDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState<"creating" | "opening">("creating");
   const [branchId, setBranchId] = useState("");
   const [source, setSource] = useState("WALK_IN");
   const [type, setType] = useState("DINE_IN");
@@ -84,7 +115,6 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryPhone, setDeliveryPhone] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
-  const [sendToKitchen, setSendToKitchen] = useState(false);
   const { formatCurrency } = useCurrency();
 
   // Customer combobox state
@@ -108,13 +138,20 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
     }
     setIsCreatingCustomer(true);
     try {
-      const result = await createCustomer({ name: newName.trim(), phone: newPhone.trim() });
+      const result = await createCustomer({
+        name: newName.trim(),
+        phone: newPhone.trim(),
+      });
       if (result.error) {
         toast.error(result.error);
         return;
       }
       if (result.data) {
-        const newCustomer = { id: result.data.id, name: result.data.name, phone: result.data.phone };
+        const newCustomer = {
+          id: result.data.id,
+          name: result.data.name,
+          phone: result.data.phone,
+        };
         setLocalCustomers((prev) => [newCustomer, ...prev]);
         setCustomerId(result.data.id);
         toast.success(`Customer "${result.data.name}" created`);
@@ -134,38 +171,57 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
     (item) =>
       !searchItem ||
       item.name.toLowerCase().includes(searchItem.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchItem.toLowerCase())
+      item.sku.toLowerCase().includes(searchItem.toLowerCase()),
   );
 
-  const subtotal = Math.round(cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0) * 100) / 100;
+  const subtotal =
+    Math.round(
+      cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0) * 100,
+    ) / 100;
   const discount = Math.round((parseFloat(discountStr) || 0) * 100) / 100;
   const deliveryFee = Math.round((parseFloat(deliveryFeeStr) || 0) * 100) / 100;
   const isDelivery = type === "DELIVERY";
 
   // Calculate tax based on selected branch
   const selectedBranch = branches.find((b) => b.id === branchId);
-  const taxRate = selectedBranch?.taxEnabled ? (selectedBranch.taxRate / 100) : 0;
+  const taxRate = selectedBranch?.taxEnabled ? selectedBranch.taxRate / 100 : 0;
   const taxableAmount = subtotal - discount;
-  const tax = Math.round((taxableAmount > 0 ? taxableAmount * taxRate : 0) * 100) / 100;
-  const total = Math.round((subtotal + tax - discount + (isDelivery ? deliveryFee : 0)) * 100) / 100;
+  const tax =
+    Math.round((taxableAmount > 0 ? taxableAmount * taxRate : 0) * 100) / 100;
+  const total =
+    Math.round(
+      (subtotal + tax - discount + (isDelivery ? deliveryFee : 0)) * 100,
+    ) / 100;
 
   const addToCart = (item: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find((c) => c.menuItemId === item.id);
       if (existing) {
         return prev.map((c) =>
-          c.menuItemId === item.id ? { ...c, quantity: c.quantity + 1 } : c
+          c.menuItemId === item.id ? { ...c, quantity: c.quantity + 1 } : c,
         );
       }
-      return [...prev, { menuItemId: item.id, name: item.name, quantity: 1, unitPrice: item.price }];
+      return [
+        ...prev,
+        {
+          menuItemId: item.id,
+          name: item.name,
+          quantity: 1,
+          unitPrice: item.price,
+        },
+      ];
     });
   };
 
   const updateQuantity = (menuItemId: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((c) => (c.menuItemId === menuItemId ? { ...c, quantity: c.quantity + delta } : c))
-        .filter((c) => c.quantity > 0)
+        .map((c) =>
+          c.menuItemId === menuItemId
+            ? { ...c, quantity: c.quantity + delta }
+            : c,
+        )
+        .filter((c) => c.quantity > 0),
     );
   };
 
@@ -183,13 +239,15 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
       return;
     }
 
+    setSubmitPhase("creating");
     setIsSubmitting(true);
     try {
       const result = await createOrder({
         branchId,
         source: source as any,
         type: type as any,
-        customerId: customerId && customerId !== "walk-in" ? customerId : undefined,
+        customerId:
+          customerId && customerId !== "walk-in" ? customerId : undefined,
         items: cart.map((c) => ({
           menuItemId: c.menuItemId,
           quantity: c.quantity,
@@ -202,13 +260,17 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
         deliveryAddress: isDelivery ? deliveryAddress : undefined,
         deliveryPhone: isDelivery ? deliveryPhone : undefined,
         deliveryNotes: isDelivery ? deliveryNotes : undefined,
-        sendToKitchen,
       });
 
       if (result.error) {
         toast.error(result.error);
       } else {
         toast.success("Order created successfully");
+        const orderId = result.data?.id;
+        if (orderId && onOrderCreated) {
+          setSubmitPhase("opening");
+          await onOrderCreated(orderId);
+        }
         resetForm();
         onOpenChange(false);
       }
@@ -232,18 +294,33 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
     setDeliveryAddress("");
     setDeliveryPhone("");
     setDeliveryNotes("");
-    setSendToKitchen(false);
     setShowNewCustomer(false);
     setNewName("");
     setNewPhone("");
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && isSubmitting) return;
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto relative">
+        {isSubmitting && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-lg bg-background/85 backdrop-blur-sm">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-sm font-medium text-foreground">
+              {submitPhase === "opening" ? "Opening order…" : "Creating order…"}
+            </p>
+          </div>
+        )}
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
-          <DialogDescription>Add a new order with items, customer, and delivery details</DialogDescription>
+          <DialogDescription>
+            Add a new order with items, customer, and delivery details
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
@@ -257,7 +334,9 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
                 </SelectTrigger>
                 <SelectContent>
                   {branches.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -266,7 +345,12 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
               <Label>Customer</Label>
               <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" aria-expanded={customerOpen} className="justify-between font-normal">
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={customerOpen}
+                    className="justify-between font-normal"
+                  >
                     <span className="truncate">{selectedCustomerLabel}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -280,28 +364,52 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
                         <CommandGroup>
                           <CommandItem
                             value="walk-in"
-                            onSelect={() => { setCustomerId("walk-in"); setCustomerOpen(false); }}
+                            onSelect={() => {
+                              setCustomerId("walk-in");
+                              setCustomerOpen(false);
+                            }}
                           >
-                            <Check className={cn("mr-2 h-4 w-4", customerId === "walk-in" ? "opacity-100" : "opacity-0")} />
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                customerId === "walk-in"
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
                             Walk-in Customer
                           </CommandItem>
                           {localCustomers.map((c) => (
                             <CommandItem
                               key={c.id}
                               value={`${c.name} ${c.phone}`}
-                              onSelect={() => { setCustomerId(c.id); setCustomerOpen(false); }}
+                              onSelect={() => {
+                                setCustomerId(c.id);
+                                setCustomerOpen(false);
+                              }}
                             >
-                              <Check className={cn("mr-2 h-4 w-4", customerId === c.id ? "opacity-100" : "opacity-0")} />
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  customerId === c.id
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
                               <div className="flex flex-col">
                                 <span>{c.name}</span>
-                                <span className="text-xs text-muted-foreground">{c.phone}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {c.phone}
+                                </span>
                               </div>
                             </CommandItem>
                           ))}
                         </CommandGroup>
                         <CommandSeparator />
                         <CommandGroup>
-                          <CommandItem onSelect={() => setShowNewCustomer(true)}>
+                          <CommandItem
+                            onSelect={() => setShowNewCustomer(true)}
+                          >
                             <UserPlus className="mr-2 h-4 w-4" />
                             Add New Customer
                           </CommandItem>
@@ -311,15 +419,44 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
                   ) : (
                     <div className="p-3 space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">New Customer</Label>
-                        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowNewCustomer(false)}>
+                        <Label className="text-sm font-semibold">
+                          New Customer
+                        </Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          onClick={() => setShowNewCustomer(false)}
+                        >
                           Cancel
                         </Button>
                       </div>
-                      <Input placeholder="Customer name" value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus />
-                      <Input placeholder="Phone number" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
-                      <Button size="sm" className="w-full" onClick={handleCreateCustomer} disabled={isCreatingCustomer || !newName.trim() || !newPhone.trim()}>
-                        {isCreatingCustomer ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserPlus className="mr-2 h-3 w-3" />}
+                      <Input
+                        placeholder="Customer name"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        autoFocus
+                      />
+                      <Input
+                        placeholder="Phone number"
+                        value={newPhone}
+                        onChange={(e) => setNewPhone(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={handleCreateCustomer}
+                        disabled={
+                          isCreatingCustomer ||
+                          !newName.trim() ||
+                          !newPhone.trim()
+                        }
+                      >
+                        {isCreatingCustomer ? (
+                          <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        ) : (
+                          <UserPlus className="mr-2 h-3 w-3" />
+                        )}
                         {isCreatingCustomer ? "Creating..." : "Create & Select"}
                       </Button>
                     </div>
@@ -360,18 +497,6 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
             </div>
           </div>
 
-          {/* Send to Kitchen toggle */}
-          <div className="flex items-center justify-between rounded-lg border px-3 py-2 bg-muted/20">
-            <div className="flex items-center gap-2">
-              <ChefHat className="h-4 w-4 text-orange-500" />
-              <div>
-                <p className="text-sm font-medium">Send to Kitchen</p>
-                <p className="text-xs text-muted-foreground">Create a kitchen ticket for this order</p>
-              </div>
-            </div>
-            <Switch checked={sendToKitchen} onCheckedChange={setSendToKitchen} />
-          </div>
-
           {/* Menu Items Search + Cart */}
           <div className="grid gap-2">
             <Label>Items *</Label>
@@ -392,12 +517,21 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
                       setSearchItem("");
                     }}
                   >
-                    <span>{item.name} <span className="text-muted-foreground">({item.sku})</span></span>
-                    <span className="font-medium">{formatCurrency(item.price)}</span>
+                    <span>
+                      {item.name}{" "}
+                      <span className="text-muted-foreground">
+                        ({item.sku})
+                      </span>
+                    </span>
+                    <span className="font-medium">
+                      {formatCurrency(item.price)}
+                    </span>
                   </button>
                 ))}
                 {filteredMenuItems.length === 0 && (
-                  <p className="px-3 py-2 text-sm text-muted-foreground">No items found</p>
+                  <p className="px-3 py-2 text-sm text-muted-foreground">
+                    No items found
+                  </p>
                 )}
               </div>
             )}
@@ -407,21 +541,45 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
           {cart.length > 0 && (
             <div className="border rounded-md divide-y">
               {cart.map((item) => (
-                <div key={item.menuItemId} className="flex items-center justify-between px-3 py-2">
+                <div
+                  key={item.menuItemId}
+                  className="flex items-center justify-between px-3 py-2"
+                >
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium">{item.name}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">{formatCurrency(item.unitPrice)} each</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {formatCurrency(item.unitPrice)} each
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.menuItemId, -1)}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateQuantity(item.menuItemId, -1)}
+                    >
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.menuItemId, 1)}>
+                    <span className="text-sm font-medium w-6 text-center">
+                      {item.quantity}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => updateQuantity(item.menuItemId, 1)}
+                    >
                       <Plus className="h-3 w-3" />
                     </Button>
-                    <span className="text-sm font-medium w-20 text-right">{formatCurrency(item.quantity * item.unitPrice)}</span>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => removeFromCart(item.menuItemId)}>
+                    <span className="text-sm font-medium w-20 text-right">
+                      {formatCurrency(item.quantity * item.unitPrice)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-red-500"
+                      onClick={() => removeFromCart(item.menuItemId)}
+                    >
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
@@ -440,11 +598,19 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1">
                   <Label className="text-xs">Delivery Address</Label>
-                  <Input value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} placeholder="Address" />
+                  <Input
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    placeholder="Address"
+                  />
                 </div>
                 <div className="grid gap-1">
                   <Label className="text-xs">Delivery Phone</Label>
-                  <Input value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} placeholder="Phone" />
+                  <Input
+                    value={deliveryPhone}
+                    onChange={(e) => setDeliveryPhone(e.target.value)}
+                    placeholder="Phone"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -456,13 +622,18 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
                     value={deliveryFeeStr}
                     onChange={(e) => {
                       const v = e.target.value;
-                      if (v === "" || /^\d*\.?\d{0,2}$/.test(v)) setDeliveryFeeStr(v);
+                      if (v === "" || /^\d*\.?\d{0,2}$/.test(v))
+                        setDeliveryFeeStr(v);
                     }}
                   />
                 </div>
                 <div className="grid gap-1">
                   <Label className="text-xs">Delivery Notes</Label>
-                  <Input value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} placeholder="Instructions" />
+                  <Input
+                    value={deliveryNotes}
+                    onChange={(e) => setDeliveryNotes(e.target.value)}
+                    placeholder="Instructions"
+                  />
                 </div>
               </div>
             </div>
@@ -483,7 +654,12 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
             </div>
             <div className="grid gap-2">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} placeholder="Order notes" />
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={1}
+                placeholder="Order notes"
+              />
             </div>
           </div>
 
@@ -497,12 +673,17 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
               {discount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Discount</span>
-                  <span className="text-red-500">-{formatCurrency(discount)}</span>
+                  <span className="text-red-500">
+                    -{formatCurrency(discount)}
+                  </span>
                 </div>
               )}
               {taxRate > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax ({selectedBranch?.taxName || "VAT"} {selectedBranch?.taxRate}%)</span>
+                  <span className="text-muted-foreground">
+                    Tax ({selectedBranch?.taxName || "VAT"}{" "}
+                    {selectedBranch?.taxRate}%)
+                  </span>
                   <span>{formatCurrency(tax)}</span>
                 </div>
               )}
@@ -521,10 +702,20 @@ export function CreateOrderDialog({ open, onOpenChange, branches, menuItems, cus
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Order
+            {isSubmitting
+              ? submitPhase === "opening"
+                ? "Opening order…"
+                : "Creating order…"
+              : "Create Order"}
           </Button>
         </DialogFooter>
       </DialogContent>

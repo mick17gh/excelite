@@ -10,6 +10,7 @@ import { createDeliveryRequest } from "@/lib/actions/delivery";
 function serializeOrder(order: Record<string, any>) {
   return {
     ...order,
+    id: order.id as string,
     subtotal: Number(order.subtotal),
     tax: Number(order.tax),
     discount: Number(order.discount),
@@ -455,7 +456,7 @@ export async function createOrder(input: CreateOrderInput) {
   }
 }
 
-export async function updateOrderStatus(input: UpdateOrderStatusInput) {
+export async function updateOrderStatus(input: { id: string; status: OrderStatus }) {
   try {
     const order = await db.order.update({
       where: { id: input.id },
@@ -463,10 +464,75 @@ export async function updateOrderStatus(input: UpdateOrderStatusInput) {
     });
 
     revalidatePath("/dashboard/orders");
+    revalidatePath("/kitchen");
     return { data: serializeOrder(order) };
   } catch (error) {
     console.error("[updateOrderStatus] Error:", error);
     return { error: "Failed to update order status" };
+  }
+}
+
+export async function sendOrderToKitchen(input: { orderId: string; stationId?: string }) {
+  try {
+    // Get the order with its items to find the branch and create kitchen items
+    const order = await db.order.findUnique({
+      where: { id: input.orderId },
+      select: { 
+        id: true, 
+        branchId: true,
+        items: {
+          select: { id: true }
+        }
+      },
+    });
+
+    if (!order) {
+      return { error: "Order not found" };
+    }
+
+    // Check if kitchen ticket already exists
+    const existingTicket = await db.kitchenTicket.findFirst({
+      where: { orderId: input.orderId },
+    });
+
+    if (existingTicket) {
+      return { error: "Order already sent to kitchen" };
+    }
+
+    // Find station or use default
+    let stationId = input.stationId;
+    if (!stationId) {
+      const defaultStation = await db.kitchenStation.findFirst({
+        where: { branchId: order.branchId, isActive: true },
+      });
+      stationId = defaultStation?.id;
+    }
+
+    if (!stationId) {
+      return { error: "No active kitchen station found for this branch" };
+    }
+
+    // Create kitchen ticket with items
+    const ticket = await db.kitchenTicket.create({
+      data: {
+        orderId: input.orderId,
+        stationId,
+        status: "NEW",
+        items: {
+          create: order.items.map((item) => ({ 
+            orderItemId: item.id, 
+            status: "NEW" 
+          })),
+        },
+      },
+    });
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/kitchen");
+    return { success: true, data: ticket };
+  } catch (error) {
+    console.error("[sendOrderToKitchen] Error:", error);
+    return { error: "Failed to send order to kitchen" };
   }
 }
 

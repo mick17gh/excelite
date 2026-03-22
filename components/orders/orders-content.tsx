@@ -188,6 +188,20 @@ export function OrdersContent({ orders: initialOrders, branches, menuItems, cust
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { formatCurrency } = useCurrency();
 
+  // Handle new order creation - automatically open detail modal
+  const handleOrderCreated = async (orderId: string) => {
+    // Refresh orders to get the new order
+    await fetchOrders(false);
+    // Find and select the new order
+    const result = await getOrders({ page, pageSize });
+    if (result.data) {
+      const newOrder = result.data.find((o: any) => o.id === orderId);
+      if (newOrder) {
+        setSelectedOrder(newOrder);
+      }
+    }
+  };
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchesSearch =
@@ -546,6 +560,7 @@ export function OrdersContent({ orders: initialOrders, branches, menuItems, cust
         branches={branches}
         menuItems={menuItems}
         customers={customers}
+        onOrderCreated={handleOrderCreated}
       />
 
       {selectedOrder && (
