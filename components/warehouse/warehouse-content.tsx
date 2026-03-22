@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { TransferStatus } from "@/lib/generated/prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,13 +40,15 @@ import {
   TruckIcon,
   Trash2,
   Upload,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateTransferStatus } from "@/lib/actions/warehouse";
-import { CreateWarehouseDialog, CreateWarehouseItemDialog, CreateTransferDialog } from "./warehouse-forms";
+import { CreateWarehouseDialog, CreateWarehouseItemDialog, CreateTransferDialog, BulkTransferToBranchDialog } from "./warehouse-forms";
 import { SupplierReceivingDialog, WastageDialog } from "./warehouse-dialogs";
 import { WarehouseImportDialog } from "./warehouse-import";
 import { useCurrency } from "@/contexts/currency-context";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface WarehouseData {
   id: string;
@@ -170,11 +172,19 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
   const [showCreateWarehouse, setShowCreateWarehouse] = useState(false);
   const [showCreateItem, setShowCreateItem] = useState(false);
   const [showCreateTransfer, setShowCreateTransfer] = useState(false);
+  const [showBulkTransfer, setShowBulkTransfer] = useState(false);
   const [showSupplierReceiving, setShowSupplierReceiving] = useState(false);
   const [showWastage, setShowWastage] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [selectedWarehouseForImport, setSelectedWarehouseForImport] = useState<{id: string, name: string} | null>(null);
   const { formatCurrency } = useCurrency();
+
+  const [pageSize, setPageSize] = useState(10);
+  const [pageWarehouses, setPageWarehouses] = useState(1);
+  const [pageInventory, setPageInventory] = useState(1);
+  const [pageTransfers, setPageTransfers] = useState(1);
+  const [pageReceiving, setPageReceiving] = useState(1);
+  const [pageWastage, setPageWastage] = useState(1);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -189,7 +199,70 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
     return transfers.filter((t) => t.warehouseId === selectedWarehouse);
   }, [transfers, selectedWarehouse]);
 
+  useEffect(() => {
+    setPageInventory(1);
+  }, [searchQuery, selectedWarehouse]);
+
+  useEffect(() => {
+    setPageTransfers(1);
+  }, [selectedWarehouse, transfers]);
+
+  useEffect(() => {
+    setPageWarehouses(1);
+    setPageInventory(1);
+    setPageTransfers(1);
+    setPageReceiving(1);
+    setPageWastage(1);
+  }, [pageSize]);
+
   const branchMap = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches]);
+
+  const paginatedWarehouses = useMemo(() => {
+    const start = (pageWarehouses - 1) * pageSize;
+    return warehouses.slice(start, start + pageSize);
+  }, [warehouses, pageWarehouses, pageSize]);
+
+  const paginatedInventory = useMemo(() => {
+    const start = (pageInventory - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, pageInventory, pageSize]);
+
+  const paginatedTransfers = useMemo(() => {
+    const start = (pageTransfers - 1) * pageSize;
+    return filteredTransfers.slice(start, start + pageSize);
+  }, [filteredTransfers, pageTransfers, pageSize]);
+
+  const paginatedInbound = useMemo(() => {
+    const start = (pageReceiving - 1) * pageSize;
+    return inboundRecords.slice(start, start + pageSize);
+  }, [inboundRecords, pageReceiving, pageSize]);
+
+  const paginatedWastage = useMemo(() => {
+    const start = (pageWastage - 1) * pageSize;
+    return wastageRecords.slice(start, start + pageSize);
+  }, [wastageRecords, pageWastage, pageSize]);
+
+  const totalPagesWh = Math.max(1, Math.ceil(warehouses.length / pageSize) || 1);
+  const totalPagesInv = Math.max(1, Math.ceil(filteredItems.length / pageSize) || 1);
+  const totalPagesXfer = Math.max(1, Math.ceil(filteredTransfers.length / pageSize) || 1);
+  const totalPagesRecv = Math.max(1, Math.ceil(inboundRecords.length / pageSize) || 1);
+  const totalPagesWaste = Math.max(1, Math.ceil(wastageRecords.length / pageSize) || 1);
+
+  useEffect(() => {
+    if (pageWarehouses > totalPagesWh) setPageWarehouses(totalPagesWh);
+  }, [pageWarehouses, totalPagesWh]);
+  useEffect(() => {
+    if (pageInventory > totalPagesInv) setPageInventory(totalPagesInv);
+  }, [pageInventory, totalPagesInv]);
+  useEffect(() => {
+    if (pageTransfers > totalPagesXfer) setPageTransfers(totalPagesXfer);
+  }, [pageTransfers, totalPagesXfer]);
+  useEffect(() => {
+    if (pageReceiving > totalPagesRecv) setPageReceiving(totalPagesRecv);
+  }, [pageReceiving, totalPagesRecv]);
+  useEffect(() => {
+    if (pageWastage > totalPagesWaste) setPageWastage(totalPagesWaste);
+  }, [pageWastage, totalPagesWaste]);
 
   const handleApproveTransfer = async (id: string) => {
     const result = await updateTransferStatus(id, "IN_TRANSIT" as TransferStatus);
@@ -280,6 +353,9 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                 <DropdownMenuItem onClick={() => setShowCreateTransfer(true)}>
                   <ArrowRightLeft className="mr-2 h-4 w-4" />Transfer to Branch
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowBulkTransfer(true)}>
+                  <Layers className="mr-2 h-4 w-4" />Bulk transfer to Branch
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowSupplierReceiving(true)}>
                   <TruckIcon className="mr-2 h-4 w-4" />Receive from Supplier
                 </DropdownMenuItem>
@@ -322,7 +398,7 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No warehouses yet</TableCell>
                     </TableRow>
                   ) : (
-                    warehouses.map((wh) => (
+                    paginatedWarehouses.map((wh) => (
                       <TableRow key={wh.id}>
                         <TableCell className="font-medium">{wh.name}</TableCell>
                         <TableCell className="font-mono text-sm">{wh.code}</TableCell>
@@ -339,6 +415,16 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                   )}
                 </TableBody>
               </Table>
+              {warehouses.length > 0 && (
+                <TablePagination
+                  currentPage={pageWarehouses}
+                  totalPages={totalPagesWh}
+                  totalItems={warehouses.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageWarehouses}
+                  onPageSizeChange={setPageSize}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -384,7 +470,7 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                       <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No inventory items</TableCell>
                     </TableRow>
                   ) : (
-                    filteredItems.map((item) => (
+                    paginatedInventory.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell className="font-mono text-sm">{item.sku}</TableCell>
@@ -410,6 +496,16 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                   )}
                 </TableBody>
               </Table>
+              {filteredItems.length > 0 && (
+                <TablePagination
+                  currentPage={pageInventory}
+                  totalPages={totalPagesInv}
+                  totalItems={filteredItems.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageInventory}
+                  onPageSizeChange={setPageSize}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -437,7 +533,7 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No transfers</TableCell>
                     </TableRow>
                   ) : (
-                    filteredTransfers.map((t) => (
+                    paginatedTransfers.map((t) => (
                       <TableRow key={t.id}>
                         <TableCell className="font-medium">{t.warehouseName}</TableCell>
                         <TableCell>
@@ -482,6 +578,16 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                   )}
                 </TableBody>
               </Table>
+              {filteredTransfers.length > 0 && (
+                <TablePagination
+                  currentPage={pageTransfers}
+                  totalPages={totalPagesXfer}
+                  totalItems={filteredTransfers.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageTransfers}
+                  onPageSizeChange={setPageSize}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -513,7 +619,7 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                       </TableCell>
                     </TableRow>
                   ) : (
-                    inboundRecords.map((record) => (
+                    paginatedInbound.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>{new Date(record.deliveryDate).toLocaleDateString()}</TableCell>
                         <TableCell>{record.warehouseName}</TableCell>
@@ -532,6 +638,16 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                   )}
                 </TableBody>
               </Table>
+              {inboundRecords.length > 0 && (
+                <TablePagination
+                  currentPage={pageReceiving}
+                  totalPages={totalPagesRecv}
+                  totalItems={inboundRecords.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageReceiving}
+                  onPageSizeChange={setPageSize}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -563,7 +679,7 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                       </TableCell>
                     </TableRow>
                   ) : (
-                    wastageRecords.map((record) => (
+                    paginatedWastage.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>{new Date(record.wasteDate).toLocaleDateString()}</TableCell>
                         <TableCell>{record.warehouseName}</TableCell>
@@ -582,6 +698,16 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                   )}
                 </TableBody>
               </Table>
+              {wastageRecords.length > 0 && (
+                <TablePagination
+                  currentPage={pageWastage}
+                  totalPages={totalPagesWaste}
+                  totalItems={wastageRecords.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageWastage}
+                  onPageSizeChange={setPageSize}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -590,6 +716,7 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
       <CreateWarehouseDialog open={showCreateWarehouse} onOpenChange={setShowCreateWarehouse} />
       <CreateWarehouseItemDialog open={showCreateItem} onOpenChange={setShowCreateItem} warehouses={warehouses} />
       <CreateTransferDialog open={showCreateTransfer} onOpenChange={setShowCreateTransfer} warehouses={warehouses} items={items} branches={branches} />
+      <BulkTransferToBranchDialog open={showBulkTransfer} onOpenChange={setShowBulkTransfer} warehouses={warehouses} items={items} branches={branches} />
       <SupplierReceivingDialog open={showSupplierReceiving} onOpenChange={setShowSupplierReceiving} warehouses={warehouses} items={items} />
       <WastageDialog open={showWastage} onOpenChange={setShowWastage} warehouses={warehouses} items={items} />
       {selectedWarehouseForImport && (

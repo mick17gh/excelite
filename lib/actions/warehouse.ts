@@ -4,6 +4,19 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { InventoryCategory, UnitType, TransferStatus } from "@/lib/generated/prisma/client";
 
+/** Prisma Decimal → plain number (RSC props and server-action responses must be JSON-serializable) */
+function decimalToNumber(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  if (typeof value === "object" && value !== null && "toNumber" in value) {
+    const d = value as { toNumber: () => number };
+    if (typeof d.toNumber === "function") return d.toNumber();
+  }
+  const n = Number(value as string | number);
+  return Number.isFinite(n) ? n : 0;
+}
+
 export interface CreateWarehouseInput {
   name: string;
   code: string;
@@ -95,10 +108,10 @@ export async function getWarehouseInventory(warehouseId: string) {
         sku: item.sku,
         category: item.category,
         unit: item.unit,
-        unitCost: Number(item.unitCost),
-        currentStock: Number(item.currentStock),
-        minStock: Number(item.minStock),
-        reorderPoint: Number(item.reorderPoint),
+        unitCost: decimalToNumber(item.unitCost),
+        currentStock: decimalToNumber(item.currentStock),
+        minStock: decimalToNumber(item.minStock),
+        reorderPoint: decimalToNumber(item.reorderPoint),
         isActive: item.isActive,
         createdAt: item.createdAt.toISOString(),
       })),
@@ -136,9 +149,9 @@ export async function getWarehouseTransfers(warehouseId?: string) {
         itemUnit: t.warehouseItem?.unit || "",
         toBranchId: t.toBranchId,
         toBranchName: t.toBranch?.name || "",
-        quantity: Number(t.quantity),
-        unitCost: Number(t.unitCost),
-        totalCost: Number(t.totalCost),
+        quantity: decimalToNumber(t.quantity),
+        unitCost: decimalToNumber(t.unitCost),
+        totalCost: decimalToNumber(t.totalCost),
         status: t.status,
         transferDate: t.transferDate.toISOString(),
         approvedBy: t.approvedBy,
@@ -226,7 +239,22 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
     });
 
     revalidatePath("/dashboard/warehouse");
-    return { data: item };
+    return {
+      data: {
+        id: item.id,
+        warehouseId: item.warehouseId,
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        unit: item.unit,
+        unitCost: decimalToNumber(item.unitCost),
+        currentStock: decimalToNumber(item.currentStock),
+        minStock: decimalToNumber(item.minStock),
+        reorderPoint: decimalToNumber(item.reorderPoint),
+        isActive: item.isActive,
+        createdAt: item.createdAt.toISOString(),
+      },
+    };
   } catch (error) {
     console.error("[createWarehouseItem] Error:", error);
     return { error: "Failed to create warehouse item" };
@@ -257,7 +285,24 @@ export async function createWarehouseTransfer(input: CreateWarehouseTransferInpu
     });
 
     revalidatePath("/dashboard/warehouse");
-    return { data: transfer };
+    return {
+      data: {
+        id: transfer.id,
+        warehouseId: transfer.warehouseId,
+        warehouseItemId: transfer.warehouseItemId,
+        toBranchId: transfer.toBranchId,
+        quantity: decimalToNumber(transfer.quantity),
+        unitCost: decimalToNumber(transfer.unitCost),
+        totalCost: decimalToNumber(transfer.totalCost),
+        status: transfer.status,
+        transferDate: transfer.transferDate.toISOString(),
+        approvedBy: transfer.approvedBy,
+        receivedBy: transfer.receivedBy,
+        notes: transfer.notes,
+        createdAt: transfer.createdAt.toISOString(),
+        updatedAt: transfer.updatedAt.toISOString(),
+      },
+    };
   } catch (error) {
     console.error("[createWarehouseTransfer] Error:", error);
     return { error: "Failed to create transfer" };
@@ -320,7 +365,24 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
 
     revalidatePath("/dashboard/warehouse");
     revalidatePath("/dashboard/inventory");
-    return { data: updated };
+    return {
+      data: {
+        id: updated.id,
+        warehouseId: updated.warehouseId,
+        warehouseItemId: updated.warehouseItemId,
+        toBranchId: updated.toBranchId,
+        quantity: decimalToNumber(updated.quantity),
+        unitCost: decimalToNumber(updated.unitCost),
+        totalCost: decimalToNumber(updated.totalCost),
+        status: updated.status,
+        transferDate: updated.transferDate.toISOString(),
+        approvedBy: updated.approvedBy,
+        receivedBy: updated.receivedBy,
+        notes: updated.notes,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+    };
   } catch (error) {
     console.error("[updateTransferStatus] Error:", error);
     return { error: "Failed to update transfer status" };
@@ -392,10 +454,17 @@ export async function recordWarehouseWaste(input: RecordWarehouseWasteInput) {
     revalidatePath("/dashboard/warehouse");
     return {
       data: {
-        ...wasteLog,
-        quantity: Number(wasteLog.quantity),
-        unitCost: Number(wasteLog.unitCost),
-        totalCost: Number(wasteLog.totalCost),
+        id: wasteLog.id,
+        warehouseId: wasteLog.warehouseId,
+        warehouseItemId: wasteLog.warehouseItemId,
+        quantity: decimalToNumber(wasteLog.quantity),
+        unitCost: decimalToNumber(wasteLog.unitCost),
+        totalCost: decimalToNumber(wasteLog.totalCost),
+        reason: wasteLog.reason,
+        notes: wasteLog.notes,
+        recordedBy: wasteLog.recordedBy,
+        wasteDate: wasteLog.wasteDate.toISOString(),
+        createdAt: wasteLog.createdAt.toISOString(),
       },
     };
   } catch (error) {
@@ -428,9 +497,9 @@ export async function getWarehouseWasteLogs(warehouseId?: string) {
         itemName: l.warehouseItem?.name || "",
         itemSku: l.warehouseItem?.sku || "",
         itemUnit: l.warehouseItem?.unit || "",
-        quantity: Number(l.quantity),
-        unitCost: Number(l.unitCost),
-        totalCost: Number(l.totalCost),
+        quantity: decimalToNumber(l.quantity),
+        unitCost: decimalToNumber(l.unitCost),
+        totalCost: decimalToNumber(l.totalCost),
         reason: l.reason,
         notes: l.notes,
         recordedBy: l.recordedBy,
@@ -487,10 +556,18 @@ export async function recordWarehouseInbound(input: RecordWarehouseInboundInput)
     revalidatePath("/dashboard/warehouse");
     return {
       data: {
-        ...inbound,
-        quantity: Number(inbound.quantity),
-        unitCost: Number(inbound.unitCost),
-        totalCost: Number(inbound.totalCost),
+        id: inbound.id,
+        warehouseId: inbound.warehouseId,
+        warehouseItemId: inbound.warehouseItemId,
+        supplierId: inbound.supplierId,
+        quantity: decimalToNumber(inbound.quantity),
+        unitCost: decimalToNumber(inbound.unitCost),
+        totalCost: decimalToNumber(inbound.totalCost),
+        invoiceNumber: inbound.invoiceNumber,
+        notes: inbound.notes,
+        receivedBy: inbound.receivedBy,
+        deliveryDate: inbound.deliveryDate.toISOString(),
+        createdAt: inbound.createdAt.toISOString(),
       },
     };
   } catch (error) {
@@ -526,9 +603,9 @@ export async function getWarehouseInboundRecords(warehouseId?: string) {
         itemUnit: r.warehouseItem?.unit || "",
         supplierId: r.supplierId,
         supplierName: r.supplier?.name || "",
-        quantity: Number(r.quantity),
-        unitCost: Number(r.unitCost),
-        totalCost: Number(r.totalCost),
+        quantity: decimalToNumber(r.quantity),
+        unitCost: decimalToNumber(r.unitCost),
+        totalCost: decimalToNumber(r.totalCost),
         invoiceNumber: r.invoiceNumber,
         notes: r.notes,
         receivedBy: r.receivedBy,
