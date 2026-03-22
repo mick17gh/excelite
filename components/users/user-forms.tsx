@@ -177,7 +177,7 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
                   <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
                   <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
                   <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
-                  <SelectItem value="STAFF">Staff (POS & Orders)</SelectItem>
+                  <SelectItem value="STAFF">Staff (POS, KDS, Orders & Customers)</SelectItem>
                   <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
                   <SelectItem value="AUDITOR">Auditor (Read-Only)</SelectItem>
                   <SelectItem value="DEVELOPER">Developer (API Access)</SelectItem>

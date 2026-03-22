@@ -377,13 +377,16 @@ const rolePermissions: Record<Role, Permission[]> = {
 
   STAFF: [
     "dashboard:view",
-    "transactions:view",
-    "transactions:create",
-    "sales:view",
     "pos:access",
     "kitchen:access",
     "orders:view",
     "orders:create",
+    "orders:edit",
+    "orders:assign",
+    "orders:cancel",
+    "customers:view",
+    "customers:create",
+    "customers:edit",
   ],
 
   KITCHEN_STAFF: [
@@ -520,10 +523,10 @@ export const roleDescriptions: Record<Role, string> = {
   OPERATIONS_MANAGER: "Manage all branches, staff, inventory, orders, and warehouse operations",
   BRANCH_MANAGER: "Manage a specific branch including staff, inventory, orders, and sales",
   SUPERVISOR: "Oversee branch operations with limited management capabilities",
-  STAFF: "POS access for processing transactions and basic order management",
+  STAFF: "Dashboard, POS, kitchen (KDS), orders, and customers",
   KITCHEN_STAFF: "Kitchen display access for order preparation",
   AUDITOR: "Read-only access to all data for compliance and auditing",
   DEVELOPER: "API key management and technical settings access",
-  CALL_CENTER: "Order placement, customer management, and delivery coordination",
+  CALL_CENTER: "Dashboard, orders, and customers only",
   WAREHOUSE_STAFF: "Warehouse inventory management and branch transfer operations",
 };

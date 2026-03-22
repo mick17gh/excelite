@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useIsMounted } from "@/hooks/use-is-mounted";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,7 +52,10 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
-import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
+import {
+  useBranchRestrictions,
+  filterBranchesForUser,
+} from "@/hooks/use-branch-restrictions";
 import { createTransaction, getTransactions } from "@/lib/actions/transactions";
 import { getBranchTaxRate } from "@/lib/actions/tax";
 import { SalesChannel } from "@/lib/generated/prisma/client";
@@ -91,7 +100,6 @@ interface Transaction {
   status: string;
 }
 
-
 interface TransactionsContentProps {
   branches: Branch[];
   menuItems: MenuItem[];
@@ -112,19 +120,27 @@ function formatTxns(data: any[]): Transaction[] {
   }));
 }
 
-export function TransactionsContent({ branches, menuItems, initialTransactions }: TransactionsContentProps) {
+export function TransactionsContent({
+  branches,
+  menuItems,
+  initialTransactions,
+}: TransactionsContentProps) {
   const mounted = useIsMounted();
   const { formatCurrency, formatCurrencyShort } = useCurrency();
-  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
-  
+  const {
+    canViewAllBranches,
+    userBranchId,
+    isLoading: authLoading,
+  } = useBranchRestrictions();
+
   // Filter branches based on user permissions (use all branches until mounted to prevent hydration mismatch)
-  const availableBranches = mounted 
+  const availableBranches = mounted
     ? filterBranchesForUser(branches, canViewAllBranches, userBranchId)
     : branches;
-  
+
   // Initialize with user's branch if restricted, otherwise first available branch
   const [selectedBranch, setSelectedBranch] = useState<string>("");
-  
+
   // Auto-select user's branch if they're restricted
   useEffect(() => {
     if (!authLoading) {
@@ -141,13 +157,18 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
   const [customerCount, setCustomerCount] = useState<number>(1);
   const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>(
-    initialTransactions ? formatTxns(initialTransactions) : []
+    initialTransactions ? formatTxns(initialTransactions) : [],
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [initialFetchDone, setInitialFetchDone] = useState(!!initialTransactions);
+  const [initialFetchDone, setInitialFetchDone] =
+    useState(!!initialTransactions);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [taxSettings, setTaxSettings] = useState<{ rate: number; name: string; enabled: boolean }>({ rate: 0, name: "Tax", enabled: false });
+  const [taxSettings, setTaxSettings] = useState<{
+    rate: number;
+    name: string;
+    enabled: boolean;
+  }>({ rate: 0, name: "Tax", enabled: false });
 
   // Auto-set currency based on selected branch
   useBranchCurrency(selectedBranch, branches);
@@ -196,9 +217,13 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
       setCart(
         cart.map((c) =>
           c.menuItemId === item.id
-            ? { ...c, quantity: c.quantity + 1, total: (c.quantity + 1) * c.unitPrice }
-            : c
-        )
+            ? {
+                ...c,
+                quantity: c.quantity + 1,
+                total: (c.quantity + 1) * c.unitPrice,
+              }
+            : c,
+        ),
       );
     } else {
       setCart([
@@ -226,8 +251,8 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
     }
     setCart(
       cart.map((c) =>
-        c.id === id ? { ...c, quantity, total: quantity * c.unitPrice } : c
-      )
+        c.id === id ? { ...c, quantity, total: quantity * c.unitPrice } : c,
+      ),
     );
   };
 
@@ -303,7 +328,7 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
   const filteredMenuItems = displayMenuItems.filter(
     (item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      item.category.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // Group menu items by category
@@ -313,8 +338,8 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
     <div className="space-y-4">
       {/* Header Controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Select 
-          value={selectedBranch} 
+        <Select
+          value={selectedBranch}
           onValueChange={setSelectedBranch}
           disabled={mounted ? !canViewAllBranches : false}
         >
@@ -332,7 +357,7 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
 
         <Dialog open={isNewSaleOpen} onOpenChange={setIsNewSaleOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="h-9">
+            <Button size="sm" className="h-9 hidden">
               <Plus className="mr-2 h-4 w-4" />
               New Transaction
             </Button>
@@ -362,11 +387,15 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                 <ScrollArea className="flex-1 h-0">
                   <div className="p-3 space-y-3">
                     {categories.map((category) => {
-                      const items = filteredMenuItems.filter((i) => i.category === category);
+                      const items = filteredMenuItems.filter(
+                        (i) => i.category === category,
+                      );
                       if (items.length === 0) return null;
                       return (
                         <div key={category}>
-                          <h4 className="text-xs font-medium text-muted-foreground mb-2">{category}</h4>
+                          <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                            {category}
+                          </h4>
                           <div className="grid grid-cols-2 gap-2">
                             {items.map((item) => (
                               <Button
@@ -375,7 +404,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                                 className="h-auto py-2 px-2 flex flex-col items-start justify-start text-left"
                                 onClick={() => addToCart(item)}
                               >
-                                <span className="font-medium text-xs truncate w-full">{item.name}</span>
+                                <span className="font-medium text-xs truncate w-full">
+                                  {item.name}
+                                </span>
                                 <span className="text-xs font-semibold text-primary mt-0.5">
                                   {formatCurrency(item.price)}
                                 </span>
@@ -392,7 +423,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
               {/* Cart */}
               <div className="flex flex-col min-h-0">
                 <div className="p-3 border-b shrink-0">
-                  <h3 className="font-semibold text-sm">Current Order ({cart.length} items)</h3>
+                  <h3 className="font-semibold text-sm">
+                    Current Order ({cart.length} items)
+                  </h3>
                 </div>
                 <ScrollArea className="flex-1 h-0">
                   <div className="p-3">
@@ -409,7 +442,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                             className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-lg"
                           >
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-xs truncate">{item.menuItem}</p>
+                              <p className="font-medium text-xs truncate">
+                                {item.menuItem}
+                              </p>
                               <p className="text-[10px] text-muted-foreground">
                                 {formatCurrency(item.unitPrice)} each
                               </p>
@@ -419,16 +454,22 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                                 variant="outline"
                                 size="icon"
                                 className="h-6 w-6"
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                onClick={() =>
+                                  updateQuantity(item.id, item.quantity - 1)
+                                }
                               >
                                 -
                               </Button>
-                              <span className="w-6 text-center text-xs">{item.quantity}</span>
+                              <span className="w-6 text-center text-xs">
+                                {item.quantity}
+                              </span>
                               <Button
                                 variant="outline"
                                 size="icon"
                                 className="h-6 w-6"
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                onClick={() =>
+                                  updateQuantity(item.id, item.quantity + 1)
+                                }
                               >
                                 +
                               </Button>
@@ -461,7 +502,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                       </div>
                       {taxSettings.enabled && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">{taxSettings.name} ({taxSettings.rate}%)</span>
+                          <span className="text-muted-foreground">
+                            {taxSettings.name} ({taxSettings.rate}%)
+                          </span>
                           <span>{formatCurrency(tax)}</span>
                         </div>
                       )}
@@ -489,7 +532,10 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                     </div>
                     <div>
                       <Label className="text-[10px]">Payment</Label>
-                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <Select
+                        value={paymentMethod}
+                        onValueChange={setPaymentMethod}
+                      >
                         <SelectTrigger className="h-8 mt-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -506,7 +552,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                         type="number"
                         min="1"
                         value={customerCount}
-                        onChange={(e) => setCustomerCount(parseInt(e.target.value) || 1)}
+                        onChange={(e) =>
+                          setCustomerCount(parseInt(e.target.value) || 1)
+                        }
                         className="h-8 mt-1"
                       />
                     </div>
@@ -522,7 +570,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                     ) : (
                       <CheckCircle2 className="mr-2 h-4 w-4" />
                     )}
-                    {isSubmitting ? "Processing..." : `Complete Sale (${formatCurrency(grandTotal)})`}
+                    {isSubmitting
+                      ? "Processing..."
+                      : `Complete Sale (${formatCurrency(grandTotal)})`}
                   </Button>
                 </div>
               </div>
@@ -537,9 +587,16 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Today's Revenue</p>
-                <p className="text-base font-bold mt-0.5 truncate" title={formatCurrency(todayTotal)}>
-                  {todayTotal >= 10000 ? formatCurrencyShort(todayTotal) : formatCurrency(todayTotal)}
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Today's Revenue
+                </p>
+                <p
+                  className="text-base font-bold mt-0.5 truncate"
+                  title={formatCurrency(todayTotal)}
+                >
+                  {todayTotal >= 10000
+                    ? formatCurrencyShort(todayTotal)
+                    : formatCurrency(todayTotal)}
                 </p>
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
@@ -553,7 +610,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Transactions</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Transactions
+                </p>
                 <p className="text-base font-bold mt-0.5">{todayCount}</p>
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
@@ -567,7 +626,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Ticket</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Avg Ticket
+                </p>
                 <p className="text-base font-bold mt-0.5 truncate">
                   {formatCurrency(avgTicket)}
                 </p>
@@ -583,7 +644,9 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Daypart</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Daypart
+                </p>
                 <p className="text-base font-bold mt-0.5">{getDaypart()}</p>
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
@@ -627,35 +690,51 @@ export function TransactionsContent({ branches, menuItems, initialTransactions }
                   </TableRow>
                 ) : transactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
+                    <TableCell
+                      colSpan={7}
+                      className="h-24 text-center text-muted-foreground text-sm"
+                    >
                       No transactions yet today
                     </TableCell>
                   </TableRow>
                 ) : (
                   transactions.map((txn) => (
                     <TableRow key={txn.id}>
-                      <TableCell className="text-xs font-medium py-2">{txn.saleNumber}</TableCell>
+                      <TableCell className="text-xs font-medium py-2">
+                        {txn.saleNumber}
+                      </TableCell>
                       <TableCell className="text-xs py-2">{txn.time}</TableCell>
-                      <TableCell className="text-xs py-2">{txn.items}</TableCell>
+                      <TableCell className="text-xs py-2">
+                        {txn.items}
+                      </TableCell>
                       <TableCell className="py-2">
                         <Badge variant="secondary" className="text-[10px] h-5">
                           {txn.channel.replace("_", " ")}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs py-2">{txn.paymentMethod}</TableCell>
+                      <TableCell className="text-xs py-2">
+                        {txn.paymentMethod}
+                      </TableCell>
                       <TableCell className="text-right text-xs font-medium py-2">
                         {formatCurrency(txn.total)}
                       </TableCell>
                       <TableCell className="py-2">
-                        <Badge className={cn(
-                          "text-[10px] h-5",
-                          txn.status === "completed" 
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        )}>
+                        <Badge
+                          className={cn(
+                            "text-[10px] h-5",
+                            txn.status === "completed"
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                          )}
+                        >
                           {txn.status === "completed" ? (
-                            <><CheckCircle2 className="mr-0.5 h-3 w-3" />Done</>
-                          ) : "Voided"}
+                            <>
+                              <CheckCircle2 className="mr-0.5 h-3 w-3" />
+                              Done
+                            </>
+                          ) : (
+                            "Voided"
+                          )}
                         </Badge>
                       </TableCell>
                     </TableRow>
