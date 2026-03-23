@@ -123,13 +123,15 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
 
 export async function createOrganization(name: string, tier: SubscriptionTier = "FREE") {
   try {
+    const tierLimits = TIER_CONFIG[tier];
     const org = await db.organization.create({
       data: {
         name,
         tier,
         status: "ACTIVE",
-        maxBranches: tier === "FREE" ? 1 : tier === "PRO" ? 10 : 999,
-        maxUsers: tier === "FREE" ? 2 : tier === "PRO" ? 50 : 999,
+        maxBranches: tierLimits.maxBranches === Infinity ? 999 : tierLimits.maxBranches,
+        maxUsers: tierLimits.maxUsers === Infinity ? 999 : tierLimits.maxUsers,
+        maxMenuItems: tierLimits.maxMenuItems,
       },
     });
 

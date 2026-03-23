@@ -45,9 +45,68 @@ interface OrgInfo {
 }
 
 const PLANS = [
-  { tier: "FREE", label: "Free", icon: Zap, price: 0, desc: "For small businesses getting started", features: ["1 Branch", "2 Users", "50 Menu Items", "Basic POS", "Inventory"] },
-  { tier: "PRO", label: "Pro", icon: Rocket, price: 149, desc: "For multi-branch operations", features: ["10 Branches", "50 Users", "Unlimited Menu Items", "AI Assistant", "Online Ordering", "API Access"] },
-  { tier: "ENTERPRISE", label: "Enterprise", icon: Building, price: 0, desc: "Custom pricing for large chains", features: ["Unlimited Everything", "WhatsApp Ordering", "Custom Branding", "Priority Support"] },
+  {
+    tier: "FREE",
+    label: "Basic",
+    icon: Zap,
+    annualPriceGhs: 5000,
+    desc: "Single-branch starter operations plan",
+    features: [
+      "Dashboard",
+      "1 Branch",
+      "1 Warehouse",
+      "POS + Kitchen Display",
+      "Inventory",
+      "Unlimited Menu Items",
+      "Up to 5 User Accounts",
+      "Technical Support",
+      "Free 1 Month Trial",
+    ],
+  },
+  {
+    tier: "PRO",
+    label: "Pro",
+    icon: Rocket,
+    annualPriceGhs: 10000,
+    desc: "For growing multi-branch operations",
+    features: [
+      "Dashboard",
+      "Up to 5 Branches",
+      "Online Ordering",
+      "POS + Kitchen Display",
+      "Inventory + Warehouse",
+      "Delivery Management",
+      "Customer Management",
+      "Up to 50 Users",
+      "Sales & Revenue Reports",
+      "AI Assistant",
+      "Technical Support",
+      "Free 1 Month Trial",
+    ],
+  },
+  {
+    tier: "ENTERPRISE",
+    label: "Premium",
+    icon: Building,
+    annualPriceGhs: 25000,
+    desc: "Full premium suite for large organizations",
+    features: [
+      "Dashboard",
+      "Unlimited Branches",
+      "Online + WhatsApp Ordering",
+      "POS + Kitchen Display",
+      "Inventory + Warehouse",
+      "Delivery + Customer Management",
+      "Unlimited Users",
+      "Executive & Custom Reports",
+      "Staff Management + Sales Analytics",
+      "AI Assistant + API Support",
+      "Custom Alerts & Notifications",
+      "Priority Support",
+      "Technical Support",
+      "Free 1 Month Trial",
+    ],
+  },
 ];
 
 const TIER_COLORS: Record<string, string> = {
@@ -105,7 +164,11 @@ export function SubscriptionTab() {
                 <CardDescription className="text-xs">Your active plan and billing details</CardDescription>
               </div>
               <Badge className={TIER_COLORS[orgInfo.subscription.tier] || ""}>
-                {orgInfo.subscription.tier}
+                {orgInfo.subscription.tier === "FREE"
+                  ? "Basic"
+                  : orgInfo.subscription.tier === "ENTERPRISE"
+                    ? "Premium"
+                    : "Pro"}
               </Badge>
             </div>
           </CardHeader>
@@ -159,7 +222,7 @@ export function SubscriptionTab() {
                   </div>
                   <p className="text-xs text-muted-foreground">{plan.desc}</p>
                   <p className="text-lg font-bold">
-                    {plan.price > 0 ? `$${plan.price}/mo` : plan.tier === "ENTERPRISE" ? "Custom" : "Free"}
+                    {`GHS ${plan.annualPriceGhs.toLocaleString()} yearly`}
                   </p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
                     {plan.features.map((f) => (
@@ -168,7 +231,7 @@ export function SubscriptionTab() {
                   </ul>
                   {!isCurrent && plan.tier !== "ENTERPRISE" && (
                     <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => toast.info("Contact support to change plans")}>
-                      {plan.price > (PLANS.find((p) => p.tier === orgInfo?.tier)?.price || 0) ? "Upgrade" : "Downgrade"}
+                      {plan.annualPriceGhs > (PLANS.find((p) => p.tier === orgInfo?.tier)?.annualPriceGhs || 0) ? "Upgrade" : "Downgrade"}
                     </Button>
                   )}
                   {plan.tier === "ENTERPRISE" && !isCurrent && (

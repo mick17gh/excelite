@@ -11,6 +11,8 @@ import { Separator } from "@/components/ui/separator";
 import { Building2, Users, GitBranch, Warehouse, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getOrganization, updateOrganization } from "@/lib/actions/organization";
+import { getTierLimits, TIER_DISPLAY_NAMES } from "@/lib/tier-config";
+import { SubscriptionTier } from "@/lib/generated/prisma/client";
 
 interface OrgData {
   id: string;
@@ -31,7 +33,6 @@ interface OrgData {
 
 const TIER_COLORS: Record<string, string> = {
   FREE: "bg-slate-100 text-slate-700",
-  BASIC: "bg-blue-100 text-blue-700",
   PRO: "bg-purple-100 text-purple-700",
   ENTERPRISE: "bg-amber-100 text-amber-700",
 };
@@ -93,6 +94,9 @@ export function OrganizationTab() {
     );
   }
 
+  const tier = org.tier as SubscriptionTier;
+  const tierLimits = getTierLimits(tier);
+
   return (
     <div className="space-y-4">
       <Card className="chart-card rounded-xl">
@@ -105,7 +109,9 @@ export function OrganizationTab() {
               </CardTitle>
               <CardDescription className="text-xs">Manage your organization details</CardDescription>
             </div>
-            <Badge className={TIER_COLORS[org.tier] || ""}>{org.tier}</Badge>
+            <Badge className={TIER_COLORS[org.tier] || ""}>
+              {TIER_DISPLAY_NAMES[tier] || org.tier}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-4 pt-0 space-y-4">
@@ -139,11 +145,21 @@ export function OrganizationTab() {
           <CardDescription className="text-xs">Current resource usage vs plan limits</CardDescription>
         </CardHeader>
         <CardContent className="px-4 pb-4 pt-0 space-y-4">
-          <UsageMeter icon={GitBranch} label="Branches" used={org.branchCount} max={org.maxBranches} />
+          <UsageMeter
+            icon={GitBranch}
+            label="Branches"
+            used={org.branchCount}
+            max={tierLimits.maxBranches}
+          />
           <Separator />
-          <UsageMeter icon={Users} label="Users" used={org.userCount} max={org.maxUsers} />
+          <UsageMeter icon={Users} label="Users" used={org.userCount} max={tierLimits.maxUsers} />
           <Separator />
-          <UsageMeter icon={Warehouse} label="Warehouses" used={org.warehouseCount} max={999} />
+          <UsageMeter
+            icon={Warehouse}
+            label="Warehouses"
+            used={org.warehouseCount}
+            max={tierLimits.maxWarehouses}
+          />
 
           {org.trialEndsAt && (
             <>
@@ -164,7 +180,8 @@ export function OrganizationTab() {
 }
 
 function UsageMeter({ icon: Icon, label, used, max }: { icon: React.ElementType; label: string; used: number; max: number }) {
-  const pct = max > 0 ? Math.min((used / max) * 100, 100) : 0;
+  const isUnlimited = !Number.isFinite(max);
+  const pct = !isUnlimited && max > 0 ? Math.min((used / max) * 100, 100) : 0;
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-sm">
@@ -172,7 +189,9 @@ function UsageMeter({ icon: Icon, label, used, max }: { icon: React.ElementType;
           <Icon className="h-4 w-4 text-muted-foreground" />
           <span>{label}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{used} / {max === 999 ? "∞" : max}</span>
+        <span className="text-xs text-muted-foreground">
+          {used} / {isUnlimited ? "∞" : max}
+        </span>
       </div>
       <Progress value={pct} className="h-2" />
     </div>

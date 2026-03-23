@@ -41,27 +41,27 @@ export interface TierFeatures {
 export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
   FREE: {
     maxBranches: 1,
-    maxUsers: 2,
-    maxMenuItems: 50,
+    maxUsers: 5,
+    maxMenuItems: null,
     maxWarehouses: 1,
     features: {
       pos: true,
       kitchenDisplay: true,
       inventory: true,
       warehouse: true,
-      salesAnalytics: true,
+      salesAnalytics: false,
       advancedReports: false,
-      staffManagement: true,
+      staffManagement: false,
       staffScheduling: false,
-      targets: true,
-      alerts: true,
+      targets: false,
+      alerts: false,
       apiAccess: false,
       aiAssistant: false,
       callCenter: false,
       onlineOrdering: false,
       whatsappOrdering: false,
       delivery: false,
-      crm: true,
+      crm: false,
       multiCurrency: false,
       customBranding: false,
       auditLogs: false,
@@ -71,7 +71,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
   },
   PRO: {
-    maxBranches: 10,
+    maxBranches: 5,
     maxUsers: 50,
     maxMenuItems: null,
     maxWarehouses: 3,
@@ -177,13 +177,13 @@ export function isWithinLimit(
 }
 
 export const TIER_DISPLAY_NAMES: Record<SubscriptionTier, string> = {
-  FREE: "Free",
+  FREE: "Basic",
   PRO: "Pro",
-  ENTERPRISE: "Enterprise",
+  ENTERPRISE: "Premium",
 };
 
 export const TIER_DESCRIPTIONS: Record<SubscriptionTier, string> = {
-  FREE: "Get started with essential POS and inventory for a single branch",
-  PRO: "Full platform with AI, delivery, online ordering, and advanced reporting",
-  ENTERPRISE: "Unlimited scale with WhatsApp ordering, custom branding, and dedicated support",
+  FREE: "Single-branch starter plan with POS, KDS, inventory, and warehouse essentials",
+  PRO: "Growing operations plan with online ordering, delivery, customer management, and AI",
+  ENTERPRISE: "Premium enterprise plan with unlimited scale, advanced analytics, and priority support",
 };

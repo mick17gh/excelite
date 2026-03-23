@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { db } from "@/lib/db";
+import { hasFeature } from "@/lib/tier-config";
 
 export default async function DashboardLayout({
   children,
@@ -29,6 +30,7 @@ export default async function DashboardLayout({
   }
 
   const orgTier: SubscriptionTier = org.tier;
+  const canUseAiAssistant = hasFeature(orgTier, "aiAssistant", userRole);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -44,8 +46,8 @@ export default async function DashboardLayout({
         <Header />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10">{children}</main>
         
-        {/* AI Chat Widget */}
-        <FloatingChatWidget />
+        {/* AI Chat Widget (tier-gated) */}
+        {canUseAiAssistant && <FloatingChatWidget />}
       </div>
     </div>
   );

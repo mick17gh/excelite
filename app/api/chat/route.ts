@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Role } from '@/lib/generated/prisma/client';
+import { Role, SubscriptionTier } from '@/lib/generated/prisma/client';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { chatService } from '@/lib/ai';
 import type { LLMProvider, SelectionMode, LLMMessage } from '@/lib/ai/types';
+import { db } from '@/lib/db';
+import { hasFeature } from '@/lib/tier-config';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -32,6 +34,18 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user;
+    const userRole = (user.role as Role) || Role.BRANCH_MANAGER;
+
+    // Enforce tier-level access for AI assistant at API layer.
+    const org = await db.organization.findFirst({ select: { tier: true } });
+    const orgTier: SubscriptionTier = org?.tier || "FREE";
+    if (!hasFeature(orgTier, "aiAssistant", userRole)) {
+      return NextResponse.json(
+        { error: 'AI Assistant is not available on your current plan' },
+        { status: 403 }
+      );
+    }
+
     const body: ChatRequestBody = await request.json();
 
     // Validate request
@@ -53,7 +67,7 @@ export async function POST(request: NextRequest) {
       message: body.message,
       context: {
         userId: user.id,
-        userRole: (user.role as Role) || Role.BRANCH_MANAGER,
+        userRole,
         branchId: user.branchId || null,
         sessionId: body.sessionId || 'default',
         previousMessages: body.previousMessages || [],

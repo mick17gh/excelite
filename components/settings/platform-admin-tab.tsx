@@ -24,6 +24,7 @@ import { Search, Building2, Users, Loader2, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { getAllOrganizations, updateOrganization } from "@/lib/actions/organization";
 import { SubscriptionTier } from "@/lib/generated/prisma/client";
+import { getTierLimits } from "@/lib/tier-config";
 
 interface Organization {
   id: string;
@@ -49,6 +50,12 @@ const TIER_COLORS: Record<string, string> = {
   FREE: "bg-slate-100 text-slate-700",
   PRO: "bg-purple-100 text-purple-700",
   ENTERPRISE: "bg-amber-100 text-amber-700",
+};
+
+const TIER_LABELS: Record<string, string> = {
+  FREE: "Basic",
+  PRO: "Pro",
+  ENTERPRISE: "Premium",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -146,7 +153,7 @@ export function PlatformAdminTab() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Free Tier</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Basic Tier</p>
                 <p className="text-base font-bold mt-0.5">{freeOrgs}</p>
               </div>
               <div className="rounded-lg p-1.5 shrink-0 bg-slate-100">
@@ -174,7 +181,7 @@ export function PlatformAdminTab() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Enterprise</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Premium Tier</p>
                 <p className="text-base font-bold mt-0.5 text-amber-600">{enterpriseOrgs}</p>
               </div>
               <div className="rounded-lg p-1.5 shrink-0 bg-amber-100">
@@ -203,9 +210,9 @@ export function PlatformAdminTab() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Tiers</SelectItem>
-              <SelectItem value="FREE">Free</SelectItem>
+              <SelectItem value="FREE">Basic</SelectItem>
               <SelectItem value="PRO">Pro</SelectItem>
-              <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
+              <SelectItem value="ENTERPRISE">Premium</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -240,7 +247,7 @@ export function PlatformAdminTab() {
                   </TableCell>
                   <TableCell>
                     <Badge className={TIER_COLORS[org.tier] || "bg-slate-100 text-slate-700"}>
-                      {org.tier}
+                      {TIER_LABELS[org.tier] || org.tier}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -250,10 +257,20 @@ export function PlatformAdminTab() {
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <p>{org.userCount}/{org.maxUsers} users</p>
-                      <p className="text-xs text-muted-foreground">
-                        {org.branchCount} branches • {org.warehouseCount} warehouses
-                      </p>
+                      {(() => {
+                        const limits = getTierLimits(org.tier as SubscriptionTier);
+                        const maxBranches = Number.isFinite(limits.maxBranches) ? limits.maxBranches : "∞";
+                        const maxUsers = Number.isFinite(limits.maxUsers) ? limits.maxUsers : "∞";
+                        const maxWarehouses = Number.isFinite(limits.maxWarehouses) ? limits.maxWarehouses : "∞";
+                        return (
+                          <>
+                            <p>{org.userCount}/{maxUsers} users</p>
+                            <p className="text-xs text-muted-foreground">
+                              {org.branchCount}/{maxBranches} branches • {org.warehouseCount}/{maxWarehouses} warehouses
+                            </p>
+                          </>
+                        );
+                      })()}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -273,9 +290,9 @@ export function PlatformAdminTab() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="FREE">Free</SelectItem>
+                        <SelectItem value="FREE">Basic</SelectItem>
                         <SelectItem value="PRO">Pro</SelectItem>
-                        <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
+                        <SelectItem value="ENTERPRISE">Premium</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>
