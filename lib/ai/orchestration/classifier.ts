@@ -2,7 +2,20 @@ import type { ClassifiedQuery, QueryIntent, ExtractedEntity, TimeRange, QueryCom
 import { findMatchingTemplates } from '../data/query-templates';
 
 const INTENT_KEYWORDS: Record<QueryIntent, string[]> = {
-  informational: ['what', 'how much', 'how many', 'current', 'show', 'list', 'get', 'tell me'],
+  informational: [
+    'what',
+    'how much',
+    'how many',
+    'current',
+    'show',
+    'list',
+    'get',
+    'tell me',
+    'report',
+    'export',
+    'warehouse',
+    'where',
+  ],
   analytical: ['why', 'analyze', 'explain', 'cause', 'reason', 'because', 'trend', 'pattern'],
   comparative: ['compare', 'versus', 'vs', 'difference', 'between', 'better', 'worse', 'ranking'],
   predictive: ['predict', 'forecast', 'will', 'expect', 'projection', 'estimate', 'future'],
@@ -40,7 +53,7 @@ const ENTITY_PATTERNS: Record<string, RegExp[]> = {
     /(\w+)\s+category/i,
   ],
   metric: [
-    /(sales|revenue|profit|waste|inventory|stock|transactions?|orders?)/i,
+    /(sales|revenue|profit|waste|inventory|stock|transactions?|orders?|warehouse|hub|transfer|report|customer|pos|delivery)/i,
   ],
 };
 

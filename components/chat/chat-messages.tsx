@@ -41,14 +41,14 @@ export function ChatMessages({
           <div className="text-4xl mb-4">🤖</div>
           <h3 className="font-medium mb-2">ServStack AI Assistant</h3>
           <p className="text-sm">
-            Ask me about sales, inventory, staff schedules, or get business insights.
+            Ask about sales, branch vs warehouse stock, orders, reports exports, staff, or KPIs.
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {[
               "Today's sales",
-              'Low stock items',
-              'Staff on duty',
-              'Branch comparison',
+              'Warehouse transfers this month',
+              'Orders by status',
+              'What reports can I export?',
             ].map((suggestion) => (
               <span
                 key={suggestion}

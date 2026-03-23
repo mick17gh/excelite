@@ -278,33 +278,33 @@ export function ReportsContent({ branches }: ReportsContentProps) {
 
     return (
       <Dialog open={!!viewingReport} onOpenChange={() => setViewingReport(null)}>
-        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 border-b shrink-0">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                <reportType.icon className="h-5 w-5" />
-                {data.reportName as string}
+        <DialogContent className="flex h-[90vh] max-h-[90vh] w-[min(95vw,56rem)] max-w-4xl min-w-0 flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <DialogTitle className="flex min-w-0 items-center gap-2 text-left">
+                <reportType.icon className="h-5 w-5 shrink-0" />
+                <span className="truncate">{data.reportName as string}</span>
               </DialogTitle>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground break-words">
               {data.branchName as string} • {format(new Date((data.period as { startDate: string; endDate: string })?.startDate), "MMM dd")} - {format(new Date((data.period as { startDate: string; endDate: string })?.endDate), "MMM dd, yyyy")}
             </p>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full px-6 py-4">
-              <div className="space-y-6 pr-4">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <ScrollArea className="h-full min-h-0 min-w-0 px-6 py-4">
+              <div className="min-w-0 max-w-full space-y-6 pb-2">
                 {/* Summary Section */}
                 {summary && (
-                  <div>
-                    <h3 className="text-sm font-semibold mb-3">Summary</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="min-w-0">
+                    <h3 className="mb-3 text-sm font-semibold">Summary</h3>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       {Object.entries(summary).map(([key, value]) => (
-                        <div key={key} className="rounded-lg border p-3">
-                          <p className="text-xs text-muted-foreground capitalize">
+                        <div key={key} className="min-w-0 rounded-lg border p-3">
+                          <p className="text-xs capitalize text-muted-foreground break-words">
                             {key.replace(/([A-Z])/g, " $1").trim()}
                           </p>
-                          <p className="text-sm font-semibold mt-1">
+                          <p className="mt-1 break-words text-sm font-semibold">
                             {typeof value === "number"
                               ? key.toLowerCase().includes("revenue") ||
                                 key.toLowerCase().includes("cost") ||
@@ -328,13 +328,13 @@ export function ReportsContent({ branches }: ReportsContentProps) {
                   if (!Array.isArray(value) || value.length === 0) return null;
                   
                   return (
-                    <div key={key}>
-                      <h3 className="text-sm font-semibold mb-3 capitalize">
+                    <div key={key} className="min-w-0 max-w-full">
+                      <h3 className="mb-3 text-sm font-semibold capitalize">
                         {key.replace(/([A-Z])/g, " $1").trim()}
                       </h3>
-                      <div className="rounded-lg border overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                      <div className="min-w-0 max-w-full overflow-hidden rounded-lg border">
+                        <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+                          <table className="w-full min-w-0 max-w-full text-sm">
                             <thead className="bg-muted/50">
                               <tr>
                                 {Object.keys(value[0]).map((col) => (
@@ -347,20 +347,32 @@ export function ReportsContent({ branches }: ReportsContentProps) {
                             <tbody>
                               {value.map((row, index) => (
                                 <tr key={index} className="border-t">
-                                  {Object.entries(row as Record<string, unknown>).map(([col, val]) => (
-                                    <td key={col} className="px-3 py-2 text-xs whitespace-nowrap">
-                                      {typeof val === "number"
+                                  {Object.entries(row as Record<string, unknown>).map(([col, val]) => {
+                                    const isNum = typeof val === "number";
+                                    const display =
+                                      isNum
                                         ? col.toLowerCase().includes("revenue") ||
                                           col.toLowerCase().includes("cost") ||
                                           col.toLowerCase().includes("value") ||
                                           col.toLowerCase().includes("pay")
                                           ? formatCurrency(val)
                                           : col.toLowerCase().includes("percentage")
-                                          ? `${val}%`
-                                          : val.toLocaleString()
-                                        : String(val)}
-                                    </td>
-                                  ))}
+                                            ? `${val}%`
+                                            : val.toLocaleString()
+                                        : String(val);
+                                    return (
+                                      <td
+                                        key={col}
+                                        className={
+                                          isNum
+                                            ? "px-3 py-2 text-xs whitespace-nowrap tabular-nums"
+                                            : "max-w-[min(280px,55vw)] px-3 py-2 text-xs break-words sm:max-w-[min(360px,50vw)]"
+                                        }
+                                      >
+                                        {display}
+                                      </td>
+                                    );
+                                  })}
                                 </tr>
                               ))}
                             </tbody>

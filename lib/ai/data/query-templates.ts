@@ -555,6 +555,147 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
   },
 
   // ============================================
+  // WAREHOUSE HUB & UNIFIED ORDERS
+  // ============================================
+  {
+    id: 'warehouse_hub_stock_levels',
+    intent: 'informational',
+    entity: 'warehouseHub',
+    patterns: [
+      'warehouse stock',
+      'hub inventory',
+      'central warehouse',
+      'warehouse sku',
+      'warehouse low stock',
+      'what is in the warehouse',
+    ],
+    description: 'Central warehouse inventory lines with quantities',
+    buildQuery: (params: QueryParams): PrismaQueryConfig => {
+      return {
+        model: 'warehouseInventoryItem',
+        operation: 'findMany',
+        where: { isActive: true },
+        select: {
+          name: true,
+          sku: true,
+          category: true,
+          unit: true,
+          currentStock: true,
+          reorderPoint: true,
+          unitCost: true,
+          warehouse: { select: { name: true, code: true } },
+        },
+        orderBy: { currentStock: 'asc' },
+        take: params.limit || 35,
+      };
+    },
+    maxResults: 50,
+    requiredRoles: [
+      Role.SUPER_ADMIN,
+      Role.ADMIN,
+      Role.EXECUTIVE,
+      Role.OPERATIONS_MANAGER,
+      Role.BRANCH_MANAGER,
+      Role.WAREHOUSE_STAFF,
+      Role.AUDITOR,
+    ],
+    cacheTTL: 120,
+  },
+  {
+    id: 'warehouse_transfers_period',
+    intent: 'informational',
+    entity: 'warehouseHub',
+    patterns: [
+      'warehouse transfers',
+      'transfers to branches',
+      'stock sent to branches',
+      'hub transfers',
+      'warehouse to branch',
+    ],
+    description: 'Warehouse to branch transfers in a period',
+    buildQuery: (params: QueryParams): PrismaQueryConfig => {
+      const { startDate, endDate } =
+        params.startDate && params.endDate
+          ? { startDate: params.startDate, endDate: params.endDate }
+          : getDateRange((params as { period?: string }).period || 'last_30_days');
+      return {
+        model: 'warehouseBranchTransfer',
+        operation: 'findMany',
+        where: {
+          transferDate: { gte: startDate, lte: endDate },
+          ...(params.branchId && { toBranchId: params.branchId }),
+        },
+        select: {
+          transferDate: true,
+          status: true,
+          quantity: true,
+          totalCost: true,
+          notes: true,
+          warehouse: { select: { name: true, code: true } },
+          warehouseItem: { select: { name: true, sku: true, unit: true } },
+          toBranch: { select: { name: true, code: true } },
+        },
+        orderBy: { transferDate: 'desc' },
+        take: params.limit || 25,
+      };
+    },
+    maxResults: 50,
+    requiredRoles: [
+      Role.SUPER_ADMIN,
+      Role.ADMIN,
+      Role.EXECUTIVE,
+      Role.OPERATIONS_MANAGER,
+      Role.BRANCH_MANAGER,
+      Role.WAREHOUSE_STAFF,
+      Role.AUDITOR,
+    ],
+    cacheTTL: 180,
+  },
+  {
+    id: 'unified_orders_by_status',
+    intent: 'comparative',
+    entity: 'unifiedOrders',
+    patterns: [
+      'orders by status',
+      'order pipeline',
+      'how many orders pending',
+      'unified orders',
+      'order breakdown',
+      'pending orders count',
+    ],
+    description: 'Unified orders grouped by status',
+    buildQuery: (params: QueryParams): PrismaQueryConfig => {
+      const { startDate, endDate } =
+        params.startDate && params.endDate
+          ? { startDate: params.startDate, endDate: params.endDate }
+          : getDateRange((params as { period?: string }).period || 'last_30_days');
+      return {
+        model: 'order',
+        operation: 'groupBy',
+        by: ['status'],
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          ...(params.branchId && { branchId: params.branchId }),
+        },
+        _count: { id: true },
+        _sum: { total: true },
+      };
+    },
+    maxResults: 20,
+    requiredRoles: [
+      Role.SUPER_ADMIN,
+      Role.ADMIN,
+      Role.EXECUTIVE,
+      Role.OPERATIONS_MANAGER,
+      Role.BRANCH_MANAGER,
+      Role.SUPERVISOR,
+      Role.CALL_CENTER,
+      Role.AUDITOR,
+    ],
+    cacheTTL: 120,
+  },
+
+  // ============================================
   // BRANCH QUERIES
   // ============================================
   {

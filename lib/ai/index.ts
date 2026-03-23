@@ -13,6 +13,8 @@ import { getStaffSummary, getStaff } from '@/lib/actions/staff';
 import { getBranches, getBranchPerformance } from '@/lib/actions/branches';
 import { getTargets } from '@/lib/actions/targets';
 import { getMenuItems } from '@/lib/actions/menu';
+import { getWarehouseStats } from '@/lib/actions/warehouse';
+import { getOrderStats } from '@/lib/actions/orders';
 import type {
   ChatRequest,
   ChatResponse,
@@ -312,6 +314,28 @@ Average Ticket: GHS ${kpi.averageTicket.toFixed(2)}
 COGS %: ${kpi.cogsPercentage.toFixed(1)}%
 Profit Margin: ${kpi.profitMargin.toFixed(1)}%`);
         templatesUsed.push('kpi_data');
+      }
+
+      const warehouseStatsResult = await getWarehouseStats();
+      if (warehouseStatsResult.data) {
+        const w = warehouseStatsResult.data;
+        results.push(`[Warehouse hub snapshot]
+Active warehouses: ${w.totalWarehouses}
+Hub SKU lines: ${w.totalItems}
+Pending transfers to branches: ${w.pendingTransfers}
+Warehouse waste records (all time, count): ${w.totalWastage}`);
+        templatesUsed.push('warehouse_stats_snapshot');
+      }
+
+      const orderStatsResult = await getOrderStats(branchId || undefined);
+      if (orderStatsResult.data) {
+        const o = orderStatsResult.data;
+        results.push(`[Unified orders snapshot]
+Total orders (scoped): ${o.totalOrders}
+In progress (NEW / IN_PROGRESS / READY): ${o.pendingOrders}
+Completed today: ${o.completedToday}
+Revenue from orders completed today (GHS): ${o.todayRevenue.toFixed(2)}`);
+        templatesUsed.push('order_stats_snapshot');
       }
 
       // Get sales by channel for the query period
