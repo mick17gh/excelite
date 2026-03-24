@@ -28,7 +28,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { data: session } = authClient.useSession();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  
+
   const user = {
     name: session?.user?.name,
     email: session?.user?.email,
@@ -63,7 +63,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </Button>
 
       <div className="flex-1">
-        <form className="hidden md:block">
+        <form className="hidden">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -90,12 +90,17 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <AvatarImage src={user.image || undefined} alt={user.name} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                   {user.name
-                    ? user.name.split(" ").map((n) => n[0]).join("")
+                    ? user.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
                     : "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden flex-col items-start text-left md:flex">
-                <span className="text-sm font-medium">{user.name || "User"}</span>
+                <span className="text-sm font-medium">
+                  {user.name || "User"}
+                </span>
                 <span className="text-xs text-muted-foreground">
                   {user.role || "Member"}
                 </span>
@@ -109,7 +114,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               <Link href="/dashboard/settings">Settings</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               className="text-destructive"
               onClick={handleSignOut}
               disabled={isSigningOut}
