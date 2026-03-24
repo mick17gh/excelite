@@ -45,6 +45,7 @@ interface NavItem {
   icon: React.ElementType;
   permission?: Permission;
   featureKey?: keyof TierFeatures;
+  openInNewTab?: boolean;
 }
 
 const navigation: NavItem[] = [
@@ -59,6 +60,7 @@ const navigation: NavItem[] = [
     href: "/dashboard/orders",
     icon: ShoppingCart,
     permission: "orders:view",
+    openInNewTab: true,
   },
   {
     name: "POS",
@@ -66,6 +68,7 @@ const navigation: NavItem[] = [
     icon: Monitor,
     permission: "pos:access",
     featureKey: "pos",
+    openInNewTab: true,
   },
   {
     name: "Kitchen (KDS)",
@@ -288,6 +291,8 @@ export function Sidebar({ className, userRole = "STAFF", orgTier = "FREE" }: Sid
               <Link
                 key={item.name}
                 href={item.href}
+                target={item.openInNewTab ? "_blank" : undefined}
+                rel={item.openInNewTab ? "noopener noreferrer" : undefined}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-smooth min-w-0",
                   isActive

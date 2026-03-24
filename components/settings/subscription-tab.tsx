@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -13,10 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CreditCard, Loader2, Crown, Zap, Rocket, Building } from "lucide-react";
+import { CreditCard, Loader2, Zap, Rocket, Building } from "lucide-react";
 import { toast } from "sonner";
 import { getOrganization } from "@/lib/actions/organization";
-import { useCurrency } from "@/contexts/currency-context";
 
 interface SubscriptionData {
   id: string;
@@ -49,7 +47,6 @@ const PLANS = [
     tier: "FREE",
     label: "Basic",
     icon: Zap,
-    annualPriceGhs: 5000,
     desc: "Single-branch starter operations plan",
     features: [
       "Dashboard",
@@ -67,7 +64,6 @@ const PLANS = [
     tier: "PRO",
     label: "Pro",
     icon: Rocket,
-    annualPriceGhs: 10000,
     desc: "For growing multi-branch operations",
     features: [
       "Dashboard",
@@ -88,7 +84,6 @@ const PLANS = [
     tier: "ENTERPRISE",
     label: "Premium",
     icon: Building,
-    annualPriceGhs: 25000,
     desc: "Full premium suite for large organizations",
     features: [
       "Dashboard",
@@ -118,7 +113,6 @@ const TIER_COLORS: Record<string, string> = {
 export function SubscriptionTab() {
   const [orgInfo, setOrgInfo] = useState<OrgInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { formatCurrency } = useCurrency();
 
   useEffect(() => {
     loadData();
@@ -176,7 +170,7 @@ export function SubscriptionTab() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <div>
                 <p className="text-xs text-muted-foreground">Amount</p>
-                <p className="font-medium">{formatCurrency(orgInfo.subscription.amount)}/{orgInfo.subscription.billingCycle}</p>
+                <p className="font-medium">Contact Sales</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Status</p>
@@ -222,19 +216,14 @@ export function SubscriptionTab() {
                   </div>
                   <p className="text-xs text-muted-foreground">{plan.desc}</p>
                   <p className="text-lg font-bold">
-                    {`GHS ${plan.annualPriceGhs.toLocaleString()} yearly`}
+                    Contact Sales
                   </p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
                     {plan.features.map((f) => (
                       <li key={f}>• {f}</li>
                     ))}
                   </ul>
-                  {!isCurrent && plan.tier !== "ENTERPRISE" && (
-                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => toast.info("Contact support to change plans")}>
-                      {plan.annualPriceGhs > (PLANS.find((p) => p.tier === orgInfo?.tier)?.annualPriceGhs || 0) ? "Upgrade" : "Downgrade"}
-                    </Button>
-                  )}
-                  {plan.tier === "ENTERPRISE" && !isCurrent && (
+                  {!isCurrent && (
                     <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => toast.info("Contact sales@servstack.com")}>
                       Contact Sales
                     </Button>
@@ -260,7 +249,7 @@ export function SubscriptionTab() {
                   <TableHead>Reference</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Billing</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -274,7 +263,7 @@ export function SubscriptionTab() {
                         {p.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
+                    <TableCell className="text-right font-medium">Contact Sales</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
