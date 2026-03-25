@@ -36,8 +36,8 @@ async function main() {
 
   await prisma.user.create({
     data: {
-      name: "Mike",
-      email: "mike17gh@gmail.com",
+      name: "Mite",
+      email: "miteexpressgh@gmail.com",
       emailVerified: true,
       role: "SUPER_ADMIN",
       isActive: true,
@@ -53,7 +53,7 @@ async function main() {
 
   console.log("✅ Seed completed successfully!");
   console.log("\n📋 Admin Account Created:");
-  console.log("   Email: mike17gh@gmail.com");
+  console.log("   Email: miteexpressgh@gmail.com");
   console.log("   Password: pass1234");
   console.log("   Role: SUPER_ADMIN");
   console.log("\n🚀 Next Steps:");

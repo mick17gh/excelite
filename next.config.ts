@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.digitaloceanspaces.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.cdn.digitaloceanspaces.com",
+      },
     ],
   },
 
@@ -35,5 +43,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-
-
