@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   title: "ServStack - The Command Center for Restaurant Growth and Control",
   description: "The all-in-one restaurant operations platform for multi-branch restaurants. Track sales, manage inventory, optimize operations, and boost profitability.",
   keywords: ["restaurant analytics", "restaurant management", "sales analytics", "inventory management", "staff management"],
+  icons: {
+    icon: "/favv.png",
+    shortcut: "/favv.png",
+    apple: "/favv.png",
+  },
 };
 
 

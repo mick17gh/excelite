@@ -4,8 +4,27 @@ import type { NextRequest } from "next/server";
 const publicRoutes = ["/","/login", "/forgot-password", "/reset-password", "/auth/reset-password", "/api/auth", "/api/v1"];
 const authRoutes = ["/login", "/forgot-password", "/reset-password"];
 
+function isTruthyEnv(value: string | undefined): boolean {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Optional hosting mode: hide landing page and force sign-in.
+  // When enabled, requesting "/" redirects to "/login" (or "/dashboard" if already signed in).
+  const hideLanding = isTruthyEnv(process.env.NEXT_PUBLIC_HIDE_LANDING_PAGE);
+
+  if (hideLanding && pathname === "/") {
+    const sessionCookie = request.cookies.get("better-auth.session_token");
+    if (sessionCookie) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", "/");
+    return NextResponse.redirect(loginUrl);
+  }
 
   // Allow public routes and API auth routes
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
