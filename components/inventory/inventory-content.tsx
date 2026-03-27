@@ -54,6 +54,7 @@ import {
 } from "@/components/inventory/inventory-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { updateBranchTransferStatus } from "@/lib/actions/inventory";
+import { updateTransferStatus as updateWarehouseTransferStatus } from "@/lib/actions/warehouse";
 import { TransferStatus } from "@/lib/generated/prisma/client";
 import { toast } from "sonner";
 import { useCurrency } from "@/contexts/currency-context";
@@ -550,6 +551,7 @@ export function InventoryContent({
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -569,6 +571,36 @@ export function InventoryContent({
                           <Badge className={TRANSFER_STATUS_COLORS[record.status] || ""}>{record.status}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{new Date(record.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
+                        <TableCell>
+                          {record.status === "IN_TRANSIT" &&
+                            (canViewAllBranches || !userBranchId || record.toBranchId === userBranchId) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      const res = await updateWarehouseTransferStatus(
+                                        record.id,
+                                        "COMPLETED" as TransferStatus
+                                      );
+                                      if (res.data) {
+                                        toast.success("Transfer marked as received");
+                                      } else {
+                                        toast.error(res.error || "Failed to update transfer");
+                                      }
+                                    }}
+                                  >
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Mark Received
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
