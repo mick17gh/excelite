@@ -21,24 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ChefHat, Plus, Pencil, Trash2, Loader2, UtensilsCrossed } from "lucide-react";
+import { ChefHat, Plus, Pencil, Loader2, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { getBranches } from "@/lib/actions/branches";
 import {
   listKitchenStations,
   createKitchenStation,
   updateKitchenStation,
-  deleteKitchenStation,
 } from "@/lib/actions/kitchen";
 
 interface Station {
@@ -75,7 +64,6 @@ export function KitchenStationsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
   const [form, setForm] = useState<StationFormState>(emptyForm);
-  const [deleteTarget, setDeleteTarget] = useState<Station | null>(null);
 
   useEffect(() => {
     getBranches().then((res) => {
@@ -159,21 +147,6 @@ export function KitchenStationsTab() {
         setStations((refresh.success && refresh.data ? refresh.data : []) as Station[]);
       } else {
         toast.error(res.error || "Failed to update station");
-      }
-    });
-  };
-
-  const handleDelete = () => {
-    if (!deleteTarget) return;
-    startTransition(async () => {
-      const res = await deleteKitchenStation(deleteTarget.id);
-      if (res.success) {
-        toast.success("Station deleted");
-        setDeleteTarget(null);
-        const refresh = await listKitchenStations(selectedBranch);
-        setStations((refresh.success && refresh.data ? refresh.data : []) as Station[]);
-      } else {
-        toast.error(res.error || "Failed to delete station");
       }
     });
   };
@@ -268,14 +241,6 @@ export function KitchenStationsTab() {
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget(station)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
                 </div>
               ))}
@@ -334,28 +299,6 @@ export function KitchenStationsTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Station</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This cannot be undone.
-              Existing kitchen tickets for this station will not be affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

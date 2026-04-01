@@ -243,8 +243,14 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
     const result = await getKitchenStations(branchId);
     if (result.success && result.data) {
       setKitchenStations(result.data);
-      if (result.data.length > 0 && !selectedStation) {
-        setSelectedStation(result.data[0].id);
+      if (result.data.length > 0) {
+        if (!selectedStation) {
+          setSelectedStation(result.data[0].id);
+        }
+      } else {
+        // No stations for this branch: disable kitchen auto-send and clear selection.
+        setAutoSendToKitchen(false);
+        setSelectedStation("");
       }
     }
   }, [selectedStation]);
@@ -399,16 +405,18 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
             </div>
 
             <div className="flex items-center gap-2 ml-auto">
-              <Button
-                variant={autoSendToKitchen ? "default" : "outline"}
-                size="sm"
-                className={cn("h-8", autoSendToKitchen && "bg-orange-500 hover:bg-orange-600")}
-                onClick={() => setAutoSendToKitchen(!autoSendToKitchen)}
-                title={kitchenStations.length === 0 ? "No kitchen stations configured" : "Toggle auto-send to kitchen"}
-              >
-                <ChefHat className="h-4 w-4 mr-1.5" />
-                Kitchen
-              </Button>
+              {kitchenStations.length > 0 && (
+                <Button
+                  variant={autoSendToKitchen ? "default" : "outline"}
+                  size="sm"
+                  className={cn("h-8", autoSendToKitchen && "bg-orange-500 hover:bg-orange-600")}
+                  onClick={() => setAutoSendToKitchen(!autoSendToKitchen)}
+                  title="Toggle auto-send to kitchen"
+                >
+                  <ChefHat className="h-4 w-4 mr-1.5" />
+                  Kitchen
+                </Button>
+              )}
               {kitchenStations.length > 0 && (
                 <Select value={selectedStation} onValueChange={setSelectedStation}>
                   <SelectTrigger className="w-[130px] h-8 text-xs">

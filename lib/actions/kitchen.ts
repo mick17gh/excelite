@@ -53,7 +53,12 @@ export async function updateKitchenStation(input: { id: string; name?: string; d
 
 export async function deleteKitchenStation(id: string) {
   try {
-    await db.kitchenStation.delete({ where: { id } });
+    // Soft-delete by deactivating station to preserve FK integrity
+    // for historical kitchen tickets that still reference this station.
+    await db.kitchenStation.update({
+      where: { id },
+      data: { isActive: false },
+    });
     revalidatePath("/dashboard/settings");
     revalidatePath("/kitchen");
     return { success: true };
