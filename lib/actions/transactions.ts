@@ -335,6 +335,14 @@ export async function getSales(branchId?: string, startDate?: Date, endDate?: Da
       tax: Number(sale.tax),
       discount: Number(sale.discount || 0),
       total: Number(sale.total),
+      branch: sale.branch
+        ? {
+            ...sale.branch,
+            taxRate: sale.branch.taxRate ? Number(sale.branch.taxRate) : 0,
+            latitude: sale.branch.latitude ? Number(sale.branch.latitude) : null,
+            longitude: sale.branch.longitude ? Number(sale.branch.longitude) : null,
+          }
+        : null,
       items: sale.items.map((item) => ({
         ...item,
         unitPrice: Number(item.unitPrice),

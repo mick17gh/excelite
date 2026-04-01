@@ -42,7 +42,20 @@ export default async function BranchDetailsPage({
     notFound();
   }
 
-  const branch = branchResult.data;
+  // Defensive serialization guard for client component props.
+  // Some environments can still retain Prisma Decimal wrappers in nested payloads.
+  const branch = {
+    ...JSON.parse(JSON.stringify(branchResult.data)),
+    taxRate: Number((branchResult.data as any).taxRate ?? 0),
+    latitude:
+      (branchResult.data as any).latitude != null
+        ? Number((branchResult.data as any).latitude)
+        : null,
+    longitude:
+      (branchResult.data as any).longitude != null
+        ? Number((branchResult.data as any).longitude)
+        : null,
+  };
   const rawTransactions = transactionsResult.data || [];
   const rawSales = salesResult.data || [];
   const rawInventory = inventoryResult.data || [];
@@ -52,22 +65,31 @@ export default async function BranchDetailsPage({
   
   // Convert Decimal fields to numbers
   const transactions = rawTransactions.map((t: any) => ({
-    ...t,
+    id: t.id,
+    transactionRef: t.transactionRef,
     amount: Number(t.amount),
+    paymentMethod: t.paymentMethod,
+    transactionDate: t.transactionDate,
   }));
   
   // Convert sales data (includes manual POS entries)
   const sales = rawSales.map((s: any) => ({
-    ...s,
+    id: s.id,
+    saleNumber: s.saleNumber,
     total: Number(s.total),
     subtotal: Number(s.subtotal),
     tax: Number(s.tax),
+    channel: s.channel,
+    dayPart: s.dayPart,
+    saleDate: s.saleDate,
   }));
   
   const inventory = rawInventory.map((item: any) => ({
-    ...item,
+    id: item.id,
+    name: item.name,
     currentStock: Number(item.currentStock),
     unitCost: Number(item.unitCost),
+    status: item.status,
   }));
   
   // Targets already converted in getTargets action

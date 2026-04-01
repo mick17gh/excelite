@@ -73,7 +73,15 @@ export async function createBranch(input: CreateBranchInput) {
     });
 
     revalidatePath("/dashboard/branches");
-    return { success: true, data: branch };
+    return {
+      success: true,
+      data: {
+        ...JSON.parse(JSON.stringify(branch)),
+        taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+        latitude: branch.latitude ? Number(branch.latitude) : null,
+        longitude: branch.longitude ? Number(branch.longitude) : null,
+      },
+    };
   } catch (error) {
     console.error("[createBranch] Error:", error);
     return { success: false, error: "Failed to create branch" };
@@ -88,8 +96,29 @@ export async function updateBranch(input: UpdateBranchInput) {
       data,
     });
 
+    // Branch name/code changes are consumed across multiple route segments.
+    // Revalidate all pages that render branch selectors/labels from server data.
     revalidatePath("/dashboard/branches");
-    return { success: true, data: branch };
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/transactions");
+    revalidatePath("/dashboard/reports");
+    revalidatePath("/dashboard/sales");
+    revalidatePath("/dashboard/staff");
+    revalidatePath("/dashboard/targets");
+    revalidatePath("/dashboard/warehouse");
+    revalidatePath("/pos");
+    revalidatePath("/kitchen");
+    return {
+      success: true,
+      data: {
+        ...JSON.parse(JSON.stringify(branch)),
+        taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
+        latitude: branch.latitude ? Number(branch.latitude) : null,
+        longitude: branch.longitude ? Number(branch.longitude) : null,
+      },
+    };
   } catch (error) {
     console.error("[updateBranch] Error:", error);
     return { success: false, error: "Failed to update branch" };
