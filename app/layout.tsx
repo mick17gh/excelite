@@ -15,8 +15,9 @@ const geistMono = Geist_Mono({
 
 
 export const metadata: Metadata = {
-  title: "ServStack - The Command Center for Restaurant Growth and Control",
-  description: "The all-in-one restaurant operations platform for multi-branch restaurants. Track sales, manage inventory, optimize operations, and boost profitability.",
+  title: "ServStack — QSR Operating System for Visibility, Control & Profitability",
+  description:
+    "Expose hidden revenue leaks, run kitchens and inventory in real time, and manage multi-branch performance from one unified platform built for QSR.",
   keywords: ["restaurant analytics", "restaurant management", "sales analytics", "inventory management", "staff management"],
   icons: {
     icon: "/favv.png",
