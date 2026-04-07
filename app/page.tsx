@@ -33,9 +33,12 @@ import {
 const SALES_EMAIL =
   process.env.NEXT_PUBLIC_SALES_EMAIL ?? "miteexpressgh@gmail.com";
 
+/**
+ * Use encodeURIComponent (not URLSearchParams) so spaces become %20.
+ * URLSearchParams uses + for spaces, which many mobile mail apps show literally.
+ */
 function buildMailto(subject: string, body: string): string {
-  const params = new URLSearchParams({ subject, body });
-  return `mailto:${SALES_EMAIL}?${params.toString()}`;
+  return `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 const DEMO_MAILTO = buildMailto(
