@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +39,10 @@ import {
   Upload,
 } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
-import { AddMenuItemForm, EditMenuItemForm } from "@/components/menu/menu-forms";
+import {
+  AddMenuItemForm,
+  EditMenuItemForm,
+} from "@/components/menu/menu-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { deleteMenuItem } from "@/lib/actions/menu";
 import { toast } from "sonner";
@@ -73,7 +82,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -84,8 +93,10 @@ export function MenuContent({ items, categories }: MenuContentProps) {
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
-      const matchesStatus = statusFilter === "all" || 
+      const matchesCategory =
+        categoryFilter === "all" || item.category === categoryFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
         (statusFilter === "active" && item.isActive) ||
         (statusFilter === "inactive" && !item.isActive);
       return matchesSearch && matchesCategory && matchesStatus;
@@ -105,7 +116,11 @@ export function MenuContent({ items, categories }: MenuContentProps) {
   }, [filteredItems, currentPage, pageSize]);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      )
+    ) {
       return;
     }
 
@@ -121,17 +136,24 @@ export function MenuContent({ items, categories }: MenuContentProps) {
   const totalItems = items.length;
   const activeItems = items.filter((i) => i.isActive).length;
   const totalValue = items.reduce((sum, i) => sum + i.price, 0);
-  const avgMargin = items.length > 0
-    ? items.reduce((sum, i) => sum + ((i.price - i.cost) / i.price) * 100, 0) / items.length
-    : 0;
+  const avgMargin =
+    items.length > 0
+      ? items.reduce(
+          (sum, i) => sum + ((i.price - i.cost) / i.price) * 100,
+          0,
+        ) / items.length
+      : 0;
 
-  const groupedByCategory = filteredItems.reduce((acc, item) => {
-    if (!acc[item.category]) {
-      acc[item.category] = [];
-    }
-    acc[item.category].push(item);
-    return acc;
-  }, {} as Record<string, MenuItem[]>);
+  const groupedByCategory = filteredItems.reduce(
+    (acc, item) => {
+      if (!acc[item.category]) {
+        acc[item.category] = [];
+      }
+      acc[item.category].push(item);
+      return acc;
+    },
+    {} as Record<string, MenuItem[]>,
+  );
 
   return (
     <div className="space-y-4">
@@ -141,7 +163,9 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Items</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Total Items
+                </p>
                 <p className="text-base font-bold mt-0.5">{totalItems}</p>
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
@@ -155,8 +179,12 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Active</p>
-                <p className="text-base font-bold mt-0.5 text-emerald-600">{activeItems}</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Active
+                </p>
+                <p className="text-base font-bold mt-0.5 text-emerald-600">
+                  {activeItems}
+                </p>
               </div>
               <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
                 <TrendingUp className="h-4 w-4 text-emerald-600" />
@@ -169,8 +197,12 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg Margin</p>
-                <p className="text-base font-bold mt-0.5">{avgMargin.toFixed(1)}%</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Avg Margin
+                </p>
+                <p className="text-base font-bold mt-0.5">
+                  {avgMargin.toFixed(1)}%
+                </p>
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
                 <DollarSign className="h-4 w-4" />
@@ -183,8 +215,12 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Categories</p>
-                <p className="text-base font-bold mt-0.5">{categories.length}</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">
+                  Categories
+                </p>
+                <p className="text-base font-bold mt-0.5">
+                  {categories.length}
+                </p>
               </div>
               <div className="icon-blue rounded-lg p-1.5 shrink-0">
                 <Package className="h-4 w-4" />
@@ -237,7 +273,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           </Button>
           <Button onClick={() => setIsAddOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Menu Item
+            Add Product
           </Button>
         </div>
       </div>
@@ -294,9 +330,14 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                     <span className="text-sm">{formatCurrency(item.cost)}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Margin</span>
+                    <span className="text-sm text-muted-foreground">
+                      Margin
+                    </span>
                     <span className="text-sm font-medium text-emerald-600">
-                      {((item.price - item.cost) / item.price * 100).toFixed(1)}%
+                      {(((item.price - item.cost) / item.price) * 100).toFixed(
+                        1,
+                      )}
+                      %
                     </span>
                   </div>
                   {item.description && (
@@ -394,7 +435,9 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {item.sku}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">{item.category}</Badge>
                       </TableCell>
@@ -404,7 +447,11 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                       <TableCell>{formatCurrency(item.cost)}</TableCell>
                       <TableCell>
                         <span className="text-emerald-600 font-medium">
-                          {((item.price - item.cost) / item.price * 100).toFixed(1)}%
+                          {(
+                            ((item.price - item.cost) / item.price) *
+                            100
+                          ).toFixed(1)}
+                          %
                         </span>
                       </TableCell>
                       <TableCell>
@@ -458,51 +505,57 @@ export function MenuContent({ items, categories }: MenuContentProps) {
 
         <TabsContent value="categories" className="mt-6">
           <div className="space-y-6">
-            {Object.entries(groupedByCategory).map(([category, categoryItems]) => (
-              <Card key={category} className="glass">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-primary" />
-                    {category}
-                    <Badge variant="outline" className="ml-auto">
-                      {categoryItems.length} items
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {categoryItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(item.price)}
-                          </p>
+            {Object.entries(groupedByCategory).map(
+              ([category, categoryItems]) => (
+                <Card key={category} className="glass">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-primary" />
+                      {category}
+                      <Badge variant="outline" className="ml-auto">
+                        {categoryItems.length} items
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {categoryItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(item.price)}
+                            </p>
+                          </div>
+                          <div className="flex gap-1 ml-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingItem(item)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-1 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingItem(item)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ),
+            )}
           </div>
         </TabsContent>
       </Tabs>
 
       {/* Forms */}
-      <AddMenuItemForm open={isAddOpen} onOpenChange={setIsAddOpen} categories={categories} />
+      <AddMenuItemForm
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        categories={categories}
+      />
       {editingItem && (
         <EditMenuItemForm
           open={!!editingItem}

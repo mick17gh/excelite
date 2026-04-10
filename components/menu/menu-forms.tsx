@@ -30,11 +30,20 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Loader2, Upload, Image as ImageIcon, X, Plus, Trash2, ChevronDown, Package } from "lucide-react";
+import {
+  Loader2,
+  Upload,
+  Image as ImageIcon,
+  X,
+  Plus,
+  Trash2,
+  ChevronDown,
+  Package,
+} from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
-import { 
-  createMenuItem, 
-  updateMenuItem, 
+import {
+  createMenuItem,
+  updateMenuItem,
   getInventoryItemsForIngredients,
   getMenuItemWithIngredients,
 } from "@/lib/actions/menu";
@@ -86,13 +95,18 @@ interface IngredientRow {
 }
 
 // Dynamic unit options from constants
-const unitOptions: { value: UnitType; label: string }[] = UNIT_TYPES.map(unit => ({
-  value: unit,
-  label: UNIT_LABELS[unit]
-}));
+const unitOptions: { value: UnitType; label: string }[] = UNIT_TYPES.map(
+  (unit) => ({
+    value: unit,
+    label: UNIT_LABELS[unit],
+  }),
+);
 
-
-export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<MenuFormProps, "item">) {
+export function AddMenuItemForm({
+  open,
+  onOpenChange,
+  categories = [],
+}: Omit<MenuFormProps, "item">) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -108,7 +122,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>(
+    [],
+  );
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
   const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
 
@@ -150,7 +166,11 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
-  const updateIngredient = (index: number, field: keyof IngredientRow, value: string | number) => {
+  const updateIngredient = (
+    index: number,
+    field: keyof IngredientRow,
+    value: string | number,
+  ) => {
     const updated = [...ingredients];
     if (field === "inventoryItemId") {
       const item = inventoryItems.find((i) => i.id === value);
@@ -219,7 +239,7 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
       }
 
       const validIngredients = ingredients.filter(
-        (ing) => ing.inventoryItemId && ing.quantity > 0
+        (ing) => ing.inventoryItemId && ing.quantity > 0,
       );
 
       const result = await createMenuItem({
@@ -227,7 +247,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
         sku: formData.sku,
         categoryId: formData.categoryId,
         price: parseFloat(formData.price),
-        cost: calculatedCost ?? (formData.cost ? parseFloat(formData.cost) : undefined),
+        cost:
+          calculatedCost ??
+          (formData.cost ? parseFloat(formData.cost) : undefined),
         description: formData.description || undefined,
         imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
@@ -257,7 +279,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
       }
     } catch (error) {
       console.error("Error creating menu item:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create menu item");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create menu item",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -267,9 +291,11 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Add Menu Item</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">
+            Add Product
+          </DialogTitle>
           <DialogDescription>
-            Create a new menu item for your restaurant. All fields marked with * are required.
+            Create a new product. All fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -337,7 +363,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   id="name"
                   placeholder="e.g., Grilled Salmon"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -349,7 +377,12 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   id="sku"
                   placeholder="e.g., SALM-001"
                   value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      sku: e.target.value.toUpperCase(),
+                    })
+                  }
                   required
                 />
               </div>
@@ -364,7 +397,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   <select
                     id="category"
                     value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, categoryId: e.target.value })
+                    }
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     required
                   >
@@ -376,7 +411,8 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   </select>
                 ) : (
                   <p className="text-sm text-muted-foreground p-3 border rounded-md bg-muted/50">
-                    No categories available. Please create categories first in the Categories page.
+                    No categories available. Please create categories first in
+                    the Categories page.
                   </p>
                 )}
               </div>
@@ -392,7 +428,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   <Switch
                     id="isActive-switch"
                     checked={formData.isActive}
-                    onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, isActive: checked })
+                    }
                   />
                 </div>
               </div>
@@ -411,7 +449,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   min="0"
                   placeholder="0.00"
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, price: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -426,7 +466,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                   min="0"
                   placeholder="0.00"
                   value={formData.cost}
-                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cost: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -437,7 +479,13 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Profit Margin</span>
                   <span className="font-semibold text-emerald-600">
-                    {((parseFloat(formData.price) - parseFloat(formData.cost)) / parseFloat(formData.price) * 100).toFixed(1)}%
+                    {(
+                      ((parseFloat(formData.price) -
+                        parseFloat(formData.cost)) /
+                        parseFloat(formData.price)) *
+                      100
+                    ).toFixed(1)}
+                    %
                   </span>
                 </div>
               </div>
@@ -450,15 +498,24 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                 id="description"
                 placeholder="Describe the menu item..."
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 rows={3}
               />
             </div>
 
             {/* Ingredients Section */}
-            <Collapsible open={isIngredientsOpen} onOpenChange={setIsIngredientsOpen}>
+            <Collapsible
+              open={isIngredientsOpen}
+              onOpenChange={setIsIngredientsOpen}
+            >
               <CollapsibleTrigger asChild>
-                <Button variant="outline" type="button" className="w-full justify-between">
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="w-full justify-between"
+                >
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     Recipe Ingredients
@@ -468,7 +525,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                       </Badge>
                     )}
                   </div>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${isIngredientsOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${isIngredientsOpen ? "rotate-180" : ""}`}
+                  />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-4">
@@ -477,7 +536,12 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                     <p className="text-sm text-muted-foreground">
                       Link inventory items to auto-calculate cost
                     </p>
-                    <Button type="button" size="sm" variant="outline" onClick={addIngredient}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={addIngredient}
+                    >
                       <Plus className="mr-1 h-3 w-3" />
                       Add
                     </Button>
@@ -487,12 +551,25 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                     <div className="max-h-64 overflow-y-auto border rounded-lg">
                       <div className="space-y-2 p-2">
                         {ingredients.map((ing, index) => (
-                          <div key={index} className="flex items-center gap-2 rounded border p-2">
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 rounded border p-2"
+                          >
                             <div className="flex-1">
                               <Combobox
-                                options={inventoryItems.map((item) => ({ value: item.id, label: item.name, description: item.sku }))}
+                                options={inventoryItems.map((item) => ({
+                                  value: item.id,
+                                  label: item.name,
+                                  description: item.sku,
+                                }))}
                                 value={ing.inventoryItemId}
-                                onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                                onValueChange={(value) =>
+                                  updateIngredient(
+                                    index,
+                                    "inventoryItemId",
+                                    value,
+                                  )
+                                }
                                 placeholder="Select item"
                                 searchPlaceholder="Search items..."
                                 emptyText="No items found"
@@ -505,19 +582,30 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
                               min="0"
                               placeholder="Qty"
                               value={ing.quantity || ""}
-                              onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                              onChange={(e) =>
+                                updateIngredient(
+                                  index,
+                                  "quantity",
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
                               className="w-20 h-8 text-xs"
                             />
                             <Select
                               value={ing.unit}
-                              onValueChange={(value) => updateIngredient(index, "unit", value)}
+                              onValueChange={(value) =>
+                                updateIngredient(index, "unit", value)
+                              }
                             >
                               <SelectTrigger className="w-24 h-8 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {unitOptions.map((unit) => (
-                                  <SelectItem key={unit.value} value={unit.value}>
+                                  <SelectItem
+                                    key={unit.value}
+                                    value={unit.value}
+                                  >
                                     {unit.label}
                                   </SelectItem>
                                 ))}
@@ -540,7 +628,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
 
                   {calculatedCost !== null && (
                     <div className="flex items-center justify-between rounded bg-muted/50 p-2">
-                      <span className="text-sm font-medium">Calculated Cost:</span>
+                      <span className="text-sm font-medium">
+                        Calculated Cost:
+                      </span>
                       <span className="text-sm font-bold text-primary">
                         GH₵ {calculatedCost.toFixed(2)}
                       </span>
@@ -561,7 +651,9 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Create Menu Item
             </Button>
           </DialogFooter>
@@ -571,23 +663,33 @@ export function AddMenuItemForm({ open, onOpenChange, categories = [] }: Omit<Me
   );
 }
 
-export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: MenuFormProps) {
+export function EditMenuItemForm({
+  open,
+  onOpenChange,
+  item,
+  categories = [],
+}: MenuFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: item?.name || "",
     sku: item?.sku || "",
-    categoryId: item?.categoryId || (categories.length > 0 ? categories[0].id : ""),
+    categoryId:
+      item?.categoryId || (categories.length > 0 ? categories[0].id : ""),
     price: item?.price.toString() || "",
     cost: item?.cost.toString() || "",
     description: item?.description || "",
     imageUrl: item?.imageUrl || "",
     isActive: item?.isActive ?? true,
   });
-  const [imagePreview, setImagePreview] = useState<string | null>(item?.imageUrl || null);
+  const [imagePreview, setImagePreview] = useState<string | null>(
+    item?.imageUrl || null,
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [ingredients, setIngredients] = useState<IngredientRow[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>(
+    [],
+  );
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
   const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
@@ -597,7 +699,8 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
       setFormData({
         name: item.name,
         sku: item.sku,
-        categoryId: item?.categoryId || (categories.length > 0 ? categories[0].id : ""),
+        categoryId:
+          item?.categoryId || (categories.length > 0 ? categories[0].id : ""),
         price: item.price.toString(),
         cost: item.cost.toString(),
         description: item.description || "",
@@ -612,7 +715,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
   useEffect(() => {
     if (ingredients.length > 0) {
       const total = ingredients.reduce((sum, ing) => {
-        const itemData = inventoryItems.find((i) => i.id === ing.inventoryItemId);
+        const itemData = inventoryItems.find(
+          (i) => i.id === ing.inventoryItemId,
+        );
         const unitCost = itemData?.unitCost || ing.unitCost || 0;
         return sum + ing.quantity * unitCost;
       }, 0);
@@ -630,11 +735,11 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
         getInventoryItemsForIngredients(),
         getMenuItemWithIngredients(item.id),
       ]);
-      
+
       if (invResult.success && invResult.data) {
         setInventoryItems(invResult.data as InventoryItemOption[]);
       }
-      
+
       if (ingResult.success && ingResult.data?.ingredients) {
         setIngredients(
           ingResult.data.ingredients.map((ing) => ({
@@ -643,7 +748,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
             quantity: ing.quantity,
             unit: ing.unit,
             unitCost: ing.unitCost,
-          }))
+          })),
         );
       }
     } catch (error) {
@@ -671,7 +776,11 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
-  const updateIngredient = (index: number, field: keyof IngredientRow, value: string | number) => {
+  const updateIngredient = (
+    index: number,
+    field: keyof IngredientRow,
+    value: string | number,
+  ) => {
     const updated = [...ingredients];
     if (field === "inventoryItemId") {
       const itemData = inventoryItems.find((i) => i.id === value);
@@ -742,7 +851,7 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
       }
 
       const validIngredients = ingredients.filter(
-        (ing) => ing.inventoryItemId && ing.quantity > 0
+        (ing) => ing.inventoryItemId && ing.quantity > 0,
       );
 
       const result = await updateMenuItem({
@@ -751,7 +860,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
         sku: formData.sku,
         categoryId: formData.categoryId,
         price: parseFloat(formData.price),
-        cost: calculatedCost ?? (formData.cost ? parseFloat(formData.cost) : undefined),
+        cost:
+          calculatedCost ??
+          (formData.cost ? parseFloat(formData.cost) : undefined),
         description: formData.description || undefined,
         imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
@@ -767,7 +878,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
       }
     } catch (error) {
       console.error("Error updating menu item:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to update menu item");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update menu item",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -779,9 +892,12 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Edit Menu Item</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">
+            Edit Product
+          </DialogTitle>
           <DialogDescription>
-            Update the details for {item.name}. All fields marked with * are required.
+            Update the details for {item.name}. All fields marked with * are
+            required.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -848,7 +964,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                 <Input
                   id="edit-name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -859,7 +977,12 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                 <Input
                   id="edit-sku"
                   value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      sku: e.target.value.toUpperCase(),
+                    })
+                  }
                   required
                 />
               </div>
@@ -874,7 +997,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                   <select
                     id="edit-category"
                     value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, categoryId: e.target.value })
+                    }
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     required
                   >
@@ -902,7 +1027,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                   <Switch
                     id="edit-isActive-switch"
                     checked={formData.isActive}
-                    onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, isActive: checked })
+                    }
                   />
                 </div>
               </div>
@@ -920,7 +1047,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                   step="0.01"
                   min="0"
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, price: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -934,7 +1063,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                   step="0.01"
                   min="0"
                   value={formData.cost}
-                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cost: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -945,7 +1076,13 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Profit Margin</span>
                   <span className="font-semibold text-emerald-600">
-                    {((parseFloat(formData.price) - parseFloat(formData.cost)) / parseFloat(formData.price) * 100).toFixed(1)}%
+                    {(
+                      ((parseFloat(formData.price) -
+                        parseFloat(formData.cost)) /
+                        parseFloat(formData.price)) *
+                      100
+                    ).toFixed(1)}
+                    %
                   </span>
                 </div>
               </div>
@@ -957,15 +1094,24 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
               <Textarea
                 id="edit-description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 rows={3}
               />
             </div>
 
             {/* Ingredients Section */}
-            <Collapsible open={isIngredientsOpen} onOpenChange={setIsIngredientsOpen}>
+            <Collapsible
+              open={isIngredientsOpen}
+              onOpenChange={setIsIngredientsOpen}
+            >
               <CollapsibleTrigger asChild>
-                <Button variant="outline" type="button" className="w-full justify-between">
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="w-full justify-between"
+                >
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     Recipe Ingredients
@@ -975,7 +1121,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                       </Badge>
                     )}
                   </div>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${isIngredientsOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${isIngredientsOpen ? "rotate-180" : ""}`}
+                  />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-4">
@@ -984,7 +1132,12 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                     <p className="text-sm text-muted-foreground">
                       Link inventory items to auto-calculate cost
                     </p>
-                    <Button type="button" size="sm" variant="outline" onClick={addIngredient}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={addIngredient}
+                    >
                       <Plus className="mr-1 h-3 w-3" />
                       Add
                     </Button>
@@ -998,12 +1151,25 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                     <div className="max-h-64 overflow-y-auto border rounded-lg">
                       <div className="space-y-2 p-2">
                         {ingredients.map((ing, index) => (
-                          <div key={index} className="flex items-center gap-2 rounded border p-2">
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 rounded border p-2"
+                          >
                             <div className="flex-1">
                               <Combobox
-                                options={inventoryItems.map((invItem) => ({ value: invItem.id, label: invItem.name, description: invItem.sku }))}
+                                options={inventoryItems.map((invItem) => ({
+                                  value: invItem.id,
+                                  label: invItem.name,
+                                  description: invItem.sku,
+                                }))}
                                 value={ing.inventoryItemId}
-                                onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                                onValueChange={(value) =>
+                                  updateIngredient(
+                                    index,
+                                    "inventoryItemId",
+                                    value,
+                                  )
+                                }
                                 placeholder="Select item"
                                 searchPlaceholder="Search items..."
                                 emptyText="No items found"
@@ -1016,19 +1182,30 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                               min="0"
                               placeholder="Qty"
                               value={ing.quantity || ""}
-                              onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                              onChange={(e) =>
+                                updateIngredient(
+                                  index,
+                                  "quantity",
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
                               className="w-20 h-8 text-xs"
                             />
                             <Select
                               value={ing.unit}
-                              onValueChange={(value) => updateIngredient(index, "unit", value)}
+                              onValueChange={(value) =>
+                                updateIngredient(index, "unit", value)
+                              }
                             >
                               <SelectTrigger className="w-24 h-8 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {unitOptions.map((unit) => (
-                                  <SelectItem key={unit.value} value={unit.value}>
+                                  <SelectItem
+                                    key={unit.value}
+                                    value={unit.value}
+                                  >
                                     {unit.label}
                                   </SelectItem>
                                 ))}
@@ -1049,13 +1226,16 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-3">
-                      No ingredients linked. Add ingredients to auto-calculate recipe cost.
+                      No ingredients linked. Add ingredients to auto-calculate
+                      recipe cost.
                     </p>
                   )}
 
                   {calculatedCost !== null && (
                     <div className="flex items-center justify-between rounded bg-muted/50 p-2">
-                      <span className="text-sm font-medium">Calculated Cost:</span>
+                      <span className="text-sm font-medium">
+                        Calculated Cost:
+                      </span>
                       <span className="text-sm font-bold text-primary">
                         GH₵ {calculatedCost.toFixed(2)}
                       </span>
@@ -1076,7 +1256,9 @@ export function EditMenuItemForm({ open, onOpenChange, item, categories = [] }: 
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Update Menu Item
             </Button>
           </DialogFooter>
