@@ -117,7 +117,7 @@ const navigation: NavItem[] = [
     featureKey: "warehouse",
   },
   {
-    name: "Menu Management",
+    name: "Products",
     href: "/dashboard/menu",
     icon: UtensilsCrossed,
     permission: "menu:view",

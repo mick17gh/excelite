@@ -3,7 +3,7 @@ import { MenuContent } from "@/components/menu/menu-content";
 import { getMenuItems, getMenuCategories } from "@/lib/actions/menu";
 
 export const metadata = {
-  title: "Menu Management | ServStack",
+  title: "Products | ServStack",
   description: "Manage your restaurant menu items and products",
 };
 
@@ -20,7 +20,7 @@ export default async function MenuPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Menu Management
+          Products
         </h1>
         <p className="text-muted-foreground">
           Create and manage your restaurant menu items and products
