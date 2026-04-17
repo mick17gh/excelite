@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +73,12 @@ export function SupplierReceivingDialog({ open, onOpenChange, warehouses, items 
     if (result.success && result.data) setSuppliers(result.data);
   };
 
+  useEffect(() => {
+    if (open) {
+      loadSuppliers();
+    }
+  }, [open]);
+
   const handleAddSupplier = async () => {
     if (!newSupplierName.trim()) {
       toast.error("Please enter supplier name");
@@ -127,7 +133,7 @@ export function SupplierReceivingDialog({ open, onOpenChange, warehouses, items 
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (o) loadSuppliers(); }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Receive from Supplier</DialogTitle>
