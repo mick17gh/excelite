@@ -32,7 +32,7 @@ import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
 import { getSalesAnalyticsData } from "@/lib/actions/transactions";
 import {
   Bar,
-  BarChart,
+  ComposedChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -296,7 +296,7 @@ export function SalesContent({
             <CardContent>
               <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={hourlyData}>
+                  <ComposedChart data={hourlyData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                     <XAxis
                       dataKey="hour"
@@ -321,8 +321,14 @@ export function SalesContent({
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload || !payload.length) return null;
-                        const transactions = payload[0]?.value || 0;
-                        const revenue = payload[1]?.value || 0;
+                        const transactionsEntry = payload.find(
+                          (entry) => entry.dataKey === "transactions"
+                        );
+                        const revenueEntry = payload.find(
+                          (entry) => entry.dataKey === "revenue"
+                        );
+                        const transactions = Number(transactionsEntry?.value) || 0;
+                        const revenue = Number(revenueEntry?.value) || 0;
                         return (
                           <div className="rounded-lg border bg-background p-3 shadow-lg">
                             <p className="text-sm font-medium">{label}</p>
@@ -330,7 +336,7 @@ export function SalesContent({
                               Transactions: {transactions}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Revenue: {formatCurrency(Number(revenue) || 0)}
+                              Revenue: {formatCurrency(revenue)}
                             </p>
                           </div>
                         );
@@ -350,7 +356,7 @@ export function SalesContent({
                       strokeWidth={2}
                       dot={false}
                     />
-                  </BarChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
               <div className="mt-4 flex items-center justify-center gap-6 text-sm">
