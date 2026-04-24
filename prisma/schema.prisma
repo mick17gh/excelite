@@ -1100,6 +1100,32 @@ model Organization {
   maxUsers           Int                @default(2)
   maxMenuItems       Int?
   features           Json?
+  onlineOrderingEnabled Boolean         @default(false)
+  storeSlug          String?            @unique
+  storeName          String?
+  storeDescription   String?
+  storeLogoUrl       String?
+  storeBannerUrl     String?
+  storeTheme         Json?
+  businessHours      Json?
+  storeTimezone      String?            @default("Africa/Accra")
+  storefrontTemplateId String?          @default("classic")
+  allowedStorefrontTemplates Json?
+  closureMessage     String?
+  deliveryEnabled    Boolean            @default(true)
+  pickupEnabled      Boolean            @default(true)
+  minOrderAmount     Decimal?           @db.Decimal(10, 2)
+  deliveryFeeFlat    Decimal?           @db.Decimal(10, 2)
+  deliveryRadius     Decimal?           @db.Decimal(5, 2)
+  estimatedPrepTime  Int?
+  contactEmail       String?
+  contactPhone       String?
+  whatsappNumber     String?
+  facebookUrl        String?
+  instagramUrl       String?
+  paystackPublicKey  String?
+  paystackSecretKey  String?
+  paystackEnabled    Boolean            @default(false)
   trialEndsAt        DateTime?
   subscriptionEndsAt DateTime?
   createdAt          DateTime           @default(now())

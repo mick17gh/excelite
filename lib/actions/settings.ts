@@ -58,6 +58,7 @@ export async function getCurrentUser() {
         image: user.image,
         branchId: user.branchId,
         branchName: user.branch?.name || null,
+        organizationId: user.organizationId,
         isActive: user.isActive,
       },
     };

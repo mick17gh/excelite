@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 import { SubscriptionTier, SubscriptionStatus, Role } from "@/lib/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
-import { TIER_CONFIG } from "@/lib/tier-config";
+import { hasFeature, TIER_CONFIG } from "@/lib/tier-config";
+import { encryptSecret } from "@/lib/storefront/paystack";
+import { normalizeTemplateId, STOREFRONT_TEMPLATES } from "@/lib/storefront/templates";
+import { buildPublicStoreConfig, getOrganizationForStorefront } from "@/lib/storefront/config";
 
 export interface UpdateOrganizationInput {
   id: string;
@@ -15,6 +18,32 @@ export interface UpdateOrganizationInput {
   maxUsers?: number;
   maxMenuItems?: number | null;
   features?: Record<string, boolean>;
+  onlineOrderingEnabled?: boolean;
+  storeSlug?: string | null;
+  storeName?: string | null;
+  storeDescription?: string | null;
+  storeLogoUrl?: string | null;
+  storeBannerUrl?: string | null;
+  storeTheme?: Record<string, unknown> | null;
+  businessHours?: Record<string, { open: string; close: string; closed?: boolean }> | null;
+  storeTimezone?: string | null;
+  storefrontTemplateId?: string | null;
+  allowedStorefrontTemplates?: string[] | null;
+  closureMessage?: string | null;
+  deliveryEnabled?: boolean;
+  pickupEnabled?: boolean;
+  minOrderAmount?: number | null;
+  deliveryFeeFlat?: number | null;
+  deliveryRadius?: number | null;
+  estimatedPrepTime?: number | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  whatsappNumber?: string | null;
+  facebookUrl?: string | null;
+  instagramUrl?: string | null;
+  paystackPublicKey?: string | null;
+  paystackSecretKey?: string | null;
+  paystackEnabled?: boolean;
 }
 
 export async function getOrganization(id?: string) {
@@ -44,6 +73,31 @@ export async function getOrganization(id?: string) {
         maxUsers: org.maxUsers,
         maxMenuItems: org.maxMenuItems,
         features: org.features as Record<string, boolean> | null,
+        onlineOrderingEnabled: org.onlineOrderingEnabled,
+        storeSlug: org.storeSlug,
+        storeName: org.storeName,
+        storeDescription: org.storeDescription,
+        storeLogoUrl: org.storeLogoUrl,
+        storeBannerUrl: org.storeBannerUrl,
+        storeTheme: org.storeTheme as Record<string, unknown> | null,
+        storefrontTemplateId: org.storefrontTemplateId || "classic",
+        businessHours: org.businessHours as Record<string, { open: string; close: string; closed?: boolean }> | null,
+        storeTimezone: org.storeTimezone || "Africa/Accra",
+        allowedStorefrontTemplates: (org.allowedStorefrontTemplates as string[] | null) ?? [...STOREFRONT_TEMPLATES],
+        closureMessage: org.closureMessage,
+        deliveryEnabled: org.deliveryEnabled,
+        pickupEnabled: org.pickupEnabled,
+        minOrderAmount: org.minOrderAmount ? Number(org.minOrderAmount) : null,
+        deliveryFeeFlat: org.deliveryFeeFlat ? Number(org.deliveryFeeFlat) : null,
+        deliveryRadius: org.deliveryRadius ? Number(org.deliveryRadius) : null,
+        estimatedPrepTime: org.estimatedPrepTime,
+        contactEmail: org.contactEmail,
+        contactPhone: org.contactPhone,
+        whatsappNumber: org.whatsappNumber,
+        facebookUrl: org.facebookUrl,
+        instagramUrl: org.instagramUrl,
+        paystackPublicKey: org.paystackPublicKey,
+        paystackEnabled: org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true,
         trialEndsAt: org.trialEndsAt?.toISOString() || null,
         subscriptionEndsAt: org.subscriptionEndsAt?.toISOString() || null,
         userCount: org._count.users,
@@ -82,6 +136,14 @@ export async function getOrganization(id?: string) {
 
 export async function updateOrganization(input: UpdateOrganizationInput) {
   try {
+    const existingOrg = await db.organization.findUnique({
+      where: { id: input.id },
+      select: { tier: true, features: true },
+    });
+    if (!existingOrg) {
+      return { error: "Organization not found" };
+    }
+
     // Check if user is trying to change tier
     if (input.tier !== undefined) {
       const session = await auth.api.getSession({ headers: await import("next/headers").then(m => m.headers()) });
@@ -106,6 +168,45 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
     if (input.maxUsers !== undefined) data.maxUsers = input.maxUsers;
     if (input.maxMenuItems !== undefined) data.maxMenuItems = input.maxMenuItems;
     if (input.features !== undefined) data.features = input.features;
+    if (input.onlineOrderingEnabled && !hasFeature(existingOrg.tier, "onlineOrdering")) {
+      return { error: "Current subscription tier does not support online ordering" };
+    }
+    if (input.onlineOrderingEnabled !== undefined) data.onlineOrderingEnabled = input.onlineOrderingEnabled;
+    if (input.storeSlug !== undefined) data.storeSlug = input.storeSlug;
+    if (input.storeName !== undefined) data.storeName = input.storeName;
+    if (input.storeDescription !== undefined) data.storeDescription = input.storeDescription;
+    if (input.storeLogoUrl !== undefined) data.storeLogoUrl = input.storeLogoUrl;
+    if (input.storeBannerUrl !== undefined) data.storeBannerUrl = input.storeBannerUrl;
+    if (input.storeTheme !== undefined) data.storeTheme = input.storeTheme;
+    if (input.businessHours !== undefined) data.businessHours = input.businessHours;
+    if (input.storeTimezone !== undefined) data.storeTimezone = input.storeTimezone;
+    if (input.storefrontTemplateId !== undefined) data.storefrontTemplateId = normalizeTemplateId(input.storefrontTemplateId);
+    if (input.allowedStorefrontTemplates !== undefined) data.allowedStorefrontTemplates = input.allowedStorefrontTemplates;
+    if (input.closureMessage !== undefined) data.closureMessage = input.closureMessage;
+    if (input.deliveryEnabled !== undefined) data.deliveryEnabled = input.deliveryEnabled;
+    if (input.pickupEnabled !== undefined) data.pickupEnabled = input.pickupEnabled;
+    if (input.minOrderAmount !== undefined) data.minOrderAmount = input.minOrderAmount;
+    if (input.deliveryFeeFlat !== undefined) data.deliveryFeeFlat = input.deliveryFeeFlat;
+    if (input.deliveryRadius !== undefined) data.deliveryRadius = input.deliveryRadius;
+    if (input.estimatedPrepTime !== undefined) data.estimatedPrepTime = input.estimatedPrepTime;
+    if (input.contactEmail !== undefined) data.contactEmail = input.contactEmail;
+    if (input.contactPhone !== undefined) data.contactPhone = input.contactPhone;
+    if (input.whatsappNumber !== undefined) data.whatsappNumber = input.whatsappNumber;
+    if (input.facebookUrl !== undefined) data.facebookUrl = input.facebookUrl;
+    if (input.instagramUrl !== undefined) data.instagramUrl = input.instagramUrl;
+    if (input.paystackPublicKey !== undefined) data.paystackPublicKey = input.paystackPublicKey;
+    if (input.paystackEnabled !== undefined) {
+      data.paystackEnabled = input.paystackEnabled;
+      const currentFeatures = (existingOrg.features as Record<string, unknown> | null) || {};
+      data.features = {
+        ...currentFeatures,
+        ...(input.features || {}),
+        paystackEnabled: input.paystackEnabled,
+      };
+    }
+    if (input.paystackSecretKey !== undefined) {
+      data.paystackSecretKey = input.paystackSecretKey ? encryptSecret(input.paystackSecretKey) : null;
+    }
 
     const org = await db.organization.update({
       where: { id: input.id },
@@ -114,11 +215,84 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
 
     revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/branches");
-    return { data: org };
+    return {
+      data: {
+        ...JSON.parse(JSON.stringify(org)),
+        minOrderAmount: org.minOrderAmount ? Number(org.minOrderAmount) : null,
+        deliveryFeeFlat: org.deliveryFeeFlat ? Number(org.deliveryFeeFlat) : null,
+        deliveryRadius: org.deliveryRadius ? Number(org.deliveryRadius) : null,
+        paystackSecretKey: undefined,
+      },
+    };
   } catch (error) {
     console.error("[updateOrganization] Error:", error);
     return { error: "Failed to update organization" };
   }
+}
+
+export async function getOnlineStoreSettings(organizationId: string) {
+  const org = await db.organization.findUnique({
+    where: { id: organizationId },
+  });
+  if (!org) return { error: "Organization not found" };
+
+  return {
+    data: {
+      onlineOrderingEnabled: org.onlineOrderingEnabled,
+      storeSlug: org.storeSlug,
+      storeName: org.storeName,
+      storeDescription: org.storeDescription,
+      storeLogoUrl: org.storeLogoUrl,
+      storeBannerUrl: org.storeBannerUrl,
+      storefrontTemplateId: normalizeTemplateId(org.storefrontTemplateId),
+      businessHours: org.businessHours as Record<string, { open: string; close: string; closed?: boolean }> | null,
+      storeTimezone: org.storeTimezone || "Africa/Accra",
+      allowedStorefrontTemplates: (org.allowedStorefrontTemplates as string[] | null) ?? [...STOREFRONT_TEMPLATES],
+      closureMessage: org.closureMessage,
+      deliveryEnabled: org.deliveryEnabled,
+      pickupEnabled: org.pickupEnabled,
+      minOrderAmount: org.minOrderAmount ? Number(org.minOrderAmount) : null,
+      deliveryFeeFlat: org.deliveryFeeFlat ? Number(org.deliveryFeeFlat) : null,
+      deliveryRadius: org.deliveryRadius ? Number(org.deliveryRadius) : null,
+      estimatedPrepTime: org.estimatedPrepTime,
+      contactEmail: org.contactEmail,
+      contactPhone: org.contactPhone,
+      whatsappNumber: org.whatsappNumber,
+      facebookUrl: org.facebookUrl,
+      instagramUrl: org.instagramUrl,
+      paystackPublicKey: org.paystackPublicKey,
+      paystackEnabled: org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true,
+      hasPaystackSecretKey: Boolean(org.paystackSecretKey),
+      storeTheme: org.storeTheme as Record<string, unknown> | null,
+    },
+  };
+}
+
+export async function generateStorefrontConfig(organizationId: string) {
+  const org = await getOrganizationForStorefront(organizationId);
+  if (!org) return { error: "Organization not found" };
+  const apiBaseUrl = (process.env.NEXT_PUBLIC_SERVSTACK_API_URL || "").replace(/\/$/, "");
+  const publicEndpoints = apiBaseUrl
+    ? {
+        config: `${apiBaseUrl}/api/public/store/${organizationId}/config`,
+        menu: `${apiBaseUrl}/api/public/store/${organizationId}/menu`,
+        branches: `${apiBaseUrl}/api/public/store/${organizationId}/branches`,
+        orders: `${apiBaseUrl}/api/public/store/${organizationId}/orders`,
+        trackOrder: `${apiBaseUrl}/api/public/orders/{orderNumber}/track?phone={phone}`,
+      }
+    : null;
+  const canonical = buildPublicStoreConfig(org);
+
+  return {
+    data: {
+      data: canonical,
+      meta: {
+        version: "1.1",
+        apiBaseUrl,
+        publicEndpoints,
+      },
+    },
+  };
 }
 
 export async function createOrganization(name: string, tier: SubscriptionTier = "FREE") {

@@ -14,7 +14,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CreditCard, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { recordPayment, refundPayment } from "@/lib/actions/payments";
+import {
+  recordPayment,
+  refundPayment,
+  initializePaystackOrderPayment,
+} from "@/lib/actions/payments";
 import { useCurrency } from "@/contexts/currency-context";
 
 interface PaymentItem {
@@ -29,16 +33,31 @@ interface PaymentItem {
 
 interface PaymentPanelProps {
   orderId: string;
+  orderNumber: string;
   orderTotal: number;
   paymentStatus: string;
+  paystackEnabled?: boolean;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
   payments: PaymentItem[];
   /** Called after a payment is recorded or refunded so the parent can refresh order data */
   onRefresh?: () => void | Promise<void>;
 }
 
-export function PaymentPanel({ orderId, orderTotal, paymentStatus, payments, onRefresh }: PaymentPanelProps) {
+export function PaymentPanel({
+  orderId,
+  orderNumber,
+  orderTotal,
+  paymentStatus,
+  paystackEnabled = false,
+  customerPhone,
+  customerEmail,
+  payments,
+  onRefresh,
+}: PaymentPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPaystackInitializing, setIsPaystackInitializing] = useState(false);
   const [amount, setAmount] = useState(orderTotal);
   const [provider, setProvider] = useState("cash");
   const [providerRef, setProviderRef] = useState("");
@@ -87,6 +106,36 @@ export function PaymentPanel({ orderId, orderTotal, paymentStatus, payments, onR
     }
   };
 
+  const handlePaystackPayment = async () => {
+    setIsPaystackInitializing(true);
+    try {
+      const fallbackEmail = customerPhone
+        ? `${customerPhone.replace(/\D/g, "") || "guest"}@servstack.app`
+        : `${orderNumber.toLowerCase().replace(/[^a-z0-9]/g, "") || "guest"}@servstack.app`;
+      const email = customerEmail || fallbackEmail;
+      const callback = new URL(window.location.href);
+      callback.searchParams.set("paystackCallback", "1");
+      callback.searchParams.set("orderId", orderId);
+
+      const result = await initializePaystackOrderPayment({
+        orderId,
+        email,
+        callbackUrl: callback.toString(),
+      });
+      if (result.error || !result.data?.authorizationUrl) {
+        toast.error(result.details ? `${result.error}: ${result.details}` : (result.error || "Failed to initialize Paystack"));
+        return;
+      }
+
+      // Redirect to Paystack-hosted checkout page (no embedded popup).
+      window.location.assign(result.data.authorizationUrl);
+    } catch {
+      toast.error("Failed to start Paystack payment");
+    } finally {
+      setIsPaystackInitializing(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -107,9 +156,17 @@ export function PaymentPanel({ orderId, orderTotal, paymentStatus, payments, onR
           </Badge>
         </div>
         {remaining > 0 && (
-          <Button variant="outline" size="sm" onClick={() => { setShowForm(!showForm); setAmount(remaining); }}>
-            <Plus className="mr-1 h-3 w-3" />Record Payment
-          </Button>
+          <div className="flex items-center gap-2">
+            {paystackEnabled && (
+              <Button variant="default" size="sm" onClick={handlePaystackPayment} disabled={isPaystackInitializing}>
+                {isPaystackInitializing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CreditCard className="mr-1 h-3 w-3" />}
+                Pay with Paystack
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => { setShowForm(!showForm); setAmount(remaining); }}>
+              <Plus className="mr-1 h-3 w-3" />Record Payment
+            </Button>
+          </div>
         )}
       </div>
 

@@ -60,6 +60,7 @@ interface Order {
   total: number;
   paymentMethod: string | null;
   paymentStatus: string;
+  paystackEnabled?: boolean;
   notes: string | null;
   deliveryAddress: string | null;
   deliveryCity: string | null;
@@ -316,8 +317,12 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
             <TabsContent value="payment" className="mt-3">
               <PaymentPanel
                 orderId={order.id}
+                orderNumber={order.orderNumber}
                 orderTotal={order.total}
                 paymentStatus={order.paymentStatus}
+                paystackEnabled={order.paystackEnabled}
+                customerPhone={order.customerPhone}
+                customerEmail={null}
                 payments={order.payments}
                 onRefresh={onRefresh}
               />

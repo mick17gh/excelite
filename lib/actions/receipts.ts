@@ -11,6 +11,44 @@ export interface GenerateReceiptInput {
   paymentMethod: string;
 }
 
+function serializeReceipt(receipt: {
+  id: string;
+  orderId: string;
+  receiptNumber: string;
+  customerName: string;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  items: unknown;
+  subtotal: unknown;
+  tax: unknown;
+  discount: unknown;
+  deliveryFee: unknown;
+  total: unknown;
+  paymentMethod: string;
+  pdfUrl: string | null;
+  sentVia: string[];
+  createdAt: Date | string;
+}) {
+  return {
+    id: receipt.id,
+    orderId: receipt.orderId,
+    receiptNumber: receipt.receiptNumber,
+    customerName: receipt.customerName,
+    customerPhone: receipt.customerPhone,
+    customerEmail: receipt.customerEmail,
+    items: receipt.items as Record<string, unknown>[],
+    subtotal: Number(receipt.subtotal),
+    tax: Number(receipt.tax),
+    discount: Number(receipt.discount),
+    deliveryFee: Number(receipt.deliveryFee),
+    total: Number(receipt.total),
+    paymentMethod: receipt.paymentMethod,
+    pdfUrl: receipt.pdfUrl,
+    sentVia: receipt.sentVia,
+    createdAt: receipt.createdAt instanceof Date ? receipt.createdAt.toISOString() : receipt.createdAt,
+  };
+}
+
 export async function getReceiptByOrder(orderId: string) {
   try {
     const receipt = await db.receipt.findUnique({
@@ -19,26 +57,7 @@ export async function getReceiptByOrder(orderId: string) {
 
     if (!receipt) return { data: null };
 
-    return {
-      data: {
-        id: receipt.id,
-        orderId: receipt.orderId,
-        receiptNumber: receipt.receiptNumber,
-        customerName: receipt.customerName,
-        customerPhone: receipt.customerPhone,
-        customerEmail: receipt.customerEmail,
-        items: receipt.items as Record<string, unknown>[],
-        subtotal: Number(receipt.subtotal),
-        tax: Number(receipt.tax),
-        discount: Number(receipt.discount),
-        deliveryFee: Number(receipt.deliveryFee),
-        total: Number(receipt.total),
-        paymentMethod: receipt.paymentMethod,
-        pdfUrl: receipt.pdfUrl,
-        sentVia: receipt.sentVia,
-        createdAt: receipt.createdAt.toISOString(),
-      },
-    };
+    return { data: serializeReceipt(receipt) };
   } catch (error) {
     console.error("[getReceiptByOrder] Error:", error);
     return { data: null };
@@ -48,7 +67,7 @@ export async function getReceiptByOrder(orderId: string) {
 export async function generateReceipt(input: GenerateReceiptInput) {
   try {
     const existing = await db.receipt.findUnique({ where: { orderId: input.orderId } });
-    if (existing) return { data: existing };
+    if (existing) return { data: serializeReceipt(existing) };
 
     const order = await db.order.findUnique({
       where: { id: input.orderId },
@@ -90,7 +109,7 @@ export async function generateReceipt(input: GenerateReceiptInput) {
     });
 
     revalidatePath("/dashboard/orders");
-    return { data: receipt };
+    return { data: serializeReceipt(receipt) };
   } catch (error) {
     console.error("[generateReceipt] Error:", error);
     return { error: "Failed to generate receipt" };

@@ -51,6 +51,8 @@ import {
   updateBranchTaxSettings,
 } from "@/lib/actions/tax";
 import { getBranches } from "@/lib/actions/branches";
+import { getOrganization } from "@/lib/actions/organization";
+import { OnlineStoreTab } from "./online-store-tab";
 
 interface UserData {
   id: string;
@@ -61,6 +63,7 @@ interface UserData {
   image: string | null;
   branchId: string | null;
   branchName: string | null;
+  organizationId?: string | null;
 }
 
 interface Session {
@@ -79,6 +82,7 @@ export function SettingsContent() {
   const [user, setUser] = useState<UserData | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [organizationTier, setOrganizationTier] = useState<"FREE" | "PRO" | "ENTERPRISE">("FREE");
   
   // Profile form
   const [profileForm, setProfileForm] = useState({
@@ -118,10 +122,11 @@ export function SettingsContent() {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [userResult, sessionsResult, branchesResult] = await Promise.all([
+        const [userResult, sessionsResult, branchesResult, orgResult] = await Promise.all([
           getCurrentUser(),
           getActiveSessions(),
           getBranches(),
+          getOrganization(),
         ]);
         
         if (userResult.success && userResult.data) {
@@ -142,6 +147,9 @@ export function SettingsContent() {
           if (branchesResult.data.length > 0) {
             setSelectedBranch(branchesResult.data[0].id);
           }
+        }
+        if (orgResult.data?.tier) {
+          setOrganizationTier(orgResult.data.tier);
         }
       } catch (error) {
         console.error("Failed to load settings data:", error);
@@ -348,6 +356,10 @@ export function SettingsContent() {
         <TabsTrigger value="subscription" className="text-xs">
           <CreditCard className="mr-1.5 h-3.5 w-3.5" />
           Subscription
+        </TabsTrigger>
+        <TabsTrigger value="online-store" className="text-xs">
+          <Building2 className="mr-1.5 h-3.5 w-3.5" />
+          Online Store
         </TabsTrigger>
         {user?.role === "SUPER_ADMIN" && (
           <TabsTrigger value="platform-admin" className="text-xs">
@@ -758,6 +770,18 @@ export function SettingsContent() {
 
       <TabsContent value="subscription">
         <SubscriptionTab />
+      </TabsContent>
+
+      <TabsContent value="online-store">
+        {user?.organizationId ? (
+          <OnlineStoreTab organizationId={user.organizationId} tier={organizationTier} />
+        ) : (
+          <Card className="chart-card rounded-xl">
+            <CardContent className="px-4 py-6 text-sm text-muted-foreground">
+              Organization context is required to manage online store settings.
+            </CardContent>
+          </Card>
+        )}
       </TabsContent>
 
       {user?.role === "SUPER_ADMIN" && (

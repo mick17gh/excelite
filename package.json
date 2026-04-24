@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset --force && npx tsx prisma/seed.ts"
+    "db:reset": "prisma migrate reset --force && npx tsx prisma/seed.ts",
+    "test:storefront-contracts": "npx tsx scripts/storefront-contract-smoke.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",

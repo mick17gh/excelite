@@ -50,6 +50,47 @@ export async function sendPaymentReceiptSMS(orderId: string) {
 }
 
 /**
+ * Auto-send SMS notification when order is placed
+ * Only sends if customer has name and phone
+ */
+export async function sendOrderPlacedSMS(orderId: string) {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        customer: { select: { name: true, phone: true } },
+        branch: { select: { name: true } },
+      },
+    });
+
+    if (!order) return;
+
+    const customerName = order.customer?.name || order.customerName;
+    const customerPhone = order.customer?.phone || order.deliveryPhone;
+    if (!customerName || !customerPhone) return;
+
+    const message = `Hi ${customerName}, your order #${order.orderNumber} has been received${order.branch?.name ? ` at ${order.branch.name}` : ""}. We'll notify you when it is ready.`;
+    const smsResult = await sendSMS(customerPhone, message);
+
+    await db.orderNotification.create({
+      data: {
+        orderId: order.id,
+        type: "ORDER_PLACED",
+        channel: "SMS",
+        recipient: customerPhone,
+        message,
+        status: smsResult.success ? "SENT" : "FAILED",
+        sentAt: smsResult.success ? new Date() : null,
+        error: smsResult.success ? null : smsResult.message,
+      },
+    });
+  } catch (error) {
+    console.warn("[sendOrderPlacedSMS] Failed:", error);
+    // Non-fatal: don't block order creation flow
+  }
+}
+
+/**
  * Auto-send SMS notification when order is ready
  * Only sends if customer has name and phone
  */

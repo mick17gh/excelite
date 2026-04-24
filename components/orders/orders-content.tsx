@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateOrderStatus, cancelOrder, getOrders } from "@/lib/actions/orders";
+import { verifyPaystackOrderPayment } from "@/lib/actions/payments";
 import { CreateOrderDialog } from "./order-forms";
 import { OrderDetailModal } from "./order-detail-modal";
 import { useCurrency } from "@/contexts/currency-context";
@@ -88,6 +90,7 @@ interface Order {
   total: number;
   paymentMethod: string | null;
   paymentStatus: string;
+  paystackEnabled?: boolean;
   notes: string | null;
   deliveryAddress: string | null;
   deliveryCity: string | null;
@@ -187,6 +190,9 @@ export function OrdersContent({ orders: initialOrders, branches, menuItems, cust
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { formatCurrency } = useCurrency();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Handle new order creation - automatically open detail modal
   const handleOrderCreated = async (orderId: string) => {
@@ -271,6 +277,37 @@ export function OrdersContent({ orders: initialOrders, branches, menuItems, cust
   useEffect(() => {
     fetchOrders();
   }, [page, pageSize, fetchOrders]);
+
+  // Handle Paystack callback verification after redirect back from Paystack
+  useEffect(() => {
+    const marker = searchParams.get("paystackCallback");
+    const orderId = searchParams.get("orderId");
+    const reference = searchParams.get("reference") || searchParams.get("trxref");
+    if (marker !== "1" || !orderId || !reference) return;
+
+    let cancelled = false;
+    const toastId = toast.loading("Verifying Paystack payment...");
+    (async () => {
+      const result = await verifyPaystackOrderPayment({ orderId, reference });
+      if (cancelled) {
+        toast.dismiss(toastId);
+        return;
+      }
+      if (result.error) {
+        const message = result.details ? `${result.error}: ${result.details}` : result.error;
+        toast.error(message, { id: toastId });
+      } else {
+        toast.success("Paystack payment verified", { id: toastId });
+        await fetchOrders(false);
+      }
+      router.replace(pathname);
+    })();
+
+    return () => {
+      cancelled = true;
+      toast.dismiss(toastId);
+    };
+  }, [searchParams, fetchOrders, router, pathname]);
 
   return (
     <div className="space-y-4">

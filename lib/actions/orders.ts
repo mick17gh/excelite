@@ -11,6 +11,8 @@ function serializeOrder(order: Record<string, any>) {
   return {
     ...order,
     id: order.id as string,
+    orderNumber: order.orderNumber as string,
+    paymentStatus: order.paymentStatus as PaymentStatus,
     subtotal: Number(order.subtotal),
     tax: Number(order.tax),
     discount: Number(order.discount),
@@ -31,6 +33,7 @@ function serializeOrder(order: Record<string, any>) {
 
 export interface CreateOrderInput {
   customerId?: string;
+  customerName?: string;
   branchId: string;
   source: OrderSource;
   type: OrderType;
@@ -95,7 +98,21 @@ export async function getOrders(filters?: {
         where,
         include: {
           customer: { select: { id: true, name: true, phone: true } },
-          branch: { select: { id: true, name: true, code: true } },
+          branch: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              organization: {
+                select: {
+                  features: true,
+                  paystackEnabled: true,
+                  paystackPublicKey: true,
+                  paystackSecretKey: true,
+                },
+              },
+            },
+          },
           items: {
             include: {
               menuItem: { select: { id: true, name: true, sku: true, price: true } },
@@ -119,8 +136,8 @@ export async function getOrders(filters?: {
         id: order.id,
         orderNumber: order.orderNumber,
         customerId: order.customerId,
-        customerName: order.customer?.name || null,
-        customerPhone: order.customer?.phone || null,
+        customerName: order.customer?.name || order.customerName || null,
+        customerPhone: order.customer?.phone || order.deliveryPhone || null,
         branchId: order.branchId,
         branchName: order.branch?.name || "",
         branchCode: order.branch?.code || "",
@@ -135,6 +152,12 @@ export async function getOrders(filters?: {
         total: Number(order.total),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
+        paystackEnabled: Boolean(
+          (order.branch?.organization?.paystackEnabled ||
+            (order.branch?.organization?.features as Record<string, unknown> | null)?.paystackEnabled === true) &&
+          order.branch?.organization?.paystackPublicKey &&
+          order.branch?.organization?.paystackSecretKey
+        ),
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,
@@ -202,7 +225,21 @@ export async function getOrderById(id: string) {
       where: { id },
       include: {
         customer: true,
-        branch: { select: { id: true, name: true, code: true } },
+        branch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            organization: {
+              select: {
+                features: true,
+                paystackEnabled: true,
+                paystackPublicKey: true,
+                paystackSecretKey: true,
+              },
+            },
+          },
+        },
         items: {
           include: {
             menuItem: { select: { id: true, name: true, sku: true, price: true } },
@@ -235,6 +272,12 @@ export async function getOrderById(id: string) {
         total: Number(order.total),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
+        paystackEnabled: Boolean(
+          (order.branch?.organization?.paystackEnabled ||
+            (order.branch?.organization?.features as Record<string, unknown> | null)?.paystackEnabled === true) &&
+          order.branch?.organization?.paystackPublicKey &&
+          order.branch?.organization?.paystackSecretKey
+        ),
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,
@@ -257,6 +300,17 @@ export async function getOrderById(id: string) {
           longitude: order.customer.longitude ? Number(order.customer.longitude) : null,
           isActive: order.customer.isActive,
           createdAt: order.customer.createdAt.toISOString(),
+        } : order.customerName ? {
+          id: "guest",
+          name: order.customerName,
+          phone: order.deliveryPhone || "",
+          email: null,
+          address: order.deliveryAddress,
+          city: order.deliveryCity,
+          latitude: null,
+          longitude: null,
+          isActive: true,
+          createdAt: order.createdAt.toISOString(),
         } : null,
         items: order.items.map((item) => ({
           id: item.id,
@@ -380,6 +434,7 @@ export async function createOrder(input: CreateOrderInput) {
       data: {
         orderNumber,
         customerId: input.customerId || null,
+        customerName: input.customerName || null,
         branchId: input.branchId,
         source: input.source,
         type: input.type,
