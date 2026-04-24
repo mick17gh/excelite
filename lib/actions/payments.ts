@@ -302,6 +302,9 @@ export async function initializePaystackOrderPayment(input: InitializePaystackOr
     if (order.status === "CANCELLED") return { error: "Cannot initialize payment for cancelled order" };
 
     const org = order.branch.organization;
+    if (!org) {
+      return { error: "Organization not found for branch" };
+    }
     const credentials = resolvePaystackCredentials(org);
     if (!credentials.enabled || !credentials.secret) {
       return { error: "Paystack is disabled in setup or not fully configured" };
@@ -406,6 +409,9 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
           select: {
             organization: {
               select: {
+                features: true,
+                paystackEnabled: true,
+                paystackPublicKey: true,
                 paystackSecretKey: true,
               },
             },
@@ -415,7 +421,9 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
     });
 
     if (!order) return { error: "Order not found" };
-    const credentials = resolvePaystackCredentials(order.branch.organization);
+    const org = order.branch.organization;
+    if (!org) return { error: "Organization not found for branch" };
+    const credentials = resolvePaystackCredentials(org);
     if (!credentials.secret) return { error: "Paystack secret key is not configured" };
 
     let verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${input.reference}`, {
