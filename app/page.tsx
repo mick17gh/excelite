@@ -141,14 +141,14 @@ const profitabilityPillars: Array<{
     gradient: "from-teal-500 to-emerald-600",
   },
   {
-    title: "Smarter Decision-Making with Data & AI",
+    title: "Smarter Decision-Making with Data",
     intro:
-      "Turn your data into actionable insights—without needing a data analyst.",
+      "Turn every transaction into a permanent, professional record—get actionable insights.",
     listLabel: "Capabilities include:",
     bullets: [
-      "Custom BI reporting across all operations",
-      "Real-time alerts for critical issues",
-      "AI-powered insights and forecasting (Pro & Premium)",
+      "Custom business intelligence reports across all operations",
+      "Bank ready documents to support loan applications",
+      "Intelligent insights and forecasting (Pro & Premium)",
     ],
     icon: Brain,
     gradient: "from-violet-500 to-purple-600",
@@ -240,7 +240,8 @@ const faqs: Array<{ question: string; answer: string }> = [
   },
   {
     question: "Does ServStack use AI?",
-    answer: "Yes. The Pro tier includes an AI assistant built directly into your system.",
+    answer:
+      "Yes. The Pro tier includes an AI assistant built directly into your system.",
   },
   {
     question: "What does the AI assistant actually help with?",
@@ -394,31 +395,31 @@ export default function Home() {
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-[1.1]">
-                You&apos;re Losing Revenue in{" "}
-                <span className="text-transparent bg-linear-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text">
-                  Places You Can&apos;t See
-                </span>
+                Master Your Operations. Maximize Your Margins. Scale with
+                Confidence.
               </h1>
 
               <div className="space-y-4 text-lg md:text-xl text-muted-foreground mb-6 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 <p>
-                  Long wait times. Missed orders. Inventory shrinkage.
-                  Inefficient kitchens.
-                </p>
-                <p>
-                  These hidden problems quietly drain your profits every single
-                  day—without showing up clearly in your reports.
+                  Fragmented systems lead to missed orders, lost inventory, and
+                  hidden revenue leaks.
                 </p>
                 <p className="text-foreground font-medium">
-                  ServStack exposes these gaps, fixes them in real time, and
-                  gives you complete control over your operations.
+                  ServStack brings everything together—from order capture to
+                  inventory control—into one seamless command center.
                 </p>
               </div>
 
               <p className="text-base md:text-lg text-foreground/90 font-medium mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed border-l-4 border-emerald-500 pl-4">
-                From order capture to inventory to multi-branch
-                performance—everything connected, optimized, and working for
-                your profitability.
+                With built-in digital records, you&apos;re not just staying
+                organized—you&apos;re building a business banks can trust. Every
+                transaction, every report, every insight creates the financial
+                history lenders require, putting you in a stronger position to
+                access funding and grow.
+              </p>
+              <p className="text-base md:text-lg text-foreground font-semibold mb-8 max-w-xl mx-auto lg:mx-0">
+                See the gaps. Fix the leaks. Build a business banks are ready to
+                back.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -648,7 +649,7 @@ export default function Home() {
       </section>
 
       {/* Social Proof Bar */}
-      <section className="py-12 border-y bg-muted/30">
+      <section className="hidden py-12 border-y bg-muted/30">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <p className="text-sm text-muted-foreground text-center md:text-left">
@@ -700,11 +701,7 @@ export default function Home() {
 
           <div className="space-y-8 max-w-5xl mx-auto">
             {profitabilityPillars.map((pillar, index) => (
-              <ProfitabilityPillar
-                key={pillar.title}
-                index={index + 1}
-                {...pillar}
-              />
+              <ProfitabilityPillar key={pillar.title} {...pillar} />
             ))}
           </div>
         </div>
@@ -782,7 +779,7 @@ export default function Home() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-20 bg-linear-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white relative overflow-hidden">
+      <section className="hidden py-20 bg-linear-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#fff1_1px,transparent_1px),linear-gradient(to_bottom,#fff1_1px,transparent_1px)] bg-size[24px_24px]" />
         <div className="container relative mx-auto px-4 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -827,27 +824,43 @@ export default function Home() {
             {[
               {
                 quote:
-                  "ServStack helped us reduce food waste by 32% in just 3 months. The inventory alerts are a game-changer for our 8 branches.",
-                author: "Kwame Asante",
-                role: "CEO, Golden Grills Ghana",
-                avatar: "KA",
+                  "I usually spend weeks chasing restaurant owners for clear financial statements, and even then, the numbers rarely add up. Recently, a client brought in a full performance report generated directly from ServStack. The transparency was impressive, actual margins, inventory value, and verified sales. It turned a difficult loan conversation into a very quick 'yes.' It's the kind of data evidence we actually look for.",
+                author: "Kwesi Mensah",
+                role: "Senior Credit Officer, GCB",
+                avatar: "KM",
                 color: "bg-emerald-500",
               },
               {
                 quote:
-                  "Before ServStack, I spent hours every week compiling reports from each branch. Now I have real-time visibility on my phone.",
-                author: "Ama Mensah",
-                role: "Operations Director, Tasty Bites",
-                avatar: "AM",
+                  "A reputable client wanted to expand, but they weren't sure where. We looked at their ServStack delivery data and realized 40% of their orders were actually being shipped to the Haatso area, despite the long wait times. We opened a 'satellite' branch there last month, and it was profitable by week 3. Using actual delivery intelligence took the guesswork out of the expansion.",
+                author: "Georgina Acquaye",
+                role: "Growth Strategist",
+                avatar: "GA",
                 color: "bg-blue-500",
               },
               {
                 quote:
-                  "The multi-branch comparison feature helped us identify which branches were underperforming. We improved revenue by 25% in Q1.",
-                author: "Yaw Boateng",
-                role: "Managing Partner, Local Delights",
-                avatar: "YB",
+                  "Before ServStack, I was tired of hearing 'Boss, the charcoal is finished' or 'the chicken is short' without any warning. And my customers were complaining about wrong orders every Friday night. Now, I see my real costs daily. I know exactly where my money is going, and the kitchen staff have no excuses anymore. Order mistakes have dropped significantly, and I finally feel like I'm in control of my profit, not just my staff.",
+                author: 'Evans "Bones" Turkson',
+                role: "CEO, Chancellor Grill, Accra",
+                avatar: "ET",
                 color: "bg-purple-500",
+              },
+              {
+                quote:
+                  "I was worried about the 'AI' and the technical side of things because I am not a computer person. But the ServStack team stayed with us for two days straight to train my servers and the kitchen team. Even when I had a small issue with the receipt printer on a busy Saturday, their support team was on WhatsApp immediately to fix it. They don't just sell you a system and run away; they actually help you use it.",
+                author: "Tracy",
+                role: "Milky Moments, Kwabenya",
+                avatar: "TR",
+                color: "bg-rose-500",
+              },
+              {
+                quote:
+                  "Moving four branches away from our old POS was a headache I was avoiding for a long time. I thought the transition would be a mess, but the migration to ServStack was surprisingly smooth. Being able to see all my locations from my phone while I'm at home, comparing which branch is wasting more and which is selling more—has been a game changer. Yes, it's an investment, but the money we've saved on inventory leaks alone paid for the system in the first three months.",
+                author: "Alisha T",
+                role: "Managing Director, 2 Cousinns Pizza, Lancaster PA, USA (4 Locations)",
+                avatar: "AT",
+                color: "bg-cyan-500",
               },
             ].map((testimonial, i) => (
               <Card
@@ -933,8 +946,12 @@ export default function Home() {
             <Badge variant="secondary" className="mb-4">
               FAQ
             </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-3">ServStack FAQ</h2>
-            <p className="text-muted-foreground">Top questions from restaurant operators.</p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-3">
+              ServStack FAQ
+            </h2>
+            <p className="text-muted-foreground">
+              Top questions from restaurant operators.
+            </p>
           </div>
 
           <Card>
@@ -1093,7 +1110,6 @@ export default function Home() {
 }
 
 function ProfitabilityPillar({
-  index,
   title,
   intro,
   listLabel,
@@ -1101,7 +1117,6 @@ function ProfitabilityPillar({
   icon: Icon,
   gradient,
 }: {
-  index: number;
   title: string;
   intro: string;
   listLabel: string;
@@ -1119,15 +1134,9 @@ function ProfitabilityPillar({
           >
             <Icon className="h-6 w-6 text-white" />
           </div>
-          <span className="text-sm font-semibold text-muted-foreground tabular-nums md:hidden">
-            {index}.
-          </span>
         </div>
         <div className="min-w-0">
-          <div className="flex flex-wrap items-baseline gap-2 mb-2">
-            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums hidden md:inline">
-              {index}.
-            </span>
+          <div className="mb-2">
             <h3 className="text-xl md:text-2xl font-semibold">{title}</h3>
           </div>
           <p className="text-muted-foreground mb-4 leading-relaxed">{intro}</p>
