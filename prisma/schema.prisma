@@ -258,6 +258,13 @@ enum DeliveryIssue {
   PROFESSIONALISM
 }
 
+enum PosOfflineMutationStatus {
+  PENDING
+  ORDER_CREATED
+  COMPLETED
+  FAILED
+}
+
 enum NotificationType {
   ORDER_PLACED
   ORDER_CONFIRMED
@@ -1440,6 +1447,7 @@ model Order {
   closedAt        DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  offlineClientMutationId String? @unique
 
   // Relations
   customer       Customer?           @relation(fields: [customerId], references: [id])
@@ -1460,6 +1468,21 @@ model Order {
   @@index([source])
   @@index([orderNumber])
   @@map("order")
+}
+
+model PosOfflineMutation {
+  id               String                   @id @default(cuid())
+  clientMutationId String                   @unique
+  orderId          String?
+  status           PosOfflineMutationStatus @default(PENDING)
+  payloadJson      Json
+  resultJson       Json?
+  errorMessage     String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([status])
+  @@map("pos_offline_mutation")
 }
 
 model OrderItem {

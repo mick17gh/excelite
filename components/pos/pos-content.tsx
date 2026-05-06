@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -32,14 +33,17 @@ import {
   UtensilsCrossed,
   Package,
   Truck,
-  Smartphone,
   Clock,
   ChevronUp,
   ChevronDown,
   ChefHat,
   Send,
+  WifiOff,
 } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
 import { createPosOrder, sendToKitchen, getKitchenStations, completeOrder } from "@/lib/actions/pos";
+import { savePosSnapshot, loadPosSnapshot, enqueuePosOutbox } from "@/lib/offline/pos-idb";
+import { drainPosOutbox } from "@/lib/offline/pos-sync";
 import { getBranchTaxRate } from "@/lib/actions/tax";
 import { OrderType } from "@/lib/generated/prisma/client";
 import { useEffect, useCallback } from "react";
@@ -71,8 +75,8 @@ interface RecentOrder {
   id: string;
   orderNumber: string;
   status: string;
-  total: any;
-  openedAt: Date;
+  total: number;
+  openedAt: Date | string;
   branch: { name: string };
 }
 
@@ -105,10 +109,80 @@ const orderTypes = [
 export function PosContent({ branches, menuItems, recentOrders, customers }: PosContentProps) {
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+  const [liveBranches, setLiveBranches] = useState(branches);
+  const [liveMenuItems, setLiveMenuItems] = useState(menuItems);
+  const [liveRecentOrders, setLiveRecentOrders] = useState(recentOrders);
+  const [liveCustomers, setLiveCustomers] = useState(customers);
   
   // Filter branches based on user permissions
-  const availableBranches = filterBranchesForUser(branches, canViewAllBranches, userBranchId);
-  
+  const availableBranches = filterBranchesForUser(liveBranches, canViewAllBranches, userBranchId);
+
+  useEffect(() => {
+    const onOnline = () => {
+      setIsOnline(true);
+      void drainPosOutbox().then((r) => {
+        if (r.synced > 0) {
+          toast.success(`Synced ${r.synced} offline order(s)`);
+        }
+      });
+    };
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const snap = await loadPosSnapshot();
+        if (!cancelled && snap) {
+          setLiveBranches(snap.branches as Branch[]);
+          setLiveMenuItems(snap.menuItems as MenuItem[]);
+          setLiveRecentOrders(snap.recentOrders as RecentOrder[]);
+          setLiveCustomers(snap.customers as Customer[]);
+        }
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.onLine) return;
+    setLiveBranches(branches);
+    setLiveMenuItems(menuItems);
+    setLiveRecentOrders(recentOrders);
+    setLiveCustomers(customers);
+    void savePosSnapshot({ branches, menuItems, recentOrders, customers });
+    void drainPosOutbox();
+  }, [branches, menuItems, recentOrders, customers]);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    void drainPosOutbox();
+  }, [isOnline]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible" && typeof navigator !== "undefined" && navigator.onLine) {
+        void drainPosOutbox();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   const [branchId, setBranchId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -116,6 +190,12 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   const [cart, setCart] = useState<CartLine[]>([]);
   const [isPending, startTransition] = useTransition();
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOnline && orderType === "DELIVERY") {
+      setOrderType("DINE_IN");
+    }
+  }, [isOnline, orderType]);
 
   // Auto-select user's branch if they're restricted, or first available branch
   useEffect(() => {
@@ -131,7 +211,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   }, [authLoading, canViewAllBranches, userBranchId, availableBranches, branchId]);
 
   // Auto-set currency based on selected branch
-  useBranchCurrency(branchId, branches);
+  useBranchCurrency(branchId, liveBranches);
 
   // Keyboard shortcuts
   useKeyboardShortcuts([
@@ -163,16 +243,16 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   ]);
 
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(menuItems.map((m) => m.category))).sort();
+    const cats = Array.from(new Set(liveMenuItems.map((m) => m.category))).sort();
     const categoryCounts = cats.map((cat) => ({
       name: cat,
-      count: menuItems.filter((m) => m.category === cat).length,
+      count: liveMenuItems.filter((m) => m.category === cat).length,
     }));
     return categoryCounts;
-  }, [menuItems]);
+  }, [liveMenuItems]);
 
   const filteredMenu = useMemo(() => {
-    let filtered = menuItems;
+    let filtered = liveMenuItems;
     const q = search.trim().toLowerCase();
     if (q) {
       filtered = filtered.filter(
@@ -183,7 +263,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
       filtered = filtered.filter((m) => m.category === selectedCategory);
     }
     return filtered;
-  }, [menuItems, search, selectedCategory]);
+  }, [liveMenuItems, search, selectedCategory]);
 
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = Math.round(cart.reduce((s, l) => s + l.unitPrice * l.quantity, 0) * 100) / 100;
@@ -221,6 +301,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mixes serialized Order and offline queue receipt
   const [completedOrder, setCompletedOrder] = useState<any>(null);
   
   // Kitchen integration state
@@ -275,9 +356,20 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   };
 
   const handlePaymentComplete = async (paymentData: PaymentData) => {
-    startTransition(async () => {
-      // First create the POS order
-      const result = await createPosOrder({
+    const online = typeof navigator !== "undefined" && navigator.onLine;
+    const branch = liveBranches.find((b) => b.id === branchId);
+
+    const queueOffline = async () => {
+      if (paymentData.paymentMethod !== "CASH") {
+        toast.error("Offline checkout is cash only");
+        return;
+      }
+      if ((paymentData.orderType as OrderType) === "DELIVERY") {
+        toast.error("Delivery orders cannot be completed offline");
+        return;
+      }
+      const clientMutationId = uuidv4();
+      const createPayload = {
         branchId,
         type: paymentData.orderType as OrderType,
         customerId: paymentData.customerId,
@@ -295,47 +387,111 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
         deliveryAddress: paymentData.deliveryAddress,
         deliveryPhone: paymentData.deliveryPhone,
         deliveryNotes: paymentData.deliveryNotes,
+      };
+      await enqueuePosOutbox({
+        clientMutationId,
+        createdAt: Date.now(),
+        payload: {
+          create: createPayload,
+          amountReceived: paymentData.amountPaid,
+          tip: 0,
+          skipStatusComplete: autoSendToKitchen,
+        },
       });
-      if (!result.success || !result.data) {
-        toast.error(result.error || "Failed to create order");
-        setIsPaymentOpen(false);
-        return;
-      }
-
-      // Complete the order to create Transaction + Sale records for reporting
-      // skipStatusComplete keeps status as IN_PROGRESS when kitchen toggle is on
-      // so the kitchen workflow (bumpTicket) drives the order to COMPLETED
-      const completeResult = await completeOrder({
-        orderId: result.data.id,
-        paymentMethod: paymentData.paymentMethod,
-        amountReceived: paymentData.amountPaid,
-        tip: 0,
-        createSale: true,
-        skipStatusComplete: autoSendToKitchen,
-      });
-
-      if (!completeResult.success) {
-        console.error("Failed to complete order:", completeResult.error);
-        // Order was created but completion failed - still show success but log error
-      }
-
       setCompletedOrder({
-        ...result.data,
-        change: completeResult.data?.change || paymentData.change,
+        syncPending: true,
+        clientMutationId,
+        orderNumber: `OFFLINE-${clientMutationId.slice(0, 8).toUpperCase()}`,
+        type: paymentData.orderType,
+        paymentMethod: paymentData.paymentMethod,
+        total,
+        subtotal: cartSubtotal,
+        tax,
+        branch: branch ? { name: branch.name, code: branch.code } : {},
+        createdAt: new Date().toISOString(),
+        customerName: paymentData.customerName,
+        items: cart.map((l) => ({
+          menuItem: { name: l.name },
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          lineTotal: l.unitPrice * l.quantity,
+        })),
+        change: paymentData.change,
       });
       setIsPaymentOpen(false);
       setIsReceiptOpen(true);
-      
-      if (autoSendToKitchen) {
-        toast.success("Order sent to kitchen", {
-          description: `Order #${result.data?.orderNumber} sent to kitchen display`,
-        });
-      } else {
-        toast.success("Order completed successfully", {
-          description: `Order #${result.data?.orderNumber}`,
-        });
-      }
+      toast.message("Order queued for sync", {
+        description: "Will upload when you are back online.",
+      });
       setCart([]);
+    };
+
+    startTransition(async () => {
+      if (!online) {
+        await queueOffline();
+        return;
+      }
+
+      try {
+        const result = await createPosOrder({
+          branchId,
+          type: paymentData.orderType as OrderType,
+          customerId: paymentData.customerId,
+          customerName: paymentData.customerName,
+          items: cart.map((l) => ({
+            menuItemId: l.menuItemId,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+          })),
+          paymentMethod: paymentData.paymentMethod,
+          notes: paymentData.notes,
+          sendToKitchen: autoSendToKitchen,
+          stationId: selectedStation || undefined,
+          deliveryFee: paymentData.deliveryFee,
+          deliveryAddress: paymentData.deliveryAddress,
+          deliveryPhone: paymentData.deliveryPhone,
+          deliveryNotes: paymentData.deliveryNotes,
+        });
+        if (!result.success || !result.data) {
+          toast.error(result.error || "Failed to create order");
+          setIsPaymentOpen(false);
+          return;
+        }
+
+        const completeResult = await completeOrder({
+          orderId: result.data.id,
+          paymentMethod: paymentData.paymentMethod,
+          amountReceived: paymentData.amountPaid,
+          tip: 0,
+          createSale: true,
+          skipStatusComplete: autoSendToKitchen,
+        });
+
+        if (!completeResult.success) {
+          console.error("Failed to complete order:", completeResult.error);
+        }
+
+        setCompletedOrder({
+          ...result.data,
+          change: completeResult.data?.change || paymentData.change,
+        });
+        setIsPaymentOpen(false);
+        setIsReceiptOpen(true);
+
+        if (autoSendToKitchen) {
+          toast.success("Order sent to kitchen", {
+            description: `Order #${result.data?.orderNumber} sent to kitchen display`,
+          });
+        } else {
+          toast.success("Order completed successfully", {
+            description: `Order #${result.data?.orderNumber}`,
+          });
+        }
+        setCart([]);
+      } catch (e) {
+        console.warn("[POS] Network error, queueing offline:", e);
+        await queueOffline();
+      }
     });
   };
   
@@ -356,11 +512,20 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
     }
   };
 
-  const selectedBranch = branches.find((b) => b.id === branchId);
-  const selectedOrderType = orderTypes.find((t) => t.value === orderType);
+  const selectedBranch = liveBranches.find((b) => b.id === branchId);
 
   return (
-    <div className="flex h-[calc(100vh-100px)] gap-4">
+    <div className="flex h-[calc(100vh-100px)] flex-col gap-3">
+      {!isOnline ? (
+        <Alert className="shrink-0 border-amber-500/50 bg-amber-500/5 py-2">
+          <WifiOff className="h-4 w-4 text-amber-700" />
+          <AlertDescription className="text-sm text-amber-950 dark:text-amber-100">
+            Offline mode: using the last saved menu and prices. Checkout is cash only; orders sync when you reconnect.
+            Kitchen and inventory update after sync.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="flex min-h-0 flex-1 gap-4">
       {/* Left Panel - Menu */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header Controls */}
@@ -372,7 +537,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
               <SelectValue placeholder="Select Branch" />
             </SelectTrigger>
             <SelectContent>
-              {branches.map((b) => (
+              {liveBranches.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
                   {b.name}
                 </SelectItem>
@@ -395,6 +560,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
                       "h-8 px-3 transition-all",
                       isActive && type.color
                     )}
+                    disabled={!isOnline && type.value === "DELIVERY"}
                     onClick={() => setOrderType(type.value as OrderType)}
                   >
                     <Icon className="h-4 w-4 mr-2" />
@@ -464,7 +630,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
             className="shrink-0 h-8"
             onClick={() => setSelectedCategory("all")}
           >
-            All ({menuItems.length})
+            All ({liveMenuItems.length})
           </Button>
           {categories.map((cat) => (
             <Button
@@ -676,7 +842,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
           )}
 
           {/* Recent Orders Collapsible */}
-          {recentOrders.length > 0 && (
+          {liveRecentOrders.length > 0 && (
             <Collapsible open={isRecentOrdersOpen} onOpenChange={setIsRecentOrdersOpen}>
               <CollapsibleTrigger asChild>
                 <Button
@@ -685,7 +851,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
                 >
                   <span className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    Recent Orders ({recentOrders.length})
+                    Recent Orders ({liveRecentOrders.length})
                   </span>
                   {isRecentOrdersOpen ? (
                     <ChevronDown className="h-4 w-4" />
@@ -696,7 +862,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2">
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {recentOrders.slice(0, 5).map((o) => (
+                  {liveRecentOrders.slice(0, 5).map((o) => (
                     <div
                       key={o.id}
                       className="flex items-center justify-between rounded-lg border p-2 text-sm"
@@ -759,9 +925,10 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
         taxRate={taxSettings.rate}
         onComplete={handlePaymentComplete}
         isProcessing={isPending}
-        customers={customers}
+        customers={liveCustomers}
         orderType={orderType}
         onOrderTypeChange={(t) => setOrderType(t as OrderType)}
+        offlineRestricted={!isOnline}
       />
 
       {/* Receipt Modal */}
@@ -776,6 +943,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
           }}
         />
       )}
+      </div>
     </div>
   );
 }

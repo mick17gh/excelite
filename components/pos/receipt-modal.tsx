@@ -9,14 +9,37 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Receipt, Printer, Download, X } from "lucide-react";
+import { Receipt, Printer, Download } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
 import { format } from "date-fns";
+
+type ReceiptLineItem = {
+  quantity?: number;
+  unitPrice?: number;
+  menuItem?: { name?: string };
+};
+
+type ReceiptOrderShape = Record<string, unknown> & {
+  orderNumber?: string;
+  type?: string;
+  paymentMethod?: string;
+  customerName?: string;
+  createdAt?: string;
+  branch?: { name?: string; code?: string };
+  items?: ReceiptLineItem[];
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
+  deliveryFee?: number;
+  total?: number;
+  notes?: string;
+  syncPending?: boolean;
+};
 
 interface ReceiptModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  order: any;
+  order: ReceiptOrderShape;
   onClose: () => void;
 }
 
@@ -64,6 +87,12 @@ export function ReceiptModal({ open, onOpenChange, order, onClose }: ReceiptModa
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {order.syncPending ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+              This sale is queued on this device and will sync to the server when you are online. Kitchen
+              tickets and inventory run after sync completes.
+            </div>
+          ) : null}
           {/* Receipt Content */}
           <div className="rounded-lg border bg-muted/30 p-6 font-mono text-sm space-y-3">
             <div className="text-center space-y-1 border-b pb-3 mb-3">
@@ -80,7 +109,11 @@ export function ReceiptModal({ open, onOpenChange, order, onClose }: ReceiptModa
               </div>
               <div className="flex justify-between">
                 <span>Date:</span>
-                <span>{format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}</span>
+                <span>
+                  {order.createdAt
+                    ? format(new Date(String(order.createdAt)), "MMM dd, yyyy HH:mm")
+                    : "—"}
+                </span>
               </div>
               {order.customerName && (
                 <div className="flex justify-between">
@@ -90,27 +123,27 @@ export function ReceiptModal({ open, onOpenChange, order, onClose }: ReceiptModa
               )}
               <div className="flex justify-between">
                 <span>Type:</span>
-                <span>{order.type.replace(/_/g, " ")}</span>
+                <span>{(order.type ?? "").replace(/_/g, " ")}</span>
               </div>
-              {order.paymentMethod && (
+              {order.paymentMethod ? (
                 <div className="flex justify-between">
                   <span>Payment:</span>
-                  <span>{order.paymentMethod.replace(/_/g, " ")}</span>
+                  <span>{String(order.paymentMethod).replace(/_/g, " ")}</span>
                 </div>
-              )}
+              ) : null}
             </div>
 
             <div className="border-t border-b py-2 my-3">
               <div className="space-y-1">
-                {order.items?.map((item: any, idx: number) => (
+                {order.items?.map((item, idx: number) => (
                   <div key={idx} className="flex justify-between text-xs">
                     <div className="flex-1">
                       <div className="font-medium">
-                        {item.quantity}x {item.menuItem?.name || "Item"}
+                        {item.quantity ?? 0}x {item.menuItem?.name || "Item"}
                       </div>
                     </div>
                     <div className="ml-2">
-                      {formatCurrency(Number(item.unitPrice) * item.quantity)}
+                      {formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}
                     </div>
                   </div>
                 ))}
@@ -175,7 +208,7 @@ export function ReceiptModal({ open, onOpenChange, order, onClose }: ReceiptModa
   );
 }
 
-function generateReceiptHTML(order: any, formatCurrency: (amount: number) => string): string {
+function generateReceiptHTML(order: ReceiptOrderShape, formatCurrency: (amount: number) => string): string {
   return `
 <!DOCTYPE html>
 <html>
@@ -193,12 +226,12 @@ function generateReceiptHTML(order: any, formatCurrency: (amount: number) => str
   <div class="header">
     <h2>${order.branch?.name || "Restaurant"}</h2>
     <p>Order #${order.orderNumber}</p>
-    <p>${format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}</p>
+    <p>${order.createdAt ? format(new Date(String(order.createdAt)), "MMM dd, yyyy HH:mm") : "—"}</p>
   </div>
-  ${order.items?.map((item: any) => `
+  ${order.items?.map((item) => `
     <div class="item">
-      <span>${item.quantity}x ${item.menuItem?.name || "Item"}</span>
-      <span>${formatCurrency(Number(item.unitPrice) * item.quantity)}</span>
+      <span>${item.quantity ?? 0}x ${item.menuItem?.name || "Item"}</span>
+      <span>${formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}</span>
     </div>
   `).join("")}
   <div class="total">
@@ -226,20 +259,22 @@ function generateReceiptHTML(order: any, formatCurrency: (amount: number) => str
   `;
 }
 
-function generateReceiptText(order: any, formatCurrency: (amount: number) => string): string {
+function generateReceiptText(order: ReceiptOrderShape, formatCurrency: (amount: number) => string): string {
   const lines = [
     "=".repeat(40),
     `  ${order.branch?.name || "Restaurant"}`,
     `  ${order.branch?.code || ""}`,
     "=".repeat(40),
     `Order #: ${order.orderNumber}`,
-    `Date: ${format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}`,
+    order.createdAt
+      ? `Date: ${format(new Date(String(order.createdAt)), "MMM dd, yyyy HH:mm")}`
+      : "Date: —",
     order.customerName ? `Customer: ${order.customerName}` : "",
-    `Type: ${order.type.replace(/_/g, " ")}`,
-    order.paymentMethod ? `Payment: ${order.paymentMethod.replace(/_/g, " ")}` : "",
+    `Type: ${(order.type ?? "").replace(/_/g, " ")}`,
+    order.paymentMethod ? `Payment: ${String(order.paymentMethod).replace(/_/g, " ")}` : "",
     "-".repeat(40),
-    ...order.items?.map((item: any) =>
-      `${item.quantity}x ${item.menuItem?.name || "Item"}${" ".repeat(20)}${formatCurrency(Number(item.unitPrice) * item.quantity)}`
+    ...order.items?.map((item) =>
+      `${item.quantity ?? 0}x ${item.menuItem?.name || "Item"}${" ".repeat(20)}${formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}`
     ) || [],
     "-".repeat(40),
     `Subtotal:${" ".repeat(25)}${formatCurrency(Number(order.subtotal))}`,

@@ -71,10 +71,28 @@ export interface CreatePosOrderInput {
   deliveryNotes?: string;
   sendToKitchen?: boolean; // Automatically create kitchen ticket
   stationId?: string; // Specific kitchen station (optional)
+  /** When replaying offline POS sync, prevents duplicate Order rows */
+  offlineClientMutationId?: string;
 }
 
 export async function createPosOrder(input: CreatePosOrderInput) {
   try {
+    if (input.offlineClientMutationId) {
+      const existingOrder = await db.order.findFirst({
+        where: { offlineClientMutationId: input.offlineClientMutationId },
+        include: {
+          items: { include: { menuItem: true } },
+          branch: true,
+          cashier: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      });
+      if (existingOrder) {
+        return { success: true, data: serializePosOrder(existingOrder) };
+      }
+    }
+
     const orderNumber = generateOrderNumber();
     
     // Fetch branch tax settings
@@ -113,6 +131,7 @@ export async function createPosOrder(input: CreatePosOrderInput) {
         deliveryAddress: input.deliveryAddress || null,
         deliveryPhone: input.deliveryPhone || null,
         deliveryNotes: input.deliveryNotes || null,
+        offlineClientMutationId: input.offlineClientMutationId || null,
         items: {
           create: input.items.map((it) => ({
             menuItemId: it.menuItemId,
@@ -263,8 +282,24 @@ export async function completeOrder(input: CompleteOrderInput) {
       return { success: false, error: "Order not found" };
     }
 
-    if (order.status === "COMPLETED") {
-      return { success: false, error: "Order already completed" };
+    // Idempotent replay (e.g. offline sync retry): order already finalized
+    if (order.status === "COMPLETED" || order.paymentStatus === "PAID") {
+      const totalWithTip = Number(order.total) + (input.tip || 0);
+      const change = input.amountReceived - totalWithTip;
+      return {
+        success: true,
+        data: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          total: Number(order.total),
+          tip: input.tip || 0,
+          totalWithTip,
+          amountReceived: input.amountReceived,
+          change: Math.max(0, change),
+          paymentMethod: order.paymentMethod || input.paymentMethod,
+          saleId: null,
+        },
+      };
     }
 
     // Update order status and payment

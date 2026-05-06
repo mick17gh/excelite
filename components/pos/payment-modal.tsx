@@ -15,7 +15,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { CreditCard, DollarSign, Smartphone, Building2, Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, UtensilsCrossed, Package, Truck } from "lucide-react";
+import { CreditCard, DollarSign, Smartphone, Building2, Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, UtensilsCrossed, Package, Truck, WifiOff } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createCustomer } from "@/lib/actions/customers";
 import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,8 @@ interface PaymentModalProps {
   customers?: Customer[];
   orderType?: string;
   onOrderTypeChange?: (type: string) => void;
+  /** When true: cash only, no delivery type, no new customers (POS offline guardrails). */
+  offlineRestricted?: boolean;
 }
 
 export interface PaymentData {
@@ -84,6 +87,7 @@ export function PaymentModal({
   customers = [],
   orderType: initialOrderType = "DINE_IN",
   onOrderTypeChange,
+  offlineRestricted = false,
 }: PaymentModalProps) {
   const { formatCurrency } = useCurrency();
   const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
@@ -106,8 +110,16 @@ export function PaymentModal({
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [deliveryFeeStr, setDeliveryFeeStr] = useState("");
   const deliveryFee = parseFloat(deliveryFeeStr) || 0;
-  const isDelivery = localOrderType === "DELIVERY";
+  const isDelivery = localOrderType === "DELIVERY" && !offlineRestricted;
   const total = Math.round((isDelivery ? totalProp + deliveryFee : totalProp) * 100) / 100;
+
+  const orderTypeOptionsFiltered = offlineRestricted
+    ? orderTypeOptions.filter((o) => o.value !== "DELIVERY")
+    : orderTypeOptions;
+
+  const paymentMethodsFiltered = offlineRestricted
+    ? paymentMethods.filter((m) => m.value === "CASH")
+    : paymentMethods;
 
   const handleOrderTypeChange = (type: string) => {
     setLocalOrderType(type);
@@ -149,9 +161,15 @@ export function PaymentModal({
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setAmountPaid(paymentMethod === "CASH" ? "" : total.toFixed(2));
+      setPaymentMethod("CASH");
+      const nextType =
+        offlineRestricted && initialOrderType === "DELIVERY" ? "DINE_IN" : initialOrderType;
+      setLocalOrderType(nextType);
+      if (offlineRestricted && initialOrderType === "DELIVERY") {
+        onOrderTypeChange?.("DINE_IN");
+      }
+      setAmountPaid("");
       setCustomerId("walk-in");
-      setLocalOrderType(initialOrderType);
       setNotes("");
       setDeliveryAddress("");
       setDeliveryPhone("");
@@ -160,8 +178,7 @@ export function PaymentModal({
       setShowNewCustomer(false);
       setLocalCustomers(customers);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, offlineRestricted, initialOrderType, customers, onOrderTypeChange]);
 
   // Update amount when payment method or total changes
   useEffect(() => {
@@ -216,9 +233,19 @@ export function PaymentModal({
 
         <ScrollArea className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
+            {offlineRestricted ? (
+              <Alert className="border-amber-500/50 bg-amber-500/5">
+                <WifiOff className="text-amber-700" />
+                <AlertDescription className="text-amber-900 dark:text-amber-200">
+                  Offline checkout: cash only, dine-in or takeout. Orders sync when you are back online;
+                  kitchen and inventory update after sync (not in real time while offline).
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             {/* Order Type Selector */}
-            <div className="grid grid-cols-3 gap-2">
-              {orderTypeOptions.map((opt) => {
+            <div className={cn("grid gap-2", offlineRestricted ? "grid-cols-2" : "grid-cols-3")}>
+              {orderTypeOptionsFiltered.map((opt) => {
                 const Icon = opt.icon;
                 const isActive = localOrderType === opt.value;
                 return (
@@ -264,8 +291,8 @@ export function PaymentModal({
             {/* Payment Methods */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">Payment Method</Label>
-              <div className="grid grid-cols-2 gap-3">
-                {paymentMethods.map((method) => {
+              <div className={cn("grid gap-3", offlineRestricted ? "grid-cols-1" : "grid-cols-2")}>
+                {paymentMethodsFiltered.map((method) => {
                   const Icon = method.icon;
                   const isSelected = paymentMethod === method.value;
                   return (
@@ -394,13 +421,17 @@ export function PaymentModal({
                             </CommandItem>
                           ))}
                         </CommandGroup>
-                        <CommandSeparator />
-                        <CommandGroup>
-                          <CommandItem onSelect={() => setShowNewCustomer(true)}>
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Add New Customer
-                          </CommandItem>
-                        </CommandGroup>
+                        {!offlineRestricted ? (
+                          <>
+                            <CommandSeparator />
+                            <CommandGroup>
+                              <CommandItem onSelect={() => setShowNewCustomer(true)}>
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                Add New Customer
+                              </CommandItem>
+                            </CommandGroup>
+                          </>
+                        ) : null}
                       </CommandList>
                     </Command>
                   ) : (
