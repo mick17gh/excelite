@@ -418,12 +418,11 @@ export default function Home() {
                 access funding and grow.
               </p>
               <p className="text-base md:text-lg text-foreground font-semibold mb-8 max-w-xl mx-auto lg:mx-0">
-                See the gaps. Fix the leaks. Build a business banks are ready to
-                back.
+                See the gaps. Fix the leaks. Grow with ServStack. back.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
-                <Link href="/login">
+                {/* <Link href="/login">
                   <Button
                     size="lg"
                     className="h-14 px-8 text-base bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-xl shadow-emerald-500/25 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02] w-full sm:w-auto"
@@ -431,7 +430,7 @@ export default function Home() {
                     Start Your Free Trial
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
-                </Link>
+                </Link> */}
                 <Button
                   size="lg"
                   variant="outline"
@@ -442,7 +441,7 @@ export default function Home() {
                 </Button>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
+              {/* <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   <span>No credit card required</span>
@@ -455,7 +454,7 @@ export default function Home() {
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   <span>Free onboarding</span>
                 </div>
-              </div>
+              </div> */}
             </div>
 
             {/* Right Content - Dashboard Preview */}
@@ -987,30 +986,20 @@ export default function Home() {
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
             <div className="relative">
               <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                Ready to run your QSR with total control?
-              </h2>
-              <p className="text-lg text-emerald-100 mb-8 max-w-2xl mx-auto">
                 Start your trial or speak with our team about a demo tailored to
                 your operations.
+              </h2>
+              <p className="text-lg text-emerald-100 mb-8 max-w-2xl mx-auto">
+                Call Us: <a href="tel:+233554510864">+233554510864</a>
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/login">
-                  <Button
-                    size="lg"
-                    variant="secondary"
-                    className="h-14 px-8 text-base font-medium"
-                  >
-                    Start Your Free Trial
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
                 <Button
                   size="lg"
                   variant="outline"
                   className="h-14 px-8 text-base border-white/30 text-white hover:bg-white/10 font-medium"
                   asChild
                 >
-                  <a href={DEMO_MAILTO}>Book a Demo</a>
+                  <a href={DEMO_MAILTO}>Contact Us</a>
                 </Button>
               </div>
             </div>
