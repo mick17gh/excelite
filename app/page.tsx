@@ -394,7 +394,7 @@ export default function Home() {
                 <span>Built for QSR operators &amp; multi-branch brands</span>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-[1.1]">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-6 leading-[1.1]">
                 Master Your Operations. Maximize Your Margins. Scale with
                 Confidence.
               </h1>

@@ -10,6 +10,65 @@ export const metadata = {
 };
 
 export default async function InventoryPage() {
+  type RawInventoryItem = {
+    id: string;
+    name: string;
+    sku: string;
+    category: string;
+    unit: string;
+    currentStock: { toNumber?: () => number } | number;
+    minStock: { toNumber?: () => number } | number;
+    maxStock: { toNumber?: () => number } | number;
+    reorderPoint: { toNumber?: () => number } | number;
+    unitCost: { toNumber?: () => number } | number;
+    branchId: string;
+    branch?: { name?: string };
+  };
+  type OutboundRecord = {
+    id: string;
+    quantity: number;
+    movementType: string;
+    reason: string | null;
+    createdAt: Date;
+    item: { name: string; sku: string };
+    branch: { name: string };
+  };
+  type TransferRecord = {
+    id: string;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    transferDate: Date;
+    status: string;
+    notes: string | null;
+    approvedBy: string | null;
+    receivedBy: string | null;
+    createdAt: Date;
+    item: { name: string; sku: string };
+    fromBranch: { name: string };
+    toBranch: { name: string };
+  };
+  type WarehouseTransfer = {
+    id: string;
+    warehouseId: string;
+    warehouseName: string;
+    warehouseItemId: string;
+    itemName: string;
+    itemSku: string;
+    itemUnit: string;
+    toBranchId: string;
+    toBranchName: string;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    status: string;
+    transferDate: string;
+    approvedBy: string | null;
+    receivedBy: string | null;
+    notes: string | null;
+    createdAt: string;
+  };
+
   const [branchesResult, inventoryResult, suppliersResult, outboundResult, transferResult, warehouseTransfersResult] = await Promise.all([
     getBranches(),
     getInventoryItems(undefined, { page: 1, pageSize: 1000 }),
@@ -26,11 +85,11 @@ export default async function InventoryPage() {
       taxRate: taxRate ? Number(taxRate) : 0,
     };
   });
-  const rawItems = inventoryResult.data || [];
-  const outboundRecords = outboundResult.data || [];
-  const transferRecords = transferResult.data || [];
-  const warehouseTransfers = warehouseTransfersResult.data || [];
-  const items = rawItems.map((item: { id: string; name: string; sku: string; category: string; unit: string; currentStock: { toNumber?: () => number } | number; minStock: { toNumber?: () => number } | number; maxStock: { toNumber?: () => number } | number; reorderPoint: { toNumber?: () => number } | number; unitCost: { toNumber?: () => number } | number; branchId: string; branch: { name: string } }) => {
+  const rawItems = (inventoryResult.data || []) as RawInventoryItem[];
+  const outboundRecords = (outboundResult.data || []) as OutboundRecord[];
+  const transferRecords = (transferResult.data || []) as TransferRecord[];
+  const warehouseTransfers = (warehouseTransfersResult.data || []) as WarehouseTransfer[];
+  const items = rawItems.map((item) => {
     const currentStock = typeof item.currentStock === 'object' && item.currentStock.toNumber ? item.currentStock.toNumber() : Number(item.currentStock);
     const minStock = typeof item.minStock === 'object' && item.minStock.toNumber ? item.minStock.toNumber() : Number(item.minStock);
     const maxStock = typeof item.maxStock === 'object' && item.maxStock.toNumber ? item.maxStock.toNumber() : Number(item.maxStock);

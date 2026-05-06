@@ -79,7 +79,11 @@ export async function POST(request: NextRequest) {
       if (totalPaid >= Number(order.total)) {
         await db.order.update({
           where: { id: orderId },
-          data: { paymentStatus: "PAID", paymentMethod: provider || "api" },
+          data: {
+            paymentStatus: "PAID",
+            paymentMethod: provider || "api",
+            orderReceivedTime: new Date(),
+          },
         });
       }
     }

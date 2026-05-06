@@ -495,6 +495,7 @@ export function canAccessRoute(
     "/dashboard/orders": ["orders:view"],
     "/dashboard/warehouse": ["warehouse:view"],
     "/dashboard/customers": ["customers:view"],
+    "/dashboard/suppliers": ["warehouse:view"],
     "/dashboard/delivery": ["delivery:view"],
     "/dashboard/subscriptions": ["subscriptions:view"],
     "/pos": ["pos:access"],

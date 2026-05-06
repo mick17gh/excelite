@@ -17,10 +17,14 @@ interface Customer {
   email: string | null;
   address: string | null;
   city: string | null;
+  location?: string | null;
+  customerVibe?: string | null;
+  specialNotes?: string | null;
   latitude: number | null;
   longitude: number | null;
   isActive: boolean;
   orderCount: number;
+  lifetimeValue?: number;
   createdAt: string;
 }
 
@@ -55,11 +59,11 @@ export function CustomerDetailModal({ customer, open, onOpenChange }: CustomerDe
                 <span>{customer.email}</span>
               </div>
             )}
-            {(customer.address || customer.city) && (
+            {(customer.address || customer.location || customer.city) && (
               <div className="flex items-center gap-3 text-sm">
                 <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span>
-                  {[customer.address, customer.city].filter(Boolean).join(", ")}
+                  {[customer.address, customer.location || customer.city].filter(Boolean).join(", ")}
                 </span>
               </div>
             )}
@@ -71,6 +75,19 @@ export function CustomerDetailModal({ customer, open, onOpenChange }: CustomerDe
             <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
             <span><strong>{customer.orderCount}</strong> orders placed</span>
           </div>
+          <div className="text-sm">
+            Lifetime Value: <strong>{(customer.lifetimeValue || 0).toLocaleString(undefined, { style: "currency", currency: "GHS" })}</strong>
+          </div>
+          {customer.customerVibe && (
+            <div className="text-sm">
+              Vibe: <Badge variant="outline">{customer.customerVibe.replace("_", " ")}</Badge>
+            </div>
+          )}
+          {customer.specialNotes && (
+            <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              {customer.specialNotes}
+            </div>
+          )}
 
           <div className="text-xs text-muted-foreground">
             Customer since {new Date(customer.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}

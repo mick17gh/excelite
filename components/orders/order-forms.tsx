@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
@@ -43,9 +42,7 @@ import {
   ChevronsUpDown,
   Check,
   UserPlus,
-  ChefHat,
 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/actions/orders";
 import { createCustomer } from "@/lib/actions/customers";
@@ -113,6 +110,7 @@ export function CreateOrderDialog({
   const [discountStr, setDiscountStr] = useState("");
   const [deliveryFeeStr, setDeliveryFeeStr] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryNeighborhood, setDeliveryNeighborhood] = useState("");
   const [deliveryPhone, setDeliveryPhone] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const { formatCurrency } = useCurrency();
@@ -244,8 +242,8 @@ export function CreateOrderDialog({
     try {
       const result = await createOrder({
         branchId,
-        source: source as any,
-        type: type as any,
+        source: source as "CALL_CENTER" | "ONLINE" | "WHATSAPP" | "WALK_IN" | "POS",
+        type: type as "DINE_IN" | "TAKEOUT" | "DELIVERY",
         customerId:
           customerId && customerId !== "walk-in" ? customerId : undefined,
         items: cart.map((c) => ({
@@ -258,6 +256,7 @@ export function CreateOrderDialog({
         discount,
         deliveryFee: isDelivery ? deliveryFee : 0,
         deliveryAddress: isDelivery ? deliveryAddress : undefined,
+        deliveryNeighborhood: isDelivery ? deliveryNeighborhood : undefined,
         deliveryPhone: isDelivery ? deliveryPhone : undefined,
         deliveryNotes: isDelivery ? deliveryNotes : undefined,
       });
@@ -292,6 +291,7 @@ export function CreateOrderDialog({
     setDiscountStr("");
     setDeliveryFeeStr("");
     setDeliveryAddress("");
+    setDeliveryNeighborhood("");
     setDeliveryPhone("");
     setDeliveryNotes("");
     setShowNewCustomer(false);
@@ -602,6 +602,14 @@ export function CreateOrderDialog({
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
                     placeholder="Address"
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs">Neighborhood</Label>
+                  <Input
+                    value={deliveryNeighborhood}
+                    onChange={(e) => setDeliveryNeighborhood(e.target.value)}
+                    placeholder="Neighborhood"
                   />
                 </div>
                 <div className="grid gap-1">

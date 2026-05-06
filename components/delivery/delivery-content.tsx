@@ -57,13 +57,20 @@ interface DeliveryRequest {
   externalId: string | null;
   pickupAddress: string | null;
   deliveryAddress: string | null;
+  neighborhood?: string | null;
   deliveryPhone: string | null;
   status: string;
   driverName: string | null;
   driverPhone: string | null;
   estimatedTime: number | null;
   actualPickupTime: string | null;
+  dispatchTime?: string | null;
   actualDeliveryTime: string | null;
+  orderReceivedTime?: string | null;
+  preparationTimeMins?: number | null;
+  averageOrderToCustomerTimeMins?: number | null;
+  deliveryIssues?: string[];
+  comments?: string | null;
   fee: number;
   notes: string | null;
   createdAt: string;
@@ -74,6 +81,7 @@ interface DeliveryStats {
   active: number;
   deliveredToday: number;
   avgEstimatedTime: number;
+  averageOrderToCustomerTimeMins?: number;
 }
 
 interface DeliveryContentProps {
@@ -189,7 +197,7 @@ export function DeliveryContent({ deliveries, stats }: DeliveryContentProps) {
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-medium text-muted-foreground truncate">Avg. Est. Time</p>
-                <p className="text-base font-bold mt-0.5">{stats.avgEstimatedTime} min</p>
+                <p className="text-base font-bold mt-0.5">{stats.averageOrderToCustomerTimeMins || stats.avgEstimatedTime} min</p>
               </div>
               <div className="rounded-lg p-1.5 shrink-0 bg-purple-100 dark:bg-purple-900/30">
                 <MapPin className="h-4 w-4 text-purple-600" />
@@ -231,6 +239,7 @@ export function DeliveryContent({ deliveries, stats }: DeliveryContentProps) {
                 <TableHead>Customer</TableHead>
                 <TableHead>Branch</TableHead>
                 <TableHead>Delivery Address</TableHead>
+                <TableHead>Timing</TableHead>
                 <TableHead>Driver</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Fee</TableHead>
@@ -241,7 +250,7 @@ export function DeliveryContent({ deliveries, stats }: DeliveryContentProps) {
             <TableBody>
               {filteredDeliveries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No deliveries found</TableCell>
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No deliveries found</TableCell>
                 </TableRow>
               ) : (
                 filteredDeliveries.map((d) => {
@@ -258,6 +267,10 @@ export function DeliveryContent({ deliveries, stats }: DeliveryContentProps) {
                       </TableCell>
                       <TableCell className="text-sm">{d.branchName}</TableCell>
                       <TableCell className="text-sm max-w-[180px] truncate">{d.deliveryAddress}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <div>Prep: {d.preparationTimeMins ?? "—"} min</div>
+                        <div>Order to Customer: {d.averageOrderToCustomerTimeMins ?? "—"} min</div>
+                      </TableCell>
                       <TableCell>
                         {d.driverName ? (
                           <div>

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { updateDeliveryStatus } from "@/lib/actions/delivery";
@@ -32,6 +33,7 @@ export function AssignDriverDialog({ delivery, open, onOpenChange }: AssignDrive
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
   const [estimatedTime, setEstimatedTime] = useState(30);
+  const [comments, setComments] = useState("");
 
   const handleSubmit = async () => {
     if (!driverName.trim() || !driverPhone.trim()) {
@@ -47,6 +49,7 @@ export function AssignDriverDialog({ delivery, open, onOpenChange }: AssignDrive
         driverName: driverName.trim(),
         driverPhone: driverPhone.trim(),
         estimatedTime,
+        comments: comments.trim() || undefined,
       });
 
       if (result.error) {
@@ -84,6 +87,10 @@ export function AssignDriverDialog({ delivery, open, onOpenChange }: AssignDrive
           <div className="grid gap-2">
             <Label>Estimated Time (minutes)</Label>
             <Input type="number" value={estimatedTime} onChange={(e) => setEstimatedTime(Number(e.target.value))} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Comments</Label>
+            <Textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={3} placeholder="Driver or delivery notes" />
           </div>
         </div>
 

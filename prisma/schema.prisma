@@ -208,6 +208,56 @@ enum DeliveryStatus {
   FAILED
 }
 
+enum CustomerVibe {
+  VIP
+  SPECIAL
+  FLAGGED
+  LARGE_ORDER
+  FOB
+}
+
+enum SupplierLeadTime {
+  SAME_DAY
+  NEXT_DAY
+  THREE_TO_SEVEN_DAYS
+  THIRTY_DAYS
+}
+
+enum SupplierConsistency {
+  HIGHLY_RELIABLE
+  HIT_OR_MISS
+  BACKUP_ONLY
+}
+
+enum SupplierCoreCategory {
+  PERISHABLES
+  DRY_GOODS
+  BEVERAGES
+  PACKAGING
+  CLEANING_SUPPLIES
+}
+
+enum SupplierPaymentMethod {
+  MOMO_PREFERRED
+  BANK_TRANSFER
+  CASH_ONLY
+}
+
+enum SupplierQualityRating {
+  GRADE_A
+  STANDARD
+  BARGAIN_GRADE
+}
+
+enum DeliveryIssue {
+  SPILLAGE
+  MECHANICAL
+  DROP_OFF_ADDRESS
+  EXCESSIVE_DELAY
+  INACCURATE_ORDER
+  PROFESSIONALISM
+}
+
 enum NotificationType {
   ORDER_PLACED
   ORDER_CONFIRMED
@@ -571,6 +621,14 @@ model Supplier {
   email       String?
   phone       String?
   address     String?
+  leadTime    SupplierLeadTime?
+  consistency SupplierConsistency?
+  coreCategory SupplierCoreCategory?
+  specialization String?
+  paymentMethod SupplierPaymentMethod?
+  qualityRating SupplierQualityRating?
+  specialNotes String?
+  tags        String[]        @default([])
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1330,6 +1388,9 @@ model Customer {
   email     String?
   address   String?
   city      String?
+  location  String?
+  customerVibe CustomerVibe?
+  specialNotes String?
   latitude  Decimal? @db.Decimal(10, 8)
   longitude Decimal? @db.Decimal(11, 8)
   isActive  Boolean  @default(true)
@@ -1369,11 +1430,13 @@ model Order {
   notes           String?
   deliveryAddress String?
   deliveryCity    String?
+  deliveryNeighborhood String?
   deliveryLat     Decimal?      @db.Decimal(10, 8)
   deliveryLng     Decimal?      @db.Decimal(11, 8)
   deliveryPhone   String?
   deliveryNotes   String?
   openedAt        DateTime      @default(now())
+  orderReceivedTime DateTime?
   closedAt        DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1431,6 +1494,7 @@ model DeliveryRequest {
   pickupLat          Decimal?       @db.Decimal(10, 8)
   pickupLng          Decimal?       @db.Decimal(11, 8)
   deliveryAddress    String?
+  neighborhood       String?
   deliveryLat        Decimal?       @db.Decimal(10, 8)
   deliveryLng        Decimal?       @db.Decimal(11, 8)
   deliveryPhone      String?
@@ -1439,8 +1503,11 @@ model DeliveryRequest {
   driverName         String?
   driverPhone        String?
   estimatedTime      Int?
+  dispatchTime       DateTime?
   actualPickupTime   DateTime?
   actualDeliveryTime DateTime?
+  deliveryIssues     DeliveryIssue[] @default([])
+  comments           String?
   fee                Decimal        @db.Decimal(10, 2)
   notes              String?
   createdAt          DateTime       @default(now())

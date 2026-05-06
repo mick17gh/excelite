@@ -64,8 +64,10 @@ interface Order {
   notes: string | null;
   deliveryAddress: string | null;
   deliveryCity: string | null;
+  deliveryNeighborhood?: string | null;
   deliveryPhone: string | null;
   deliveryNotes: string | null;
+  orderReceivedTime?: string | null;
   deliveryStatus: string | null;
   items: OrderItem[];
   payments: PaymentItem[];
@@ -162,7 +164,7 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
           onRefresh();
         }
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to send order to kitchen");
     } finally {
       setIsSendingToKitchen(false);
@@ -220,6 +222,7 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
                 <p className="text-muted-foreground mb-1">Delivery</p>
                 <p className="font-medium">{order.deliveryAddress}</p>
                 {order.deliveryCity && <p className="text-muted-foreground">{order.deliveryCity}</p>}
+                {order.deliveryNeighborhood && <p className="text-muted-foreground">{order.deliveryNeighborhood}</p>}
                 {order.deliveryPhone && <p className="text-muted-foreground">{order.deliveryPhone}</p>}
                 {order.deliveryNotes && <p className="text-muted-foreground italic">{order.deliveryNotes}</p>}
                 {order.deliveryStatus && (
@@ -227,6 +230,13 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
                 )}
               </div>
             </>
+          )}
+
+          {order.orderReceivedTime && (
+            <div className="text-sm">
+              <p className="text-muted-foreground">Order Received Time</p>
+              <p className="font-medium">{new Date(order.orderReceivedTime).toLocaleString()}</p>
+            </div>
           )}
 
           <Separator />

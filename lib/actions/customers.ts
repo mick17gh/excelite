@@ -9,6 +9,9 @@ export interface CreateCustomerInput {
   email?: string;
   address?: string;
   city?: string;
+  location?: string;
+  customerVibe?: "VIP" | "SPECIAL" | "FLAGGED" | "LARGE_ORDER" | "FOB";
+  specialNotes?: string;
   latitude?: number;
   longitude?: number;
 }
@@ -20,6 +23,9 @@ export interface UpdateCustomerInput {
   email?: string;
   address?: string;
   city?: string;
+  location?: string;
+  customerVibe?: "VIP" | "SPECIAL" | "FLAGGED" | "LARGE_ORDER" | "FOB" | null;
+  specialNotes?: string;
   latitude?: number;
   longitude?: number;
   isActive?: boolean;
@@ -41,6 +47,8 @@ export async function getCustomers(filters?: {
         { name: { contains: filters.search, mode: "insensitive" } },
         { phone: { contains: filters.search } },
         { email: { contains: filters.search, mode: "insensitive" } },
+        { location: { contains: filters.search, mode: "insensitive" } },
+        { city: { contains: filters.search, mode: "insensitive" } },
       ];
     }
 
@@ -57,6 +65,18 @@ export async function getCustomers(filters?: {
       db.customer.count({ where }),
     ]);
 
+    const lifetimeValueRows = await db.order.groupBy({
+      by: ["customerId"],
+      where: {
+        customerId: { in: customers.map((c) => c.id) },
+        paymentStatus: "PAID",
+      },
+      _sum: { total: true },
+    });
+    const lifetimeValueMap = new Map(
+      lifetimeValueRows.map((row) => [row.customerId, Number(row._sum.total || 0)]),
+    );
+
     return {
       data: customers.map((c) => ({
         id: c.id,
@@ -65,10 +85,14 @@ export async function getCustomers(filters?: {
         email: c.email,
         address: c.address,
         city: c.city,
+        location: c.location || c.city,
+        customerVibe: c.customerVibe,
+        specialNotes: c.specialNotes,
         latitude: c.latitude ? Number(c.latitude) : null,
         longitude: c.longitude ? Number(c.longitude) : null,
         isActive: c.isActive,
         orderCount: c._count.orders,
+        lifetimeValue: lifetimeValueMap.get(c.id) || 0,
         createdAt: c.createdAt.toISOString(),
       })),
       total,
@@ -108,8 +132,14 @@ export async function getCustomerById(id: string) {
         email: customer.email,
         address: customer.address,
         city: customer.city,
+        location: customer.location || customer.city,
+        customerVibe: customer.customerVibe,
+        specialNotes: customer.specialNotes,
         isActive: customer.isActive,
         orderCount: customer._count.orders,
+        lifetimeValue: customer.orders
+          .filter((o) => o.paymentStatus === "PAID")
+          .reduce((sum, o) => sum + Number(o.total), 0),
         orders: customer.orders.map((o) => ({
           id: o.id,
           orderNumber: o.orderNumber,
@@ -142,7 +172,10 @@ export async function createCustomer(input: CreateCustomerInput) {
         phone: input.phone,
         email: input.email || null,
         address: input.address || null,
-        city: input.city || null,
+        city: input.city || input.location || null,
+        location: input.location || input.city || null,
+        customerVibe: input.customerVibe || null,
+        specialNotes: input.specialNotes || null,
         latitude: input.latitude || null,
         longitude: input.longitude || null,
       },
@@ -165,6 +198,9 @@ export async function updateCustomer(input: UpdateCustomerInput) {
     if (input.email !== undefined) data.email = input.email || null;
     if (input.address !== undefined) data.address = input.address || null;
     if (input.city !== undefined) data.city = input.city || null;
+    if (input.location !== undefined) data.location = input.location || null;
+    if (input.customerVibe !== undefined) data.customerVibe = input.customerVibe;
+    if (input.specialNotes !== undefined) data.specialNotes = input.specialNotes || null;
     if (input.latitude !== undefined) data.latitude = input.latitude || null;
     if (input.longitude !== undefined) data.longitude = input.longitude || null;
     if (input.isActive !== undefined) data.isActive = input.isActive;

@@ -66,7 +66,11 @@ export async function POST(req: NextRequest) {
 
   await db.order.update({
     where: { id: order.id },
-    data: { paymentStatus: "PAID", paymentMethod: "PAYSTACK" },
+    data: {
+      paymentStatus: "PAID",
+      paymentMethod: "PAYSTACK",
+      orderReceivedTime: order.orderReceivedTime || new Date(),
+    },
   });
 
   await db.payment.updateMany({

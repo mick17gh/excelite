@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { InventoryCategory, UnitType, StockMovementType, TransferStatus } from "@/lib/generated/prisma/client";
-import { logCreate, logTransfer } from "@/lib/services/audit";
+import { logTransfer } from "@/lib/services/audit";
 
 export interface CreateInventoryItemInput {
   name: string;
@@ -127,7 +127,7 @@ export interface PaginatedResult<T> {
 export async function getInventoryItems(
   branchId?: string,
   pagination?: PaginationParams
-): Promise<PaginatedResult<any>> {
+): Promise<PaginatedResult<Record<string, unknown>>> {
   try {
     const page = pagination?.page || 1;
     const pageSize = pagination?.pageSize || 10;
@@ -464,8 +464,22 @@ export async function getSuppliers() {
     const suppliers = await db.supplier.findMany({
       where: { deletedAt: null, isActive: true },
       orderBy: { name: "asc" },
+      include: {
+        warehouseInbound: {
+          select: { totalCost: true },
+        },
+      },
     });
-    return { success: true, data: suppliers };
+    return {
+      success: true,
+      data: suppliers.map((supplier) => ({
+        ...supplier,
+        lifetimePayments: supplier.warehouseInbound.reduce(
+          (sum, row) => sum + Number(row.totalCost),
+          0,
+        ),
+      })),
+    };
   } catch (error) {
     console.error("[getSuppliers] Error:", error);
     return { success: false, error: "Failed to fetch suppliers", data: [] };
@@ -479,6 +493,14 @@ export interface CreateSupplierInput {
   email?: string;
   phone?: string;
   address?: string;
+  leadTime?: "SAME_DAY" | "NEXT_DAY" | "THREE_TO_SEVEN_DAYS" | "THIRTY_DAYS";
+  consistency?: "HIGHLY_RELIABLE" | "HIT_OR_MISS" | "BACKUP_ONLY";
+  coreCategory?: "PERISHABLES" | "DRY_GOODS" | "BEVERAGES" | "PACKAGING" | "CLEANING_SUPPLIES";
+  specialization?: string;
+  paymentMethod?: "MOMO_PREFERRED" | "BANK_TRANSFER" | "CASH_ONLY";
+  qualityRating?: "GRADE_A" | "STANDARD" | "BARGAIN_GRADE";
+  specialNotes?: string;
+  tags?: string[];
 }
 
 export async function createSupplier(input: CreateSupplierInput) {
@@ -491,6 +513,14 @@ export async function createSupplier(input: CreateSupplierInput) {
         email: input.email,
         phone: input.phone,
         address: input.address,
+        leadTime: input.leadTime,
+        consistency: input.consistency,
+        coreCategory: input.coreCategory,
+        specialization: input.specialization,
+        paymentMethod: input.paymentMethod,
+        qualityRating: input.qualityRating,
+        specialNotes: input.specialNotes,
+        tags: input.tags || [],
         isActive: true,
       },
     });
@@ -503,12 +533,141 @@ export async function createSupplier(input: CreateSupplierInput) {
   }
 }
 
+export interface UpdateSupplierInput {
+  id: string;
+  name?: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  leadTime?: "SAME_DAY" | "NEXT_DAY" | "THREE_TO_SEVEN_DAYS" | "THIRTY_DAYS" | null;
+  consistency?: "HIGHLY_RELIABLE" | "HIT_OR_MISS" | "BACKUP_ONLY" | null;
+  coreCategory?: "PERISHABLES" | "DRY_GOODS" | "BEVERAGES" | "PACKAGING" | "CLEANING_SUPPLIES" | null;
+  specialization?: string;
+  paymentMethod?: "MOMO_PREFERRED" | "BANK_TRANSFER" | "CASH_ONLY" | null;
+  qualityRating?: "GRADE_A" | "STANDARD" | "BARGAIN_GRADE" | null;
+  specialNotes?: string;
+  tags?: string[];
+  isActive?: boolean;
+}
+
+export async function getSuppliersForManagement(search?: string) {
+  try {
+    const suppliers = await db.supplier.findMany({
+      where: {
+        deletedAt: null,
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { code: { contains: search, mode: "insensitive" } },
+                { contactName: { contains: search, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        warehouseInbound: {
+          select: { totalCost: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return {
+      success: true,
+      data: suppliers.map((supplier) => ({
+        id: supplier.id,
+        name: supplier.name,
+        code: supplier.code,
+        contactName: supplier.contactName,
+        phone: supplier.phone,
+        email: supplier.email,
+        address: supplier.address,
+        leadTime: supplier.leadTime,
+        consistency: supplier.consistency,
+        coreCategory: supplier.coreCategory,
+        specialization: supplier.specialization,
+        paymentMethod: supplier.paymentMethod,
+        qualityRating: supplier.qualityRating,
+        specialNotes: supplier.specialNotes,
+        tags: supplier.tags,
+        isActive: supplier.isActive,
+        lifetimePayments: supplier.warehouseInbound.reduce(
+          (sum, row) => sum + Number(row.totalCost),
+          0,
+        ),
+      })),
+    };
+  } catch (error) {
+    console.error("[getSuppliersForManagement] Error:", error);
+    return { success: false, error: "Failed to fetch suppliers", data: [] };
+  }
+}
+
+export async function getSupplierById(id: string) {
+  try {
+    const supplier = await db.supplier.findUnique({
+      where: { id },
+      include: { warehouseInbound: true },
+    });
+    if (!supplier) return { success: false, error: "Supplier not found" };
+    return {
+      success: true,
+      data: {
+        ...supplier,
+        lifetimePayments: supplier.warehouseInbound.reduce(
+          (sum, row) => sum + Number(row.totalCost),
+          0,
+        ),
+      },
+    };
+  } catch (error) {
+    console.error("[getSupplierById] Error:", error);
+    return { success: false, error: "Failed to fetch supplier" };
+  }
+}
+
+export async function updateSupplier(input: UpdateSupplierInput) {
+  try {
+    const { id, ...fields } = input;
+    const supplier = await db.supplier.update({
+      where: { id },
+      data: {
+        ...fields,
+        specialization: fields.specialization || null,
+        specialNotes: fields.specialNotes || null,
+      },
+    });
+    revalidatePath("/dashboard/suppliers");
+    revalidatePath("/dashboard/warehouse");
+    return { success: true, data: supplier };
+  } catch (error) {
+    console.error("[updateSupplier] Error:", error);
+    return { success: false, error: "Failed to update supplier" };
+  }
+}
+
+export async function deleteSupplier(id: string) {
+  try {
+    await db.supplier.update({
+      where: { id },
+      data: { isActive: false, deletedAt: new Date() },
+    });
+    revalidatePath("/dashboard/suppliers");
+    return { success: true };
+  } catch (error) {
+    console.error("[deleteSupplier] Error:", error);
+    return { success: false, error: "Failed to delete supplier" };
+  }
+}
+
 // getInboundRecords removed - branches track warehouse transfers instead
 
 export async function getOutboundRecords(
   branchId?: string,
   pagination?: PaginationParams
-): Promise<PaginatedResult<any>> {
+): Promise<PaginatedResult<Record<string, unknown>>> {
   try {
     const page = pagination?.page || 1;
     const pageSize = pagination?.pageSize || 20;
@@ -546,7 +705,7 @@ export async function getOutboundRecords(
 export async function getTransferRecords(
   branchId?: string,
   pagination?: PaginationParams
-): Promise<PaginatedResult<any>> {
+): Promise<PaginatedResult<Record<string, unknown>>> {
   try {
     const page = pagination?.page || 1;
     const pageSize = pagination?.pageSize || 100;

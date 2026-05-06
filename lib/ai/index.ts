@@ -482,10 +482,15 @@ Average Price: GHS ${avgPrice.toFixed(2)}`);
       // Get inventory summary
       const inventoryResult = await getInventoryItems();
       if (inventoryResult.success && inventoryResult.data) {
-        const totalItems = inventoryResult.data.length;
-        const lowStock = inventoryResult.data.filter((i: { currentStock: number; reorderPoint: number }) => 
+        const inventoryItems = inventoryResult.data as Array<{
+          currentStock: number;
+          reorderPoint: number;
+          unitCost: number;
+        }>;
+        const totalItems = inventoryItems.length;
+        const lowStock = inventoryItems.filter((i) =>
           Number(i.currentStock) <= Number(i.reorderPoint)).length;
-        const totalValue = inventoryResult.data.reduce((sum: number, i: { currentStock: number; unitCost: number }) => 
+        const totalValue = inventoryItems.reduce((sum: number, i) =>
           sum + (Number(i.currentStock) * Number(i.unitCost)), 0);
         results.push(`[Inventory Overview]
 Total Items: ${totalItems}

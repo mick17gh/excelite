@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
       branchName: d.order?.branch?.name,
       customerName: d.customerName,
       deliveryAddress: d.deliveryAddress,
+      neighborhood: d.neighborhood,
       deliveryPhone: d.deliveryPhone,
       status: d.status,
       driverName: d.driverName,
@@ -68,7 +69,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, status, driverName, driverPhone } = body;
+    const { id, status, driverName, driverPhone, comments, deliveryIssues } = body;
 
     if (!id || !status) {
       return NextResponse.json({ error: "id and status are required" }, { status: 400 });
@@ -77,7 +78,10 @@ export async function PATCH(request: NextRequest) {
     const data: Record<string, unknown> = { status };
     if (driverName) data.driverName = driverName;
     if (driverPhone) data.driverPhone = driverPhone;
+    if (comments !== undefined) data.comments = comments || null;
+    if (deliveryIssues) data.deliveryIssues = deliveryIssues;
     if (status === "PICKED_UP") data.actualPickupTime = new Date();
+    if (status === "PICKED_UP") data.dispatchTime = new Date();
     if (status === "DELIVERED") data.actualDeliveryTime = new Date();
 
     const delivery = await db.deliveryRequest.update({ where: { id }, data });

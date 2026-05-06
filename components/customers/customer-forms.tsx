@@ -12,6 +12,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { createCustomer, updateCustomer } from "@/lib/actions/customers";
@@ -28,6 +36,8 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
+  const [customerVibe, setCustomerVibe] = useState("");
+  const [specialNotes, setSpecialNotes] = useState("");
 
   const handleSubmit = async () => {
     if (!name.trim() || !phone.trim()) {
@@ -42,7 +52,15 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
         phone: phone.trim(),
         email: email.trim() || undefined,
         address: address.trim() || undefined,
-        city: city.trim() || undefined,
+        location: city.trim() || undefined,
+        customerVibe: (customerVibe || undefined) as
+          | "VIP"
+          | "SPECIAL"
+          | "FLAGGED"
+          | "LARGE_ORDER"
+          | "FOB"
+          | undefined,
+        specialNotes: specialNotes.trim() || undefined,
       });
 
       if (result.error) {
@@ -65,6 +83,8 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
     setEmail("");
     setAddress("");
     setCity("");
+    setCustomerVibe("");
+    setSpecialNotes("");
   };
 
   return (
@@ -93,8 +113,25 @@ export function CreateCustomerDialog({ open, onOpenChange }: CreateCustomerDialo
             <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" />
           </div>
           <div className="grid gap-2">
-            <Label>City</Label>
-            <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+            <Label>Location</Label>
+            <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Location" />
+          </div>
+          <div className="grid gap-2">
+            <Label>Customer Vibe</Label>
+            <Select value={customerVibe} onValueChange={setCustomerVibe}>
+              <SelectTrigger><SelectValue placeholder="Select vibe" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="VIP">VIP</SelectItem>
+                <SelectItem value="SPECIAL">Special</SelectItem>
+                <SelectItem value="FLAGGED">Flagged</SelectItem>
+                <SelectItem value="LARGE_ORDER">Large Order</SelectItem>
+                <SelectItem value="FOB">FOB</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Special Notes</Label>
+            <Textarea value={specialNotes} onChange={(e) => setSpecialNotes(e.target.value)} placeholder="Internal notes" rows={3} />
           </div>
         </div>
 
@@ -118,6 +155,9 @@ interface EditCustomerDialogProps {
     email: string | null;
     address: string | null;
     city: string | null;
+    location?: string | null;
+    customerVibe?: string | null;
+    specialNotes?: string | null;
     isActive: boolean;
   };
   open: boolean;
@@ -130,7 +170,9 @@ export function EditCustomerDialog({ customer, open, onOpenChange }: EditCustome
   const [phone, setPhone] = useState(customer.phone);
   const [email, setEmail] = useState(customer.email || "");
   const [address, setAddress] = useState(customer.address || "");
-  const [city, setCity] = useState(customer.city || "");
+  const [city, setCity] = useState(customer.location || customer.city || "");
+  const [customerVibe, setCustomerVibe] = useState(customer.customerVibe || "");
+  const [specialNotes, setSpecialNotes] = useState(customer.specialNotes || "");
 
   const handleSubmit = async () => {
     if (!name.trim() || !phone.trim()) {
@@ -146,7 +188,15 @@ export function EditCustomerDialog({ customer, open, onOpenChange }: EditCustome
         phone: phone.trim(),
         email: email.trim() || undefined,
         address: address.trim() || undefined,
-        city: city.trim() || undefined,
+        location: city.trim() || undefined,
+        customerVibe: (customerVibe || null) as
+          | "VIP"
+          | "SPECIAL"
+          | "FLAGGED"
+          | "LARGE_ORDER"
+          | "FOB"
+          | null,
+        specialNotes: specialNotes.trim() || undefined,
       });
 
       if (result.error) {
@@ -188,8 +238,25 @@ export function EditCustomerDialog({ customer, open, onOpenChange }: EditCustome
             <Input value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <div className="grid gap-2">
-            <Label>City</Label>
+            <Label>Location</Label>
             <Input value={city} onChange={(e) => setCity(e.target.value)} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Customer Vibe</Label>
+            <Select value={customerVibe} onValueChange={setCustomerVibe}>
+              <SelectTrigger><SelectValue placeholder="Select vibe" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="VIP">VIP</SelectItem>
+                <SelectItem value="SPECIAL">Special</SelectItem>
+                <SelectItem value="FLAGGED">Flagged</SelectItem>
+                <SelectItem value="LARGE_ORDER">Large Order</SelectItem>
+                <SelectItem value="FOB">FOB</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Special Notes</Label>
+            <Textarea value={specialNotes} onChange={(e) => setSpecialNotes(e.target.value)} rows={3} />
           </div>
         </div>
 

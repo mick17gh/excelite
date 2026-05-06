@@ -42,10 +42,14 @@ interface Customer {
   email: string | null;
   address: string | null;
   city: string | null;
+  location?: string | null;
+  customerVibe?: string | null;
+  specialNotes?: string | null;
   latitude: number | null;
   longitude: number | null;
   isActive: boolean;
   orderCount: number;
+  lifetimeValue?: number;
   createdAt: string;
 }
 
@@ -74,7 +78,7 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
         c.name.toLowerCase().includes(q) ||
         c.phone.includes(q) ||
         c.email?.toLowerCase().includes(q) ||
-        c.city?.toLowerCase().includes(q)
+        (c.location || c.city)?.toLowerCase().includes(q)
       );
     });
   }, [customers, searchQuery]);
@@ -161,7 +165,9 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>City</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Vibe</TableHead>
+                <TableHead className="text-right">Lifetime Value</TableHead>
                 <TableHead className="text-center">Orders</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
@@ -171,7 +177,7 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     No customers found
                   </TableCell>
                 </TableRow>
@@ -181,7 +187,15 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell className="font-mono text-sm">{customer.phone}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{customer.email || "—"}</TableCell>
-                    <TableCell className="text-sm">{customer.city || "—"}</TableCell>
+                    <TableCell className="text-sm">{customer.location || customer.city || "—"}</TableCell>
+                    <TableCell className="text-sm">
+                      {customer.customerVibe ? (
+                        <Badge variant="outline">{customer.customerVibe.replace("_", " ")}</Badge>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {(customer.lifetimeValue || 0).toLocaleString(undefined, { style: "currency", currency: "GHS" })}
+                    </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary">{customer.orderCount}</Badge>
                     </TableCell>

@@ -88,7 +88,11 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
   const alreadyPaid = order.paymentStatus === "PAID";
   await db.order.update({
     where: { id: orderId },
-    data: { paymentStatus: "PAID", paymentMethod },
+    data: {
+      paymentStatus: "PAID",
+      paymentMethod,
+      orderReceivedTime: order.orderReceivedTime || new Date(),
+    },
   });
 
   if (alreadyPaid) return;

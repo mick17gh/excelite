@@ -62,6 +62,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
     data: {
       paymentStatus: "PAID",
       paymentMethod: "PAYSTACK",
+      orderReceivedTime: order.orderReceivedTime || new Date(),
     },
   });
 

@@ -47,6 +47,7 @@ export interface CreateOrderInput {
   paymentMethod?: string;
   deliveryAddress?: string;
   deliveryCity?: string;
+  deliveryNeighborhood?: string;
   deliveryPhone?: string;
   deliveryNotes?: string;
   deliveryFee?: number;
@@ -161,8 +162,10 @@ export async function getOrders(filters?: {
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,
+        deliveryNeighborhood: order.deliveryNeighborhood,
         deliveryPhone: order.deliveryPhone,
         deliveryNotes: order.deliveryNotes,
+        orderReceivedTime: order.orderReceivedTime?.toISOString() || null,
         deliveryStatus: order.delivery?.status || null,
         items: order.items.map((item) => ({
           id: item.id,
@@ -281,10 +284,12 @@ export async function getOrderById(id: string) {
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,
+        deliveryNeighborhood: order.deliveryNeighborhood,
         deliveryLat: order.deliveryLat ? Number(order.deliveryLat) : null,
         deliveryLng: order.deliveryLng ? Number(order.deliveryLng) : null,
         deliveryPhone: order.deliveryPhone,
         deliveryNotes: order.deliveryNotes,
+        orderReceivedTime: order.orderReceivedTime?.toISOString() || null,
         createdAt: order.createdAt.toISOString(),
         updatedAt: order.updatedAt.toISOString(),
         branch: order.branch,
@@ -449,6 +454,7 @@ export async function createOrder(input: CreateOrderInput) {
         notes: input.notes || null,
         deliveryAddress: input.deliveryAddress || null,
         deliveryCity: input.deliveryCity || null,
+        deliveryNeighborhood: input.deliveryNeighborhood || null,
         deliveryPhone: input.deliveryPhone || null,
         deliveryNotes: input.deliveryNotes || null,
         items: { create: orderItems },
@@ -492,6 +498,7 @@ export async function createOrder(input: CreateOrderInput) {
         await createDeliveryRequest({
           orderId: order.id,
           deliveryAddress: input.deliveryAddress || undefined,
+          neighborhood: input.deliveryNeighborhood || undefined,
           deliveryPhone: input.deliveryPhone || undefined,
           fee: input.deliveryFee || 0,
           notes: input.deliveryNotes || undefined,

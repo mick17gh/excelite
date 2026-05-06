@@ -28,6 +28,7 @@ import {
   Truck,
   ChefHat,
   Monitor,
+  Handshake,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -134,6 +135,13 @@ const navigation: NavItem[] = [
     icon: Contact,
     permission: "customers:view",
     featureKey: "crm",
+  },
+  {
+    name: "Suppliers",
+    href: "/dashboard/suppliers",
+    icon: Handshake,
+    permission: "warehouse:view",
+    featureKey: "warehouse",
   },
   {
     name: "Delivery",
