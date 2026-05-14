@@ -10,7 +10,10 @@ import type {
   BulkCategoryInput,
   BulkSupplierInput,
   BulkStaffInput,
+  BulkMenuOptionRow,
 } from "@/lib/utils/bulk-import";
+import { updateMenuItem } from "@/lib/actions/menu";
+import type { MenuItemOptionGroupInput } from "@/lib/actions/menu";
 
 // =====================================
 // MENU BULK OPERATIONS
@@ -99,6 +102,93 @@ export async function bulkCreateMenuItems(items: BulkMenuItemInput[]) {
   } catch (error) {
     console.error("[bulkCreateMenuItems] Error:", error);
     return { success: false, error: "Failed to create menu items" };
+  }
+}
+
+function bulkMenuOptionRowsToGroupInputs(rows: BulkMenuOptionRow[]): MenuItemOptionGroupInput[] {
+  const sorted = [...rows].sort((a, b) => {
+    const ga = a.groupSortOrder ?? 0;
+    const gb = b.groupSortOrder ?? 0;
+    if (ga !== gb) return ga - gb;
+    const oa = a.optionSortOrder ?? 0;
+    const ob = b.optionSortOrder ?? 0;
+    if (oa !== ob) return oa - ob;
+    return a.optionName.localeCompare(b.optionName);
+  });
+  const groups: MenuItemOptionGroupInput[] = [];
+  const indexByName = new Map<string, number>();
+  for (const r of sorted) {
+    const gname = r.groupName.trim();
+    let idx = indexByName.get(gname);
+    if (idx === undefined) {
+      const isReq = r.isRequired ?? true;
+      const minS = isReq ? (r.minSelections ?? 1) : 0;
+      const maxS = Math.max(1, r.maxSelections ?? 1);
+      groups.push({
+        name: gname,
+        sortOrder: r.groupSortOrder ?? groups.length,
+        isRequired: isReq,
+        minSelections: minS,
+        maxSelections: maxS,
+        isActive: true,
+        options: [],
+      });
+      idx = groups.length - 1;
+      indexByName.set(gname, idx);
+    }
+    const g = groups[idx];
+    g.options.push({
+      name: r.optionName.trim(),
+      sortOrder: r.optionSortOrder ?? g.options.length,
+      priceDelta: r.priceDelta ?? 0,
+      costDelta: r.costDelta != null && Number.isFinite(r.costDelta) ? r.costDelta : null,
+      sku: r.optionSku?.trim() ? r.optionSku.trim().toUpperCase() : null,
+      isDefault: r.isDefault ?? false,
+      isActive: true,
+    });
+  }
+  return groups;
+}
+
+export async function bulkUpsertMenuItemOptionGroups(rows: BulkMenuOptionRow[]) {
+  try {
+    if (!rows?.length) {
+      return { success: false, error: "No rows provided" };
+    }
+    const bySku = new Map<string, BulkMenuOptionRow[]>();
+    for (const r of rows) {
+      const sku = r.menuItemSku.trim().toUpperCase();
+      const arr = bySku.get(sku) || [];
+      arr.push(r);
+      bySku.set(sku, arr);
+    }
+    let updated = 0;
+    for (const [sku, list] of bySku.entries()) {
+      const menuItem = await db.menuItem.findFirst({
+        where: { sku, deletedAt: null },
+      });
+      if (!menuItem) {
+        return { success: false, error: `Unknown product SKU: ${sku}` };
+      }
+      const optionGroups = bulkMenuOptionRowsToGroupInputs(list);
+      const res = await updateMenuItem({ id: menuItem.id, optionGroups });
+      if (!res.success) {
+        return { success: false, error: res.error || `Failed for SKU ${sku}` };
+      }
+      updated += 1;
+    }
+
+    await logUpdate("MenuItem", "BULK", {}, {
+      action: "BULK_UPSERT_OPTION_GROUPS",
+      products: updated,
+    });
+
+    revalidatePath("/dashboard/menu");
+    revalidatePath("/pos");
+    return { success: true, updated };
+  } catch (error) {
+    console.error("[bulkUpsertMenuItemOptionGroups] Error:", error);
+    return { success: false, error: "Failed to import menu option groups" };
   }
 }
 

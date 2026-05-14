@@ -16,6 +16,7 @@ const createOrderSchema = z.object({
       menuItemId: z.string().min(1),
       quantity: z.number().int().positive(),
       notes: z.string().max(300).optional(),
+      menuItemOptionIds: z.array(z.string()).optional(),
     })
   ).min(1),
   customerInfo: z.object({

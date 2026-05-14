@@ -185,7 +185,7 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
       return {
         model: 'saleItem',
         operation: 'groupBy',
-        by: ['menuItemId'],
+        by: ['menuItemId', 'configurationKey'],
         where: {
           sale: {
             saleDate: { gte: startDate, lte: endDate },

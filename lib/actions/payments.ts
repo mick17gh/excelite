@@ -75,7 +75,12 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
   const order = await db.order.findUnique({
     where: { id: orderId },
     include: {
-      items: { include: { menuItem: { select: { cost: true } } } },
+      items: {
+        include: {
+          menuItem: { select: { cost: true } },
+          selections: { select: { menuItemOptionId: true } },
+        },
+      },
       payments: { where: { status: "PAID" } },
     },
   });
@@ -124,6 +129,19 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
   };
   const channel = channelMap[order.type] || "DINE_IN";
 
+  const allOptionIds = order.items.flatMap((i) =>
+    i.selections?.map((s) => s.menuItemOptionId) || []
+  );
+  const optionRows = allOptionIds.length
+    ? await db.menuItemOption.findMany({
+        where: { id: { in: allOptionIds } },
+        select: { id: true, costDelta: true },
+      })
+    : [];
+  const optCostDelta = new Map(
+    optionRows.map((o) => [o.id, o.costDelta != null ? Number(o.costDelta) : 0])
+  );
+
   await db.sale.create({
     data: {
       saleNumber,
@@ -137,21 +155,37 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
       customerCount: 1,
       saleDate: new Date(),
       items: {
-        create: order.items.map((item) => ({
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          unitCost: item.menuItem?.cost || 0,
-          total: item.lineTotal,
-          discount: 0,
-        })),
+        create: order.items.map((item) => {
+          const oids = item.selections?.map((s) => s.menuItemOptionId) || [];
+          const optionCostSum = oids.reduce((s, id) => s + (optCostDelta.get(id) || 0), 0);
+          const unitCost =
+            Math.round(((item.menuItem?.cost ? Number(item.menuItem.cost) : 0) + optionCostSum) * 100) / 100;
+          return {
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unitCost,
+            total: item.lineTotal,
+            discount: 0,
+            configurationLabel: item.configurationLabel,
+            configurationKey: item.configurationKey,
+            selections:
+              oids.length > 0
+                ? { create: oids.map((menuItemOptionId) => ({ menuItemOptionId })) }
+                : undefined,
+          };
+        }),
       },
     },
   });
 
   try {
     await deductInventoryForSale(
-      order.items.map((item) => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+      order.items.map((item) => ({
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
+      })),
       order.branchId,
       order.id
     );

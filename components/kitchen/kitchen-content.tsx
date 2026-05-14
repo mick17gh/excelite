@@ -52,6 +52,7 @@ interface KitchenItem {
   createdAt: Date;
   orderItem: {
     quantity: number;
+    configurationLabel?: string | null;
     menuItem: { name: string };
   };
 }
@@ -440,6 +441,12 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold text-sm leading-tight">
                               {item.orderItem.quantity}× {item.orderItem.menuItem.name}
+                              {item.orderItem.configurationLabel ? (
+                                <span className="font-normal text-muted-foreground">
+                                  {" "}
+                                  ({item.orderItem.configurationLabel})
+                                </span>
+                              ) : null}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge

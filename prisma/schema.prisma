@@ -510,16 +510,73 @@ model MenuItem {
   deletedAt   DateTime?
 
   // Relations
-  category    Category?            @relation(fields: [categoryId], references: [id])
-  saleItems   SaleItem[]
-  posItems    PosOrderItem[]
-  ingredients MenuItemIngredient[]
-  manualLines ManualEntryLine[]
-  orderItems  OrderItem[]
+  category     Category?              @relation(fields: [categoryId], references: [id])
+  saleItems    SaleItem[]
+  posItems     PosOrderItem[]
+  ingredients  MenuItemIngredient[]
+  manualLines  ManualEntryLine[]
+  orderItems   OrderItem[]
+  optionGroups MenuItemOptionGroup[]
 
   @@index([categoryId])
   @@index([isActive])
   @@map("menu_item")
+}
+
+model MenuItemOptionGroup {
+  id             String   @id @default(cuid())
+  menuItemId     String
+  name           String
+  sortOrder      Int      @default(0)
+  isRequired     Boolean  @default(true)
+  minSelections  Int      @default(1)
+  maxSelections  Int      @default(1)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  menuItem MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  options  MenuItemOption[]
+
+  @@index([menuItemId])
+  @@map("menu_item_option_group")
+}
+
+model MenuItemOption {
+  id         String   @id @default(cuid())
+  groupId    String
+  name       String
+  sortOrder  Int      @default(0)
+  priceDelta Decimal  @default(0) @db.Decimal(10, 2)
+  costDelta  Decimal? @db.Decimal(10, 2)
+  sku        String?  @unique
+  isDefault  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  group             MenuItemOptionGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  ingredients       MenuItemOptionIngredient[]
+  orderSelections   OrderItemSelection[]
+  saleSelections    SaleItemSelection[]
+
+  @@index([groupId])
+  @@map("menu_item_option")
+}
+
+model MenuItemOptionIngredient {
+  id               String   @id @default(cuid())
+  menuItemOptionId String
+  inventoryItemId  String
+  quantity         Decimal  @db.Decimal(12, 3)
+  unit             UnitType
+
+  menuItemOption MenuItemOption @relation(fields: [menuItemOptionId], references: [id], onDelete: Cascade)
+  inventoryItem  InventoryItem  @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([menuItemOptionId])
+  @@index([inventoryItemId])
+  @@map("menu_item_option_ingredient")
 }
 
 model Sale {
@@ -553,22 +610,40 @@ model Sale {
 }
 
 model SaleItem {
-  id         String  @id @default(cuid())
-  saleId     String
-  menuItemId String
-  quantity   Int
-  unitPrice  Decimal @db.Decimal(10, 2)
-  unitCost   Decimal @db.Decimal(10, 2)
-  total      Decimal @db.Decimal(12, 2)
-  discount   Decimal @default(0) @db.Decimal(10, 2)
+  id                   String  @id @default(cuid())
+  saleId               String
+  menuItemId           String
+  quantity             Int
+  unitPrice            Decimal @db.Decimal(10, 2)
+  unitCost             Decimal @db.Decimal(10, 2)
+  total                Decimal @db.Decimal(12, 2)
+  discount             Decimal @default(0) @db.Decimal(10, 2)
+  configurationLabel   String?
+  configurationKey     String?
 
   // Relations
-  sale     Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+  sale        Sale                 @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  menuItem    MenuItem             @relation(fields: [menuItemId], references: [id])
+  selections  SaleItemSelection[]
 
   @@index([saleId])
   @@index([menuItemId])
+  @@index([configurationKey])
   @@map("sale_item")
+}
+
+model SaleItemSelection {
+  id               String @id @default(cuid())
+  saleItemId       String
+  menuItemOptionId String
+
+  saleItem       SaleItem       @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  menuItemOption MenuItemOption @relation(fields: [menuItemOptionId], references: [id])
+
+  @@unique([saleItemId, menuItemOptionId])
+  @@index([saleItemId])
+  @@index([menuItemOptionId])
+  @@map("sale_item_selection")
 }
 
 model Transaction {
@@ -673,7 +748,8 @@ model InventoryItem {
   outboundStock OutboundStock[]
   wasteLogs     WasteLog[]
   transferLogs  TransferLog[]
-  ingredients   MenuItemIngredient[]
+  ingredients              MenuItemIngredient[]
+  menuItemOptionIngredients MenuItemOptionIngredient[]
 
   @@unique([sku, branchId])
   @@index([branchId])
@@ -946,14 +1022,16 @@ model ManualEntryBatch {
 }
 
 model ManualEntryLine {
-  id               String       @id @default(cuid())
-  batchId          String
-  date             DateTime     @db.Date
-  channel          SalesChannel
-  totalRevenue     Decimal      @db.Decimal(12, 2)
-  transactionCount Int
-  menuItemId       String?
-  notes            String?
+  id                   String       @id @default(cuid())
+  batchId              String
+  date                 DateTime     @db.Date
+  channel              SalesChannel
+  totalRevenue         Decimal      @db.Decimal(12, 2)
+  transactionCount     Int
+  menuItemId           String?
+  notes                String?
+  configurationLabel   String?
+  configurationKey     String?
 
   // Relations
   batch    ManualEntryBatch @relation(fields: [batchId], references: [id])
@@ -1486,22 +1564,40 @@ model PosOfflineMutation {
 }
 
 model OrderItem {
-  id         String  @id @default(cuid())
-  orderId    String
-  menuItemId String
-  quantity   Int
-  unitPrice  Decimal @db.Decimal(10, 2)
-  lineTotal  Decimal @db.Decimal(12, 2)
-  notes      String?
+  id                   String  @id @default(cuid())
+  orderId              String
+  menuItemId           String
+  quantity             Int
+  unitPrice            Decimal @db.Decimal(10, 2)
+  lineTotal            Decimal @db.Decimal(12, 2)
+  notes                String?
+  configurationLabel   String?
+  configurationKey     String?
 
   // Relations
-  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem     MenuItem      @relation(fields: [menuItemId], references: [id])
+  order        Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem     MenuItem               @relation(fields: [menuItemId], references: [id])
   kitchenItems KitchenItem[]
+  selections   OrderItemSelection[]
 
   @@index([orderId])
   @@index([menuItemId])
+  @@index([configurationKey])
   @@map("order_item")
+}
+
+model OrderItemSelection {
+  id               String @id @default(cuid())
+  orderItemId      String
+  menuItemOptionId String
+
+  orderItem      OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  menuItemOption MenuItemOption @relation(fields: [menuItemOptionId], references: [id])
+
+  @@unique([orderItemId, menuItemOptionId])
+  @@index([orderItemId])
+  @@index([menuItemOptionId])
+  @@map("order_item_selection")
 }
 
 // ============================================

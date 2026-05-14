@@ -37,6 +37,91 @@ export function getMenuCSVTemplate(): string {
   return [headers.join(","), example.join(",")].join("\n");
 }
 
+/** One row = one option under a group for an existing menu item (matched by product SKU). */
+export interface BulkMenuOptionRow {
+  menuItemSku: string;
+  groupName: string;
+  optionName: string;
+  groupSortOrder?: number;
+  isRequired?: boolean;
+  minSelections?: number;
+  maxSelections?: number;
+  optionSortOrder?: number;
+  priceDelta?: number;
+  optionSku?: string;
+  costDelta?: number;
+  isDefault?: boolean;
+}
+
+export function parseMenuOptionsCSV(rows: ParsedCSVRow[]): BulkMenuOptionRow[] {
+  return rows
+    .map((row) => {
+      const menuItemSku = (
+        row.menuItemSku ||
+        row.menu_sku ||
+        row.productSku ||
+        row.product_sku ||
+        row.parentSku ||
+        row.ParentSku ||
+        ""
+      ).trim();
+      const groupName = (row.groupName || row.group || row.Group || "").trim();
+      const optionName = (row.optionName || row.option || row.Option || "").trim();
+      const parseNum = (v: string | undefined, fallback: number | undefined) => {
+        if (v === undefined || v === "") return fallback;
+        const n = parseFloat(String(v));
+        return Number.isFinite(n) ? n : fallback;
+      };
+      const parseIntRow = (v: string | undefined, fallback: number | undefined) => {
+        if (v === undefined || v === "") return fallback;
+        const n = parseInt(String(v), 10);
+        return Number.isFinite(n) ? n : fallback;
+      };
+      return {
+        menuItemSku,
+        groupName,
+        optionName,
+        groupSortOrder: parseIntRow(row.groupSortOrder ?? row.group_sort, undefined),
+        isRequired:
+          String(row.isRequired ?? row.required ?? "true").toLowerCase() === "false"
+            ? false
+            : true,
+        minSelections: parseIntRow(row.minSelections ?? row.min_sel, undefined),
+        maxSelections: parseIntRow(row.maxSelections ?? row.max_sel, undefined),
+        optionSortOrder: parseIntRow(row.optionSortOrder ?? row.option_sort, undefined),
+        priceDelta: parseNum(row.priceDelta ?? row.PriceDelta, 0),
+        optionSku: (row.optionSku || row.option_sku || row.OptionSku || "").trim() || undefined,
+        costDelta: (() => {
+          const raw = row.costDelta ?? row.CostDelta;
+          if (raw === undefined || raw === "") return undefined;
+          const n = parseFloat(String(raw));
+          return Number.isFinite(n) ? n : undefined;
+        })(),
+        isDefault: String(row.isDefault ?? "false").toLowerCase() === "true",
+      };
+    })
+    .filter((r) => r.menuItemSku && r.groupName && r.optionName);
+}
+
+export function getMenuOptionsCSVTemplate(): string {
+  const headers = [
+    "menuItemSku",
+    "groupName",
+    "optionName",
+    "priceDelta",
+    "optionSku",
+    "groupSortOrder",
+    "optionSortOrder",
+    "minSelections",
+    "maxSelections",
+    "isRequired",
+    "isDefault",
+    "costDelta",
+  ];
+  const example = ["GC-001", "Size", "Large", "2.50", "OPT-LG", "0", "0", "1", "1", "true", "false", ""];
+  return [headers.join(","), example.join(",")].join("\n");
+}
+
 // =====================================
 // INVENTORY UTILITIES
 // =====================================

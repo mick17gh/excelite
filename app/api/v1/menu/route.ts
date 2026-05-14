@@ -28,6 +28,24 @@ export async function GET(request: Request) {
         category: {
           select: { id: true, name: true },
         },
+        optionGroups: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+          include: {
+            options: {
+              where: { isActive: true },
+              orderBy: { sortOrder: "asc" },
+              select: {
+                id: true,
+                name: true,
+                sortOrder: true,
+                priceDelta: true,
+                sku: true,
+                isDefault: true,
+              },
+            },
+          },
+        },
       },
       orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
     });
@@ -47,6 +65,22 @@ export async function GET(request: Request) {
         dietaryInfo: null,
         updatedAt: i.updatedAt,
         createdAt: i.createdAt,
+        optionGroups: i.optionGroups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          sortOrder: g.sortOrder,
+          isRequired: g.isRequired,
+          minSelections: g.minSelections,
+          maxSelections: g.maxSelections,
+          options: g.options.map((o) => ({
+            id: o.id,
+            name: o.name,
+            sortOrder: o.sortOrder,
+            priceDelta: Number(o.priceDelta),
+            sku: o.sku,
+            isDefault: o.isDefault,
+          })),
+        })),
       })),
       error: null,
       pagination: {
@@ -81,28 +115,61 @@ export async function GET(request: Request) {
       deletedAt: null,
       isActive: true,
     },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      sku: true,
-      category: true,
-      price: true,
-      cost: true,
-      imageUrl: true,
-      isActive: true,
-      description: true,
-      updatedAt: true,
-      createdAt: true,
+    include: {
+      category: { select: { id: true, name: true } },
+      optionGroups: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+        include: {
+          options: {
+            where: { isActive: true },
+            orderBy: { sortOrder: "asc" },
+            select: {
+              id: true,
+              name: true,
+              sortOrder: true,
+              priceDelta: true,
+              sku: true,
+              isDefault: true,
+            },
+          },
+        },
+      },
     },
+    orderBy: { name: "asc" },
   });
 
   return NextResponse.json({
     success: true,
     data: items.map((i) => ({
-      ...i,
+      id: i.id,
+      name: i.name,
+      sku: i.sku,
+      categoryId: i.categoryId,
+      category: i.category?.name || null,
       price: Number(i.price),
       cost: i.cost ? Number(i.cost) : null,
+      imageUrl: i.imageUrl,
+      isActive: i.isActive,
+      description: i.description,
+      updatedAt: i.updatedAt,
+      createdAt: i.createdAt,
+      optionGroups: i.optionGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        sortOrder: g.sortOrder,
+        isRequired: g.isRequired,
+        minSelections: g.minSelections,
+        maxSelections: g.maxSelections,
+        options: g.options.map((o) => ({
+          id: o.id,
+          name: o.name,
+          sortOrder: o.sortOrder,
+          priceDelta: Number(o.priceDelta),
+          sku: o.sku,
+          isDefault: o.isDefault,
+        })),
+      })),
     })),
     error: null,
     pagination: {

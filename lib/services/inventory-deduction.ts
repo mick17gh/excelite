@@ -2,73 +2,97 @@
 
 import { db } from "@/lib/db";
 
+export type SaleDeductionLine = {
+  menuItemId: string;
+  quantity: number;
+  menuItemOptionIds?: string[];
+};
+
 /**
- * Deduct branch inventory based on MenuItemIngredient recipes when an order/sale is completed.
- * Non-blocking — logs errors but never fails the parent operation.
- *
- * @param items - Array of { menuItemId, quantity } sold
- * @param branchId - The branch where the sale occurred
- * @param reference - A reference string (orderId or transactionId) for audit
+ * Deduct branch inventory from base MenuItemIngredient recipes plus optional
+ * MenuItemOptionIngredient deltas for each selected option.
  */
 export async function deductInventoryForSale(
-  items: { menuItemId: string; quantity: number }[],
+  items: SaleDeductionLine[],
   branchId: string,
   reference: string
 ) {
   try {
     if (!items.length || !branchId) return;
 
-    // Collect all unique menu item IDs
     const menuItemIds = [...new Set(items.map((i) => i.menuItemId))];
+    const allOptionIds = [...new Set(items.flatMap((i) => i.menuItemOptionIds || []))];
 
-    // Load recipes for all sold menu items
-    const recipes = await db.menuItemIngredient.findMany({
-      where: { menuItemId: { in: menuItemIds } },
-      include: {
-        inventoryItem: {
-          select: { id: true, sku: true, branchId: true, currentStock: true },
+    const [baseRecipes, optionRecipes] = await Promise.all([
+      db.menuItemIngredient.findMany({
+        where: { menuItemId: { in: menuItemIds } },
+        include: {
+          inventoryItem: {
+            select: { id: true, sku: true, branchId: true, currentStock: true },
+          },
         },
-      },
-    });
+      }),
+      allOptionIds.length
+        ? db.menuItemOptionIngredient.findMany({
+            where: { menuItemOptionId: { in: allOptionIds } },
+            include: {
+              inventoryItem: {
+                select: { id: true, sku: true, branchId: true, currentStock: true },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
 
-    if (!recipes.length) return; // No recipes defined — skip deduction
-
-    // Build a map: menuItemId -> ingredient list
-    const recipeMap = new Map<
+    const baseMap = new Map<
       string,
-      Array<{ inventoryItemId: string; sku: string; quantityPerUnit: number }>
+      Array<{ sku: string; quantityPerUnit: number }>
     >();
-    for (const r of recipes) {
-      const list = recipeMap.get(r.menuItemId) || [];
+    for (const r of baseRecipes) {
+      const list = baseMap.get(r.menuItemId) || [];
       list.push({
-        inventoryItemId: r.inventoryItemId,
         sku: r.inventoryItem?.sku || "",
         quantityPerUnit: Number(r.quantity),
       });
-      recipeMap.set(r.menuItemId, list);
+      baseMap.set(r.menuItemId, list);
     }
 
-    // Aggregate total deductions per inventory SKU for this branch
+    const optionMap = new Map<string, Array<{ sku: string; quantityPerUnit: number }>>();
+    for (const r of optionRecipes) {
+      const list = optionMap.get(r.menuItemOptionId) || [];
+      list.push({
+        sku: r.inventoryItem?.sku || "",
+        quantityPerUnit: Number(r.quantity),
+      });
+      optionMap.set(r.menuItemOptionId, list);
+    }
+
     const deductions = new Map<string, { sku: string; totalQty: number }>();
 
-    for (const saleItem of items) {
-      const ingredients = recipeMap.get(saleItem.menuItemId);
-      if (!ingredients) continue;
-
-      for (const ing of ingredients) {
-        const deductQty = ing.quantityPerUnit * saleItem.quantity;
-        const existing = deductions.get(ing.sku);
-        if (existing) {
-          existing.totalQty += deductQty;
-        } else {
-          deductions.set(ing.sku, { sku: ing.sku, totalQty: deductQty });
+    for (const line of items) {
+      const q = line.quantity;
+      const base = baseMap.get(line.menuItemId) || [];
+      for (const ing of base) {
+        if (!ing.sku) continue;
+        const deductQty = ing.quantityPerUnit * q;
+        const cur = deductions.get(ing.sku);
+        if (cur) cur.totalQty += deductQty;
+        else deductions.set(ing.sku, { sku: ing.sku, totalQty: deductQty });
+      }
+      for (const oid of line.menuItemOptionIds || []) {
+        const extras = optionMap.get(oid) || [];
+        for (const ing of extras) {
+          if (!ing.sku) continue;
+          const deductQty = ing.quantityPerUnit * q;
+          const cur = deductions.get(ing.sku);
+          if (cur) cur.totalQty += deductQty;
+          else deductions.set(ing.sku, { sku: ing.sku, totalQty: deductQty });
         }
       }
     }
 
     if (deductions.size === 0) return;
 
-    // Find matching branch inventory items by SKU
     const skus = [...deductions.keys()];
     const branchItems = await db.inventoryItem.findMany({
       where: {
@@ -83,18 +107,15 @@ export async function deductInventoryForSale(
 
     const lowStockAlerts: Array<{ itemId: string; itemName: string; currentStock: number; reorderPoint: number }> = [];
 
-    // Deduct stock and create outbound records
     for (const [sku, { totalQty }] of deductions) {
       const branchItem = branchItemMap.get(sku);
-      if (!branchItem) continue; // Item doesn't exist in this branch
+      if (!branchItem) continue;
 
-      // Deduct stock (allow going negative to track over-consumption)
       await db.inventoryItem.update({
         where: { id: branchItem.id },
         data: { currentStock: { decrement: totalQty } },
       });
 
-      // Create outbound record for audit
       await db.outboundStock.create({
         data: {
           branchId,
@@ -106,7 +127,6 @@ export async function deductInventoryForSale(
         },
       });
 
-      // Check if stock dropped below reorder point
       const newStock = Number(branchItem.currentStock) - totalQty;
       if (newStock <= Number(branchItem.reorderPoint)) {
         lowStockAlerts.push({
@@ -118,12 +138,10 @@ export async function deductInventoryForSale(
       }
     }
 
-    // Create low stock alerts
     if (lowStockAlerts.length > 0) {
       await createLowStockAlerts(branchId, lowStockAlerts);
     }
   } catch (error) {
-    // Non-blocking — log but don't throw
     console.error("[deductInventoryForSale] Error:", error);
   }
 }
@@ -134,7 +152,6 @@ async function createLowStockAlerts(
 ) {
   try {
     for (const item of items) {
-      // Avoid duplicate alerts — check if one already exists for this item today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 

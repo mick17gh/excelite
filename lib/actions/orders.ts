@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, OrderSource, OrderType, PaymentStatus } from "@/lib/generated/prisma/client";
 import { createDeliveryRequest } from "@/lib/actions/delivery";
+import {
+  applyDefaultMenuItemSelections,
+  resolveMenuItemSelections,
+} from "@/lib/menu-selections";
 
 // Helper to serialize Decimal fields from raw Prisma order objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -12,6 +16,9 @@ function serializeOrder(order: Record<string, any>) {
     ...order,
     id: order.id as string,
     orderNumber: order.orderNumber as string,
+    branchId: order.branchId as string,
+    type: order.type as OrderType,
+    status: order.status as OrderStatus,
     paymentStatus: order.paymentStatus as PaymentStatus,
     subtotal: Number(order.subtotal),
     tax: Number(order.tax),
@@ -25,6 +32,8 @@ function serializeOrder(order: Record<string, any>) {
       ...item,
       unitPrice: Number(item.unitPrice),
       lineTotal: Number(item.lineTotal),
+      menuItemOptionIds:
+        item.selections?.map((s: { menuItemOptionId: string }) => s.menuItemOptionId) ?? [],
     })) || [],
     createdAt: order.createdAt?.toISOString?.() ?? order.createdAt,
     updatedAt: order.updatedAt?.toISOString?.() ?? order.updatedAt,
@@ -42,6 +51,8 @@ export interface CreateOrderInput {
     quantity: number;
     unitPrice?: number;
     notes?: string;
+    /** Selected option ids (multi-group); server validates and recomputes price */
+    menuItemOptionIds?: string[];
   }[];
   notes?: string;
   paymentMethod?: string;
@@ -117,6 +128,7 @@ export async function getOrders(filters?: {
           items: {
             include: {
               menuItem: { select: { id: true, name: true, sku: true, price: true } },
+              selections: { select: { menuItemOptionId: true } },
             },
           },
           delivery: true,
@@ -176,6 +188,9 @@ export async function getOrders(filters?: {
           unitPrice: Number(item.unitPrice),
           lineTotal: Number(item.lineTotal),
           notes: item.notes,
+          configurationLabel: item.configurationLabel,
+          configurationKey: item.configurationKey,
+          menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) ?? [],
         })),
         payments: order.payments.map((p) => ({
           id: p.id,
@@ -246,6 +261,7 @@ export async function getOrderById(id: string) {
         items: {
           include: {
             menuItem: { select: { id: true, name: true, sku: true, price: true } },
+            selections: { select: { menuItemOptionId: true } },
           },
         },
         delivery: true,
@@ -325,6 +341,9 @@ export async function getOrderById(id: string) {
           unitPrice: Number(item.unitPrice),
           lineTotal: Number(item.lineTotal),
           notes: item.notes,
+          configurationLabel: item.configurationLabel,
+          configurationKey: item.configurationKey,
+          menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) ?? [],
           menuItem: item.menuItem ? {
             id: item.menuItem.id,
             name: item.menuItem.name,
@@ -413,18 +432,44 @@ export async function createOrder(input: CreateOrderInput) {
     const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
 
     let subtotal = 0;
-    const orderItems: { menuItemId: string; quantity: number; unitPrice: number; lineTotal: number; notes?: string }[] = [];
+    const orderItemsPayload: {
+      menuItemId: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+      notes?: string;
+      configurationLabel: string | null;
+      configurationKey: string | null;
+      optionIds: string[];
+    }[] = [];
 
     for (const item of input.items) {
+      const withDefaults = await applyDefaultMenuItemSelections(
+        item.menuItemId,
+        item.menuItemOptionIds
+      );
+      const resolved = await resolveMenuItemSelections(item.menuItemId, withDefaults);
+      if (!resolved.ok) {
+        return { error: resolved.error };
+      }
       const menuItem = menuItemMap.get(item.menuItemId);
       if (!menuItem) {
         return { error: `Menu item not found: ${item.menuItemId}` };
       }
-      const unitPrice = item.unitPrice ?? Number(menuItem.price);
       const quantity = item.quantity || 1;
-      const lineTotal = quantity * unitPrice;
+      const unitPrice = resolved.data.unitPrice;
+      const lineTotal = Math.round(quantity * unitPrice * 100) / 100;
       subtotal += lineTotal;
-      orderItems.push({ menuItemId: item.menuItemId, quantity, unitPrice, lineTotal, notes: item.notes });
+      orderItemsPayload.push({
+        menuItemId: item.menuItemId,
+        quantity,
+        unitPrice,
+        lineTotal,
+        notes: item.notes,
+        configurationLabel: resolved.data.configurationLabel || null,
+        configurationKey: resolved.data.configurationKey || null,
+        optionIds: resolved.data.resolvedOptionIds,
+      });
     }
 
     // Get branch tax rate
@@ -457,10 +502,31 @@ export async function createOrder(input: CreateOrderInput) {
         deliveryNeighborhood: input.deliveryNeighborhood || null,
         deliveryPhone: input.deliveryPhone || null,
         deliveryNotes: input.deliveryNotes || null,
-        items: { create: orderItems },
+        items: {
+          create: orderItemsPayload.map((oi) => ({
+            menuItemId: oi.menuItemId,
+            quantity: oi.quantity,
+            unitPrice: oi.unitPrice,
+            lineTotal: oi.lineTotal,
+            notes: oi.notes,
+            configurationLabel: oi.configurationLabel,
+            configurationKey: oi.configurationKey,
+            selections:
+              oi.optionIds.length > 0
+                ? {
+                    create: oi.optionIds.map((menuItemOptionId) => ({ menuItemOptionId })),
+                  }
+                : undefined,
+          })),
+        },
       },
       include: {
-        items: { include: { menuItem: { select: { name: true } } } },
+        items: {
+          include: {
+            menuItem: { select: { name: true } },
+            selections: { select: { menuItemOptionId: true } },
+          },
+        },
         branch: { select: { name: true } },
       },
     });

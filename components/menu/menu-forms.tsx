@@ -47,6 +47,12 @@ import {
   getInventoryItemsForIngredients,
   getMenuItemWithIngredients,
 } from "@/lib/actions/menu";
+import {
+  MenuOptionGroupsForm,
+  serializeLocalOptionGroups,
+  localFromServerOptionGroups,
+  type LocalMenuOptionGroupRow,
+} from "@/components/menu/menu-option-groups-form";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { UnitType } from "@/lib/generated/prisma/client";
@@ -127,6 +133,7 @@ export function AddMenuItemForm({
   );
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
   const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
+  const [optionGroups, setOptionGroups] = useState<LocalMenuOptionGroupRow[]>([]);
 
   // Load inventory items when ingredients section is opened
   useEffect(() => {
@@ -254,6 +261,9 @@ export function AddMenuItemForm({
         imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
         ingredients: validIngredients.length > 0 ? validIngredients : undefined,
+        ...(optionGroups.length
+          ? { optionGroups: serializeLocalOptionGroups(optionGroups)! }
+          : {}),
       });
 
       if (result.success) {
@@ -272,6 +282,7 @@ export function AddMenuItemForm({
         setImagePreview(null);
         setSelectedFile(null);
         setIngredients([]);
+        setOptionGroups([]);
         setCalculatedCost(null);
         router.refresh();
       } else {
@@ -505,6 +516,15 @@ export function AddMenuItemForm({
               />
             </div>
 
+            <MenuOptionGroupsForm
+              groups={optionGroups}
+              onChange={setOptionGroups}
+              inventoryItems={inventoryItems}
+              onEnsureInventory={() => {
+                void loadInventoryItems();
+              }}
+            />
+
             {/* Ingredients Section */}
             <Collapsible
               open={isIngredientsOpen}
@@ -693,6 +713,7 @@ export function EditMenuItemForm({
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
   const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
+  const [optionGroups, setOptionGroups] = useState<LocalMenuOptionGroupRow[]>([]);
 
   useEffect(() => {
     if (item) {
@@ -710,6 +731,21 @@ export function EditMenuItemForm({
       setImagePreview(item.imageUrl || null);
     }
   }, [item, categories]);
+
+  useEffect(() => {
+    if (!open || !item?.id) {
+      setOptionGroups([]);
+      return;
+    }
+    let cancelled = false;
+    void getMenuItemWithIngredients(item.id).then((res) => {
+      if (cancelled || !res.success || !res.data) return;
+      setOptionGroups(localFromServerOptionGroups(res.data.optionGroups || []));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, item?.id]);
 
   // Calculate cost when ingredients change
   useEffect(() => {
@@ -867,6 +903,7 @@ export function EditMenuItemForm({
         imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
         ingredients: validIngredients,
+        optionGroups: optionGroups.length ? serializeLocalOptionGroups(optionGroups)! : [],
       });
 
       if (result.success) {
@@ -1100,6 +1137,21 @@ export function EditMenuItemForm({
                 rows={3}
               />
             </div>
+
+            <MenuOptionGroupsForm
+              groups={optionGroups}
+              onChange={setOptionGroups}
+              inventoryItems={inventoryItems}
+              onEnsureInventory={() => {
+                void (async () => {
+                  if (inventoryItems.length > 0) return;
+                  const invResult = await getInventoryItemsForIngredients();
+                  if (invResult.success && invResult.data) {
+                    setInventoryItems(invResult.data as InventoryItemOption[]);
+                  }
+                })();
+              }}
+            />
 
             {/* Ingredients Section */}
             <Collapsible

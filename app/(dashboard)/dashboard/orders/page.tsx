@@ -38,6 +38,7 @@ export default async function OrdersPage() {
     sku: m.sku,
     price: typeof m.price === "object" && m.price?.toNumber ? m.price.toNumber() : Number(m.price),
     categoryId: m.categoryId,
+    optionGroups: m.optionGroups ?? [],
   }));
   const customers = customersResult.data || [];
 

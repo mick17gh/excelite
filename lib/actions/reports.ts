@@ -261,10 +261,12 @@ export async function generateReportData(input: GenerateReportInput): Promise<Re
       const itemSales: Record<string, { name: string; quantity: number; revenue: number }> = {};
       sales.forEach((sale) => {
         sale.items.forEach((item) => {
-          const id = item.menuItemId;
+          const cfg = item.configurationKey || "";
+          const id = `${item.menuItemId}__${cfg || "base"}`;
+          const label = item.configurationLabel?.trim();
           if (!itemSales[id]) {
             itemSales[id] = {
-              name: item.menuItem?.name || "Unknown",
+              name: label ? `${item.menuItem?.name || "Unknown"} (${label})` : item.menuItem?.name || "Unknown",
               quantity: 0,
               revenue: 0,
             };

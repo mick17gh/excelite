@@ -34,6 +34,9 @@ export interface SaleItemInput {
   unitPrice: number;
   unitCost: number;
   discount?: number;
+  menuItemOptionIds?: string[];
+  configurationLabel?: string;
+  configurationKey?: string;
 }
 
 export interface CreateTransactionInput {
@@ -67,6 +70,9 @@ export async function createTransaction(input: CreateTransactionInput) {
       unitCost: number;
       total: number;
       discount: number;
+      configurationLabel: string | null;
+      configurationKey: string | null;
+      menuItemOptionIds: string[];
     }> = [];
 
     for (const item of input.items) {
@@ -79,6 +85,9 @@ export async function createTransaction(input: CreateTransactionInput) {
         unitCost: item.unitCost,
         total: itemTotal,
         discount: item.discount || 0,
+        configurationLabel: item.configurationLabel ?? null,
+        configurationKey: item.configurationKey ?? null,
+        menuItemOptionIds: item.menuItemOptionIds || [],
       });
     }
 
@@ -113,7 +122,22 @@ export async function createTransaction(input: CreateTransactionInput) {
         customerCount: input.customerCount || 1,
         saleDate: new Date(),
         items: {
-          create: saleItems,
+          create: saleItems.map((si) => ({
+            menuItemId: si.menuItemId,
+            quantity: si.quantity,
+            unitPrice: si.unitPrice,
+            unitCost: si.unitCost,
+            total: si.total,
+            discount: si.discount,
+            configurationLabel: si.configurationLabel,
+            configurationKey: si.configurationKey,
+            selections:
+              si.menuItemOptionIds.length > 0
+                ? {
+                    create: si.menuItemOptionIds.map((menuItemOptionId) => ({ menuItemOptionId })),
+                  }
+                : undefined,
+          })),
         },
       },
       include: {
@@ -138,7 +162,11 @@ export async function createTransaction(input: CreateTransactionInput) {
     // Deduct branch inventory based on recipes (non-blocking)
     try {
       await deductInventoryForSale(
-        input.items.map((item) => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+        input.items.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          menuItemOptionIds: item.menuItemOptionIds || [],
+        })),
         input.branchId,
         transaction.id
       );
@@ -465,10 +493,12 @@ export async function getTopMenuItems(branchId?: string, startDate?: Date, endDa
     const itemTotals: Record<string, { name: string; quantity: number; revenue: number }> = {};
 
     for (const item of saleItems) {
-      const key = item.menuItemId;
+      const cfg = item.configurationKey || "";
+      const key = `${item.menuItemId}__${cfg || "base"}`;
       if (!itemTotals[key]) {
+        const label = item.configurationLabel?.trim();
         itemTotals[key] = {
-          name: item.menuItem.name,
+          name: label ? `${item.menuItem.name} (${label})` : item.menuItem.name,
           quantity: 0,
           revenue: 0,
         };

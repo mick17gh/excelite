@@ -48,6 +48,14 @@ import { createOrder } from "@/lib/actions/orders";
 import { createCustomer } from "@/lib/actions/customers";
 import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
+import {
+  type ClientMenuOptionGroup,
+  applyDefaultSelections,
+  buildLinePreview,
+  formatOptionGroupRangeHint,
+  posCartLineKey,
+  validateOptionSelections,
+} from "@/lib/menu-option-client";
 
 interface Branch {
   id: string;
@@ -64,6 +72,7 @@ interface MenuItem {
   sku: string;
   price: number;
   categoryId: string | null;
+  optionGroups?: ClientMenuOptionGroup[];
 }
 
 interface Customer {
@@ -73,11 +82,14 @@ interface Customer {
 }
 
 interface CartItem {
+  lineKey: string;
   menuItemId: string;
   name: string;
   quantity: number;
   unitPrice: number;
   notes?: string;
+  menuItemOptionIds: string[];
+  configurationLabel: string;
 }
 
 interface CreateOrderDialogProps {
@@ -107,6 +119,9 @@ export function CreateOrderDialog({
   const [notes, setNotes] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchItem, setSearchItem] = useState("");
+  const [optionPickerOpen, setOptionPickerOpen] = useState(false);
+  const [optionPickerItem, setOptionPickerItem] = useState<MenuItem | null>(null);
+  const [pickerSelections, setPickerSelections] = useState<Record<string, string[]>>({});
   const [discountStr, setDiscountStr] = useState("");
   const [deliveryFeeStr, setDeliveryFeeStr] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -191,40 +206,106 @@ export function CreateOrderDialog({
       (subtotal + tax - discount + (isDelivery ? deliveryFee : 0)) * 100,
     ) / 100;
 
-  const addToCart = (item: MenuItem) => {
+  const selectionsRecordFromIds = (
+    groups: ClientMenuOptionGroup[],
+    ids: string[]
+  ): Record<string, string[]> => {
+    const set = new Set(ids);
+    const rec: Record<string, string[]> = {};
+    for (const g of groups) {
+      const picked = g.options.filter((o) => set.has(o.id)).map((o) => o.id);
+      rec[g.id] = g.maxSelections <= 1 ? picked.slice(0, 1) : picked.slice(0, g.maxSelections);
+    }
+    return rec;
+  };
+
+  const flattenPickerSelections = (groups: ClientMenuOptionGroup[], rec: Record<string, string[]>) =>
+    groups.flatMap((g) => rec[g.id] || []);
+
+  const commitCartLine = (item: MenuItem, draftOptionIds: string[]) => {
+    const groups = item.optionGroups;
+    const withDefs = applyDefaultSelections(groups, draftOptionIds);
+    const err = validateOptionSelections(groups, withDefs);
+    if (err) {
+      toast.error(err);
+      return false;
+    }
+    const preview = buildLinePreview(item.price, groups, withDefs);
+    const lineKey = posCartLineKey(item.id, preview.configurationKey);
     setCart((prev) => {
-      const existing = prev.find((c) => c.menuItemId === item.id);
+      const existing = prev.find((c) => c.lineKey === lineKey);
       if (existing) {
         return prev.map((c) =>
-          c.menuItemId === item.id ? { ...c, quantity: c.quantity + 1 } : c,
+          c.lineKey === lineKey ? { ...c, quantity: c.quantity + 1 } : c,
         );
       }
       return [
         ...prev,
         {
+          lineKey,
           menuItemId: item.id,
           name: item.name,
           quantity: 1,
-          unitPrice: item.price,
+          unitPrice: preview.unitPrice,
+          menuItemOptionIds: preview.menuItemOptionIds,
+          configurationLabel: preview.configurationLabel,
         },
       ];
     });
+    return true;
   };
 
-  const updateQuantity = (menuItemId: string, delta: number) => {
+  const requestAddToCart = (item: MenuItem) => {
+    const groups = item.optionGroups;
+    if (groups?.length) {
+      const initialIds = applyDefaultSelections(groups, []);
+      setPickerSelections(selectionsRecordFromIds(groups, initialIds));
+      setOptionPickerItem(item);
+      setOptionPickerOpen(true);
+      return;
+    }
+    commitCartLine(item, []);
+  };
+
+  const togglePickerOption = (g: ClientMenuOptionGroup, optionId: string) => {
+    setPickerSelections((prev) => {
+      const cur = prev[g.id] || [];
+      if (g.maxSelections <= 1) {
+        return { ...prev, [g.id]: cur[0] === optionId ? [] : [optionId] };
+      }
+      const set = new Set(cur);
+      if (set.has(optionId)) set.delete(optionId);
+      else if (set.size < g.maxSelections) set.add(optionId);
+      return { ...prev, [g.id]: [...set] };
+    });
+  };
+
+  const confirmOptionPicker = () => {
+    if (!optionPickerItem?.optionGroups?.length) {
+      setOptionPickerOpen(false);
+      setOptionPickerItem(null);
+      return;
+    }
+    const groups = optionPickerItem.optionGroups;
+    const flat = flattenPickerSelections(groups, pickerSelections);
+    if (commitCartLine(optionPickerItem, flat)) {
+      setOptionPickerOpen(false);
+      setOptionPickerItem(null);
+    }
+  };
+
+  const updateQuantity = (lineKey: string, delta: number) => {
     setCart((prev) =>
       prev
         .map((c) =>
-          c.menuItemId === menuItemId
-            ? { ...c, quantity: c.quantity + delta }
-            : c,
+          c.lineKey === lineKey ? { ...c, quantity: c.quantity + delta } : c,
         )
         .filter((c) => c.quantity > 0),
     );
   };
 
-  const removeFromCart = (menuItemId: string) => {
-    setCart((prev) => prev.filter((c) => c.menuItemId !== menuItemId));
+  const removeFromCart = (lineKey: string) => {
+    setCart((prev) => prev.filter((c) => c.lineKey !== lineKey));
   };
 
   const handleSubmit = async () => {
@@ -251,6 +332,7 @@ export function CreateOrderDialog({
           quantity: c.quantity,
           unitPrice: c.unitPrice,
           notes: c.notes,
+          menuItemOptionIds: c.menuItemOptionIds,
         })),
         notes: notes || undefined,
         discount,
@@ -513,7 +595,7 @@ export function CreateOrderDialog({
                     type="button"
                     className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted transition-colors"
                     onClick={() => {
-                      addToCart(item);
+                      requestAddToCart(item);
                       setSearchItem("");
                     }}
                   >
@@ -542,12 +624,17 @@ export function CreateOrderDialog({
             <div className="border rounded-md divide-y">
               {cart.map((item) => (
                 <div
-                  key={item.menuItemId}
+                  key={item.lineKey}
                   className="flex items-center justify-between px-3 py-2"
                 >
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium">{item.name}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">
+                    {item.configurationLabel ? (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {item.configurationLabel}
+                      </p>
+                    ) : null}
+                    <span className="ml-0 text-xs text-muted-foreground">
                       {formatCurrency(item.unitPrice)} each
                     </span>
                   </div>
@@ -556,7 +643,7 @@ export function CreateOrderDialog({
                       variant="outline"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => updateQuantity(item.menuItemId, -1)}
+                      onClick={() => updateQuantity(item.lineKey, -1)}
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
@@ -567,7 +654,7 @@ export function CreateOrderDialog({
                       variant="outline"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => updateQuantity(item.menuItemId, 1)}
+                      onClick={() => updateQuantity(item.lineKey, 1)}
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
@@ -578,7 +665,7 @@ export function CreateOrderDialog({
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-red-500"
-                      onClick={() => removeFromCart(item.menuItemId)}
+                      onClick={() => removeFromCart(item.lineKey)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -708,6 +795,94 @@ export function CreateOrderDialog({
             </div>
           )}
         </div>
+
+        <Dialog
+          open={optionPickerOpen}
+          onOpenChange={(o) => {
+            setOptionPickerOpen(o);
+            if (!o) setOptionPickerItem(null);
+          }}
+        >
+          <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{optionPickerItem?.name ?? "Options"}</DialogTitle>
+              <DialogDescription>
+                Choose options for this line. Prices update from your catalog.
+              </DialogDescription>
+            </DialogHeader>
+            {optionPickerItem?.optionGroups?.map((g) => {
+              const picked = pickerSelections[g.id] || [];
+              const rangeHint = formatOptionGroupRangeHint(g);
+              return (
+                <div key={g.id} className="space-y-2 mb-4">
+                  <p className="text-sm font-medium">
+                    {g.name}
+                    <span className="text-muted-foreground font-normal"> ({rangeHint})</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {g.options.map((o) => {
+                      const active = picked.includes(o.id);
+                      const deltaLabel =
+                        o.priceDelta !== 0
+                          ? ` (${o.priceDelta > 0 ? "+" : ""}${formatCurrency(o.priceDelta)})`
+                          : "";
+                      return (
+                        <Button
+                          key={o.id}
+                          type="button"
+                          variant={active ? "default" : "outline"}
+                          size="sm"
+                          className="h-auto min-h-9 whitespace-normal text-left"
+                          onClick={() => togglePickerOption(g, o.id)}
+                        >
+                          {o.name}
+                          {deltaLabel}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            <DialogFooter className="flex-col sm:flex-col gap-3">
+              {optionPickerItem?.optionGroups?.length ? (
+                <div className="flex justify-between text-sm w-full border-t pt-3">
+                  <span className="text-muted-foreground">Line price</span>
+                  <span className="font-semibold">
+                    {formatCurrency(
+                      buildLinePreview(
+                        optionPickerItem.price,
+                        optionPickerItem.optionGroups,
+                        applyDefaultSelections(
+                          optionPickerItem.optionGroups,
+                          flattenPickerSelections(
+                            optionPickerItem.optionGroups,
+                            pickerSelections
+                          )
+                        )
+                      ).unitPrice
+                    )}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex gap-2 justify-end w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setOptionPickerOpen(false);
+                    setOptionPickerItem(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" onClick={confirmOptionPicker}>
+                  Add to order
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <DialogFooter>
           <Button

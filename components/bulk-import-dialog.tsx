@@ -41,6 +41,7 @@ import {
 import { toast } from "sonner";
 import {
   bulkCreateMenuItems,
+  bulkUpsertMenuItemOptionGroups,
   bulkCreateInventoryItems,
   bulkCreateCategories,
   bulkCreateSuppliers,
@@ -48,18 +49,20 @@ import {
 } from "@/lib/actions/bulk";
 import {
   parseMenuCSV,
+  parseMenuOptionsCSV,
   parseInventoryCSV,
   parseCategoryCSV,
   parseSupplierCSV,
   parseStaffCSV,
   getMenuCSVTemplate,
+  getMenuOptionsCSVTemplate,
   getInventoryCSVTemplate,
   getCategoryCSVTemplate,
   getSupplierCSVTemplate,
   getStaffCSVTemplate,
 } from "@/lib/utils/bulk-import";
 
-type ImportType = "menu" | "inventory" | "category" | "supplier" | "staff";
+type ImportType = "menu" | "menu-options" | "inventory" | "category" | "supplier" | "staff";
 
 interface BulkImportDialogProps {
   open: boolean;
@@ -90,6 +93,7 @@ export function BulkImportDialog({
   const [importResult, setImportResult] = useState<{
     success: boolean;
     created?: number;
+    updated?: number;
     errors?: string[];
   } | null>(null);
 
@@ -114,6 +118,9 @@ export function BulkImportDialog({
     switch (type) {
       case "menu":
         template = getMenuCSVTemplate();
+        break;
+      case "menu-options":
+        template = getMenuOptionsCSVTemplate();
         break;
       case "inventory":
         template = getInventoryCSVTemplate();
@@ -173,6 +180,22 @@ export function BulkImportDialog({
         if (isNaN(price) || price <= 0) errors.push("Valid price is required");
         if (!row.category && !row.Category) errors.push("Category is required");
         break;
+      case "menu-options": {
+        const sku =
+          row.menuItemSku ||
+          row.menu_sku ||
+          row.productSku ||
+          row.product_sku ||
+          row.parentSku;
+        if (!sku?.trim()) errors.push("menuItemSku is required");
+        if (!(row.groupName || row.group || row.Group)?.trim()) {
+          errors.push("groupName is required");
+        }
+        if (!(row.optionName || row.option || row.Option)?.trim()) {
+          errors.push("optionName is required");
+        }
+        break;
+      }
       case "inventory":
         if (!row.name && !row.Name) errors.push("Name is required");
         const unitCost = parseFloat(
@@ -260,6 +283,9 @@ export function BulkImportDialog({
           case "menu":
             result = await bulkCreateMenuItems(parseMenuCSV(rowData));
             break;
+          case "menu-options":
+            result = await bulkUpsertMenuItemOptionGroups(parseMenuOptionsCSV(rowData));
+            break;
           case "inventory":
             result = await bulkCreateInventoryItems(
               parseInventoryCSV(rowData, selectedBranch),
@@ -281,7 +307,13 @@ export function BulkImportDialog({
         }
 
         if (result.success) {
-          setImportResult({ success: true, created: result.created });
+          if ("created" in result && result.created != null) {
+            setImportResult({ success: true, created: result.created });
+          } else if ("updated" in result && result.updated != null) {
+            setImportResult({ success: true, updated: result.updated });
+          } else {
+            setImportResult({ success: true });
+          }
           setStep("result");
           onSuccess?.();
         } else {
@@ -313,25 +345,29 @@ export function BulkImportDialog({
             Import{" "}
             {type === "menu"
               ? "Products"
-              : type === "inventory"
-                ? "Inventory Items"
-                : type === "category"
-                  ? "Categories"
-                  : type === "supplier"
-                    ? "Suppliers"
-                    : "Staff Members"}
+              : type === "menu-options"
+                ? "Product options"
+                : type === "inventory"
+                  ? "Inventory Items"
+                  : type === "category"
+                    ? "Categories"
+                    : type === "supplier"
+                      ? "Suppliers"
+                      : "Staff Members"}
           </DialogTitle>
           <DialogDescription>
             Upload a CSV file to bulk import{" "}
             {type === "menu"
               ? "Products"
-              : type === "inventory"
-                ? "inventory items"
-                : type === "category"
-                  ? "categories"
-                  : type === "supplier"
-                    ? "suppliers"
-                    : "staff members"}
+              : type === "menu-options"
+                ? "option groups for existing products (matched by menu SKU)"
+                : type === "inventory"
+                  ? "inventory items"
+                  : type === "category"
+                    ? "categories"
+                    : type === "supplier"
+                      ? "suppliers"
+                      : "staff members"}
           </DialogDescription>
         </DialogHeader>
 
@@ -381,6 +417,16 @@ export function BulkImportDialog({
                     <code>price</code>. Optional: <code>sku</code>,{" "}
                     <code>cost</code>, <code>description</code>,{" "}
                     <code>isActive</code>
+                  </>
+                )}
+                {type === "menu-options" && (
+                  <>
+                    Required: <code>menuItemSku</code>, <code>groupName</code>,{" "}
+                    <code>optionName</code>. Optional: <code>priceDelta</code>,{" "}
+                    <code>optionSku</code>, <code>groupSortOrder</code>,{" "}
+                    <code>optionSortOrder</code>, <code>minSelections</code>,{" "}
+                    <code>maxSelections</code>, <code>isRequired</code>,{" "}
+                    <code>isDefault</code>, <code>costDelta</code>
                   </>
                 )}
                 {type === "inventory" && (
@@ -462,11 +508,24 @@ export function BulkImportDialog({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12">#</TableHead>
-                    <TableHead>{type === "staff" ? "Name" : "Name"}</TableHead>
+                    <TableHead>
+                      {type === "staff"
+                        ? "Name"
+                        : type === "menu-options"
+                          ? "Product SKU"
+                          : "Name"}
+                    </TableHead>
                     {type === "menu" && (
                       <>
                         <TableHead>Category</TableHead>
                         <TableHead>Price</TableHead>
+                      </>
+                    )}
+                    {type === "menu-options" && (
+                      <>
+                        <TableHead>Group</TableHead>
+                        <TableHead>Option</TableHead>
+                        <TableHead>Price Δ</TableHead>
                       </>
                     )}
                     {type === "inventory" && (
@@ -504,7 +563,14 @@ export function BulkImportDialog({
                       <TableCell className="font-medium">
                         {type === "staff"
                           ? `${String(row.data.firstName || row.data["First Name"] || "")} ${String(row.data.lastName || row.data["Last Name"] || "")}`
-                          : String(row.data.name || row.data.Name || "-")}
+                          : type === "menu-options"
+                            ? String(
+                                row.data.menuItemSku ||
+                                  row.data.menu_sku ||
+                                  row.data.productSku ||
+                                  "-",
+                              )
+                            : String(row.data.name || row.data.Name || "-")}
                       </TableCell>
                       {type === "menu" && (
                         <>
@@ -515,6 +581,19 @@ export function BulkImportDialog({
                           </TableCell>
                           <TableCell>
                             {String(row.data.price || row.data.Price || "-")}
+                          </TableCell>
+                        </>
+                      )}
+                      {type === "menu-options" && (
+                        <>
+                          <TableCell>
+                            {String(row.data.groupName || row.data.group || row.data.Group || "-")}
+                          </TableCell>
+                          <TableCell>
+                            {String(row.data.optionName || row.data.option || row.data.Option || "-")}
+                          </TableCell>
+                          <TableCell>
+                            {String(row.data.priceDelta ?? row.data.PriceDelta ?? "-")}
                           </TableCell>
                         </>
                       )}
@@ -613,7 +692,11 @@ export function BulkImportDialog({
                 <div>
                   <h3 className="text-lg font-semibold">Import Successful!</h3>
                   <p className="text-muted-foreground">
-                    {importResult.created} items have been imported
+                    {importResult.created != null &&
+                      `${importResult.created} item(s) imported.`}
+                    {importResult.updated != null &&
+                      `${importResult.updated} product(s) updated with option groups.`}
+                    {importResult.created == null && importResult.updated == null && "Done."}
                   </p>
                 </div>
               </>

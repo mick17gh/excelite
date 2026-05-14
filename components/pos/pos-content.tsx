@@ -53,6 +53,21 @@ import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PaymentModal, type PaymentData } from "@/components/pos/payment-modal";
 import { ReceiptModal } from "@/components/pos/receipt-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  type ClientMenuOptionGroup,
+  applyDefaultSelections,
+  buildLinePreview,
+  formatOptionGroupRangeHint,
+  posCartLineKey,
+  validateOptionSelections,
+} from "@/lib/menu-option-client";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 
@@ -69,6 +84,7 @@ interface MenuItem {
   category: string;
   price: number;
   imageUrl?: string | null;
+  optionGroups?: ClientMenuOptionGroup[];
 }
 
 interface RecentOrder {
@@ -94,10 +110,13 @@ interface PosContentProps {
 }
 
 interface CartLine {
+  lineKey: string;
   menuItemId: string;
   name: string;
   unitPrice: number;
   quantity: number;
+  menuItemOptionIds: string[];
+  configurationLabel: string;
 }
 
 const orderTypes = [
@@ -110,9 +129,8 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
 
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
+  /** Start true on server + first client paint to avoid hydration mismatch; sync from navigator in useEffect. */
+  const [isOnline, setIsOnline] = useState(true);
   const [liveBranches, setLiveBranches] = useState(branches);
   const [liveMenuItems, setLiveMenuItems] = useState(menuItems);
   const [liveRecentOrders, setLiveRecentOrders] = useState(recentOrders);
@@ -122,6 +140,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   const availableBranches = filterBranchesForUser(liveBranches, canViewAllBranches, userBranchId);
 
   useEffect(() => {
+    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
     const onOnline = () => {
       setIsOnline(true);
       void drainPosOutbox().then((r) => {
@@ -189,6 +208,9 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   const [orderType, setOrderType] = useState<OrderType>("DINE_IN");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [optionPickerOpen, setOptionPickerOpen] = useState(false);
+  const [optionPickerItem, setOptionPickerItem] = useState<MenuItem | null>(null);
+  const [pickerSelections, setPickerSelections] = useState<Record<string, string[]>>({});
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
 
   useEffect(() => {
@@ -268,31 +290,105 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = Math.round(cart.reduce((s, l) => s + l.unitPrice * l.quantity, 0) * 100) / 100;
 
-  const addToCart = (item: MenuItem) => {
+  const selectionsRecordFromIds = (
+    groups: ClientMenuOptionGroup[],
+    ids: string[]
+  ): Record<string, string[]> => {
+    const set = new Set(ids);
+    const rec: Record<string, string[]> = {};
+    for (const g of groups) {
+      const picked = g.options.filter((o) => set.has(o.id)).map((o) => o.id);
+      rec[g.id] = g.maxSelections <= 1 ? picked.slice(0, 1) : picked.slice(0, g.maxSelections);
+    }
+    return rec;
+  };
+
+  const flattenPickerSelections = (groups: ClientMenuOptionGroup[], rec: Record<string, string[]>) =>
+    groups.flatMap((g) => rec[g.id] || []);
+
+  const commitCartLine = (item: MenuItem, draftOptionIds: string[]) => {
+    const groups = item.optionGroups;
+    const withDefs = applyDefaultSelections(groups, draftOptionIds);
+    const err = validateOptionSelections(groups, withDefs);
+    if (err) {
+      toast.error(err);
+      return false;
+    }
+    const preview = buildLinePreview(item.price, groups, withDefs);
+    const lineKey = posCartLineKey(item.id, preview.configurationKey);
     setCart((prev) => {
-      const idx = prev.findIndex((p) => p.menuItemId === item.id);
+      const idx = prev.findIndex((p) => p.lineKey === lineKey);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
         return next;
       }
-      return [...prev, { menuItemId: item.id, name: item.name, unitPrice: item.price, quantity: 1 }];
+      return [
+        ...prev,
+        {
+          lineKey,
+          menuItemId: item.id,
+          name: item.name,
+          unitPrice: preview.unitPrice,
+          quantity: 1,
+          menuItemOptionIds: preview.menuItemOptionIds,
+          configurationLabel: preview.configurationLabel,
+        },
+      ];
     });
     toast.success(`${item.name} added`, { duration: 1500 });
+    return true;
   };
 
-  const setQty = (menuItemId: string, qty: number) => {
-    if (qty <= 0) {
-      setCart((prev) => prev.filter((l) => l.menuItemId !== menuItemId));
+  const requestAddToCart = (item: MenuItem) => {
+    const groups = item.optionGroups;
+    if (groups?.length) {
+      const initialIds = applyDefaultSelections(groups, []);
+      setPickerSelections(selectionsRecordFromIds(groups, initialIds));
+      setOptionPickerItem(item);
+      setOptionPickerOpen(true);
       return;
     }
-    setCart((prev) =>
-      prev.map((l) => (l.menuItemId === menuItemId ? { ...l, quantity: qty } : l))
-    );
+    commitCartLine(item, []);
   };
 
-  const removeFromCart = (menuItemId: string) => {
-    setCart((prev) => prev.filter((l) => l.menuItemId !== menuItemId));
+  const togglePickerOption = (g: ClientMenuOptionGroup, optionId: string) => {
+    setPickerSelections((prev) => {
+      const cur = prev[g.id] || [];
+      if (g.maxSelections <= 1) {
+        return { ...prev, [g.id]: cur[0] === optionId ? [] : [optionId] };
+      }
+      const set = new Set(cur);
+      if (set.has(optionId)) set.delete(optionId);
+      else if (set.size < g.maxSelections) set.add(optionId);
+      return { ...prev, [g.id]: [...set] };
+    });
+  };
+
+  const confirmOptionPicker = () => {
+    if (!optionPickerItem?.optionGroups?.length) {
+      setOptionPickerOpen(false);
+      setOptionPickerItem(null);
+      return;
+    }
+    const groups = optionPickerItem.optionGroups;
+    const flat = flattenPickerSelections(groups, pickerSelections);
+    if (commitCartLine(optionPickerItem, flat)) {
+      setOptionPickerOpen(false);
+      setOptionPickerItem(null);
+    }
+  };
+
+  const setQty = (lineKey: string, qty: number) => {
+    if (qty <= 0) {
+      setCart((prev) => prev.filter((l) => l.lineKey !== lineKey));
+      return;
+    }
+    setCart((prev) => prev.map((l) => (l.lineKey === lineKey ? { ...l, quantity: qty } : l)));
+  };
+
+  const removeFromCart = (lineKey: string) => {
+    setCart((prev) => prev.filter((l) => l.lineKey !== lineKey));
   };
 
   const clearCart = () => {
@@ -378,6 +474,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
           menuItemId: l.menuItemId,
           quantity: l.quantity,
           unitPrice: l.unitPrice,
+          menuItemOptionIds: l.menuItemOptionIds,
         })),
         paymentMethod: paymentData.paymentMethod,
         notes: paymentData.notes,
@@ -412,6 +509,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
         customerName: paymentData.customerName,
         items: cart.map((l) => ({
           menuItem: { name: l.name },
+          configurationLabel: l.configurationLabel || null,
           quantity: l.quantity,
           unitPrice: l.unitPrice,
           lineTotal: l.unitPrice * l.quantity,
@@ -442,6 +540,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
             menuItemId: l.menuItemId,
             quantity: l.quantity,
             unitPrice: l.unitPrice,
+            menuItemOptionIds: l.menuItemOptionIds,
           })),
           paymentMethod: paymentData.paymentMethod,
           notes: paymentData.notes,
@@ -649,19 +748,21 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
         <ScrollArea className="flex-1 min-h-0">
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 p-1 pb-4">
             {filteredMenu.map((m) => {
-              const inCart = cart.find((c) => c.menuItemId === m.id);
+              const qtyOnProduct = cart
+                .filter((c) => c.menuItemId === m.id)
+                .reduce((s, c) => s + c.quantity, 0);
               return (
                 <button
                   key={m.id}
                   className={cn(
                     "relative flex flex-col rounded-xl border bg-card p-3 text-left transition-all hover:shadow-md hover:border-primary/50 active:scale-[0.98]",
-                    inCart && "ring-2 ring-primary border-primary"
+                    qtyOnProduct > 0 && "ring-2 ring-primary border-primary"
                   )}
-                  onClick={() => addToCart(m)}
+                  onClick={() => requestAddToCart(m)}
                 >
-                  {inCart && (
+                  {qtyOnProduct > 0 && (
                     <Badge className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold">
-                      {inCart.quantity}
+                      {qtyOnProduct}
                     </Badge>
                   )}
                   <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted mb-3">
@@ -747,11 +848,16 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
             <div className="space-y-2">
               {cart.map((l) => (
                 <div
-                  key={l.menuItemId}
+                  key={l.lineKey}
                   className="flex items-center gap-2 rounded-lg border bg-muted/30 p-2"
                 >
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-xs leading-tight truncate">{l.name}</h4>
+                    {l.configurationLabel ? (
+                      <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
+                        {l.configurationLabel}
+                      </p>
+                    ) : null}
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">
                         {formatCurrency(l.unitPrice)}
@@ -766,7 +872,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
                       size="icon"
                       variant="outline"
                       className="h-6 w-6 rounded-full"
-                      onClick={() => setQty(l.menuItemId, l.quantity - 1)}
+                      onClick={() => setQty(l.lineKey, l.quantity - 1)}
                       disabled={isPending}
                     >
                       <Minus className="h-3 w-3" />
@@ -778,7 +884,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
                       size="icon"
                       variant="outline"
                       className="h-6 w-6 rounded-full"
-                      onClick={() => setQty(l.menuItemId, l.quantity + 1)}
+                      onClick={() => setQty(l.lineKey, l.quantity + 1)}
                       disabled={isPending}
                     >
                       <Plus className="h-3 w-3" />
@@ -787,7 +893,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
                       size="icon"
                       variant="ghost"
                       className="h-6 w-6 rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => removeFromCart(l.menuItemId)}
+                      onClick={() => removeFromCart(l.lineKey)}
                       disabled={isPending}
                     >
                       <X className="h-3 w-3" />
@@ -930,6 +1036,88 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
         onOrderTypeChange={(t) => setOrderType(t as OrderType)}
         offlineRestricted={!isOnline}
       />
+
+      <Dialog
+        open={optionPickerOpen}
+        onOpenChange={(open) => {
+          setOptionPickerOpen(open);
+          if (!open) setOptionPickerItem(null);
+        }}
+      >
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{optionPickerItem?.name ?? "Options"}</DialogTitle>
+          </DialogHeader>
+          {optionPickerItem?.optionGroups?.map((g) => {
+            const picked = pickerSelections[g.id] || [];
+            const rangeHint = formatOptionGroupRangeHint(g);
+            return (
+              <div key={g.id} className="space-y-2 mb-4">
+                <p className="text-sm font-medium">
+                  {g.name}
+                  <span className="text-muted-foreground font-normal"> ({rangeHint})</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {g.options.map((o) => {
+                    const active = picked.includes(o.id);
+                    const deltaLabel =
+                      o.priceDelta !== 0
+                        ? ` (${o.priceDelta > 0 ? "+" : ""}${formatCurrency(o.priceDelta)})`
+                        : "";
+                    return (
+                      <Button
+                        key={o.id}
+                        type="button"
+                        variant={active ? "default" : "outline"}
+                        size="sm"
+                        className="h-auto min-h-9 whitespace-normal text-left"
+                        onClick={() => togglePickerOption(g, o.id)}
+                      >
+                        {o.name}
+                        {deltaLabel}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          <DialogFooter className="flex-col sm:flex-col gap-3 pt-2">
+            {optionPickerItem?.optionGroups?.length ? (
+              <div className="flex justify-between text-sm w-full border-t pt-3">
+                <span className="text-muted-foreground">Line price</span>
+                <span className="font-semibold">
+                  {formatCurrency(
+                    buildLinePreview(
+                      optionPickerItem.price,
+                      optionPickerItem.optionGroups,
+                      applyDefaultSelections(
+                        optionPickerItem.optionGroups,
+                        flattenPickerSelections(optionPickerItem.optionGroups, pickerSelections)
+                      )
+                    ).unitPrice
+                  )}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex gap-2 justify-end w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOptionPickerOpen(false);
+                  setOptionPickerItem(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="button" onClick={confirmOptionPicker}>
+                Add to order
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Receipt Modal */}
       {completedOrder && (

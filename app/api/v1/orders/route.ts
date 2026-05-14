@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/services/api-keys";
+import { createOrder } from "@/lib/actions/orders";
 
 // GET /api/v1/orders - Get POS orders
 export async function GET(request: NextRequest) {
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
             menuItem: {
               select: { id: true, name: true, sku: true },
             },
+            selections: { select: { menuItemOptionId: true } },
           },
         },
       },
@@ -85,6 +87,9 @@ export async function GET(request: NextRequest) {
         unitPrice: Number(item.unitPrice),
         lineTotal: Number(item.lineTotal),
         notes: item.notes,
+        configurationLabel: item.configurationLabel,
+        configurationKey: item.configurationKey,
+        menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) ?? [],
       })),
     })),
     pagination: {
@@ -123,103 +128,71 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate order number
-    const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 4).toUpperCase()}`;
-
-    // Get menu items for pricing
-    const menuItemIds = items.map((i: { menuItemId: string }) => i.menuItemId);
-    const menuItems = await db.menuItem.findMany({
-      where: { id: { in: menuItemIds } },
+    const orderResult = await createOrder({
+      branchId,
+      source: "POS",
+      type: orderType || "DINE_IN",
+      items: items.map(
+        (i: {
+          menuItemId: string;
+          quantity?: number;
+          notes?: string;
+          menuItemOptionIds?: string[];
+        }) => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity || 1,
+          notes: i.notes,
+          menuItemOptionIds: i.menuItemOptionIds,
+        })
+      ),
+      notes,
     });
 
-    const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
-
-    // Calculate totals
-    let subtotal = 0;
-    const orderItems: Array<{
-      menuItemId: string;
-      quantity: number;
-      unitPrice: number;
-      lineTotal: number;
-      notes?: string;
-    }> = [];
-
-    for (const item of items) {
-      const menuItem = menuItemMap.get(item.menuItemId);
-      if (!menuItem) {
-        return NextResponse.json(
-          { error: `Menu item not found: ${item.menuItemId}` },
-          { status: 400 }
-        );
-      }
-
-      const unitPrice = item.unitPrice || Number(menuItem.price);
-      const quantity = item.quantity || 1;
-      const lineTotal = quantity * unitPrice;
-
-      subtotal += lineTotal;
-      orderItems.push({
-        menuItemId: item.menuItemId,
-        quantity,
-        unitPrice,
-        lineTotal,
-        notes: item.notes,
-      });
+    if (orderResult.error || !orderResult.data) {
+      return NextResponse.json(
+        { error: orderResult.error || "Failed to create order" },
+        { status: 400 }
+      );
     }
 
-    const tax = subtotal * 0.125; // 12.5% VAT
-    const total = subtotal + tax;
-
-    // Create order
-    const order = await db.order.create({
-      data: {
-        orderNumber,
-        branchId,
-        source: "POS",
-        type: orderType || "DINE_IN",
-        status: "NEW",
-        paymentStatus: "PENDING",
-        subtotal,
-        tax,
-        discount: 0,
-        deliveryFee: 0,
-        total,
-        notes,
-        items: {
-          create: orderItems,
+    const o = orderResult.data;
+    return NextResponse.json(
+      {
+        data: {
+          id: o.id,
+          orderNumber: o.orderNumber,
+          branchId: o.branchId,
+          orderType: o.type,
+          status: o.status,
+          subtotal: o.subtotal,
+          tax: o.tax,
+          total: o.total,
+          createdAt: o.createdAt,
+          items: o.items.map(
+            (item: {
+              menuItemId: string;
+              quantity: number;
+              unitPrice: number;
+              lineTotal: number;
+              notes?: string | null;
+              configurationLabel?: string | null;
+              configurationKey?: string | null;
+              menuItemOptionIds?: string[];
+            }) => ({
+              menuItemId: item.menuItemId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              lineTotal: item.lineTotal,
+              notes: item.notes,
+              configurationLabel: item.configurationLabel,
+              configurationKey: item.configurationKey,
+              menuItemOptionIds: item.menuItemOptionIds ?? [],
+            })
+          ),
         },
       },
-      include: {
-        items: {
-          include: {
-            menuItem: {
-              select: { id: true, name: true },
-            },
-          },
-        },
-      },
-    });
-
-    return NextResponse.json({
-      data: {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        branchId: order.branchId,
-        orderType: order.type,
-        status: order.status,
-        subtotal: Number(order.subtotal),
-        tax: Number(order.tax),
-        total: Number(order.total),
-        createdAt: order.createdAt.toISOString(),
-        items: order.items.map((item) => ({
-          menuItemId: item.menuItemId,
-          menuItemName: item.menuItem?.name,
-          quantity: Number(item.quantity),
-          unitPrice: Number(item.unitPrice),
-          lineTotal: Number(item.lineTotal),
-        })),
-      },
-    }, { status: 201 });
+      { status: 201 }
+    );
   } catch (error) {
     console.error("[POST /api/v1/orders] Error:", error);
     return NextResponse.json(

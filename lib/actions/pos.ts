@@ -7,6 +7,10 @@ import { logCreate } from "@/lib/services/audit";
 import { createDeliveryRequest } from "@/lib/actions/delivery";
 import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
 import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
+import {
+  applyDefaultMenuItemSelections,
+  resolveMenuItemSelections,
+} from "@/lib/menu-selections";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,6 +30,8 @@ function serializePosOrder(order: Record<string, any>) {
       ...JSON.parse(JSON.stringify(item)),
       unitPrice: Number(item.unitPrice),
       lineTotal: Number(item.lineTotal),
+      menuItemOptionIds:
+        item.selections?.map((s: { menuItemOptionId: string }) => s.menuItemOptionId) ?? [],
       menuItem: item.menuItem ? {
         ...JSON.parse(JSON.stringify(item.menuItem)),
         price: Number(item.menuItem.price),
@@ -51,8 +57,10 @@ function generateOrderNumber(): string {
 export interface CreatePosOrderItemInput {
   menuItemId: string;
   quantity: number;
-  unitPrice: number;
+  /** Client hint; server recomputes from menuItemOptionIds + catalog */
+  unitPrice?: number;
   notes?: string;
+  menuItemOptionIds?: string[];
 }
 
 export interface CreatePosOrderInput {
@@ -81,7 +89,7 @@ export async function createPosOrder(input: CreatePosOrderInput) {
       const existingOrder = await db.order.findFirst({
         where: { offlineClientMutationId: input.offlineClientMutationId },
         include: {
-          items: { include: { menuItem: true } },
+          items: { include: { menuItem: true, selections: { select: { menuItemOptionId: true } } } },
           branch: true,
           cashier: {
             select: { id: true, name: true, email: true },
@@ -101,8 +109,43 @@ export async function createPosOrder(input: CreatePosOrderInput) {
       select: { taxRate: true, taxEnabled: true },
     });
     const taxRate = branch?.taxEnabled ? Number(branch?.taxRate || 12.5) / 100 : 0;
-    
-    const subtotal = input.items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
+
+    const resolvedLines: {
+      menuItemId: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+      notes?: string;
+      configurationLabel: string | null;
+      configurationKey: string | null;
+      optionIds: string[];
+    }[] = [];
+
+    for (const it of input.items) {
+      const withDefaults = await applyDefaultMenuItemSelections(
+        it.menuItemId,
+        it.menuItemOptionIds
+      );
+      const resolved = await resolveMenuItemSelections(it.menuItemId, withDefaults);
+      if (!resolved.ok) {
+        return { success: false, error: resolved.error };
+      }
+      const quantity = it.quantity || 1;
+      const unitPrice = resolved.data.unitPrice;
+      const lineTotal = Math.round(quantity * unitPrice * 100) / 100;
+      resolvedLines.push({
+        menuItemId: it.menuItemId,
+        quantity,
+        unitPrice,
+        lineTotal,
+        notes: it.notes,
+        configurationLabel: resolved.data.configurationLabel || null,
+        configurationKey: resolved.data.configurationKey || null,
+        optionIds: resolved.data.resolvedOptionIds,
+      });
+    }
+
+    const subtotal = resolvedLines.reduce((s, l) => s + l.lineTotal, 0);
     const discount = input.discount || 0;
     const deliveryFee = input.deliveryFee || 0;
     const subtotalAfterDiscount = subtotal - discount;
@@ -133,17 +176,25 @@ export async function createPosOrder(input: CreatePosOrderInput) {
         deliveryNotes: input.deliveryNotes || null,
         offlineClientMutationId: input.offlineClientMutationId || null,
         items: {
-          create: input.items.map((it) => ({
+          create: resolvedLines.map((it) => ({
             menuItemId: it.menuItemId,
             quantity: it.quantity,
             unitPrice: it.unitPrice,
-            lineTotal: it.unitPrice * it.quantity,
+            lineTotal: it.lineTotal,
             notes: it.notes,
+            configurationLabel: it.configurationLabel,
+            configurationKey: it.configurationKey,
+            selections:
+              it.optionIds.length > 0
+                ? {
+                    create: it.optionIds.map((menuItemOptionId) => ({ menuItemOptionId })),
+                  }
+                : undefined,
           })),
         },
       },
       include: {
-        items: { include: { menuItem: true } },
+        items: { include: { menuItem: true, selections: { select: { menuItemOptionId: true } } } },
         branch: true,
         cashier: {
           select: {
@@ -224,7 +275,12 @@ export async function listPosOrders(branchId?: string, status?: OrderStatus) {
         ...(status && { status }),
       },
       include: {
-        items: { include: { menuItem: true } },
+        items: {
+          include: {
+            menuItem: true,
+            selections: { select: { menuItemOptionId: true } },
+          },
+        },
         branch: true,
       },
       orderBy: { openedAt: "desc" },
@@ -274,7 +330,12 @@ export async function completeOrder(input: CompleteOrderInput) {
     const order = await db.order.findUnique({
       where: { id: input.orderId },
       include: {
-        items: { include: { menuItem: true } },
+        items: {
+          include: {
+            menuItem: true,
+            selections: { select: { menuItemOptionId: true } },
+          },
+        },
       },
     });
 
@@ -361,6 +422,19 @@ export async function completeOrder(input: CompleteOrderInput) {
         },
       });
 
+      const allOptionIds = order.items.flatMap((i) =>
+        i.selections?.map((s) => s.menuItemOptionId) || []
+      );
+      const optionRows = allOptionIds.length
+        ? await db.menuItemOption.findMany({
+            where: { id: { in: allOptionIds } },
+            select: { id: true, costDelta: true },
+          })
+        : [];
+      const optCostDelta = new Map(
+        optionRows.map((o) => [o.id, o.costDelta != null ? Number(o.costDelta) : 0])
+      );
+
       const sale = await db.sale.create({
         data: {
           saleNumber,
@@ -374,14 +448,26 @@ export async function completeOrder(input: CompleteOrderInput) {
           customerCount: 1,
           saleDate: new Date(),
           items: {
-            create: order.items.map((item) => ({
-              menuItemId: item.menuItemId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              unitCost: item.menuItem?.cost || 0,
-              total: item.lineTotal,
-              discount: 0,
-            })),
+            create: order.items.map((item) => {
+              const oids = item.selections?.map((s) => s.menuItemOptionId) || [];
+              const optionCostSum = oids.reduce((s, id) => s + (optCostDelta.get(id) || 0), 0);
+              const unitCost =
+                Math.round(((item.menuItem?.cost ? Number(item.menuItem.cost) : 0) + optionCostSum) * 100) / 100;
+              return {
+                menuItemId: item.menuItemId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                unitCost,
+                total: item.lineTotal,
+                discount: 0,
+                configurationLabel: item.configurationLabel,
+                configurationKey: item.configurationKey,
+                selections:
+                  oids.length > 0
+                    ? { create: oids.map((menuItemOptionId) => ({ menuItemOptionId })) }
+                    : undefined,
+              };
+            }),
           },
         },
       });
@@ -402,7 +488,11 @@ export async function completeOrder(input: CompleteOrderInput) {
       // Deduct branch inventory based on recipes (non-blocking)
       try {
         await deductInventoryForSale(
-          order.items.map((item) => ({ menuItemId: item.menuItemId, quantity: item.quantity })),
+          order.items.map((item) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
+          })),
           order.branchId,
           order.id
         );

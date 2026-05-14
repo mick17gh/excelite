@@ -17,6 +17,25 @@ export const publicStoreConfigSchema = z.object({
   }),
 });
 
+const publicMenuOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  sortOrder: z.number(),
+  priceDelta: z.number(),
+  sku: z.string().nullable(),
+  isDefault: z.boolean(),
+});
+
+const publicMenuOptionGroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  sortOrder: z.number(),
+  isRequired: z.boolean(),
+  minSelections: z.number(),
+  maxSelections: z.number(),
+  options: z.array(publicMenuOptionSchema),
+});
+
 export const publicMenuSchema = z.object({
   data: z.array(
     z.object({
@@ -25,6 +44,15 @@ export const publicMenuSchema = z.object({
       price: z.number(),
       description: z.string().nullable(),
       imageUrl: z.string().nullable(),
+      sku: z.string().optional(),
+      category: z
+        .object({
+          id: z.string(),
+          name: z.string(),
+        })
+        .nullable()
+        .optional(),
+      optionGroups: z.array(publicMenuOptionGroupSchema).optional(),
     })
   ),
 });

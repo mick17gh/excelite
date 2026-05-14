@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { UnitType } from "@/lib/generated/prisma/client";
+import { MAX_OPTION_GROUPS_PER_MENU_ITEM } from "@/lib/menu-selections";
 
 export interface PaginationParams {
   page?: number;
@@ -31,6 +32,7 @@ export interface CreateMenuItemInput {
   imageUrl?: string;
   isActive?: boolean;
   ingredients?: IngredientInput[];
+  optionGroups?: MenuItemOptionGroupInput[];
 }
 
 export interface UpdateMenuItemInput {
@@ -44,12 +46,179 @@ export interface UpdateMenuItemInput {
   imageUrl?: string;
   isActive?: boolean;
   ingredients?: IngredientInput[];
+  optionGroups?: MenuItemOptionGroupInput[] | null;
 }
 
 export interface IngredientInput {
   inventoryItemId: string;
   quantity: number;
   unit: UnitType;
+}
+
+export interface MenuItemOptionInput {
+  name: string;
+  sortOrder?: number;
+  priceDelta?: number;
+  costDelta?: number | null;
+  sku?: string | null;
+  isDefault?: boolean;
+  isActive?: boolean;
+  ingredients?: IngredientInput[];
+}
+
+export interface MenuItemOptionGroupInput {
+  name: string;
+  sortOrder?: number;
+  isRequired?: boolean;
+  minSelections?: number;
+  maxSelections?: number;
+  isActive?: boolean;
+  options: MenuItemOptionInput[];
+}
+
+function validateOptionGroupsStructure(
+  optionGroups: MenuItemOptionGroupInput[] | undefined
+): string | null {
+  if (!optionGroups?.length) return null;
+  if (optionGroups.length > MAX_OPTION_GROUPS_PER_MENU_ITEM) {
+    return `At most ${MAX_OPTION_GROUPS_PER_MENU_ITEM} option groups per product`;
+  }
+  for (const g of optionGroups) {
+    if (!g.name?.trim()) return "Each option group needs a name";
+    const isReq = g.isRequired ?? true;
+    const minS = isReq ? (g.minSelections ?? 1) : 0;
+    const maxS = g.maxSelections ?? 1;
+    if (minS < 0 || maxS < 1) return `Invalid min/max selections for group "${g.name}"`;
+    if (minS > maxS) return `minSelections cannot exceed maxSelections for "${g.name}"`;
+    if (!g.options?.length) return `Group "${g.name}" needs at least one option`;
+    for (const o of g.options) {
+      if (!o.name?.trim()) return "Each option needs a name";
+      if (o.priceDelta !== undefined && o.priceDelta < 0) return "Option price delta cannot be negative";
+    }
+  }
+  return null;
+}
+
+/**
+ * Ensures option SKUs are unique across the catalog.
+ * When updating a menu item, pass `excludeMenuItemId` so this product's existing
+ * option rows are ignored — otherwise a false positive happens: update runs
+ * deleteMany inside a transaction but this check used `db` and still sees
+ * uncommitted rows from the same item.
+ */
+async function assertMenuItemOptionSkusAvailable(
+  groups: MenuItemOptionGroupInput[] | undefined,
+  excludeMenuItemId?: string
+): Promise<string | null> {
+  if (!groups?.length) return null;
+  const skus: string[] = [];
+  for (const g of groups) {
+    for (const o of g.options) {
+      const s = o.sku?.trim();
+      if (s) skus.push(s.toUpperCase());
+    }
+  }
+  if (skus.length !== new Set(skus).size) return "Duplicate option SKUs in the form";
+  if (!skus.length) return null;
+  const existing = await db.menuItemOption.findMany({
+    where: {
+      sku: { in: skus },
+      ...(excludeMenuItemId
+        ? { group: { menuItemId: { not: excludeMenuItemId } } }
+        : {}),
+    },
+    select: { id: true, sku: true },
+  });
+  if (existing.length > 0) {
+    return `Option SKU already in use: ${existing[0].sku}`;
+  }
+  return null;
+}
+
+async function buildNestedOptionGroupsCreate(optionGroups: MenuItemOptionGroupInput[]) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const create: any[] = [];
+  for (const g of optionGroups) {
+    const optionCreates: any[] = [];
+    for (const o of g.options) {
+      const row: Record<string, unknown> = {
+        name: o.name.trim(),
+        sortOrder: o.sortOrder ?? 0,
+        priceDelta: o.priceDelta ?? 0,
+        costDelta: o.costDelta ?? null,
+        sku: o.sku?.trim() ? o.sku.trim().toUpperCase() : null,
+        isDefault: o.isDefault ?? false,
+        isActive: o.isActive ?? true,
+      };
+      if (o.ingredients?.length) {
+        const resolved = await resolveIngredientIds(o.ingredients);
+        row.ingredients = {
+          create: resolved.map((ing) => ({
+            inventoryItemId: ing.inventoryItemId,
+            quantity: ing.quantity,
+            unit: ing.unit,
+          })),
+        };
+      }
+      optionCreates.push(row);
+    }
+    create.push({
+      name: g.name.trim(),
+      sortOrder: g.sortOrder ?? 0,
+      isRequired: g.isRequired ?? true,
+      minSelections: (g.isRequired ?? true) ? (g.minSelections ?? 1) : 0,
+      maxSelections: g.maxSelections ?? 1,
+      isActive: g.isActive ?? true,
+      options: { create: optionCreates },
+    });
+  }
+  return { create };
+}
+
+function mapOptionGroupsForClient(
+  groups:
+    | {
+        id: string;
+        name: string;
+        sortOrder: number;
+        isRequired: boolean;
+        minSelections: number;
+        maxSelections: number;
+        isActive: boolean;
+        options: {
+          id: string;
+          name: string;
+          sortOrder: number;
+          priceDelta: unknown;
+          costDelta: unknown;
+          sku: string | null;
+          isDefault: boolean;
+          isActive: boolean;
+        }[];
+      }[]
+    | undefined
+    | null
+) {
+  if (!groups?.length) return [];
+  return groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    sortOrder: g.sortOrder,
+    isRequired: g.isRequired,
+    minSelections: g.minSelections,
+    maxSelections: g.maxSelections,
+    isActive: g.isActive,
+    options: g.options.map((o) => ({
+      id: o.id,
+      name: o.name,
+      sortOrder: o.sortOrder,
+      priceDelta: Number(o.priceDelta),
+      costDelta: o.costDelta != null ? Number(o.costDelta) : null,
+      sku: o.sku,
+      isDefault: o.isDefault,
+      isActive: o.isActive,
+    })),
+  }));
 }
 
 /**
@@ -137,6 +306,15 @@ export async function createMenuItem(input: CreateMenuItemInput) {
       return { success: false, error: "Cost cannot be negative" };
     }
 
+    const ogErr = validateOptionGroupsStructure(input.optionGroups);
+    if (ogErr) {
+      return { success: false, error: ogErr };
+    }
+    const skuErr = await assertMenuItemOptionSkusAvailable(input.optionGroups);
+    if (skuErr) {
+      return { success: false, error: skuErr };
+    }
+
     // Check if SKU already exists
     const existing = await db.menuItem.findUnique({
       where: { sku: input.sku },
@@ -176,22 +354,32 @@ export async function createMenuItem(input: CreateMenuItemInput) {
             })),
           },
         }),
+        ...(input.optionGroups?.length && {
+          optionGroups: await buildNestedOptionGroupsCreate(input.optionGroups),
+        }),
       },
       include: {
         category: true,
+        optionGroups: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            options: { orderBy: { sortOrder: "asc" } },
+          },
+        },
       },
     });
 
     revalidatePath("/dashboard/menu");
     revalidatePath("/pos");
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         ...item,
         category: item.category?.name || "",
         price: Number(item.price),
-        cost: item.cost ? Number(item.cost) : null
-      }
+        cost: item.cost ? Number(item.cost) : null,
+        optionGroups: mapOptionGroupsForClient(item.optionGroups),
+      },
     };
   } catch (error) {
     console.error("[createMenuItem] Error:", error);
@@ -201,7 +389,7 @@ export async function createMenuItem(input: CreateMenuItemInput) {
 
 export async function updateMenuItem(input: UpdateMenuItemInput) {
   try {
-    const { id, ingredients, ...updateData } = input;
+    const { id, ingredients, optionGroups, ...updateData } = input;
 
     // If SKU is being updated, check for conflicts
     if (updateData.sku) {
@@ -214,6 +402,13 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
 
       if (existing) {
         return { success: false, error: "SKU already exists" };
+      }
+    }
+
+    if (optionGroups !== undefined) {
+      const ogErr = validateOptionGroupsStructure(optionGroups ?? undefined);
+      if (ogErr) {
+        return { success: false, error: ogErr };
       }
     }
 
@@ -247,32 +442,87 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
       }
     }
 
-    const item = await db.menuItem.update({
+    if (optionGroups !== undefined) {
+      await db.$transaction(async (tx) => {
+        await tx.menuItemOptionGroup.deleteMany({ where: { menuItemId: id } });
+        if (optionGroups && optionGroups.length > 0) {
+          const skuErr = await assertMenuItemOptionSkusAvailable(optionGroups, id);
+          if (skuErr) {
+            throw new Error(skuErr);
+          }
+          const nested = await buildNestedOptionGroupsCreate(optionGroups);
+          await tx.menuItem.update({
+            where: { id },
+            data: {
+              ...(updateData.name && { name: updateData.name }),
+              ...(updateData.sku && { sku: updateData.sku }),
+              ...(updateData.categoryId && { categoryId: updateData.categoryId }),
+              ...(updateData.price !== undefined && { price: updateData.price }),
+              ...(calculatedCost !== undefined && { cost: calculatedCost }),
+              ...(updateData.description !== undefined && { description: updateData.description }),
+              ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
+              ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
+              optionGroups: nested,
+            },
+          });
+        } else {
+          await tx.menuItem.update({
+            where: { id },
+            data: {
+              ...(updateData.name && { name: updateData.name }),
+              ...(updateData.sku && { sku: updateData.sku }),
+              ...(updateData.categoryId && { categoryId: updateData.categoryId }),
+              ...(updateData.price !== undefined && { price: updateData.price }),
+              ...(calculatedCost !== undefined && { cost: calculatedCost }),
+              ...(updateData.description !== undefined && { description: updateData.description }),
+              ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
+              ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
+            },
+          });
+        }
+      });
+    } else {
+      await db.menuItem.update({
+        where: { id },
+        data: {
+          ...(updateData.name && { name: updateData.name }),
+          ...(updateData.sku && { sku: updateData.sku }),
+          ...(updateData.categoryId && { categoryId: updateData.categoryId }),
+          ...(updateData.price !== undefined && { price: updateData.price }),
+          ...(calculatedCost !== undefined && { cost: calculatedCost }),
+          ...(updateData.description !== undefined && { description: updateData.description }),
+          ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
+          ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
+        },
+      });
+    }
+
+    const item = await db.menuItem.findUniqueOrThrow({
       where: { id },
-      data: {
-        ...(updateData.name && { name: updateData.name }),
-        ...(updateData.sku && { sku: updateData.sku }),
-        ...(updateData.categoryId && { categoryId: updateData.categoryId }),
-        ...(updateData.price !== undefined && { price: updateData.price }),
-        ...(calculatedCost !== undefined && { cost: calculatedCost }),
-        ...(updateData.description !== undefined && { description: updateData.description }),
-        ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
-        ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
+      include: {
+        optionGroups: {
+          orderBy: { sortOrder: "asc" },
+          include: { options: { orderBy: { sortOrder: "asc" } } },
+        },
       },
     });
 
     revalidatePath("/dashboard/menu");
     revalidatePath("/pos");
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: {
         ...item,
         price: Number(item.price),
-        cost: item.cost ? Number(item.cost) : null
-      }
+        cost: item.cost ? Number(item.cost) : null,
+        optionGroups: mapOptionGroupsForClient(item.optionGroups),
+      },
     };
   } catch (error) {
     console.error("[updateMenuItem] Error:", error);
+    if (error instanceof Error && error.message.includes("SKU")) {
+      return { success: false, error: error.message };
+    }
     return { success: false, error: "Failed to update menu item" };
   }
 }
@@ -314,6 +564,16 @@ export async function getMenuItems(
         where,
         include: {
           category: true,
+          optionGroups: {
+            where: { isActive: true },
+            orderBy: { sortOrder: "asc" },
+            include: {
+              options: {
+                where: { isActive: true },
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
         },
         orderBy: [
           { category: { name: "asc" } },
@@ -339,6 +599,7 @@ export async function getMenuItems(
       imageUrl: item.imageUrl,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
+      optionGroups: mapOptionGroupsForClient(item.optionGroups),
     }));
 
     return {
@@ -411,6 +672,19 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
             inventoryItem: true,
           },
         },
+        optionGroups: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            options: {
+              orderBy: { sortOrder: "asc" },
+              include: {
+                ingredients: {
+                  include: { inventoryItem: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -419,7 +693,12 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
     }
 
     // Resolve branch item SKUs to warehouse item IDs for dropdown matching
-    const skus = item.ingredients.map((ing) => ing.inventoryItem.sku);
+    const skus = [
+      ...item.ingredients.map((ing) => ing.inventoryItem.sku),
+      ...item.optionGroups.flatMap((g) =>
+        g.options.flatMap((o) => o.ingredients.map((i) => i.inventoryItem.sku))
+      ),
+    ];
     const warehouseItems = skus.length
       ? await db.warehouseInventoryItem.findMany({
           where: { sku: { in: skus }, isActive: true },
@@ -432,6 +711,27 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
         skuToWarehouseId.set(wh.sku, { id: wh.id, unitCost: Number(wh.unitCost) });
       }
     }
+
+    const mapIngRow = (ing: {
+      id: string;
+      inventoryItemId: string;
+      quantity: unknown;
+      unit: UnitType;
+      inventoryItem: { name: string; sku: string; unitCost: unknown };
+    }) => {
+      const whMatch = skuToWarehouseId.get(ing.inventoryItem.sku);
+      return {
+        id: ing.id,
+        inventoryItemId: whMatch?.id || ing.inventoryItemId,
+        inventoryItemName: ing.inventoryItem.name,
+        inventoryItemSku: ing.inventoryItem.sku,
+        quantity: Number(ing.quantity),
+        unit: ing.unit,
+        unitCost: whMatch?.unitCost ?? Number(ing.inventoryItem.unitCost),
+        lineCost:
+          Number(ing.quantity) * (whMatch?.unitCost ?? Number(ing.inventoryItem.unitCost)),
+      };
+    };
 
     return {
       success: true,
@@ -446,20 +746,27 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
         description: item.description,
         imageUrl: item.imageUrl,
         isActive: item.isActive,
-        ingredients: item.ingredients.map((ing) => {
-          const whMatch = skuToWarehouseId.get(ing.inventoryItem.sku);
-          return {
-            id: ing.id,
-            // Use warehouse item ID if available, otherwise keep branch item ID
-            inventoryItemId: whMatch?.id || ing.inventoryItemId,
-            inventoryItemName: ing.inventoryItem.name,
-            inventoryItemSku: ing.inventoryItem.sku,
-            quantity: Number(ing.quantity),
-            unit: ing.unit,
-            unitCost: whMatch?.unitCost ?? Number(ing.inventoryItem.unitCost),
-            lineCost: Number(ing.quantity) * (whMatch?.unitCost ?? Number(ing.inventoryItem.unitCost)),
-          };
-        }),
+        ingredients: item.ingredients.map(mapIngRow),
+        optionGroups: item.optionGroups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          sortOrder: g.sortOrder,
+          isRequired: g.isRequired,
+          minSelections: g.minSelections,
+          maxSelections: g.maxSelections,
+          isActive: g.isActive,
+          options: g.options.map((o) => ({
+            id: o.id,
+            name: o.name,
+            sortOrder: o.sortOrder,
+            priceDelta: Number(o.priceDelta),
+            costDelta: o.costDelta != null ? Number(o.costDelta) : null,
+            sku: o.sku,
+            isDefault: o.isDefault,
+            isActive: o.isActive,
+            ingredients: o.ingredients.map(mapIngRow),
+          })),
+        })),
       },
     };
   } catch (error) {

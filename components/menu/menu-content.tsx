@@ -81,6 +81,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isBulkOptionsImportOpen, setIsBulkOptionsImportOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   // Pagination state
@@ -270,6 +271,10 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import CSV
+          </Button>
+          <Button variant="outline" onClick={() => setIsBulkOptionsImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import options
           </Button>
           <Button onClick={() => setIsAddOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -570,6 +575,12 @@ export function MenuContent({ items, categories }: MenuContentProps) {
         open={isBulkImportOpen}
         onOpenChange={setIsBulkImportOpen}
         type="menu"
+        onSuccess={() => router.refresh()}
+      />
+      <BulkImportDialog
+        open={isBulkOptionsImportOpen}
+        onOpenChange={setIsBulkOptionsImportOpen}
+        type="menu-options"
         onSuccess={() => router.refresh()}
       />
     </div>

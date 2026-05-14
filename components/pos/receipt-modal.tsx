@@ -16,8 +16,16 @@ import { format } from "date-fns";
 type ReceiptLineItem = {
   quantity?: number;
   unitPrice?: number;
+  configurationLabel?: string | null;
   menuItem?: { name?: string };
 };
+
+function receiptLineLabel(item: ReceiptLineItem): string {
+  const qty = item.quantity ?? 0;
+  const base = item.menuItem?.name || "Item";
+  const suffix = item.configurationLabel ? ` (${item.configurationLabel})` : "";
+  return `${qty}x ${base}${suffix}`;
+}
 
 type ReceiptOrderShape = Record<string, unknown> & {
   orderNumber?: string;
@@ -139,7 +147,7 @@ export function ReceiptModal({ open, onOpenChange, order, onClose }: ReceiptModa
                   <div key={idx} className="flex justify-between text-xs">
                     <div className="flex-1">
                       <div className="font-medium">
-                        {item.quantity ?? 0}x {item.menuItem?.name || "Item"}
+                        {receiptLineLabel(item)}
                       </div>
                     </div>
                     <div className="ml-2">
@@ -230,7 +238,7 @@ function generateReceiptHTML(order: ReceiptOrderShape, formatCurrency: (amount: 
   </div>
   ${order.items?.map((item) => `
     <div class="item">
-      <span>${item.quantity ?? 0}x ${item.menuItem?.name || "Item"}</span>
+      <span>${receiptLineLabel(item)}</span>
       <span>${formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}</span>
     </div>
   `).join("")}
@@ -274,7 +282,7 @@ function generateReceiptText(order: ReceiptOrderShape, formatCurrency: (amount: 
     order.paymentMethod ? `Payment: ${String(order.paymentMethod).replace(/_/g, " ")}` : "",
     "-".repeat(40),
     ...order.items?.map((item) =>
-      `${item.quantity ?? 0}x ${item.menuItem?.name || "Item"}${" ".repeat(20)}${formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}`
+      `${receiptLineLabel(item)}${" ".repeat(20)}${formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}`
     ) || [],
     "-".repeat(40),
     `Subtotal:${" ".repeat(25)}${formatCurrency(Number(order.subtotal))}`,
