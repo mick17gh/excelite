@@ -21,14 +21,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChefHat, Plus, Pencil, Loader2, UtensilsCrossed } from "lucide-react";
+import { ChefHat, Plus, Pencil, Loader2, UtensilsCrossed, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { getBranches } from "@/lib/actions/branches";
+import { getMenuCategories } from "@/lib/actions/menu";
 import {
   listKitchenStations,
   createKitchenStation,
   updateKitchenStation,
 } from "@/lib/actions/kitchen";
+import {
+  parseStationCategoryNames,
+  serializeStationCategoryNames,
+} from "@/lib/kitchen/category-routing";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 
 interface Station {
   id: string;
@@ -46,13 +54,18 @@ interface Branch {
   code: string;
 }
 
+interface MenuCategory {
+  id: string;
+  name: string;
+}
+
 interface StationFormState {
   name: string;
   description: string;
-  categories: string;
+  categoryNames: string[];
 }
 
-const emptyForm: StationFormState = { name: "", description: "", categories: "" };
+const emptyForm: StationFormState = { name: "", description: "", categoryNames: [] };
 
 export function KitchenStationsTab() {
   const [isPending, startTransition] = useTransition();
@@ -64,6 +77,16 @@ export function KitchenStationsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStation, setEditingStation] = useState<Station | null>(null);
   const [form, setForm] = useState<StationFormState>(emptyForm);
+  const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+
+  useEffect(() => {
+    getMenuCategories().then((res) => {
+      if (res.success && res.data) {
+        setMenuCategories(res.data);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     getBranches().then((res) => {
@@ -77,7 +100,7 @@ export function KitchenStationsTab() {
   useEffect(() => {
     if (!selectedBranch) return;
     setIsLoading(true);
-    listKitchenStations(selectedBranch).then((res) => {
+    listKitchenStations(selectedBranch, { activeOnly: false }).then((res) => {
       setStations((res.success && res.data ? res.data : []) as Station[]);
       setIsLoading(false);
     });
@@ -94,9 +117,18 @@ export function KitchenStationsTab() {
     setForm({
       name: station.name,
       description: station.description || "",
-      categories: station.categories || "",
+      categoryNames: parseStationCategoryNames(station.categories),
     });
     setDialogOpen(true);
+  };
+
+  const toggleCategory = (categoryName: string, checked: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      categoryNames: checked
+        ? [...prev.categoryNames, categoryName]
+        : prev.categoryNames.filter((name) => name !== categoryName),
+    }));
   };
 
   const handleSave = () => {
@@ -104,18 +136,20 @@ export function KitchenStationsTab() {
       toast.error("Station name is required");
       return;
     }
+    const categories = serializeStationCategoryNames(form.categoryNames);
+
     startTransition(async () => {
       if (editingStation) {
         const res = await updateKitchenStation({
           id: editingStation.id,
           name: form.name.trim(),
           description: form.description.trim() || undefined,
-          categories: form.categories.trim() || undefined,
+          categories,
         });
         if (res.success) {
           toast.success("Station updated");
           setDialogOpen(false);
-          const refresh = await listKitchenStations(selectedBranch);
+          const refresh = await listKitchenStations(selectedBranch, { activeOnly: false });
           setStations((refresh.success && refresh.data ? refresh.data : []) as Station[]);
         } else {
           toast.error(res.error || "Failed to update station");
@@ -125,12 +159,12 @@ export function KitchenStationsTab() {
           branchId: selectedBranch,
           name: form.name.trim(),
           description: form.description.trim() || undefined,
-          categories: form.categories.trim() || undefined,
+          categories,
         });
         if (res.success) {
           toast.success("Station created");
           setDialogOpen(false);
-          const refresh = await listKitchenStations(selectedBranch);
+          const refresh = await listKitchenStations(selectedBranch, { activeOnly: false });
           setStations((refresh.success && refresh.data ? refresh.data : []) as Station[]);
         } else {
           toast.error(res.error || "Failed to create station");
@@ -143,13 +177,20 @@ export function KitchenStationsTab() {
     startTransition(async () => {
       const res = await updateKitchenStation({ id: station.id, isActive: !station.isActive });
       if (res.success) {
-        const refresh = await listKitchenStations(selectedBranch);
+        const refresh = await listKitchenStations(selectedBranch, { activeOnly: false });
         setStations((refresh.success && refresh.data ? refresh.data : []) as Station[]);
       } else {
         toast.error(res.error || "Failed to update station");
       }
     });
   };
+
+  const categoryTriggerLabel =
+    form.categoryNames.length === 0
+      ? "All menu categories (no filter)"
+      : form.categoryNames.length === 1
+        ? form.categoryNames[0]
+        : `${form.categoryNames.length} categories selected`;
 
   return (
     <>
@@ -275,15 +316,52 @@ export function KitchenStationsTab() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Menu Categories (comma-separated)</Label>
-              <Input
-                value={form.categories}
-                onChange={(e) => setForm({ ...form, categories: e.target.value })}
-                placeholder="e.g., Mains, Desserts, Drinks"
-                className="h-9"
-              />
+              <Label className="text-xs">Menu Categories</Label>
+              <Popover open={categoriesOpen} onOpenChange={setCategoriesOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "h-9 w-full justify-between font-normal",
+                      form.categoryNames.length === 0 && "text-muted-foreground"
+                    )}
+                  >
+                    <span className="truncate">{categoryTriggerLabel}</span>
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
+                  {menuCategories.length === 0 ? (
+                    <p className="px-2 py-3 text-xs text-muted-foreground">
+                      No menu categories found. Create categories under Menu first.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 space-y-1 overflow-y-auto">
+                      {menuCategories.map((category) => {
+                        const checked = form.categoryNames.includes(category.name);
+                        return (
+                          <label
+                            key={category.id}
+                            className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(value) =>
+                                toggleCategory(category.name, value === true)
+                              }
+                            />
+                            <span>{category.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
               <p className="text-xs text-muted-foreground">
-                Used to route specific menu categories to this station
+                Only items in selected categories appear on this station. Leave empty to show all
+                items.
               </p>
             </div>
           </div>

@@ -8,6 +8,8 @@ import {
   applyDefaultMenuItemSelections,
   resolveMenuItemSelections,
 } from "@/lib/menu-selections";
+import { filterOrderItemsForKitchenStation } from "@/lib/kitchen/category-routing";
+import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
 
 // Helper to serialize Decimal fields from raw Prisma order objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -523,7 +525,9 @@ export async function createOrder(input: CreateOrderInput) {
       include: {
         items: {
           include: {
-            menuItem: { select: { name: true } },
+            menuItem: {
+              include: { category: { select: { name: true } } },
+            },
             selections: { select: { menuItemOptionId: true } },
           },
         },
@@ -535,23 +539,34 @@ export async function createOrder(input: CreateOrderInput) {
     if (input.sendToKitchen) {
       try {
         let stationId = input.stationId;
+        let stationCategories: string | null = null;
         if (!stationId) {
           const defaultStation = await db.kitchenStation.findFirst({
             where: { branchId: input.branchId, isActive: true },
           });
           stationId = defaultStation?.id;
+          stationCategories = defaultStation?.categories ?? null;
+        } else {
+          const station = await db.kitchenStation.findUnique({
+            where: { id: stationId },
+            select: { categories: true },
+          });
+          stationCategories = station?.categories ?? null;
         }
         if (stationId) {
-          await db.kitchenTicket.create({
-            data: {
-              orderId: order.id,
-              stationId,
-              status: "NEW",
-              items: {
-                create: order.items.map((item) => ({ orderItemId: item.id, status: "NEW" })),
+          const kitchenItems = filterOrderItemsForKitchenStation(order.items, stationCategories);
+          if (kitchenItems.length > 0) {
+            await db.kitchenTicket.create({
+              data: {
+                orderId: order.id,
+                stationId,
+                status: "NEW",
+                items: {
+                  create: kitchenItems.map((item) => ({ orderItemId: item.id, status: "NEW" })),
+                },
               },
-            },
-          });
+            });
+          }
         }
       } catch (err) {
         console.warn("[createOrder] Failed to create kitchen ticket:", err);
@@ -602,23 +617,15 @@ export async function updateOrderStatus(input: { id: string; status: OrderStatus
 
 export async function sendOrderToKitchen(input: { orderId: string; stationId?: string }) {
   try {
-    // Get the order with its items to find the branch and create kitchen items
     const order = await db.order.findUnique({
       where: { id: input.orderId },
-      select: { 
-        id: true, 
-        branchId: true,
-        items: {
-          select: { id: true }
-        }
-      },
+      select: { id: true, branchId: true },
     });
 
     if (!order) {
       return { error: "Order not found" };
     }
 
-    // Check if kitchen ticket already exists
     const existingTicket = await db.kitchenTicket.findFirst({
       where: { orderId: input.orderId },
     });
@@ -627,7 +634,6 @@ export async function sendOrderToKitchen(input: { orderId: string; stationId?: s
       return { error: "Order already sent to kitchen" };
     }
 
-    // Find station or use default
     let stationId = input.stationId;
     if (!stationId) {
       const defaultStation = await db.kitchenStation.findFirst({
@@ -640,16 +646,20 @@ export async function sendOrderToKitchen(input: { orderId: string; stationId?: s
       return { error: "No active kitchen station found for this branch" };
     }
 
-    // Create kitchen ticket with items
+    const eligible = await getKitchenEligibleOrderItems(input.orderId, stationId);
+    if (!eligible.ok) {
+      return { error: eligible.error };
+    }
+
     const ticket = await db.kitchenTicket.create({
       data: {
         orderId: input.orderId,
         stationId,
         status: "NEW",
         items: {
-          create: order.items.map((item) => ({ 
-            orderItemId: item.id, 
-            status: "NEW" 
+          create: eligible.items.map((item) => ({
+            orderItemId: item.id,
+            status: "NEW",
           })),
         },
       },

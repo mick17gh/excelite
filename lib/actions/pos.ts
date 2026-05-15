@@ -11,6 +11,8 @@ import {
   applyDefaultMenuItemSelections,
   resolveMenuItemSelections,
 } from "@/lib/menu-selections";
+import { filterOrderItemsForKitchenStation } from "@/lib/kitchen/category-routing";
+import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,7 +196,12 @@ export async function createPosOrder(input: CreatePosOrderInput) {
         },
       },
       include: {
-        items: { include: { menuItem: true, selections: { select: { menuItemOptionId: true } } } },
+        items: {
+          include: {
+            menuItem: { include: { category: { select: { name: true } } } },
+            selections: { select: { menuItemOptionId: true } },
+          },
+        },
         branch: true,
         cashier: {
           select: {
@@ -211,28 +218,39 @@ export async function createPosOrder(input: CreatePosOrderInput) {
     if (input.sendToKitchen) {
       try {
         let stationId = input.stationId;
+        let stationCategories: string | null = null;
         if (!stationId) {
           const defaultStation = await db.kitchenStation.findFirst({
             where: { branchId: input.branchId, isActive: true },
           });
           stationId = defaultStation?.id;
+          stationCategories = defaultStation?.categories ?? null;
+        } else {
+          const station = await db.kitchenStation.findUnique({
+            where: { id: stationId },
+            select: { categories: true },
+          });
+          stationCategories = station?.categories ?? null;
         }
 
         if (stationId) {
-          const kitchenTicket = await db.kitchenTicket.create({
-            data: {
-              orderId: order.id,
-              stationId,
-              status: "NEW",
-              items: {
-                create: order.items.map((item) => ({
-                  orderItemId: item.id,
-                  status: "NEW",
-                })),
+          const kitchenItems = filterOrderItemsForKitchenStation(order.items, stationCategories);
+          if (kitchenItems.length > 0) {
+            const kitchenTicket = await db.kitchenTicket.create({
+              data: {
+                orderId: order.id,
+                stationId,
+                status: "NEW",
+                items: {
+                  create: kitchenItems.map((item) => ({
+                    orderItemId: item.id,
+                    status: "NEW",
+                  })),
+                },
               },
-            },
-          });
-          kitchenTicketId = kitchenTicket.id;
+            });
+            kitchenTicketId = kitchenTicket.id;
+          }
         }
       } catch (error) {
         console.warn("[createPosOrder] Failed to create kitchen ticket:", error);
@@ -558,7 +576,12 @@ export async function sendToKitchen(orderId: string, itemIds?: string[], station
   try {
     const order = await db.order.findUnique({
       where: { id: orderId },
-      include: { items: true, branch: true },
+      include: {
+        branch: true,
+        items: {
+          include: { menuItem: { include: { category: { select: { name: true } } } } },
+        },
+      },
     });
 
     if (!order) return { success: false, error: "Order not found" };
@@ -573,11 +596,18 @@ export async function sendToKitchen(orderId: string, itemIds?: string[], station
 
     if (!targetStationId) return { success: false, error: "No kitchen station found" };
 
-    const itemsToSend = itemIds
-      ? order.items.filter((item) => itemIds.includes(item.id))
-      : order.items;
+    const eligible = await getKitchenEligibleOrderItems(orderId, targetStationId);
+    if (!eligible.ok) {
+      return { success: false, error: eligible.error };
+    }
 
-    if (itemsToSend.length === 0) return { success: false, error: "No items to send" };
+    const itemsToSend = itemIds
+      ? eligible.items.filter((item) => itemIds.includes(item.id))
+      : eligible.items;
+
+    if (itemsToSend.length === 0) {
+      return { success: false, error: "No items to send for this kitchen station" };
+    }
 
     const kitchenTicket = await db.kitchenTicket.create({
       data: {
@@ -600,35 +630,6 @@ export async function sendToKitchen(orderId: string, itemIds?: string[], station
   } catch (error) {
     console.error("[sendToKitchen] Error:", error);
     return { success: false, error: "Failed to send order to kitchen" };
-  }
-}
-
-// Create kitchen ticket from order (used from kitchen actions)
-export async function createKitchenTicketFromOrder(orderId: string, stationId: string) {
-  try {
-    const order = await db.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
-
-    if (!order) return { success: false, error: "Order not found" };
-
-    const ticket = await db.kitchenTicket.create({
-      data: {
-        orderId: order.id,
-        stationId,
-        status: "NEW",
-        items: {
-          create: order.items.map((item) => ({ orderItemId: item.id, status: "NEW" })),
-        },
-      },
-    });
-
-    revalidatePath("/kitchen");
-    return { success: true, data: ticket };
-  } catch (error) {
-    console.error("[createKitchenTicketFromOrder] Error:", error);
-    return { success: false, error: "Failed to create kitchen ticket" };
   }
 }
 

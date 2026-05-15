@@ -29,7 +29,13 @@ import {
   Undo2,
   FastForward,
 } from "lucide-react";
-import { updateKitchenItemStatus, bumpTicket, recallTicket, listKitchenTickets } from "@/lib/actions/kitchen";
+import {
+  updateKitchenItemStatus,
+  bumpTicket,
+  completeAllTicketItems,
+  recallTicket,
+  listKitchenTickets,
+} from "@/lib/actions/kitchen";
 import { OrderStatus } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -105,6 +111,10 @@ function getStatusIcon(status: OrderStatus) {
 function calculateTimeElapsed(createdAt: Date): number {
   return Math.floor((new Date().getTime() - new Date(createdAt).getTime()) / 1000 / 60);
 }
+
+/** Solid dark blue — kitchen ticket actions avoid the default gradient button style */
+const kitchenActionBtn =
+  "bg-blue-700 text-white hover:bg-blue-800 shadow-none hover:shadow-none";
 
 export function KitchenContent({ branches, stations, tickets: initialTickets }: KitchenContentProps) {
   const [tickets, setTickets] = useState(initialTickets);
@@ -183,6 +193,18 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
         return;
       }
       toast.success("Ticket bumped");
+      refreshTickets();
+    });
+  };
+
+  const handleCompleteAll = (ticketId: string) => {
+    startTransition(async () => {
+      const res = await completeAllTicketItems(ticketId);
+      if (!res.success) {
+        toast.error(res.error || "Failed to complete all items");
+        return;
+      }
+      toast.success("All items completed");
       refreshTickets();
     });
   };
@@ -352,6 +374,12 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
               const timeElapsed = calculateTimeElapsed(ticket.createdAt);
               const StatusIcon = getStatusIcon(ticket.status);
               const isUrgent = timeElapsed > 15;
+              const hasIncompleteItems = ticket.items.some((item) => item.status !== "COMPLETED");
+              const canBumpTicket =
+                ticket.status !== "READY" && ticket.status !== "COMPLETED";
+              const canCompleteAll =
+                ticket.status === "READY" &&
+                hasIncompleteItems;
 
               return (
                 <Card
@@ -406,16 +434,28 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                           Recall
                         </Button>
                       )}
-                      {ticket.status !== "READY" && ticket.status !== "COMPLETED" && (
+                      {canBumpTicket && (
                         <Button
                           size="sm"
                           variant="default"
                           onClick={() => handleBumpTicket(ticket.id)}
                           disabled={isPending}
-                          className="h-7 text-xs"
+                          className={cn("h-7 text-xs", kitchenActionBtn)}
                         >
                           <FastForward className="mr-1 h-3 w-3" />
                           Bump All
+                        </Button>
+                      )}
+                      {canCompleteAll && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleCompleteAll(ticket.id)}
+                          disabled={isPending}
+                          className={cn("h-7 text-xs", kitchenActionBtn)}
+                        >
+                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          Complete All
                         </Button>
                       )}
                       <span className="text-xs text-muted-foreground ml-auto">
@@ -468,7 +508,7 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                                 variant="default"
                                 onClick={() => bumpItem(item.id, "IN_PROGRESS")}
                                 disabled={isPending}
-                                className="h-7 px-2.5 text-xs"
+                                className={cn("h-7 px-2.5 text-xs", kitchenActionBtn)}
                               >
                                 <Play className="mr-1 h-3 w-3" />
                                 Start
@@ -480,7 +520,7 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                                 variant="default"
                                 onClick={() => bumpItem(item.id, "READY")}
                                 disabled={isPending}
-                                className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+                                className={cn("h-7 px-2.5 text-xs", kitchenActionBtn)}
                               >
                                 <CheckCircle2 className="mr-1 h-3 w-3" />
                                 Ready
@@ -492,7 +532,7 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                                 variant="default"
                                 onClick={() => bumpItem(item.id, "COMPLETED")}
                                 disabled={isPending}
-                                className="h-7 px-2.5 text-xs"
+                                className={cn("h-7 px-2.5 text-xs", kitchenActionBtn)}
                               >
                                 <CheckCircle2 className="mr-1 h-3 w-3" />
                                 Complete

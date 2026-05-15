@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { OrderStatus } from "@/lib/generated/prisma/client";
 import { sendOrderReadySMS } from "@/lib/services/sms-notifications";
+import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
 
 export interface CreateStationInput {
   branchId: string;
@@ -68,11 +69,15 @@ export async function deleteKitchenStation(id: string) {
   }
 }
 
-export async function listKitchenStations(branchId?: string) {
+export async function listKitchenStations(
+  branchId?: string,
+  options?: { activeOnly?: boolean }
+) {
   try {
+    const activeOnly = options?.activeOnly !== false;
     const stations = await db.kitchenStation.findMany({
       where: {
-        isActive: true,
+        ...(activeOnly && { isActive: true }),
         ...(branchId && { branchId }),
       },
       orderBy: { name: "asc" },
@@ -249,6 +254,71 @@ export async function bumpTicket(ticketId: string) {
   }
 }
 
+// Mark every item on a ticket as completed in one action
+export async function completeAllTicketItems(ticketId: string) {
+  try {
+    const ticket = await db.kitchenTicket.findUnique({
+      where: { id: ticketId },
+      include: { items: true },
+    });
+
+    if (!ticket) {
+      return { success: false, error: "Ticket not found" };
+    }
+
+    if (ticket.status === "COMPLETED") {
+      return { success: false, error: "Ticket already completed" };
+    }
+
+    const hasIncompleteItems = ticket.items.some((item) => item.status !== "COMPLETED");
+    if (!hasIncompleteItems) {
+      return { success: false, error: "All items are already completed" };
+    }
+
+    const now = new Date();
+
+    await db.kitchenItem.updateMany({
+      where: { ticketId, startedAt: null },
+      data: { startedAt: now },
+    });
+
+    await db.kitchenItem.updateMany({
+      where: { ticketId },
+      data: {
+        status: "COMPLETED",
+        completedAt: now,
+      },
+    });
+
+    const updatedTicket = await db.kitchenTicket.update({
+      where: { id: ticketId },
+      data: {
+        status: "COMPLETED",
+        completedAt: now,
+      },
+    });
+
+    await db.order
+      .update({
+        where: { id: updatedTicket.orderId },
+        data: {
+          status: "COMPLETED",
+          closedAt: now,
+        },
+      })
+      .catch(() => {
+        // Non-fatal: order may already be in this state
+      });
+
+    revalidatePath("/kitchen");
+    revalidatePath("/dashboard/orders");
+    return { success: true };
+  } catch (error) {
+    console.error("[completeAllTicketItems] Error:", error);
+    return { success: false, error: "Failed to complete all items" };
+  }
+}
+
 // Recall a completed ticket back to ready status
 export async function recallTicket(ticketId: string) {
   try {
@@ -350,22 +420,18 @@ export async function getKitchenStats(branchId?: string) {
 // Create kitchen ticket from order
 export async function createKitchenTicketFromOrder(orderId: string, stationId: string) {
   try {
-    const order = await db.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
-
-    if (!order) {
-      return { success: false, error: "Order not found" };
+    const eligible = await getKitchenEligibleOrderItems(orderId, stationId);
+    if (!eligible.ok) {
+      return { success: false, error: eligible.error };
     }
 
     const ticket = await db.kitchenTicket.create({
       data: {
-        orderId: order.id,
+        orderId,
         stationId,
         status: "NEW",
         items: {
-          create: order.items.map((item) => ({
+          create: eligible.items.map((item) => ({
             orderItemId: item.id,
             status: "NEW",
           })),
