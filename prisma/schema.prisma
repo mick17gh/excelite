@@ -1249,6 +1249,7 @@ model Organization {
   storeDescription   String?
   storeLogoUrl       String?
   storeBannerUrl     String?
+  storeBanners       Json?
   storeTheme         Json?
   businessHours      Json?
   storeTimezone      String?            @default("Africa/Accra")

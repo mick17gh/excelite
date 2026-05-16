@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, Download, Loader2, Store } from "lucide-react";
 import { toast } from "sonner";
 import { generateStorefrontConfig, getOnlineStoreSettings, updateOrganization } from "@/lib/actions/organization";
+import type { StoreBanner } from "@/lib/storefront/banners";
+import { StoreBannerManager } from "@/components/settings/store-banner-manager";
 
 const templateOptions = ["classic", "modern", "quick", "marketplace", "minimal"];
 
@@ -23,6 +25,7 @@ type Props = {
 export function OnlineStoreTab({ organizationId, tier }: Props) {
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(true);
+  const [banners, setBanners] = useState<StoreBanner[]>([]);
   const [form, setForm] = useState({
     onlineOrderingEnabled: false,
     storeSlug: "",
@@ -74,6 +77,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
         return;
       }
 
+      setBanners(result.data.storeBanners || []);
       setForm({
         onlineOrderingEnabled: result.data.onlineOrderingEnabled,
         storeSlug: result.data.storeSlug || "",
@@ -139,6 +143,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
         storeSlug: form.storeSlug || null,
         storeName: form.storeName || null,
         storeDescription: form.storeDescription || null,
+        storeBanners: banners,
         storeTimezone: form.storeTimezone || "Africa/Accra",
         storefrontTemplateId: form.storefrontTemplateId,
         businessHours: parsedBusinessHours,
@@ -162,6 +167,10 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
       if (result.error) {
         toast.error(result.error);
         return;
+      }
+      const reload = await getOnlineStoreSettings(organizationId);
+      if (reload.data?.storeBanners) {
+        setBanners(reload.data.storeBanners);
       }
       setForm((prev) => ({ ...prev, paystackSecretKey: "" }));
       toast.success("Online store settings saved");
@@ -282,6 +291,11 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
             <Label className="text-xs">Store Description</Label>
             <Textarea value={form.storeDescription} onChange={(e) => setForm((prev) => ({ ...prev, storeDescription: e.target.value }))} />
           </div>
+
+          <div className="sm:col-span-2">
+            <StoreBannerManager banners={banners} onChange={setBanners} disabled={isPending} />
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs">Storefront Template</Label>
             <Select value={form.storefrontTemplateId} onValueChange={(value) => setForm((prev) => ({ ...prev, storefrontTemplateId: value }))}>
@@ -402,7 +416,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="outline" onClick={handleDownloadConfig} disabled={isPending}>
             <Download className="mr-1.5 h-3.5 w-3.5" />
-            Generate Config
+            Download Config + Menu
           </Button>
           <Button onClick={handleSave} disabled={isPending}>
             {isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}

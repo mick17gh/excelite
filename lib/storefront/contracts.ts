@@ -9,6 +9,13 @@ export const publicStoreConfigSchema = z.object({
       description: z.string().nullable(),
       logoUrl: z.string().nullable(),
       bannerUrl: z.string().nullable(),
+      banners: z.array(
+        z.object({
+          id: z.string(),
+          url: z.string(),
+          sortOrder: z.number(),
+        })
+      ),
     }),
     template: z.object({
       id: z.string(),
@@ -55,6 +62,17 @@ export const publicMenuSchema = z.object({
       optionGroups: z.array(publicMenuOptionGroupSchema).optional(),
     })
   ),
+});
+
+export const storefrontConfigBundleSchema = z.object({
+  data: publicStoreConfigSchema.shape.data,
+  menu: publicMenuSchema.shape.data,
+  meta: z.object({
+    version: z.string(),
+    apiBaseUrl: z.string(),
+    publicEndpoints: z.record(z.string(), z.string()).nullable(),
+    notes: z.record(z.string(), z.string()).optional(),
+  }),
 });
 
 export const publicTrackSchema = z.object({

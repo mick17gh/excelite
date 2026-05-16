@@ -3,6 +3,9 @@ import { hasFeature, isSuperAdmin } from "@/lib/tier-config";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES, type StorefrontTemplateId } from "@/lib/storefront/templates";
 import { decryptSecret } from "@/lib/storefront/paystack";
 import { getStoreAvailabilityByHours, type BusinessHours } from "@/lib/storefront/hours";
+import { getPrimaryBannerUrl, resolveStoreBanners, type StoreBanner } from "@/lib/storefront/banners";
+
+export type { StoreBanner };
 
 export type PublicStoreConfig = {
   organizationId: string;
@@ -11,7 +14,9 @@ export type PublicStoreConfig = {
     slug: string;
     description: string | null;
     logoUrl: string | null;
+    /** @deprecated Use banners[0]?.url */
     bannerUrl: string | null;
+    banners: StoreBanner[];
   };
   template: {
     id: StorefrontTemplateId;
@@ -98,6 +103,7 @@ export function buildPublicStoreConfig(
   const contactAddress = firstBranch
     ? [firstBranch.address, firstBranch.city, firstBranch.country].filter(Boolean).join(", ")
     : null;
+  const banners = resolveStoreBanners(org.storeBanners, org.storeBannerUrl);
 
   return {
     organizationId: org.id,
@@ -106,7 +112,8 @@ export function buildPublicStoreConfig(
       slug: org.storeSlug || "",
       description: org.storeDescription,
       logoUrl: org.storeLogoUrl,
-      bannerUrl: org.storeBannerUrl,
+      bannerUrl: getPrimaryBannerUrl(banners),
+      banners,
     },
     template: {
       id: templateId,

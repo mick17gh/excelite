@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { buildPublicStoreConfig, getOrganizationForStorefront, getStorefrontAvailability, isStorefrontEnabledForOrg, resolveAllowedStorefrontOrigins } from "@/lib/storefront/config";
+import { getPublicStoreMenu } from "@/lib/storefront/menu";
 import { recordStorefrontMetric } from "@/lib/storefront/metrics";
 import { takeRateLimitToken } from "@/lib/storefront/rate-limit";
 
@@ -49,74 +49,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ organiz
 
   const { searchParams } = new URL(req.url);
   const categoryId = searchParams.get("categoryId");
+  const menu = await getPublicStoreMenu({ categoryId });
 
-  const items = await db.menuItem.findMany({
-    where: {
-      deletedAt: null,
-      isActive: true,
-      ...(categoryId ? { categoryId } : {}),
-    },
-    include: {
-      category: {
-        select: { id: true, name: true },
-      },
-      optionGroups: {
-        where: { isActive: true },
-        orderBy: { sortOrder: "asc" },
-        include: {
-          options: {
-            where: { isActive: true },
-            orderBy: { sortOrder: "asc" },
-            select: {
-              id: true,
-              name: true,
-              sortOrder: true,
-              priceDelta: true,
-              sku: true,
-              isDefault: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
-  });
-
-  recordStorefrontMetric("storefront.menu.requests", { organizationId, status: 200, count: items.length });
-  return applyCors(
-    req,
-    NextResponse.json({
-      data: items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        imageUrl: item.imageUrl,
-        sku: item.sku,
-        price: Number(item.price),
-        category: item.category
-          ? {
-              id: item.category.id,
-              name: item.category.name,
-            }
-          : null,
-        optionGroups: item.optionGroups.map((g) => ({
-          id: g.id,
-          name: g.name,
-          sortOrder: g.sortOrder,
-          isRequired: g.isRequired,
-          minSelections: g.minSelections,
-          maxSelections: g.maxSelections,
-          options: g.options.map((o) => ({
-            id: o.id,
-            name: o.name,
-            sortOrder: o.sortOrder,
-            priceDelta: Number(o.priceDelta),
-            sku: o.sku,
-            isDefault: o.isDefault,
-          })),
-        })),
-      })),
-    }),
-    allowedOrigins
-  );
+  recordStorefrontMetric("storefront.menu.requests", { organizationId, status: 200, count: menu.length });
+  return applyCors(req, NextResponse.json({ data: menu }), allowedOrigins);
 }

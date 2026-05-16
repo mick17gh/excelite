@@ -8,7 +8,14 @@ import { hasPermission } from "@/lib/permissions";
 import { hasFeature, TIER_CONFIG } from "@/lib/tier-config";
 import { encryptSecret } from "@/lib/storefront/paystack";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES } from "@/lib/storefront/templates";
-import { buildPublicStoreConfig, getOrganizationForStorefront } from "@/lib/storefront/config";
+import { buildPublicStoreConfig, getOrganizationForStorefront, type PublicStoreConfig } from "@/lib/storefront/config";
+import { getPublicStoreMenu, type PublicMenuItem } from "@/lib/storefront/menu";
+import {
+  normalizeBannersForSave,
+  resolveStoreBanners,
+  type StoreBanner,
+  validateStoreBannersForSave,
+} from "@/lib/storefront/banners";
 
 export interface UpdateOrganizationInput {
   id: string;
@@ -24,6 +31,7 @@ export interface UpdateOrganizationInput {
   storeDescription?: string | null;
   storeLogoUrl?: string | null;
   storeBannerUrl?: string | null;
+  storeBanners?: StoreBanner[] | null;
   storeTheme?: Record<string, unknown> | null;
   businessHours?: Record<string, { open: string; close: string; closed?: boolean }> | null;
   storeTimezone?: string | null;
@@ -79,6 +87,7 @@ export async function getOrganization(id?: string) {
         storeDescription: org.storeDescription,
         storeLogoUrl: org.storeLogoUrl,
         storeBannerUrl: org.storeBannerUrl,
+        storeBanners: org.storeBanners,
         storeTheme: org.storeTheme as Record<string, unknown> | null,
         storefrontTemplateId: org.storefrontTemplateId || "classic",
         businessHours: org.businessHours as Record<string, { open: string; close: string; closed?: boolean }> | null,
@@ -177,6 +186,14 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
     if (input.storeDescription !== undefined) data.storeDescription = input.storeDescription;
     if (input.storeLogoUrl !== undefined) data.storeLogoUrl = input.storeLogoUrl;
     if (input.storeBannerUrl !== undefined) data.storeBannerUrl = input.storeBannerUrl;
+    if (input.storeBanners !== undefined) {
+      const normalizedBanners =
+        input.storeBanners === null ? [] : normalizeBannersForSave(input.storeBanners);
+      const validationError = validateStoreBannersForSave(normalizedBanners);
+      if (validationError) return { error: validationError };
+      data.storeBanners = normalizedBanners;
+      data.storeBannerUrl = normalizedBanners[0]?.url ?? null;
+    }
     if (input.storeTheme !== undefined) data.storeTheme = input.storeTheme;
     if (input.businessHours !== undefined) data.businessHours = input.businessHours;
     if (input.storeTimezone !== undefined) data.storeTimezone = input.storeTimezone;
@@ -244,6 +261,7 @@ export async function getOnlineStoreSettings(organizationId: string) {
       storeDescription: org.storeDescription,
       storeLogoUrl: org.storeLogoUrl,
       storeBannerUrl: org.storeBannerUrl,
+      storeBanners: resolveStoreBanners(org.storeBanners, org.storeBannerUrl),
       storefrontTemplateId: normalizeTemplateId(org.storefrontTemplateId),
       businessHours: org.businessHours as Record<string, { open: string; close: string; closed?: boolean }> | null,
       storeTimezone: org.storeTimezone || "Africa/Accra",
@@ -282,18 +300,35 @@ export async function generateStorefrontConfig(organizationId: string) {
       }
     : null;
   const canonical = buildPublicStoreConfig(org);
+  const menu = await getPublicStoreMenu();
 
   return {
     data: {
       data: canonical,
+      menu,
       meta: {
-        version: "1.1",
+        version: "1.3",
         apiBaseUrl,
         publicEndpoints,
+        notes: {
+          menu: "Snapshot of active menu with optionGroups (variants). Prefer live GET .../menu for production.",
+          orders: "POST items[].menuItemOptionIds with selected option ids from menu.optionGroups[].options[].id",
+        },
       },
     },
   };
 }
+
+export type StorefrontConfigBundle = {
+  data: PublicStoreConfig;
+  menu: PublicMenuItem[];
+  meta: {
+    version: string;
+    apiBaseUrl: string;
+    publicEndpoints: Record<string, string> | null;
+    notes?: Record<string, string>;
+  };
+};
 
 export async function createOrganization(name: string, tier: SubscriptionTier = "FREE") {
   try {
