@@ -393,7 +393,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="outline" onClick={handleDownloadConfig} disabled={isPending}>
             <Download className="mr-1.5 h-3.5 w-3.5" />
-            Download Config + Menu
+            Download Config
           </Button>
           <Button onClick={handleSave} disabled={isPending}>
             {isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}

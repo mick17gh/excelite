@@ -8,7 +8,6 @@ import { hasPermission } from "@/lib/permissions";
 import { hasFeature, TIER_CONFIG } from "@/lib/tier-config";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES } from "@/lib/storefront/templates";
 import { buildPublicStoreConfig, getOrganizationForStorefront, type PublicStoreConfig } from "@/lib/storefront/config";
-import { getPublicStoreMenu, type PublicMenuItem } from "@/lib/storefront/menu";
 import {
   normalizeBannersForSave,
   resolveStoreBanners,
@@ -288,18 +287,16 @@ export async function generateStorefrontConfig(organizationId: string) {
       }
     : null;
   const canonical = buildPublicStoreConfig(org);
-  const menu = await getPublicStoreMenu();
 
   return {
     data: {
       data: canonical,
-      menu,
       meta: {
         version: "1.3",
         apiBaseUrl,
         publicEndpoints,
         notes: {
-          menu: "Snapshot of active menu with optionGroups (variants). Prefer live GET .../menu for production.",
+          menu: "Fetch live menu via GET .../menu (includes optionGroups for variants).",
           orders: "POST items[].menuItemOptionIds with selected option ids from menu.optionGroups[].options[].id",
         },
       },
@@ -309,7 +306,6 @@ export async function generateStorefrontConfig(organizationId: string) {
 
 export type StorefrontConfigBundle = {
   data: PublicStoreConfig;
-  menu: PublicMenuItem[];
   meta: {
     version: string;
     apiBaseUrl: string;
