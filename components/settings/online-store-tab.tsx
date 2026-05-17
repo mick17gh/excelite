@@ -45,8 +45,6 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
     whatsappNumber: "",
     facebookUrl: "",
     instagramUrl: "",
-    paystackPublicKey: "",
-    paystackSecretKey: "",
     paystackEnabled: false,
     businessHoursJson: "",
   });
@@ -97,8 +95,6 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
         whatsappNumber: result.data.whatsappNumber || "",
         facebookUrl: result.data.facebookUrl || "",
         instagramUrl: result.data.instagramUrl || "",
-        paystackPublicKey: result.data.paystackPublicKey || "",
-        paystackSecretKey: "",
         paystackEnabled: Boolean(result.data.paystackEnabled),
         businessHoursJson: JSON.stringify(
           result.data.businessHours || {
@@ -159,9 +155,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
         whatsappNumber: form.whatsappNumber || null,
         facebookUrl: form.facebookUrl || null,
         instagramUrl: form.instagramUrl || null,
-        paystackPublicKey: form.paystackPublicKey || null,
         paystackEnabled: form.paystackEnabled,
-        paystackSecretKey: form.paystackSecretKey || undefined,
       });
 
       if (result.error) {
@@ -172,7 +166,6 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
       if (reload.data?.storeBanners) {
         setBanners(reload.data.storeBanners);
       }
-      setForm((prev) => ({ ...prev, paystackSecretKey: "" }));
       toast.success("Online store settings saved");
     });
   };
@@ -222,7 +215,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
           </Badge>
         </CardTitle>
         <CardDescription className="text-xs">
-          Configure white-label storefront settings, template structure, and payment keys.
+          Configure white-label storefront settings and template structure. Paystack keys are set via server environment variables.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 px-4 pb-4 pt-0">
@@ -370,30 +363,14 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
-            <div>
-              <span className="text-sm">Enable Paystack</span>
-              <p className="text-xs text-muted-foreground">
-                Controls Paystack for dashboard and storefront payments independently of online store status.
-              </p>
-            </div>
-            <Switch checked={form.paystackEnabled} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, paystackEnabled: checked }))} />
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div>
+            <span className="text-sm">Enable Paystack</span>
+            <p className="text-xs text-muted-foreground">
+              Controls Paystack for dashboard and storefront payments. Keys are configured in PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY (server) and NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY (storefront).
+            </p>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Paystack Public Key</Label>
-            <Input value={form.paystackPublicKey} onChange={(e) => setForm((prev) => ({ ...prev, paystackPublicKey: e.target.value }))} className="h-9" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Paystack Secret Key</Label>
-            <Input
-              type="password"
-              value={form.paystackSecretKey}
-              onChange={(e) => setForm((prev) => ({ ...prev, paystackSecretKey: e.target.value }))}
-              placeholder="Leave blank to keep existing secret"
-              className="h-9"
-            />
-          </div>
+          <Switch checked={form.paystackEnabled} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, paystackEnabled: checked }))} />
         </div>
 
         <div className="space-y-1.5">

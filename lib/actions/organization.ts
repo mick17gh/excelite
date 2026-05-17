@@ -6,7 +6,6 @@ import { SubscriptionTier, SubscriptionStatus, Role } from "@/lib/generated/pris
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { hasFeature, TIER_CONFIG } from "@/lib/tier-config";
-import { encryptSecret } from "@/lib/storefront/paystack";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES } from "@/lib/storefront/templates";
 import { buildPublicStoreConfig, getOrganizationForStorefront, type PublicStoreConfig } from "@/lib/storefront/config";
 import { getPublicStoreMenu, type PublicMenuItem } from "@/lib/storefront/menu";
@@ -49,8 +48,6 @@ export interface UpdateOrganizationInput {
   whatsappNumber?: string | null;
   facebookUrl?: string | null;
   instagramUrl?: string | null;
-  paystackPublicKey?: string | null;
-  paystackSecretKey?: string | null;
   paystackEnabled?: boolean;
 }
 
@@ -105,7 +102,6 @@ export async function getOrganization(id?: string) {
         whatsappNumber: org.whatsappNumber,
         facebookUrl: org.facebookUrl,
         instagramUrl: org.instagramUrl,
-        paystackPublicKey: org.paystackPublicKey,
         paystackEnabled: org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true,
         trialEndsAt: org.trialEndsAt?.toISOString() || null,
         subscriptionEndsAt: org.subscriptionEndsAt?.toISOString() || null,
@@ -211,7 +207,6 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
     if (input.whatsappNumber !== undefined) data.whatsappNumber = input.whatsappNumber;
     if (input.facebookUrl !== undefined) data.facebookUrl = input.facebookUrl;
     if (input.instagramUrl !== undefined) data.instagramUrl = input.instagramUrl;
-    if (input.paystackPublicKey !== undefined) data.paystackPublicKey = input.paystackPublicKey;
     if (input.paystackEnabled !== undefined) {
       data.paystackEnabled = input.paystackEnabled;
       const currentFeatures = (existingOrg.features as Record<string, unknown> | null) || {};
@@ -221,10 +216,6 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
         paystackEnabled: input.paystackEnabled,
       };
     }
-    if (input.paystackSecretKey !== undefined) {
-      data.paystackSecretKey = input.paystackSecretKey ? encryptSecret(input.paystackSecretKey) : null;
-    }
-
     const org = await db.organization.update({
       where: { id: input.id },
       data,
@@ -238,7 +229,6 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
         minOrderAmount: org.minOrderAmount ? Number(org.minOrderAmount) : null,
         deliveryFeeFlat: org.deliveryFeeFlat ? Number(org.deliveryFeeFlat) : null,
         deliveryRadius: org.deliveryRadius ? Number(org.deliveryRadius) : null,
-        paystackSecretKey: undefined,
       },
     };
   } catch (error) {
@@ -278,9 +268,7 @@ export async function getOnlineStoreSettings(organizationId: string) {
       whatsappNumber: org.whatsappNumber,
       facebookUrl: org.facebookUrl,
       instagramUrl: org.instagramUrl,
-      paystackPublicKey: org.paystackPublicKey,
       paystackEnabled: org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true,
-      hasPaystackSecretKey: Boolean(org.paystackSecretKey),
       storeTheme: org.storeTheme as Record<string, unknown> | null,
     },
   };

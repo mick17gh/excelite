@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { PaymentStatus, SalesChannel } from "@/lib/generated/prisma/client";
 import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
 import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
-import { decryptSecret } from "@/lib/storefront/paystack";
+import { getEnvPaystackSecretKey, isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
 
 export interface RecordPaymentInput {
   orderId: string;
@@ -31,16 +31,10 @@ function buildPaystackReference(orderNumber: string): string {
 function resolvePaystackCredentials(org: {
   paystackEnabled: boolean | null;
   features: unknown;
-  paystackPublicKey: string | null;
-  paystackSecretKey: string | null;
 }) {
-  const featureEnabled =
-    org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true;
-  const publicKey = org.paystackPublicKey || process.env.PAYSTACK_PUBLIC_KEY || null;
-  const secret = decryptSecret(org.paystackSecretKey) || process.env.PAYSTACK_SECRET_KEY || null;
+  const secret = getEnvPaystackSecretKey();
   return {
-    enabled: Boolean(featureEnabled && publicKey && secret),
-    publicKey,
+    enabled: isPaystackEnabledForOrg(org),
     secret,
   };
 }
@@ -326,8 +320,6 @@ export async function initializePaystackOrderPayment(input: InitializePaystackOr
               select: {
                 features: true,
                 paystackEnabled: true,
-                paystackPublicKey: true,
-                paystackSecretKey: true,
               },
             },
           },
@@ -369,7 +361,7 @@ export async function initializePaystackOrderPayment(input: InitializePaystackOr
     });
 
     if (!initResponse.ok) {
-      let body = await initResponse.text();
+      const body = await initResponse.text();
       let detail = body;
       try {
         const parsed = JSON.parse(body) as { message?: string };
@@ -377,32 +369,8 @@ export async function initializePaystackOrderPayment(input: InitializePaystackOr
       } catch {
         // Keep raw body if it's not JSON.
       }
-      const envSecret = process.env.PAYSTACK_SECRET_KEY || null;
-      const canRetryWithEnv =
-        detail.toLowerCase().includes("invalid key") &&
-        Boolean(envSecret) &&
-        envSecret !== credentials.secret;
-      if (canRetryWithEnv && envSecret) {
-        initResponse = await initializePaystackTransaction({
-          secret: envSecret,
-          ...payload,
-        });
-        if (initResponse.ok) {
-          detail = "";
-        } else {
-          body = await initResponse.text();
-          try {
-            const parsed = JSON.parse(body) as { message?: string };
-            detail = parsed.message || body;
-          } catch {
-            detail = body;
-          }
-        }
-      }
-      if (!initResponse.ok) {
       console.error("[initializePaystackOrderPayment] Paystack initialize failed:", detail);
       return { error: "Failed to initialize payment", details: detail };
-      }
     }
 
     const paystackPayload = await initResponse.json();
@@ -449,8 +417,6 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
               select: {
                 features: true,
                 paystackEnabled: true,
-                paystackPublicKey: true,
-                paystackSecretKey: true,
               },
             },
           },
@@ -464,11 +430,11 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
     const credentials = resolvePaystackCredentials(org);
     if (!credentials.secret) return { error: "Paystack secret key is not configured" };
 
-    let verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${input.reference}`, {
+    const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${input.reference}`, {
       headers: { Authorization: `Bearer ${credentials.secret}` },
     });
     if (!verifyResponse.ok) {
-      let body = await verifyResponse.text();
+      const body = await verifyResponse.text();
       let detail = body;
       try {
         const parsed = JSON.parse(body) as { message?: string };
@@ -476,28 +442,7 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
       } catch {
         // keep raw text
       }
-      const envSecret = process.env.PAYSTACK_SECRET_KEY || null;
-      const canRetryWithEnv =
-        detail.toLowerCase().includes("invalid key") &&
-        Boolean(envSecret) &&
-        envSecret !== credentials.secret;
-      if (canRetryWithEnv && envSecret) {
-        verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${input.reference}`, {
-          headers: { Authorization: `Bearer ${envSecret}` },
-        });
-        if (!verifyResponse.ok) {
-          body = await verifyResponse.text();
-          try {
-            const parsed = JSON.parse(body) as { message?: string };
-            detail = parsed.message || body;
-          } catch {
-            detail = body;
-          }
-        }
-      }
-      if (!verifyResponse.ok) {
-        return { error: "Verification request failed", details: detail };
-      }
+      return { error: "Verification request failed", details: detail };
     }
 
     const payload = await verifyResponse.json();

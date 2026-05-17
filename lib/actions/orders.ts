@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, OrderSource, OrderType, PaymentStatus } from "@/lib/generated/prisma/client";
 import { createDeliveryRequest } from "@/lib/actions/delivery";
@@ -121,8 +122,6 @@ export async function getOrders(filters?: {
                 select: {
                   features: true,
                   paystackEnabled: true,
-                  paystackPublicKey: true,
-                  paystackSecretKey: true,
                 },
               },
             },
@@ -167,12 +166,9 @@ export async function getOrders(filters?: {
         total: Number(order.total),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
-        paystackEnabled: Boolean(
-          (order.branch?.organization?.paystackEnabled ||
-            (order.branch?.organization?.features as Record<string, unknown> | null)?.paystackEnabled === true) &&
-          order.branch?.organization?.paystackPublicKey &&
-          order.branch?.organization?.paystackSecretKey
-        ),
+        paystackEnabled: order.branch?.organization
+          ? isPaystackEnabledForOrg(order.branch.organization)
+          : false,
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,
@@ -254,8 +250,6 @@ export async function getOrderById(id: string) {
               select: {
                 features: true,
                 paystackEnabled: true,
-                paystackPublicKey: true,
-                paystackSecretKey: true,
               },
             },
           },
@@ -293,12 +287,9 @@ export async function getOrderById(id: string) {
         total: Number(order.total),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
-        paystackEnabled: Boolean(
-          (order.branch?.organization?.paystackEnabled ||
-            (order.branch?.organization?.features as Record<string, unknown> | null)?.paystackEnabled === true) &&
-          order.branch?.organization?.paystackPublicKey &&
-          order.branch?.organization?.paystackSecretKey
-        ),
+        paystackEnabled: order.branch?.organization
+          ? isPaystackEnabledForOrg(order.branch.organization)
+          : false,
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,

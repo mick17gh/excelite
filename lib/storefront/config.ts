@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { hasFeature, isSuperAdmin } from "@/lib/tier-config";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES, type StorefrontTemplateId } from "@/lib/storefront/templates";
-import { decryptSecret } from "@/lib/storefront/paystack";
+import { isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
 import { getStoreAvailabilityByHours, type BusinessHours } from "@/lib/storefront/hours";
 import { getPrimaryBannerUrl, resolveStoreBanners, type StoreBanner } from "@/lib/storefront/banners";
 
@@ -136,11 +136,7 @@ export function buildPublicStoreConfig(
       deliveryEnabled: org.deliveryEnabled,
       pickupEnabled: org.pickupEnabled,
       cashEnabled: true,
-      paystackEnabled: Boolean(
-        (org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true) &&
-        org.paystackPublicKey &&
-        org.paystackSecretKey
-      ),
+      paystackEnabled: isPaystackEnabledForOrg(org),
     },
     operations: {
       deliveryRadiusKm: org.deliveryRadius ? Number(org.deliveryRadius) : 0,
@@ -195,13 +191,4 @@ export function resolveAllowedStorefrontOrigins(orgConfig: PublicStoreConfig): s
   return [`https://${slug}.servstack.app`];
 }
 
-export async function getPaystackSecretForOrganization(organizationId: string): Promise<string | null> {
-  const org = await db.organization.findUnique({
-    where: { id: organizationId },
-    select: { paystackSecretKey: true, paystackEnabled: true, features: true },
-  });
-  if (!org) return null;
-  const paystackEnabled = org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true;
-  if (!paystackEnabled) return null;
-  return decryptSecret(org.paystackSecretKey || null);
-}
+export { getPaystackSecretForOrganization } from "@/lib/paystack/credentials";
