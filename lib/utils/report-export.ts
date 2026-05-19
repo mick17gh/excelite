@@ -1,9 +1,10 @@
 /**
  * Report export: real .xlsx (SheetJS) and sectioned CSV.
- * Avoids blank/broken "Excel" files from merging heterogeneous rows into one CSV.
  */
 
 import * as XLSX from "xlsx";
+import { formatReportDate } from "@/lib/reports/formatters";
+import { getReportExportConfig } from "@/lib/reports/sheet-config";
 
 const META_KEYS = new Set([
   "reportId",
@@ -11,17 +12,26 @@ const META_KEYS = new Set([
   "period",
   "branchName",
   "generatedAt",
+  "primaryDataKey",
+  "primarySheetName",
 ]);
 
-function sanitizeForExcel(value: unknown): string | number {
+const DATE_LIKE_KEYS = /date|time|at$/i;
+
+function sanitizeForExcel(value: unknown, key?: string): string | number {
   if (value === null || value === undefined) return "";
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (value instanceof Date) return value.toISOString();
-  const s = String(value);
-  // Excel treats leading = + - @ as formula / special; prefix with apostrophe for display
-  if (/^[=+\-@]/.test(s)) return `'${s}`;
-  return s;
+  if (value instanceof Date) return formatReportDate(value);
+  if (typeof value === "string") {
+    if (key && DATE_LIKE_KEYS.test(key) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return formatReportDate(parsed);
+    }
+    if (/^[=+\-@]/.test(value)) return `'${value}`;
+    return value;
+  }
+  return String(value);
 }
 
 function humanizeSheetName(key: string): string {
@@ -36,51 +46,74 @@ function humanizeSheetName(key: string): string {
 function flattenPeriod(period: unknown): Record<string, string> {
   if (!period || typeof period !== "object") return {};
   const p = period as { startDate?: unknown; endDate?: unknown };
-  const start = p.startDate instanceof Date ? p.startDate.toISOString() : String(p.startDate ?? "");
-  const end = p.endDate instanceof Date ? p.endDate.toISOString() : String(p.endDate ?? "");
+  const start =
+    p.startDate instanceof Date
+      ? formatReportDate(p.startDate)
+      : String(p.startDate ?? "");
+  const end =
+    p.endDate instanceof Date ? formatReportDate(p.endDate) : String(p.endDate ?? "");
   return { periodStart: start, periodEnd: end };
 }
 
-/**
- * Build worksheet payloads from server report data (summary + arrays of plain objects).
- */
 export function buildReportSheets(data: Record<string, unknown>): {
   name: string;
   data: Record<string, unknown>[];
+  freezeHeader?: boolean;
 }[] {
-  const sheets: { name: string; data: Record<string, unknown>[] }[] = [];
+  const reportId = String(data.reportId ?? "");
+  const config = getReportExportConfig(reportId);
+  const primaryKey =
+    (data.primaryDataKey as string) || config?.primaryDataKey;
+  const primaryName =
+    (data.primarySheetName as string) || config?.primarySheetName;
 
-  const metaRow: Record<string, unknown> = {
-    reportName: data.reportName ?? "",
-    branchName: data.branchName ?? "",
-    ...flattenPeriod(data.period),
-    generatedAt:
-      data.generatedAt instanceof Date
-        ? data.generatedAt.toISOString()
-        : String(data.generatedAt ?? ""),
-  };
-  sheets.push({ name: "Report", data: [metaRow] });
+  const sheets: { name: string; data: Record<string, unknown>[]; freezeHeader?: boolean }[] =
+    [];
+
+  if (primaryKey && Array.isArray(data[primaryKey])) {
+    const rows = data[primaryKey] as Record<string, unknown>[];
+    sheets.push({
+      name: primaryName || humanizeSheetName(primaryKey),
+      data: rows.length > 0 ? rows : [{ Note: "No rows for this period or filters." }],
+      freezeHeader: true,
+    });
+  }
 
   if (data.summary && typeof data.summary === "object" && data.summary !== null) {
     sheets.push({
       name: "Summary",
       data: [data.summary as Record<string, unknown>],
+      freezeHeader: true,
     });
   }
 
   for (const [key, value] of Object.entries(data)) {
-    if (META_KEYS.has(key) || key === "summary") continue;
+    if (META_KEYS.has(key) || key === "summary" || key === primaryKey) continue;
     if (!Array.isArray(value)) continue;
 
     const rows =
       value.length > 0
         ? (value as Record<string, unknown>[])
-        : [{ _note: "No rows for this period or filters." }];
+        : [{ Note: "No rows for this period or filters." }];
 
     sheets.push({
       name: humanizeSheetName(key),
       data: rows,
+      freezeHeader: true,
     });
+  }
+
+  if (sheets.length === 0) {
+    const metaRow: Record<string, unknown> = {
+      reportName: data.reportName ?? "",
+      branchName: data.branchName ?? "",
+      ...flattenPeriod(data.period),
+      generatedAt:
+        data.generatedAt instanceof Date
+          ? formatReportDate(data.generatedAt)
+          : String(data.generatedAt ?? ""),
+    };
+    sheets.push({ name: "Report", data: [metaRow], freezeHeader: true });
   }
 
   return sheets;
@@ -89,24 +122,14 @@ export function buildReportSheets(data: Record<string, unknown>): {
 function objectToMatrix(rows: Record<string, unknown>[]): (string | number)[][] {
   if (rows.length === 0) return [["(empty)"]];
 
-  const keySet = new Set<string>();
-  for (const row of rows) {
-    Object.keys(row).forEach((k) => keySet.add(k));
-  }
-  const keys = [...keySet].sort((a, b) => a.localeCompare(b));
-
-  const header = keys.map((k) =>
-    k
-      .replace(/([A-Z])/g, " $1")
-      .replace(/^./, (c) => c.toUpperCase())
-      .trim()
-  );
-
-  const dataRows = rows.map((row) =>
-    keys.map((k) => sanitizeForExcel(row[k]))
-  );
-
+  const keys = Object.keys(rows[0]);
+  const header = keys;
+  const dataRows = rows.map((row) => keys.map((k) => sanitizeForExcel(row[k], k)));
   return [header, ...dataRows];
+}
+
+function applyFreezePane(ws: XLSX.WorkSheet): void {
+  ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft" };
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -121,15 +144,17 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** Download multi-sheet .xlsx from report server payload. */
 export function downloadReportXLSX(data: Record<string, unknown>, filenameBase: string): void {
   const sheets = buildReportSheets(data);
   const wb = XLSX.utils.book_new();
   const usedNames = new Set<string>();
 
-  for (const { name, data: rows } of sheets) {
+  for (const { name, data: rows, freezeHeader } of sheets) {
     const matrix = objectToMatrix(rows);
     const ws = XLSX.utils.aoa_to_sheet(matrix);
+    if (freezeHeader && matrix.length > 1) {
+      applyFreezePane(ws);
+    }
     let sheetName = name.slice(0, 31);
     let n = 2;
     while (usedNames.has(sheetName)) {
@@ -161,17 +186,13 @@ function matrixToCsv(matrix: (string | number)[][]): string {
     .join("\n");
 }
 
-/**
- * Single UTF-8 CSV file with explicit sections (Excel opens cleanly; no fake formulas).
- */
 export function downloadReportCSV(data: Record<string, unknown>, filenameBase: string): void {
   const sheets = buildReportSheets(data);
   const parts: string[] = [];
 
   for (const { name, data: rows } of sheets) {
     parts.push(`### ${name}`);
-    const matrix = objectToMatrix(rows);
-    parts.push(matrixToCsv(matrix));
+    parts.push(matrixToCsv(objectToMatrix(rows)));
     parts.push("");
   }
 

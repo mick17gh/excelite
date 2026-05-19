@@ -1,0 +1,16 @@
+export type ReportId =
+  | "executive-summary"
+  | "weekly-performance"
+  | "sales-report"
+  | "inventory-report"
+  | "warehouse-stock"
+  | "warehouse-activity"
+  | "waste-variance"
+  | "staff-report"
+  | "manual-entries"
+  | "orders-overview"
+  | "customer-insights"
+  | "pos-sales-report"
+  | "cash-transactions"
+  | "kitchen-efficiency"
+  | "menu-performance";

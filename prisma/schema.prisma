@@ -382,6 +382,7 @@ model Branch {
   isActive       Boolean   @default(true)
   openingDate    DateTime?
   requiredStaff  Int       @default(5)
+  seatCount      Int?
   taxRate        Decimal   @default(12.5) @db.Decimal(5, 2)
   taxName        String    @default("VAT")
   taxEnabled     Boolean   @default(true)
@@ -406,6 +407,9 @@ model Branch {
   alerts             Alert[]
   staffSchedules     StaffSchedule[]
   posOrders          PosOrder[]
+  posTerminals       PosTerminal[]
+  operatingExpenses  OperatingExpense[]
+  inventoryStockCounts InventoryStockCount[]
   kitchenStations    KitchenStation[]
   manualEntryBatches ManualEntryBatch[]
   apiKeys            ApiKey[]
@@ -651,6 +655,7 @@ model Transaction {
   transactionRef  String   @unique
   branchId        String
   staffId         String?
+  terminalId      String?
   paymentMethod   String
   amount          Decimal  @db.Decimal(12, 2)
   tip             Decimal  @default(0) @db.Decimal(10, 2)
@@ -661,14 +666,74 @@ model Transaction {
   updatedAt       DateTime @updatedAt
 
   // Relations
-  branch Branch @relation(fields: [branchId], references: [id])
-  staff  Staff? @relation(fields: [staffId], references: [id])
-  sale   Sale?
+  branch   Branch       @relation(fields: [branchId], references: [id])
+  staff    Staff?       @relation(fields: [staffId], references: [id])
+  terminal PosTerminal? @relation(fields: [terminalId], references: [id])
+  sale     Sale?
 
   @@index([branchId])
+  @@index([terminalId])
   @@index([transactionDate])
   @@index([branchId, transactionDate])
   @@map("transaction")
+}
+
+model PosTerminal {
+  id        String   @id @default(cuid())
+  branchId  String
+  code      String
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch       Branch        @relation(fields: [branchId], references: [id])
+  transactions Transaction[]
+
+  @@unique([branchId, code])
+  @@index([branchId])
+  @@map("pos_terminal")
+}
+
+model OperatingExpense {
+  id          String   @id @default(cuid())
+  branchId    String
+  amount      Decimal  @db.Decimal(12, 2)
+  category    String?
+  periodStart DateTime
+  periodEnd   DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@index([branchId])
+  @@index([periodStart, periodEnd])
+  @@map("operating_expense")
+}
+
+model InventoryStockCount {
+  id           String   @id @default(cuid())
+  branchId     String
+  itemId       String
+  expectedQty  Decimal  @db.Decimal(12, 3)
+  actualQty    Decimal  @db.Decimal(12, 3)
+  wasteReason  String?
+  countedAt    DateTime
+  recordedBy   String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  branch Branch        @relation(fields: [branchId], references: [id])
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([branchId])
+  @@index([itemId])
+  @@index([countedAt])
+  @@index([branchId, countedAt])
+  @@map("inventory_stock_count")
 }
 
 // ============================================
@@ -746,8 +811,9 @@ model InventoryItem {
   branch        Branch               @relation(fields: [branchId], references: [id])
   inboundStock  InboundStock[]
   outboundStock OutboundStock[]
-  wasteLogs     WasteLog[]
-  transferLogs  TransferLog[]
+  wasteLogs          WasteLog[]
+  stockCounts        InventoryStockCount[]
+  transferLogs       TransferLog[]
   ingredients              MenuItemIngredient[]
   menuItemOptionIngredients MenuItemOptionIngredient[]
 
