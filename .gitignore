@@ -47,3 +47,6 @@ public/swe-worker*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# Local-only ops scripts (destructive DB cleanup)
+scripts/clear-training-data.ts
