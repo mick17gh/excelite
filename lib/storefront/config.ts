@@ -67,7 +67,7 @@ export async function getOrganizationForStorefront(organizationId: string) {
     where: { id: organizationId },
     include: {
       branches: {
-        where: { deletedAt: null, isActive: true },
+        where: { deletedAt: null, isActive: true, onlineStoreVisible: true },
         select: { id: true, name: true, code: true, currency: true, taxEnabled: true, taxRate: true, address: true, city: true, country: true },
       },
     },

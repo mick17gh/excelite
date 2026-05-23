@@ -14,6 +14,8 @@ import {
   type StoreBanner,
   validateStoreBannersForSave,
 } from "@/lib/storefront/banners";
+import { normalizeStorefrontUrl } from "@/lib/storefront/url";
+import { headers } from "next/headers";
 
 export interface UpdateOrganizationInput {
   id: string;
@@ -24,6 +26,7 @@ export interface UpdateOrganizationInput {
   maxMenuItems?: number | null;
   features?: Record<string, boolean>;
   onlineOrderingEnabled?: boolean;
+  storefrontUrl?: string | null;
   storeSlug?: string | null;
   storeName?: string | null;
   storeDescription?: string | null;
@@ -77,9 +80,10 @@ export async function getOrganization(id?: string) {
         maxUsers: org.maxUsers,
         maxMenuItems: org.maxMenuItems,
         features: org.features as Record<string, boolean> | null,
-        onlineOrderingEnabled: org.onlineOrderingEnabled,
-        storeSlug: org.storeSlug,
-        storeName: org.storeName,
+      onlineOrderingEnabled: org.onlineOrderingEnabled,
+      storefrontUrl: org.storefrontUrl,
+      storeSlug: org.storeSlug,
+      storeName: org.storeName,
         storeDescription: org.storeDescription,
         storeLogoUrl: org.storeLogoUrl,
         storeBannerUrl: org.storeBannerUrl,
@@ -176,6 +180,17 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
       return { error: "Current subscription tier does not support online ordering" };
     }
     if (input.onlineOrderingEnabled !== undefined) data.onlineOrderingEnabled = input.onlineOrderingEnabled;
+    if (input.storefrontUrl !== undefined) {
+      if (input.storefrontUrl === null || input.storefrontUrl.trim() === "") {
+        data.storefrontUrl = null;
+      } else {
+        const normalized = normalizeStorefrontUrl(input.storefrontUrl);
+        if (!normalized) {
+          return { error: "Storefront URL must be a valid http or https URL" };
+        }
+        data.storefrontUrl = normalized;
+      }
+    }
     if (input.storeSlug !== undefined) data.storeSlug = input.storeSlug;
     if (input.storeName !== undefined) data.storeName = input.storeName;
     if (input.storeDescription !== undefined) data.storeDescription = input.storeDescription;
@@ -245,6 +260,7 @@ export async function getOnlineStoreSettings(organizationId: string) {
   return {
     data: {
       onlineOrderingEnabled: org.onlineOrderingEnabled,
+      storefrontUrl: org.storefrontUrl,
       storeSlug: org.storeSlug,
       storeName: org.storeName,
       storeDescription: org.storeDescription,
@@ -421,5 +437,61 @@ export async function getAllOrganizations() {
   } catch (error) {
     console.error("[getAllOrganizations] Error:", error);
     return { error: "Failed to fetch organizations" };
+  }
+}
+
+async function resolveSessionOrganizationId(): Promise<string | null> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user?.id) return null;
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { organizationId: true, branchId: true },
+  });
+  if (!user) return null;
+  if (user.organizationId) return user.organizationId;
+  if (!user.branchId) return null;
+
+  const homeBranch = await db.branch.findUnique({
+    where: { id: user.branchId },
+    select: { organizationId: true },
+  });
+  return homeBranch?.organizationId ?? null;
+}
+
+export async function getPosStorefrontQrContext() {
+  try {
+    const organizationId = await resolveSessionOrganizationId();
+    if (!organizationId) {
+      return { data: { showQr: false, storefrontUrl: null as string | null } };
+    }
+
+    const org = await db.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        tier: true,
+        onlineOrderingEnabled: true,
+        storefrontUrl: true,
+      },
+    });
+    if (!org) {
+      return { data: { showQr: false, storefrontUrl: null as string | null } };
+    }
+
+    const storefrontUrl = normalizeStorefrontUrl(org.storefrontUrl);
+    const showQr =
+      hasFeature(org.tier, "onlineOrdering") &&
+      org.onlineOrderingEnabled &&
+      storefrontUrl != null;
+
+    return {
+      data: {
+        showQr,
+        storefrontUrl: showQr ? storefrontUrl : null,
+      },
+    };
+  } catch (error) {
+    console.error("[getPosStorefrontQrContext] Error:", error);
+    return { data: { showQr: false, storefrontUrl: null as string | null } };
   }
 }

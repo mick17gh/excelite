@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,12 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { getAllCurrencies, CurrencyCode } from "@/lib/currency";
-import { createBranch, updateBranch, setTarget } from "@/lib/actions/branches";
+import {
+  createBranch,
+  updateBranch,
+  setTarget,
+  getBranchOnlineStoreEditContext,
+} from "@/lib/actions/branches";
 
 const currencies = getAllCurrencies();
 
@@ -340,11 +345,13 @@ interface EditBranchFormProps {
     email?: string | null;
     requiredStaff?: number;
     isActive: boolean;
+    onlineStoreVisible?: boolean;
   } | null;
 }
 
 export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showOnlineStoreToggle, setShowOnlineStoreToggle] = useState(false);
   const [formData, setFormData] = useState({
     name: branch?.name || "",
     code: branch?.code || "",
@@ -355,7 +362,36 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
     email: branch?.email || "",
     requiredStaff: branch?.requiredStaff?.toString() || "5",
     isActive: branch?.isActive ?? true,
+    onlineStoreVisible: branch?.onlineStoreVisible ?? false,
   });
+
+  useEffect(() => {
+    if (!open || !branch?.id) return;
+
+    setFormData({
+      name: branch.name || "",
+      code: branch.code || "",
+      address: branch.address || "",
+      city: branch.city || "",
+      state: branch.state || "",
+      phone: branch.phone || "",
+      email: branch.email || "",
+      requiredStaff: branch.requiredStaff?.toString() || "5",
+      isActive: branch.isActive ?? true,
+      onlineStoreVisible: branch.onlineStoreVisible ?? false,
+    });
+
+    void (async () => {
+      const ctx = await getBranchOnlineStoreEditContext(branch.id);
+      setShowOnlineStoreToggle(Boolean(ctx.data?.showOnlineStoreToggle));
+      if (ctx.data?.onlineStoreVisible !== undefined) {
+        setFormData((prev) => ({
+          ...prev,
+          onlineStoreVisible: ctx.data!.onlineStoreVisible,
+        }));
+      }
+    })();
+  }, [open, branch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -373,10 +409,20 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
         email: formData.email || undefined,
         requiredStaff: parseInt(formData.requiredStaff) || 5,
         isActive: formData.isActive,
+        ...(showOnlineStoreToggle
+          ? { onlineStoreVisible: formData.isActive ? formData.onlineStoreVisible : false }
+          : {}),
       });
 
       if (result.success) {
-        toast.success("Branch updated successfully");
+        const linked = Boolean(
+          (result.data as { organizationLinked?: boolean } | undefined)?.organizationLinked
+        );
+        toast.success(
+          linked
+            ? "Branch updated and linked to your organization"
+            : "Branch updated successfully"
+        );
         onOpenChange(false);
       } else {
         toast.error(result.error || "Failed to update branch");
@@ -393,15 +439,15 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[min(90vh,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[500px]">
+        <DialogHeader className="shrink-0 space-y-1.5 px-6 pt-6">
           <DialogTitle>Edit Branch</DialogTitle>
           <DialogDescription>
             Update branch details for {branch.name}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Branch Name</Label>
@@ -493,11 +539,35 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
               </div>
               <Switch
                 checked={formData.isActive}
-                onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                onCheckedChange={(checked) =>
+                  setFormData({
+                    ...formData,
+                    isActive: checked,
+                    onlineStoreVisible: checked ? formData.onlineStoreVisible : false,
+                  })
+                }
               />
             </div>
+
+            {showOnlineStoreToggle && (
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label>Show on online store</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Include this branch on the online ordering checkout
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.onlineStoreVisible}
+                  disabled={!formData.isActive}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, onlineStoreVisible: checked })
+                  }
+                />
+              </div>
+            )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

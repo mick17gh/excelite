@@ -81,6 +81,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
     }
 
     const data = parsed.data;
+
+    const branchAllowed = org.branches.some((b) => b.id === data.branchId);
+    if (!branchAllowed) {
+      return applyCors(
+        req,
+        NextResponse.json({ error: "Selected branch is not available for online ordering" }, { status: 400 }),
+        allowedOrigins
+      );
+    }
+
     if (data.orderType === "DELIVERY" && !org.deliveryEnabled) {
       return applyCors(req, NextResponse.json({ error: "Delivery is disabled for this store" }, { status: 400 }), allowedOrigins);
     }

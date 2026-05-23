@@ -102,11 +102,14 @@ interface Customer {
   phone: string;
 }
 
+type StorefrontQrProp = { url: string } | null;
+
 interface PosContentProps {
   branches: Branch[];
   menuItems: MenuItem[];
   recentOrders: RecentOrder[];
   customers: Customer[];
+  storefrontQr?: StorefrontQrProp;
 }
 
 interface CartLine {
@@ -125,7 +128,13 @@ const orderTypes = [
   { value: "DELIVERY", label: "Delivery", icon: Truck, color: "bg-blue-500" },
 ];
 
-export function PosContent({ branches, menuItems, recentOrders, customers }: PosContentProps) {
+export function PosContent({
+  branches,
+  menuItems,
+  recentOrders,
+  customers,
+  storefrontQr = null,
+}: PosContentProps) {
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
 
@@ -1125,6 +1134,7 @@ export function PosContent({ branches, menuItems, recentOrders, customers }: Pos
           open={isReceiptOpen}
           onOpenChange={setIsReceiptOpen}
           order={completedOrder}
+          storefrontQr={storefrontQr}
           onClose={() => {
             setCompletedOrder(null);
             setIsReceiptOpen(false);

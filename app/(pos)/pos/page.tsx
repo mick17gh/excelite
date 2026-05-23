@@ -4,6 +4,7 @@ import { getMenuItems } from "@/lib/actions/menu";
 import { getCustomers } from "@/lib/actions/customers";
 import { PosContent } from "@/components/pos/pos-content";
 import { listPosOrders } from "@/lib/actions/pos";
+import { getPosStorefrontQrContext } from "@/lib/actions/organization";
 
 export const metadata = {
   title: "POS | ServStack",
@@ -11,12 +12,14 @@ export const metadata = {
 };
 
 export default async function PosPage() {
-  const [branchesResult, menuItemsResult, ordersResult, customersResult] = await Promise.all([
-    getBranches(),
-    getMenuItems(),
-    listPosOrders(),
-    getCustomers(),
-  ]);
+  const [branchesResult, menuItemsResult, ordersResult, customersResult, qrContextResult] =
+    await Promise.all([
+      getBranches(),
+      getMenuItems(),
+      listPosOrders(),
+      getCustomers(),
+      getPosStorefrontQrContext(),
+    ]);
 
   // Serialize Decimal fields for client components
   const branches = (branchesResult.data || []).map((branch) => {
@@ -26,6 +29,10 @@ export default async function PosPage() {
   const menuItems = menuItemsResult.data || [];
   const orders = ordersResult.data || [];
   const customers = customersResult.data || [];
+  const storefrontQr =
+    qrContextResult.data?.showQr && qrContextResult.data.storefrontUrl
+      ? { url: qrContextResult.data.storefrontUrl }
+      : null;
 
   return (
     <div className="h-full">
@@ -37,7 +44,13 @@ export default async function PosPage() {
       </div> */}
 
       <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-muted" />}>
-        <PosContent branches={branches} menuItems={menuItems} recentOrders={orders} customers={customers} />
+        <PosContent
+          branches={branches}
+          menuItems={menuItems}
+          recentOrders={orders}
+          customers={customers}
+          storefrontQr={storefrontQr}
+        />
       </Suspense>
     </div>
   );

@@ -1,7 +1,96 @@
 "use server";
 
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { hasFeature, isSuperAdmin, isWithinLimit } from "@/lib/tier-config";
+import type { Role } from "@/lib/generated/prisma/client";
+
+async function resolveActorOrganizationId(user: {
+  organizationId: string | null;
+  branchId: string | null;
+}): Promise<string | null> {
+  if (user.organizationId) {
+    return user.organizationId;
+  }
+  if (!user.branchId) {
+    return null;
+  }
+  const homeBranch = await db.branch.findUnique({
+    where: { id: user.branchId },
+    select: { organizationId: true },
+  });
+  return homeBranch?.organizationId ?? null;
+}
+
+async function getBranchActor() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (!session?.user?.id) {
+    return { ok: false as const, error: "Not authenticated" };
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, role: true, organizationId: true, branchId: true },
+  });
+  if (!user) {
+    return { ok: false as const, error: "User not found" };
+  }
+
+  const organizationId = await resolveActorOrganizationId(user);
+
+  return {
+    ok: true as const,
+    userId: user.id,
+    role: user.role as Role,
+    organizationId,
+  };
+}
+
+async function assertCanAssignOrganization(
+  organizationId: string | null,
+  role: Role,
+  options?: { countAsNewBranch?: boolean }
+): Promise<{ ok: true; organizationId: string | null } | { ok: false; error: string }> {
+  if (!organizationId) {
+    return { ok: true, organizationId: null };
+  }
+
+  const org = await db.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, tier: true, maxBranches: true },
+  });
+  if (!org) {
+    return { ok: false, error: "Organization not found" };
+  }
+
+  if (options?.countAsNewBranch !== false) {
+    const branchCount = await db.branch.count({
+      where: { organizationId, deletedAt: null },
+    });
+
+    const withinTier = isWithinLimit(org.tier, "branches", branchCount, role);
+    const withinOrgCap = branchCount < org.maxBranches;
+
+    if (!withinTier && !isSuperAdmin(role)) {
+      return {
+        ok: false,
+        error: "Branch limit reached for your subscription tier. Upgrade to add more branches.",
+      };
+    }
+    if (!withinOrgCap && !isSuperAdmin(role)) {
+      return {
+        ok: false,
+        error: `Your organization allows up to ${org.maxBranches} branch(es).`,
+      };
+    }
+  }
+
+  return { ok: true, organizationId };
+}
 
 export interface CreateBranchInput {
   name: string;
@@ -17,6 +106,7 @@ export interface CreateBranchInput {
   openingDate?: Date;
   requiredStaff?: number;
   isActive: boolean;
+  onlineStoreVisible?: boolean;
 }
 
 export interface UpdateBranchInput {
@@ -33,10 +123,16 @@ export interface UpdateBranchInput {
   timezone?: string;
   requiredStaff?: number;
   isActive?: boolean;
+  onlineStoreVisible?: boolean;
 }
 
 export async function createBranch(input: CreateBranchInput) {
   try {
+    const actor = await getBranchActor();
+    if (!actor.ok) {
+      return { success: false, error: actor.error };
+    }
+
     // Input validation
     if (!input.name?.trim()) {
       return { success: false, error: "Branch name is required" };
@@ -54,6 +150,13 @@ export async function createBranch(input: CreateBranchInput) {
       return { success: false, error: "Required staff must be at least 1" };
     }
 
+    const orgCheck = await assertCanAssignOrganization(actor.organizationId, actor.role, {
+      countAsNewBranch: true,
+    });
+    if (!orgCheck.ok) {
+      return { success: false, error: orgCheck.error };
+    }
+
     const branch = await db.branch.create({
       data: {
         name: input.name.trim(),
@@ -69,10 +172,14 @@ export async function createBranch(input: CreateBranchInput) {
         openingDate: input.openingDate,
         requiredStaff: input.requiredStaff || 5,
         isActive: input.isActive ?? true,
+        onlineStoreVisible:
+          (input.isActive ?? true) === false ? false : (input.onlineStoreVisible ?? false),
+        organizationId: orgCheck.organizationId,
       },
     });
 
     revalidatePath("/dashboard/branches");
+    revalidatePath(`/dashboard/branches/${branch.id}`);
     return {
       success: true,
       data: {
@@ -90,7 +197,50 @@ export async function createBranch(input: CreateBranchInput) {
 
 export async function updateBranch(input: UpdateBranchInput) {
   try {
-    const { id, ...data } = input;
+    const actor = await getBranchActor();
+    if (!actor.ok) {
+      return { success: false, error: actor.error };
+    }
+
+    const existing = await db.branch.findUnique({
+      where: { id: input.id },
+      select: { id: true, organizationId: true },
+    });
+    if (!existing) {
+      return { success: false, error: "Branch not found" };
+    }
+
+    if (
+      existing.organizationId &&
+      actor.organizationId &&
+      existing.organizationId !== actor.organizationId &&
+      !isSuperAdmin(actor.role)
+    ) {
+      return { success: false, error: "You do not have access to update this branch" };
+    }
+
+    const { id, ...rest } = input;
+    const data: typeof rest & { organizationId?: string | null } = { ...rest };
+
+    if (data.isActive === false) {
+      data.onlineStoreVisible = false;
+    }
+
+    let organizationLinked = false;
+    const shouldLinkOrganization =
+      !existing.organizationId && Boolean(actor.organizationId);
+
+    if (shouldLinkOrganization) {
+      const orgCheck = await assertCanAssignOrganization(actor.organizationId, actor.role, {
+        countAsNewBranch: false,
+      });
+      if (!orgCheck.ok) {
+        return { success: false, error: orgCheck.error };
+      }
+      data.organizationId = orgCheck.organizationId;
+      organizationLinked = true;
+    }
+
     const branch = await db.branch.update({
       where: { id },
       data,
@@ -110,6 +260,7 @@ export async function updateBranch(input: UpdateBranchInput) {
     revalidatePath("/dashboard/warehouse");
     revalidatePath("/pos");
     revalidatePath("/kitchen");
+    revalidatePath(`/dashboard/branches/${id}`);
     return {
       success: true,
       data: {
@@ -117,6 +268,7 @@ export async function updateBranch(input: UpdateBranchInput) {
         taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
         latitude: branch.latitude ? Number(branch.latitude) : null,
         longitude: branch.longitude ? Number(branch.longitude) : null,
+        organizationLinked,
       },
     };
   } catch (error) {
@@ -335,5 +487,48 @@ export async function setTarget(input: SetTargetInput) {
   } catch (error) {
     console.error("[setTarget] Error:", error);
     return { success: false, error: "Failed to set target" };
+  }
+}
+
+export async function getBranchOnlineStoreEditContext(branchId: string) {
+  try {
+    const actor = await getBranchActor();
+    if (!actor.ok) {
+      return { data: { showOnlineStoreToggle: false, onlineStoreVisible: false } };
+    }
+
+    const branch = await db.branch.findUnique({
+      where: { id: branchId },
+      select: { organizationId: true, onlineStoreVisible: true },
+    });
+    if (!branch) {
+      return { data: { showOnlineStoreToggle: false, onlineStoreVisible: false } };
+    }
+
+    const organizationId = branch.organizationId ?? actor.organizationId;
+    if (!organizationId) {
+      return { data: { showOnlineStoreToggle: false, onlineStoreVisible: false } };
+    }
+
+    const org = await db.organization.findUnique({
+      where: { id: organizationId },
+      select: { tier: true, onlineOrderingEnabled: true },
+    });
+    if (!org) {
+      return { data: { showOnlineStoreToggle: false, onlineStoreVisible: false } };
+    }
+
+    const showOnlineStoreToggle =
+      hasFeature(org.tier, "onlineOrdering") && org.onlineOrderingEnabled;
+
+    return {
+      data: {
+        showOnlineStoreToggle,
+        onlineStoreVisible: branch.onlineStoreVisible,
+      },
+    };
+  } catch (error) {
+    console.error("[getBranchOnlineStoreEditContext] Error:", error);
+    return { data: { showOnlineStoreToggle: false, onlineStoreVisible: false } };
   }
 }

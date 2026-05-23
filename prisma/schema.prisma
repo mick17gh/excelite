@@ -379,7 +379,8 @@ model Branch {
   latitude       Decimal?  @db.Decimal(10, 8)
   longitude      Decimal?  @db.Decimal(11, 8)
   timezone       String    @default("Africa/Accra")
-  isActive       Boolean   @default(true)
+  isActive            Boolean   @default(true)
+  onlineStoreVisible  Boolean   @default(false)
   openingDate    DateTime?
   requiredStaff  Int       @default(5)
   seatCount      Int?
@@ -1310,6 +1311,7 @@ model Organization {
   maxMenuItems       Int?
   features           Json?
   onlineOrderingEnabled Boolean         @default(false)
+  storefrontUrl      String?
   storeSlug          String?            @unique
   storeName          String?
   storeDescription   String?

@@ -28,6 +28,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
   const [banners, setBanners] = useState<StoreBanner[]>([]);
   const [form, setForm] = useState({
     onlineOrderingEnabled: false,
+    storefrontUrl: "",
     storeSlug: "",
     storeName: "",
     storeDescription: "",
@@ -78,6 +79,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
       setBanners(result.data.storeBanners || []);
       setForm({
         onlineOrderingEnabled: result.data.onlineOrderingEnabled,
+        storefrontUrl: result.data.storefrontUrl || "",
         storeSlug: result.data.storeSlug || "",
         storeName: result.data.storeName || "",
         storeDescription: result.data.storeDescription || "",
@@ -136,6 +138,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
       const result = await updateOrganization({
         id: organizationId,
         onlineOrderingEnabled: form.onlineOrderingEnabled,
+        storefrontUrl: form.storefrontUrl.trim() || null,
         storeSlug: form.storeSlug || null,
         storeName: form.storeName || null,
         storeDescription: form.storeDescription || null,
@@ -233,6 +236,21 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
 
         {!hasOnlineOrderingByTier && (
           <p className="text-xs text-amber-600">Upgrade to Pro or Enterprise to enable online ordering.</p>
+        )}
+
+        {form.onlineOrderingEnabled && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Storefront URL</Label>
+            <Input
+              value={form.storefrontUrl}
+              onChange={(e) => setForm((prev) => ({ ...prev, storefrontUrl: e.target.value }))}
+              className="h-9"
+              placeholder="https://your-store.example.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Customer link for POS receipt QR codes. QR appears on receipts only when this URL is saved.
+            </p>
+          </div>
         )}
 
         {form.onlineOrderingEnabled && (

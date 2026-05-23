@@ -44,6 +44,7 @@ interface Branch {
   email?: string | null;
   currency?: string | null;
   isActive: boolean;
+  onlineStoreVisible?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
