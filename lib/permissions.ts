@@ -57,6 +57,11 @@ export type Permission =
   | "warehouse:edit"
   | "warehouse:delete"
   | "warehouse:transfer"
+  | "warehouse:approve_dispatch"
+  | "commissary:view"
+  | "commissary:production"
+  | "commissary:request_dispatch"
+  | "transactions:purge"
   | "customers:view"
   | "customers:create"
   | "customers:edit"
@@ -125,6 +130,11 @@ const ALL_PERMISSIONS: Permission[] = [
   "warehouse:edit",
   "warehouse:delete",
   "warehouse:transfer",
+  "warehouse:approve_dispatch",
+  "commissary:view",
+  "commissary:production",
+  "commissary:request_dispatch",
+  "transactions:purge",
   "customers:view",
   "customers:create",
   "customers:edit",
@@ -190,6 +200,11 @@ const rolePermissions: Record<Role, Permission[]> = {
     "warehouse:create",
     "warehouse:edit",
     "warehouse:transfer",
+    "warehouse:approve_dispatch",
+    "commissary:view",
+    "commissary:production",
+    "commissary:request_dispatch",
+    "transactions:purge",
     "customers:view",
     "customers:create",
     "customers:edit",
@@ -439,6 +454,16 @@ const rolePermissions: Record<Role, Permission[]> = {
     "warehouse:create",
     "warehouse:edit",
     "warehouse:transfer",
+    "warehouse:approve_dispatch",
+  ],
+
+  COMMISSARY_STAFF: [
+    "dashboard:view",
+    "commissary:view",
+    "commissary:production",
+    "commissary:request_dispatch",
+    "warehouse:view",
+    "warehouse:transfer",
   ],
 };
 
@@ -521,6 +546,7 @@ export const roleDisplayNames: Record<Role, string> = {
   DEVELOPER: "Developer",
   CALL_CENTER: "Call Center",
   WAREHOUSE_STAFF: "Warehouse Staff",
+  COMMISSARY_STAFF: "Commissary Staff",
 };
 
 export const roleDescriptions: Record<Role, string> = {
@@ -541,5 +567,7 @@ export const roleDescriptions: Record<Role, string> = {
   DEVELOPER: "API key management and technical settings access",
   CALL_CENTER: "Dashboard, orders, and customers only",
   WAREHOUSE_STAFF:
-    "Warehouse inventory management and branch transfer operations",
+    "Raw warehouse inventory, approvals for commissary dispatch, and branch transfers",
+  COMMISSARY_STAFF:
+    "Back kitchen production, material handling, and branch dispatch requests",
 };

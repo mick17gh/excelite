@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { WarehouseContent } from "@/components/warehouse/warehouse-content";
 import { getWarehouses, getWarehouseInventory, getWarehouseTransfers, getWarehouseStats, getWarehouseInboundRecords, getWarehouseWasteLogs } from "@/lib/actions/warehouse";
+import { getWarehouseTransfers as getWarehouseMaterialTransfers } from "@/lib/actions/stock-transfers";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
@@ -9,9 +10,10 @@ export const metadata = {
 };
 
 export default async function WarehousePage() {
-  const [warehousesResult, transfersResult, statsResult, branchesResult, inboundResult, wastageResult] = await Promise.all([
+  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult] = await Promise.all([
     getWarehouses(),
     getWarehouseTransfers(),
+    getWarehouseMaterialTransfers(),
     getWarehouseStats(),
     getBranches(),
     getWarehouseInboundRecords(),
@@ -20,6 +22,20 @@ export default async function WarehousePage() {
 
   const warehouses = warehousesResult.data || [];
   const transfers = transfersResult.data || [];
+  const materialTransfers = (materialTransfersResult.data || []).map((t) => ({
+    id: t.id,
+    fromWarehouseId: t.fromWarehouseId,
+    toWarehouseId: t.toWarehouseId,
+    fromWarehouseName: t.fromWarehouseName,
+    toWarehouseName: t.toWarehouseName,
+    itemName: t.itemName,
+    itemSku: t.itemSku,
+    itemUnit: t.itemUnit,
+    quantity: t.quantity,
+    totalCost: t.totalCost,
+    status: t.status,
+    transferDate: t.transferDate,
+  }));
   const stats = statsResult.data;
   const inboundRecords = inboundResult.data || [];
   const wastageRecords = wastageResult.data || [];
@@ -50,6 +66,7 @@ export default async function WarehousePage() {
           warehouses={warehouses}
           items={allItems}
           transfers={transfers}
+          materialTransfers={materialTransfers}
           branches={branches}
           stats={stats}
           inboundRecords={inboundRecords}

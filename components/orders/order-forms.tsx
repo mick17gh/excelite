@@ -56,6 +56,8 @@ import {
   posCartLineKey,
   validateOptionSelections,
 } from "@/lib/menu-option-client";
+import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
+import { shouldShowTaxBreakdown } from "@/lib/services/receipt-display";
 
 interface Branch {
   id: string;
@@ -64,6 +66,8 @@ interface Branch {
   taxRate: number;
   taxEnabled: boolean;
   taxName: string;
+  taxInclusive?: boolean;
+  showTaxOnReceipt?: boolean;
 }
 
 interface MenuItem {
@@ -187,7 +191,7 @@ export function CreateOrderDialog({
       item.sku.toLowerCase().includes(searchItem.toLowerCase()),
   );
 
-  const subtotal =
+  const lineTotal =
     Math.round(
       cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0) * 100,
     ) / 100;
@@ -195,16 +199,18 @@ export function CreateOrderDialog({
   const deliveryFee = Math.round((parseFloat(deliveryFeeStr) || 0) * 100) / 100;
   const isDelivery = type === "DELIVERY";
 
-  // Calculate tax based on selected branch
   const selectedBranch = branches.find((b) => b.id === branchId);
-  const taxRate = selectedBranch?.taxEnabled ? selectedBranch.taxRate / 100 : 0;
-  const taxableAmount = subtotal - discount;
-  const tax =
-    Math.round((taxableAmount > 0 ? taxableAmount * taxRate : 0) * 100) / 100;
-  const total =
-    Math.round(
-      (subtotal + tax - discount + (isDelivery ? deliveryFee : 0)) * 100,
-    ) / 100;
+  const showTaxBreakdown = shouldShowTaxBreakdown({
+    showTaxOnReceipt: selectedBranch?.showTaxOnReceipt,
+  });
+  const { tax, total } = computeOrderTaxAmounts({
+    lineTotal,
+    discount,
+    deliveryFee: isDelivery ? deliveryFee : 0,
+    ratePercent: selectedBranch?.taxRate ?? 12.5,
+    enabled: selectedBranch?.taxEnabled ?? true,
+    inclusive: selectedBranch?.taxInclusive ?? false,
+  });
 
   const selectionsRecordFromIds = (
     groups: ClientMenuOptionGroup[],
@@ -673,7 +679,7 @@ export function CreateOrderDialog({
                 </div>
               ))}
               <div className="px-3 py-2 text-sm font-medium text-right">
-                Subtotal: {formatCurrency(subtotal)}
+                Total: {formatCurrency(total)}
               </div>
             </div>
           )}
@@ -762,8 +768,10 @@ export function CreateOrderDialog({
           {cart.length > 0 && (
             <div className="border rounded-md p-3 space-y-1 bg-muted/30">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
+                <span className="text-muted-foreground">
+                  {showTaxBreakdown && !selectedBranch?.taxInclusive ? "Subtotal" : "Items total"}
+                </span>
+                <span>{formatCurrency(lineTotal)}</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-sm">
@@ -773,15 +781,24 @@ export function CreateOrderDialog({
                   </span>
                 </div>
               )}
-              {taxRate > 0 && (
+              {showTaxBreakdown && tax > 0 && selectedBranch?.taxEnabled && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    Tax ({selectedBranch?.taxName || "VAT"}{" "}
-                    {selectedBranch?.taxRate}%)
+                    {selectedBranch?.taxInclusive
+                      ? `${selectedBranch.taxName} included (${selectedBranch.taxRate}%)`
+                      : `${selectedBranch?.taxName || "Tax"} (${selectedBranch?.taxRate ?? 0}%)`}
                   </span>
                   <span>{formatCurrency(tax)}</span>
                 </div>
               )}
+              {!showTaxBreakdown &&
+                selectedBranch?.taxInclusive &&
+                selectedBranch?.taxEnabled &&
+                tax > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Prices include {selectedBranch.taxName}; tax is not shown on the customer receipt.
+                  </p>
+                )}
               {isDelivery && deliveryFee > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Delivery Fee</span>

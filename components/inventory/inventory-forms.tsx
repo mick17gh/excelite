@@ -28,6 +28,7 @@ import {
   transferStock,
   createInventoryItem,
 } from "@/lib/actions/inventory";
+import { createBranchToWarehouseTransfer } from "@/lib/actions/stock-transfers";
 import { StockMovementType, InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
 import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
 import { INVENTORY_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants/categories";
@@ -799,6 +800,149 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface WarehouseOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface BranchReturnToWarehouseDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  branches: Branch[];
+  warehouses: WarehouseOption[];
+  items: InventoryItem[];
+}
+
+export function BranchReturnToWarehouseDialog({
+  open,
+  onOpenChange,
+  branches,
+  warehouses,
+  items,
+}: BranchReturnToWarehouseDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fromBranchId, setFromBranchId] = useState("");
+  const [toWarehouseId, setToWarehouseId] = useState("");
+  const [branchItemId, setBranchItemId] = useState("");
+  const [quantity, setQuantity] = useState(0);
+  const [notes, setNotes] = useState("");
+
+  const branchItems = items.filter((i) => !fromBranchId || i.branchId === fromBranchId);
+
+  const handleSubmit = async () => {
+    if (!fromBranchId || !toWarehouseId || !branchItemId || quantity <= 0) {
+      toast.error("Branch, warehouse, item, and quantity are required");
+      return;
+    }
+    const item = items.find((i) => i.id === branchItemId);
+    if (item && quantity > item.currentStock) {
+      toast.error("Insufficient branch stock");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await createBranchToWarehouseTransfer({
+        fromBranchId,
+        toWarehouseId,
+        branchItemId,
+        quantity,
+        notes: notes.trim() || undefined,
+      });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Return transfer created");
+        onOpenChange(false);
+      }
+    } catch {
+      toast.error("Failed to create return");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Return stock to warehouse</DialogTitle>
+          <DialogDescription>
+            Send branch inventory back to a raw or commissary warehouse.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-2">
+            <Label>From branch</Label>
+            <Select value={fromBranchId} onValueChange={setFromBranchId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select branch" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>To warehouse</Label>
+            <Select value={toWarehouseId} onValueChange={setToWarehouseId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Item</Label>
+            <Select value={branchItemId} onValueChange={setBranchItemId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select item" />
+              </SelectTrigger>
+              <SelectContent>
+                {branchItems.map((i) => (
+                  <SelectItem key={i.id} value={i.id}>
+                    {i.name} ({i.currentStock} {i.unit})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Quantity</Label>
+            <Input
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Notes</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Submit return
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

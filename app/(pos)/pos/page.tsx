@@ -5,6 +5,12 @@ import { getCustomers } from "@/lib/actions/customers";
 import { PosContent } from "@/components/pos/pos-content";
 import { listPosOrders } from "@/lib/actions/pos";
 import { getPosStorefrontQrContext } from "@/lib/actions/organization";
+import { canAuthorizeComplimentary } from "@/lib/actions/pos";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { db } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "POS | ServStack",
@@ -34,6 +40,21 @@ export default async function PosPage() {
       ? { url: qrContextResult.data.storefrontUrl }
       : null;
 
+  let allowComplimentary = false;
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session?.user?.id && session.user.role) {
+    const dbUser = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { organizationId: true },
+    });
+    if (dbUser?.organizationId) {
+      allowComplimentary = await canAuthorizeComplimentary(
+        session.user.role,
+        dbUser.organizationId,
+      );
+    }
+  }
+
   return (
     <div className="h-full">
       {/* <div className="mb-4">
@@ -50,6 +71,7 @@ export default async function PosPage() {
           recentOrders={orders}
           customers={customers}
           storefrontQr={storefrontQr}
+          allowComplimentary={allowComplimentary}
         />
       </Suspense>
     </div>

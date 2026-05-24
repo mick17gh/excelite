@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Receipt } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
 import { createTransaction } from "@/lib/actions/transactions";
+import { getBranchTaxRate } from "@/lib/actions/tax";
+import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 import { SalesChannel } from "@/lib/generated/prisma/client";
 
 interface Branch {
@@ -75,6 +77,17 @@ export function RecordTransactionForm({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedItem, setSelectedItem] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const [taxSettings, setTaxSettings] = useState({
+    rate: 12.5,
+    name: "VAT",
+    enabled: true,
+    inclusive: false,
+  });
+
+  useEffect(() => {
+    if (!formData.branchId) return;
+    void getBranchTaxRate(formData.branchId).then(setTaxSettings);
+  }, [formData.branchId]);
 
   const addItem = () => {
     if (!selectedItem || !quantity) return;
@@ -114,9 +127,13 @@ export function RecordTransactionForm({
     setOrderItems(orderItems.filter((_, i) => i !== index));
   };
 
-  const subtotal = orderItems.reduce((sum, item) => sum + item.total, 0);
-  const tax = subtotal * 0.125; // 12.5% VAT for Ghana
-  const total = subtotal + tax;
+  const lineTotal = orderItems.reduce((sum, item) => sum + item.total, 0);
+  const { subtotal, tax, total } = computeOrderTaxAmounts({
+    lineTotal,
+    ratePercent: taxSettings.rate,
+    enabled: taxSettings.enabled,
+    inclusive: taxSettings.inclusive,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

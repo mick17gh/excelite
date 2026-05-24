@@ -24,6 +24,8 @@ export interface CreateWarehouseInput {
   city: string;
   phone?: string;
   email?: string;
+  warehouseType?: "RAW" | "COMMISSARY";
+  parentWarehouseId?: string;
 }
 
 export interface UpdateWarehouseInput {
@@ -33,6 +35,7 @@ export interface UpdateWarehouseInput {
   city?: string;
   phone?: string;
   email?: string;
+  warehouseType?: "RAW" | "COMMISSARY";
   isActive?: boolean;
 }
 
@@ -46,6 +49,9 @@ export interface CreateWarehouseItemInput {
   currentStock?: number;
   minStock?: number;
   reorderPoint?: number;
+  itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
+  requiresCommissaryProcessing?: boolean;
+  allowDirectToBranch?: boolean;
 }
 
 export interface CreateWarehouseTransferInput {
@@ -81,6 +87,8 @@ export async function getWarehouses(organizationId?: string) {
         email: w.email,
         organizationId: w.organizationId,
         organizationName: w.organization?.name || "",
+        warehouseType: w.warehouseType,
+        parentWarehouseId: w.parentWarehouseId,
         isActive: w.isActive,
         itemCount: w._count.inventory,
         transferCount: w._count.transfersOut,
@@ -112,6 +120,9 @@ export async function getWarehouseInventory(warehouseId: string) {
         currentStock: decimalToNumber(item.currentStock),
         minStock: decimalToNumber(item.minStock),
         reorderPoint: decimalToNumber(item.reorderPoint),
+        itemStage: item.itemStage,
+        requiresCommissaryProcessing: item.requiresCommissaryProcessing,
+        allowDirectToBranch: item.allowDirectToBranch,
         isActive: item.isActive,
         createdAt: item.createdAt.toISOString(),
       })),
@@ -188,6 +199,8 @@ export async function createWarehouse(input: CreateWarehouseInput) {
         phone: input.phone || null,
         email: input.email || null,
         organizationId: org.id,
+        warehouseType: input.warehouseType || "RAW",
+        parentWarehouseId: input.parentWarehouseId || null,
       },
     });
 
@@ -207,6 +220,7 @@ export async function updateWarehouse(input: UpdateWarehouseInput) {
     if (input.city !== undefined) data.city = input.city;
     if (input.phone !== undefined) data.phone = input.phone || null;
     if (input.email !== undefined) data.email = input.email || null;
+    if (input.warehouseType !== undefined) data.warehouseType = input.warehouseType;
     if (input.isActive !== undefined) data.isActive = input.isActive;
 
     const warehouse = await db.warehouse.update({
@@ -235,6 +249,9 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
         currentStock: input.currentStock || 0,
         minStock: input.minStock || 0,
         reorderPoint: input.reorderPoint || 10,
+        itemStage: input.itemStage || "RAW",
+        requiresCommissaryProcessing: input.requiresCommissaryProcessing ?? false,
+        allowDirectToBranch: input.allowDirectToBranch ?? true,
       },
     });
 
@@ -251,6 +268,9 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
         currentStock: decimalToNumber(item.currentStock),
         minStock: decimalToNumber(item.minStock),
         reorderPoint: decimalToNumber(item.reorderPoint),
+        itemStage: item.itemStage,
+        requiresCommissaryProcessing: item.requiresCommissaryProcessing,
+        allowDirectToBranch: item.allowDirectToBranch,
         isActive: item.isActive,
         createdAt: item.createdAt.toISOString(),
       },
@@ -261,28 +281,23 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
   }
 }
 
-export async function createWarehouseTransfer(input: CreateWarehouseTransferInput) {
+export async function createWarehouseTransfer(
+  input: CreateWarehouseTransferInput & { requestedBy?: string },
+) {
   try {
-    const item = await db.warehouseInventoryItem.findUnique({ where: { id: input.warehouseItemId } });
-    if (!item) return { error: "Warehouse item not found" };
-
-    if (Number(item.currentStock) < input.quantity) {
-      return { error: "Insufficient stock for transfer" };
-    }
-
-    const transfer = await db.warehouseBranchTransfer.create({
-      data: {
-        warehouseId: input.warehouseId,
-        warehouseItemId: input.warehouseItemId,
-        toBranchId: input.toBranchId,
-        quantity: input.quantity,
-        unitCost: Number(item.unitCost),
-        totalCost: input.quantity * Number(item.unitCost),
-        status: "PENDING",
-        transferDate: new Date(),
-        notes: input.notes || null,
-      },
+    const { createWarehouseBranchTransferWithApproval } = await import(
+      "@/lib/actions/stock-transfers"
+    );
+    const result = await createWarehouseBranchTransferWithApproval({
+      warehouseId: input.warehouseId,
+      warehouseItemId: input.warehouseItemId,
+      toBranchId: input.toBranchId,
+      quantity: input.quantity,
+      notes: input.notes,
+      requestedBy: input.requestedBy,
     });
+    if (result.error) return { error: result.error };
+    const transfer = result.data!;
 
     revalidatePath("/dashboard/warehouse");
     return {
@@ -311,7 +326,20 @@ export async function createWarehouseTransfer(input: CreateWarehouseTransferInpu
 
 export async function updateTransferStatus(id: string, status: TransferStatus, userId?: string) {
   try {
+    const existing = await db.warehouseBranchTransfer.findUnique({ where: { id } });
+    if (!existing) return { error: "Transfer not found" };
+
+    if (status === "IN_TRANSIT" && existing.status === "APPROVED") {
+      // ok
+    } else if (status === "COMPLETED" && !["PENDING", "APPROVED", "IN_TRANSIT"].includes(existing.status)) {
+      return { error: "Invalid status transition" };
+    }
+
     const data: Record<string, unknown> = { status };
+
+    if (status === "IN_TRANSIT" && !existing.approvedBy) {
+      data.approvedBy = userId || null;
+    }
 
     if (status === "COMPLETED") {
       data.receivedBy = userId || null;
@@ -694,8 +722,12 @@ export interface UpdateWarehouseItemInput {
   category?: InventoryCategory;
   unit?: UnitType;
   unitCost?: number;
+  currentStock?: number;
   minStock?: number;
   reorderPoint?: number;
+  itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
+  requiresCommissaryProcessing?: boolean;
+  allowDirectToBranch?: boolean;
   isActive?: boolean;
 }
 
@@ -707,8 +739,16 @@ export async function updateWarehouseItem(input: UpdateWarehouseItemInput) {
     if (fields.category !== undefined) data.category = fields.category;
     if (fields.unit !== undefined) data.unit = fields.unit;
     if (fields.unitCost !== undefined) data.unitCost = fields.unitCost;
+    if (fields.currentStock !== undefined) data.currentStock = fields.currentStock;
     if (fields.minStock !== undefined) data.minStock = fields.minStock;
     if (fields.reorderPoint !== undefined) data.reorderPoint = fields.reorderPoint;
+    if (fields.itemStage !== undefined) data.itemStage = fields.itemStage;
+    if (fields.requiresCommissaryProcessing !== undefined) {
+      data.requiresCommissaryProcessing = fields.requiresCommissaryProcessing;
+    }
+    if (fields.allowDirectToBranch !== undefined) {
+      data.allowDirectToBranch = fields.allowDirectToBranch;
+    }
     if (fields.isActive !== undefined) data.isActive = fields.isActive;
 
     const item = await db.warehouseInventoryItem.update({ where: { id }, data });
@@ -716,11 +756,21 @@ export async function updateWarehouseItem(input: UpdateWarehouseItemInput) {
     revalidatePath("/dashboard/warehouse");
     return {
       data: {
-        ...item,
-        unitCost: Number(item.unitCost),
-        currentStock: Number(item.currentStock),
-        minStock: Number(item.minStock),
-        reorderPoint: Number(item.reorderPoint),
+        id: item.id,
+        warehouseId: item.warehouseId,
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        unit: item.unit,
+        unitCost: decimalToNumber(item.unitCost),
+        currentStock: decimalToNumber(item.currentStock),
+        minStock: decimalToNumber(item.minStock),
+        reorderPoint: decimalToNumber(item.reorderPoint),
+        itemStage: item.itemStage,
+        requiresCommissaryProcessing: item.requiresCommissaryProcessing,
+        allowDirectToBranch: item.allowDirectToBranch,
+        isActive: item.isActive,
+        createdAt: item.createdAt.toISOString(),
       },
     };
   } catch (error) {

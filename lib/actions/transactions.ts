@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { DayPart, SalesChannel } from "@/lib/generated/prisma/client";
 import { logCreate, logVoid } from "@/lib/services/audit";
 import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
+import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 
 function generateTransactionRef(): string {
   const prefix = "TXN";
@@ -57,12 +58,11 @@ export async function createTransaction(input: CreateTransactionInput) {
     // Fetch branch tax settings
     const branch = await db.branch.findUnique({
       where: { id: input.branchId },
-      select: { taxRate: true, taxEnabled: true },
+      select: { taxRate: true, taxEnabled: true, taxInclusive: true },
     });
-    const taxRate = branch?.taxEnabled ? Number(branch?.taxRate || 12.5) / 100 : 0;
 
     // Calculate totals
-    let subtotal = 0;
+    let lineTotal = 0;
     const saleItems: Array<{
       menuItemId: string;
       quantity: number;
@@ -77,7 +77,7 @@ export async function createTransaction(input: CreateTransactionInput) {
 
     for (const item of input.items) {
       const itemTotal = item.quantity * item.unitPrice - (item.discount || 0);
-      subtotal += itemTotal;
+      lineTotal += itemTotal;
       saleItems.push({
         menuItemId: item.menuItemId,
         quantity: item.quantity,
@@ -91,8 +91,12 @@ export async function createTransaction(input: CreateTransactionInput) {
       });
     }
 
-    const tax = subtotal * taxRate;
-    const total = subtotal + tax;
+    const { subtotal, tax, total } = computeOrderTaxAmounts({
+      lineTotal,
+      ratePercent: Number(branch?.taxRate ?? 12.5),
+      enabled: branch?.taxEnabled ?? true,
+      inclusive: branch?.taxInclusive ?? false,
+    });
     const amount = total + (input.tip || 0);
 
     // Create transaction

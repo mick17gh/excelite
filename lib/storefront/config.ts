@@ -32,6 +32,7 @@ export type PublicStoreConfig = {
     minimumOrderAmount: number;
     deliveryFee: number;
     taxRate: number;
+    taxInclusive: boolean;
   };
   features: {
     deliveryEnabled: boolean;
@@ -68,7 +69,7 @@ export async function getOrganizationForStorefront(organizationId: string) {
     include: {
       branches: {
         where: { deletedAt: null, isActive: true, onlineStoreVisible: true },
-        select: { id: true, name: true, code: true, currency: true, taxEnabled: true, taxRate: true, address: true, city: true, country: true },
+        select: { id: true, name: true, code: true, currency: true, taxEnabled: true, taxRate: true, taxInclusive: true, address: true, city: true, country: true },
       },
     },
   });
@@ -131,6 +132,7 @@ export function buildPublicStoreConfig(
       minimumOrderAmount: org.minOrderAmount ? Number(org.minOrderAmount) : 0,
       deliveryFee: org.deliveryFeeFlat ? Number(org.deliveryFeeFlat) : 0,
       taxRate,
+      taxInclusive: firstBranch?.taxInclusive ?? false,
     },
     features: {
       deliveryEnabled: org.deliveryEnabled,

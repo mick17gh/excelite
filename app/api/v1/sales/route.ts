@@ -163,8 +163,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const tax = subtotal * 0.125; // 12.5% VAT
-    const total = subtotal + tax;
+    const branchTax = await db.branch.findUnique({
+      where: { id: branchId },
+      select: { taxRate: true, taxEnabled: true, taxInclusive: true },
+    });
+    const { computeOrderTaxAmounts } = await import("@/lib/services/tax-calculation");
+    const { subtotal: netSubtotal, tax, total } = computeOrderTaxAmounts({
+      lineTotal: subtotal,
+      ratePercent: Number(branchTax?.taxRate ?? 12.5),
+      enabled: branchTax?.taxEnabled ?? true,
+      inclusive: branchTax?.taxInclusive ?? false,
+    });
 
     // Determine day part
     const hour = new Date().getHours();
@@ -178,7 +187,7 @@ export async function POST(request: NextRequest) {
       data: {
         saleNumber,
         branchId,
-        subtotal,
+        subtotal: netSubtotal,
         tax,
         total,
         channel: channel || "API",

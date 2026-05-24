@@ -31,6 +31,8 @@ export default async function OrdersPage() {
     taxRate: typeof b.taxRate === "object" ? Number(b.taxRate) : Number(b.taxRate || 0),
     taxEnabled: b.taxEnabled ?? true,
     taxName: b.taxName || "VAT",
+    taxInclusive: b.taxInclusive ?? false,
+    showTaxOnReceipt: b.showTaxOnReceipt ?? true,
   }));
   const menuItems = (menuResult.data || []).map((m: any) => ({
     id: m.id,

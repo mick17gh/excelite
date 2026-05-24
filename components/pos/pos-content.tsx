@@ -41,10 +41,17 @@ import {
   WifiOff,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
-import { createPosOrder, sendToKitchen, getKitchenStations, completeOrder } from "@/lib/actions/pos";
+import {
+  createPosOrder,
+  sendToKitchen,
+  getKitchenStations,
+  completeOrder,
+  completeComplimentaryOrder,
+} from "@/lib/actions/pos";
 import { savePosSnapshot, loadPosSnapshot, enqueuePosOutbox } from "@/lib/offline/pos-idb";
 import { drainPosOutbox } from "@/lib/offline/pos-sync";
 import { getBranchTaxRate } from "@/lib/actions/tax";
+import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 import { OrderType } from "@/lib/generated/prisma/client";
 import { useEffect, useCallback } from "react";
 import { useCurrency } from "@/contexts/currency-context";
@@ -110,6 +117,7 @@ interface PosContentProps {
   recentOrders: RecentOrder[];
   customers: Customer[];
   storefrontQr?: StorefrontQrProp;
+  allowComplimentary?: boolean;
 }
 
 interface CartLine {
@@ -134,6 +142,7 @@ export function PosContent({
   recentOrders,
   customers,
   storefrontQr = null,
+  allowComplimentary = false,
 }: PosContentProps) {
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
@@ -416,12 +425,21 @@ export function PosContent({
   const [autoSendToKitchen, setAutoSendToKitchen] = useState(true);
   
   // Tax settings state
-  const [taxSettings, setTaxSettings] = useState<{ rate: number; name: string; enabled: boolean }>({ rate: 12.5, name: "VAT", enabled: true });
+  const [taxSettings, setTaxSettings] = useState<{
+    rate: number;
+    name: string;
+    enabled: boolean;
+    inclusive: boolean;
+    showTaxOnReceipt: boolean;
+  }>({ rate: 12.5, name: "VAT", enabled: true, inclusive: false, showTaxOnReceipt: true });
 
-  // Calculate tax and total after taxSettings is declared
-  const taxRate = taxSettings.enabled ? taxSettings.rate / 100 : 0;
-  const tax = Math.round(cartSubtotal * taxRate * 100) / 100;
-  const total = Math.round((cartSubtotal + tax) * 100) / 100;
+  const taxAmounts = computeOrderTaxAmounts({
+    lineTotal: cartSubtotal,
+    ratePercent: taxSettings.rate,
+    enabled: taxSettings.enabled,
+    inclusive: taxSettings.inclusive,
+  });
+  const { subtotal: cartNetSubtotal, tax, total } = taxAmounts;
 
   // Load kitchen stations and tax settings when branch changes
   const loadKitchenStations = useCallback(async (branchId: string) => {
@@ -511,9 +529,22 @@ export function PosContent({
         type: paymentData.orderType,
         paymentMethod: paymentData.paymentMethod,
         total,
-        subtotal: cartSubtotal,
+        subtotal: cartNetSubtotal,
         tax,
-        branch: branch ? { name: branch.name, code: branch.code } : {},
+        taxInclusive: taxSettings.inclusive,
+        showTaxOnReceipt: taxSettings.showTaxOnReceipt,
+        taxName: taxSettings.name,
+        taxRate: taxSettings.rate,
+        branch: branch
+          ? {
+              name: branch.name,
+              code: branch.code,
+              taxInclusive: taxSettings.inclusive,
+              showTaxOnReceipt: taxSettings.showTaxOnReceipt,
+              taxName: taxSettings.name,
+              taxRate: taxSettings.rate,
+            }
+          : {},
         createdAt: new Date().toISOString(),
         customerName: paymentData.customerName,
         items: cart.map((l) => ({
@@ -566,14 +597,20 @@ export function PosContent({
           return;
         }
 
-        const completeResult = await completeOrder({
-          orderId: result.data.id,
-          paymentMethod: paymentData.paymentMethod,
-          amountReceived: paymentData.amountPaid,
-          tip: 0,
-          createSale: true,
-          skipStatusComplete: autoSendToKitchen,
-        });
+        const completeResult =
+          paymentData.paymentMethod === "COMPLIMENTARY"
+            ? await completeComplimentaryOrder({
+                orderId: result.data.id,
+                reason: paymentData.complimentaryReason || "Complimentary",
+              })
+            : await completeOrder({
+                orderId: result.data.id,
+                paymentMethod: paymentData.paymentMethod,
+                amountReceived: paymentData.amountPaid,
+                tip: 0,
+                createSale: true,
+                skipStatusComplete: autoSendToKitchen,
+              });
 
         if (!completeResult.success) {
           console.error("Failed to complete order:", completeResult.error);
@@ -920,14 +957,35 @@ export function PosContent({
           {cart.length > 0 && (
             <>
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatCurrency(cartSubtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{taxSettings.name} ({taxSettings.rate}%)</span>
-                  <span>{formatCurrency(tax)}</span>
-                </div>
+                {taxSettings.inclusive && taxSettings.enabled ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Items total</span>
+                      <span>{formatCurrency(cartSubtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {taxSettings.name} included ({taxSettings.rate}%)
+                      </span>
+                      <span>{formatCurrency(tax)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>{formatCurrency(cartSubtotal)}</span>
+                    </div>
+                    {taxSettings.enabled && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {taxSettings.name} ({taxSettings.rate}%)
+                        </span>
+                        <span>{formatCurrency(tax)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
@@ -1034,16 +1092,20 @@ export function PosContent({
         open={isPaymentOpen}
         onOpenChange={setIsPaymentOpen}
         total={total}
-        subtotal={cartSubtotal}
+        subtotal={taxSettings.inclusive ? cartNetSubtotal : cartSubtotal}
         tax={tax}
         taxName={taxSettings.name}
         taxRate={taxSettings.rate}
+        taxInclusive={taxSettings.inclusive}
+        taxEnabled={taxSettings.enabled}
+        lineTotal={cartSubtotal}
         onComplete={handlePaymentComplete}
         isProcessing={isPending}
         customers={liveCustomers}
         orderType={orderType}
         onOrderTypeChange={(t) => setOrderType(t as OrderType)}
         offlineRestricted={!isOnline}
+        allowComplimentary={allowComplimentary}
       />
 
       <Dialog

@@ -53,6 +53,8 @@ import {
 import { getBranches } from "@/lib/actions/branches";
 import { getOrganization } from "@/lib/actions/organization";
 import { OnlineStoreTab } from "./online-store-tab";
+import { DataManagementTab } from "./data-management-tab";
+import { PosPoliciesTab } from "./pos-policies-tab";
 
 interface UserData {
   id: string;
@@ -115,6 +117,8 @@ export function SettingsContent() {
     taxRate: 12.5,
     taxName: "VAT",
     taxEnabled: true,
+    taxInclusive: false,
+    showTaxOnReceipt: true,
   });
 
   // Load user data on mount
@@ -176,6 +180,8 @@ export function SettingsContent() {
         taxRate: settings.rate,
         taxName: settings.name,
         taxEnabled: settings.enabled,
+        taxInclusive: settings.inclusive,
+        showTaxOnReceipt: settings.showTaxOnReceipt,
       });
     } catch (error) {
       console.error("Failed to load tax settings:", error);
@@ -361,6 +367,12 @@ export function SettingsContent() {
           <Building2 className="mr-1.5 h-3.5 w-3.5" />
           Online Store
         </TabsTrigger>
+        {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+          <TabsTrigger value="data-management" className="text-xs">
+            <Shield className="mr-1.5 h-3.5 w-3.5" />
+            Data
+          </TabsTrigger>
+        )}
         {user?.role === "SUPER_ADMIN" && (
           <TabsTrigger value="platform-admin" className="text-xs">
             <Shield className="mr-1.5 h-3.5 w-3.5" />
@@ -724,6 +736,32 @@ export function SettingsContent() {
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tax pricing</Label>
+              <Select
+                value={taxSettings.taxInclusive ? "inclusive" : "exclusive"}
+                onValueChange={(v) =>
+                  setTaxSettings({ ...taxSettings, taxInclusive: v === "inclusive" })
+                }
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="exclusive">
+                    Exclusive — tax added at checkout
+                  </SelectItem>
+                  <SelectItem value="inclusive">
+                    Inclusive — tax included in menu prices
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Menu prices are always what the customer sees. Exclusive adds tax on top;
+                inclusive embeds tax in that price.
+              </p>
+            </div>
+
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-sm">Enable Tax</Label>
@@ -737,13 +775,41 @@ export function SettingsContent() {
               />
             </div>
 
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-xs font-medium mb-1">Preview</p>
-              <p className="text-xs text-muted-foreground">
-                {taxSettings.taxEnabled 
-                  ? `${taxSettings.taxName} (${taxSettings.taxRate}%) will be applied to all transactions`
-                  : "Tax is disabled for this branch"}
-              </p>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Show tax on receipt</Label>
+                <p className="text-xs text-muted-foreground">
+                  When off, receipts show menu prices only (no subtotal or tax lines). Recommended for
+                  inclusive pricing when you do not want customers to see the tax split.
+                </p>
+              </div>
+              <Switch
+                checked={taxSettings.showTaxOnReceipt}
+                onCheckedChange={(checked) =>
+                  setTaxSettings({ ...taxSettings, showTaxOnReceipt: checked })
+                }
+              />
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium">Preview (GHS 100 menu item)</p>
+              {taxSettings.taxEnabled ? (
+                taxSettings.taxInclusive ? (
+                  <p className="text-xs text-muted-foreground">
+                    Customer pays <strong>GHS 100.00</strong> — net{" "}
+                    {(100 / (1 + taxSettings.taxRate / 100)).toFixed(2)}, {taxSettings.taxName}{" "}
+                    {(100 - 100 / (1 + taxSettings.taxRate / 100)).toFixed(2)} (included)
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Customer pays <strong>GHS {(100 * (1 + taxSettings.taxRate / 100)).toFixed(2)}</strong>{" "}
+                    — subtotal GHS 100.00 + {taxSettings.taxName} GHS{" "}
+                    {(100 * (taxSettings.taxRate / 100)).toFixed(2)}
+                  </p>
+                )
+              ) : (
+                <p className="text-xs text-muted-foreground">Tax is disabled for this branch</p>
+              )}
             </div>
 
             <div className="flex justify-end">
@@ -761,7 +827,12 @@ export function SettingsContent() {
       </TabsContent>
 
       <TabsContent value="organization">
-        <OrganizationTab />
+        <div className="space-y-4">
+          <OrganizationTab />
+          {user?.organizationId && (
+            <PosPoliciesTab organizationId={user.organizationId} />
+          )}
+        </div>
       </TabsContent>
 
       <TabsContent value="kitchen">
@@ -783,6 +854,12 @@ export function SettingsContent() {
           </Card>
         )}
       </TabsContent>
+
+      {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+        <TabsContent value="data-management">
+          <DataManagementTab />
+        </TabsContent>
+      )}
 
       {user?.role === "SUPER_ADMIN" && (
         <TabsContent value="platform-admin">

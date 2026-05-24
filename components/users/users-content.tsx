@@ -60,14 +60,22 @@ interface Branch {
   code: string;
 }
 
+interface WarehouseOption {
+  id: string;
+  name: string;
+  code: string;
+  warehouseType?: string;
+}
+
 interface UsersContentProps {
   users: User[];
   branches: Branch[];
+  warehouses: WarehouseOption[];
   currentCount: number;
   maxUsers: number;
 }
 
-export function UsersContent({ users, branches, currentCount, maxUsers }: UsersContentProps) {
+export function UsersContent({ users, branches, warehouses, currentCount, maxUsers }: UsersContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -124,6 +132,7 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
       DEVELOPER: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
       CALL_CENTER: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
       WAREHOUSE_STAFF: "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-400",
+      COMMISSARY_STAFF: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
     };
     const labels: Record<string, string> = {
       SUPER_ADMIN: "Super Admin",
@@ -138,6 +147,7 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
       DEVELOPER: "Developer",
       CALL_CENTER: "Call Center",
       WAREHOUSE_STAFF: "Warehouse",
+      COMMISSARY_STAFF: "Commissary",
     };
     return <Badge className={colors[role] || "bg-slate-100 text-slate-700"}>{labels[role] || role}</Badge>;
   };
@@ -242,6 +252,7 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
               <SelectItem value="DEVELOPER">Developer</SelectItem>
               <SelectItem value="CALL_CENTER">Call Center</SelectItem>
               <SelectItem value="WAREHOUSE_STAFF">Warehouse</SelectItem>
+              <SelectItem value="COMMISSARY_STAFF">Commissary</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -381,12 +392,14 @@ export function UsersContent({ users, branches, currentCount, maxUsers }: UsersC
         open={isAddUserOpen}
         onOpenChange={setIsAddUserOpen}
         branches={branches}
+        warehouses={warehouses}
       />
       <EditUserForm
         open={!!editingUser}
         onOpenChange={(open) => !open && setEditingUser(null)}
         user={editingUser}
         branches={branches}
+        warehouses={warehouses}
       />
       <ResetPasswordDialog
         open={!!resettingPasswordUser}

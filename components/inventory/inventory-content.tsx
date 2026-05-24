@@ -51,6 +51,7 @@ import {
   WasteLogForm,
   TransferForm,
   AddInventoryItemForm,
+  BranchReturnToWarehouseDialog,
 } from "@/components/inventory/inventory-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { updateBranchTransferStatus } from "@/lib/actions/inventory";
@@ -140,9 +141,16 @@ const TRANSFER_STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
+interface WarehouseOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface InventoryContentProps {
   items: InventoryItem[];
   branches: Branch[];
+  warehouses?: WarehouseOption[];
   outboundRecords?: OutboundRecord[];
   transferRecords?: TransferRecord[];
   warehouseTransfers?: WarehouseTransfer[];
@@ -150,7 +158,8 @@ interface InventoryContentProps {
 
 export function InventoryContent({ 
   items, 
-  branches, 
+  branches,
+  warehouses = [],
   outboundRecords = [], 
   transferRecords = [],
   warehouseTransfers = []
@@ -177,6 +186,7 @@ export function InventoryContent({
   const [isOutboundOpen, setIsOutboundOpen] = useState(false);
   const [isWasteOpen, setIsWasteOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isBranchReturnOpen, setIsBranchReturnOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
@@ -387,6 +397,10 @@ export function InventoryContent({
                 <DropdownMenuItem onClick={() => setIsTransferOpen(true)}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Transfer to Branch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsBranchReturnOpen(true)}>
+                  <ArrowUpFromLine className="mr-2 h-4 w-4" />
+                  Return to Warehouse
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -779,6 +793,13 @@ export function InventoryContent({
         open={isAddItemOpen}
         onOpenChange={setIsAddItemOpen}
         branches={branches}
+      />
+      <BranchReturnToWarehouseDialog
+        open={isBranchReturnOpen}
+        onOpenChange={setIsBranchReturnOpen}
+        branches={branches}
+        warehouses={warehouses}
+        items={items}
       />
 
       {/* Bulk Import Dialog */}

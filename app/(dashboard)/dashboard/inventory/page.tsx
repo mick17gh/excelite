@@ -3,6 +3,7 @@ import { InventoryContent } from "@/components/inventory/inventory-content";
 import { getInventoryItems, getSuppliers, getOutboundRecords, getTransferRecords } from "@/lib/actions/inventory";
 import { getWarehouseTransfers } from "@/lib/actions/warehouse";
 import { getBranches } from "@/lib/actions/branches";
+import { getWarehouses } from "@/lib/actions/warehouse";
 
 export const metadata = {
   title: "Inventory Management | ServStack",
@@ -69,14 +70,20 @@ export default async function InventoryPage() {
     createdAt: string;
   };
 
-  const [branchesResult, inventoryResult, suppliersResult, outboundResult, transferResult, warehouseTransfersResult] = await Promise.all([
+  const [branchesResult, inventoryResult, suppliersResult, outboundResult, transferResult, warehouseTransfersResult, warehousesResult] = await Promise.all([
     getBranches(),
     getInventoryItems(undefined, { page: 1, pageSize: 1000 }),
     getSuppliers(),
     getOutboundRecords(),
     getTransferRecords(),
     getWarehouseTransfers(),
+    getWarehouses(),
   ]);
+  const warehouseList = (warehousesResult.data || []).map((w) => ({
+    id: w.id,
+    name: w.name,
+    code: w.code,
+  }));
 
   const branchList = (branchesResult.data || []).map((branch: any) => {
     const { taxRate, ...rest } = branch;
@@ -131,7 +138,8 @@ export default async function InventoryPage() {
       <Suspense fallback={<InventoryLoadingSkeleton />}>
         <InventoryContent 
           items={items} 
-          branches={branchList} 
+          branches={branchList}
+          warehouses={warehouseList}
           outboundRecords={outboundRecords}
           transferRecords={transferRecords}
           warehouseTransfers={warehouseTransfers}

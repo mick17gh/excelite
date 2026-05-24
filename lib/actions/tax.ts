@@ -131,31 +131,53 @@ export async function deleteTaxConfig(id: string) {
   }
 }
 
-export async function getBranchTaxRate(branchId: string): Promise<{ rate: number; name: string; enabled: boolean }> {
+export async function getBranchTaxRate(
+  branchId: string,
+): Promise<{
+  rate: number;
+  name: string;
+  enabled: boolean;
+  inclusive: boolean;
+  showTaxOnReceipt: boolean;
+}> {
   try {
     const branch = await db.branch.findUnique({
       where: { id: branchId },
-      select: { taxRate: true, taxName: true, taxEnabled: true },
+      select: {
+        taxRate: true,
+        taxName: true,
+        taxEnabled: true,
+        taxInclusive: true,
+        showTaxOnReceipt: true,
+      },
     });
 
     if (!branch) {
-      return { rate: 12.5, name: "VAT", enabled: true }; // Default fallback
+      return { rate: 12.5, name: "VAT", enabled: true, inclusive: false, showTaxOnReceipt: true };
     }
 
     return {
       rate: Number(branch.taxRate),
       name: branch.taxName,
       enabled: branch.taxEnabled,
+      inclusive: branch.taxInclusive,
+      showTaxOnReceipt: branch.showTaxOnReceipt,
     };
   } catch (error) {
     console.error("[getBranchTaxRate] Error:", error);
-    return { rate: 12.5, name: "VAT", enabled: true }; // Default fallback
+    return { rate: 12.5, name: "VAT", enabled: true, inclusive: false, showTaxOnReceipt: true };
   }
 }
 
 export async function updateBranchTaxSettings(
   branchId: string,
-  settings: { taxRate?: number; taxName?: string; taxEnabled?: boolean }
+  settings: {
+    taxRate?: number;
+    taxName?: string;
+    taxEnabled?: boolean;
+    taxInclusive?: boolean;
+    showTaxOnReceipt?: boolean;
+  },
 ) {
   try {
     const branch = await db.branch.update({
@@ -164,6 +186,10 @@ export async function updateBranchTaxSettings(
         ...(settings.taxRate !== undefined && { taxRate: settings.taxRate }),
         ...(settings.taxName !== undefined && { taxName: settings.taxName }),
         ...(settings.taxEnabled !== undefined && { taxEnabled: settings.taxEnabled }),
+        ...(settings.taxInclusive !== undefined && { taxInclusive: settings.taxInclusive }),
+        ...(settings.showTaxOnReceipt !== undefined && {
+          showTaxOnReceipt: settings.showTaxOnReceipt,
+        }),
       },
     });
 
@@ -177,6 +203,8 @@ export async function updateBranchTaxSettings(
         taxRate: Number(branch.taxRate),
         taxName: branch.taxName,
         taxEnabled: branch.taxEnabled,
+        taxInclusive: branch.taxInclusive,
+        showTaxOnReceipt: branch.showTaxOnReceipt,
       },
     };
   } catch (error) {

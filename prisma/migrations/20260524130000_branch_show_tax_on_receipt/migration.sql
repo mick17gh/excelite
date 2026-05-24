@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "branch" ADD COLUMN IF NOT EXISTS "showTaxOnReceipt" BOOLEAN NOT NULL DEFAULT true;

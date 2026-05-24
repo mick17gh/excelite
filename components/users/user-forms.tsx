@@ -31,12 +31,20 @@ interface Branch {
   code: string;
 }
 
+interface WarehouseOption {
+  id: string;
+  name: string;
+  code: string;
+  warehouseType?: string;
+}
+
 interface User {
   id: string;
   name: string;
   email: string;
   role: string;
   branchName: string | null;
+  assignedWarehouseId?: string | null;
   isActive: boolean;
 }
 
@@ -45,9 +53,10 @@ interface AddUserFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   branches: Branch[];
+  warehouses: WarehouseOption[];
 }
 
-export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) {
+export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUserFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -55,6 +64,7 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
     password: "",
     role: "BRANCH_MANAGER",
     branchId: "",
+    assignedWarehouseId: "",
     phone: "",
     isActive: true,
   });
@@ -70,6 +80,7 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
         password: formData.password,
         role: formData.role as Role,
         branchId: formData.branchId || undefined,
+        assignedWarehouseId: formData.assignedWarehouseId || undefined,
         phoneNumber: formData.phone || undefined,
         isActive: formData.isActive,
       });
@@ -83,6 +94,7 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
           password: "",
           role: "BRANCH_MANAGER",
           branchId: "",
+          assignedWarehouseId: "",
           phone: "",
           isActive: true,
         });
@@ -98,6 +110,14 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
   };
 
   const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF"].includes(formData.role);
+  const requiresWarehouse = ["WAREHOUSE_STAFF", "COMMISSARY_STAFF"].includes(formData.role);
+  const filteredWarehouses = warehouses.filter((w) =>
+    formData.role === "COMMISSARY_STAFF"
+      ? w.warehouseType === "COMMISSARY"
+      : formData.role === "WAREHOUSE_STAFF"
+        ? w.warehouseType !== "COMMISSARY"
+        : true,
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -183,6 +203,7 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
                   <SelectItem value="DEVELOPER">Developer (API Access)</SelectItem>
                   <SelectItem value="CALL_CENTER">Call Center</SelectItem>
                   <SelectItem value="WAREHOUSE_STAFF">Warehouse Staff</SelectItem>
+                  <SelectItem value="COMMISSARY_STAFF">Commissary Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -201,6 +222,29 @@ export function AddUserForm({ open, onOpenChange, branches }: AddUserFormProps) 
                     {branches.map((branch) => (
                       <SelectItem key={branch.id} value={branch.id}>
                         {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {requiresWarehouse && (
+              <div className="grid gap-2">
+                <Label>Assigned warehouse</Label>
+                <Select
+                  value={formData.assignedWarehouseId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, assignedWarehouseId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredWarehouses.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name} ({w.code})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -242,15 +286,17 @@ interface EditUserFormProps {
   onOpenChange: (open: boolean) => void;
   user: User | null;
   branches: Branch[];
+  warehouses: WarehouseOption[];
 }
 
-export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFormProps) {
+export function EditUserForm({ open, onOpenChange, user, branches, warehouses }: EditUserFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     role: "",
     branchId: "",
+    assignedWarehouseId: "",
     phone: "",
     isActive: true,
   });
@@ -262,6 +308,7 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
         email: user.email,
         role: user.role,
         branchId: "",
+        assignedWarehouseId: user.assignedWarehouseId || "",
         phone: "",
         isActive: user.isActive,
       });
@@ -279,6 +326,7 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
         email: formData.email,
         role: formData.role as Role,
         branchId: formData.branchId || undefined,
+        assignedWarehouseId: formData.assignedWarehouseId || null,
         phoneNumber: formData.phone || undefined,
         isActive: formData.isActive,
       });
@@ -300,6 +348,14 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
   if (!user) return null;
 
   const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF"].includes(formData.role);
+  const requiresWarehouse = ["WAREHOUSE_STAFF", "COMMISSARY_STAFF"].includes(formData.role);
+  const filteredWarehouses = warehouses.filter((w) =>
+    formData.role === "COMMISSARY_STAFF"
+      ? w.warehouseType === "COMMISSARY"
+      : formData.role === "WAREHOUSE_STAFF"
+        ? w.warehouseType !== "COMMISSARY"
+        : true,
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -355,6 +411,7 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
                   <SelectItem value="DEVELOPER">Developer</SelectItem>
                   <SelectItem value="CALL_CENTER">Call Center</SelectItem>
                   <SelectItem value="WAREHOUSE_STAFF">Warehouse Staff</SelectItem>
+                  <SelectItem value="COMMISSARY_STAFF">Commissary Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -373,6 +430,29 @@ export function EditUserForm({ open, onOpenChange, user, branches }: EditUserFor
                     {branches.map((branch) => (
                       <SelectItem key={branch.id} value={branch.id}>
                         {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {requiresWarehouse && (
+              <div className="grid gap-2">
+                <Label>Assigned warehouse</Label>
+                <Select
+                  value={formData.assignedWarehouseId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, assignedWarehouseId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredWarehouses.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name} ({w.code})
                       </SelectItem>
                     ))}
                   </SelectContent>

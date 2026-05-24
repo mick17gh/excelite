@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { ReportId } from "@/lib/reports/types";
 import type { ReportViewerContext } from "@/lib/reports/auth";
+import { taxModeLabel } from "@/lib/reports/tax-labels";
 import {
   applyCustomerPiiMask,
   classifyMenuItem,
@@ -228,20 +229,22 @@ async function buildExecutiveSummary(
 
   const salesByBranch: Record<
     string,
-    { revenue: number; cogs: number; transactions: number }
+    { revenue: number; tax: number; cogs: number; transactions: number }
   > = {};
   periodSales.forEach((sale) => {
     if (!salesByBranch[sale.branchId]) {
-      salesByBranch[sale.branchId] = { revenue: 0, cogs: 0, transactions: 0 };
+      salesByBranch[sale.branchId] = { revenue: 0, tax: 0, cogs: 0, transactions: 0 };
     }
     salesByBranch[sale.branchId].revenue += Number(sale.total);
+    salesByBranch[sale.branchId].tax += Number(sale.tax);
     salesByBranch[sale.branchId].cogs += saleCogs(sale.items);
     salesByBranch[sale.branchId].transactions += 1;
   });
 
   const executiveRows = branches.map((b) => {
-    const agg = salesByBranch[b.id] || { revenue: 0, cogs: 0, transactions: 0 };
+    const agg = salesByBranch[b.id] || { revenue: 0, tax: 0, cogs: 0, transactions: 0 };
     const revenue = roundMoney(agg.revenue);
+    const taxCollected = roundMoney(agg.tax);
     const cogs = roundMoney(agg.cogs);
     const grossProfit = roundMoney(revenue - cogs);
     const opEx = roundMoney(opexMap[b.id] || 0);
@@ -256,6 +259,7 @@ async function buildExecutiveSummary(
     return {
       "Branch Name": b.name,
       "Revenue (GHS)": revenue,
+      "Tax Collected (GHS)": taxCollected,
       COGS: cogs,
       "Gross Profit": grossProfit,
       "Gross Margin %": formatPercentDecimal(grossProfit, revenue),
@@ -378,6 +382,7 @@ async function buildWeeklyPerformance(
     const dateKey = cursor.toISOString().split("T")[0];
     const daySales = dailySales[dateKey] || [];
     const totalSales = roundMoney(daySales.reduce((s, x) => s + Number(x.total), 0));
+    const dayTax = roundMoney(daySales.reduce((s, x) => s + Number(x.tax), 0));
     const priorKey = new Date(cursor);
     priorKey.setDate(priorKey.getDate() - 7);
     const priorKeyStr = priorKey.toISOString().split("T")[0];
@@ -403,6 +408,7 @@ async function buildWeeklyPerformance(
       Date: formatReportDateOnly(cursor),
       "Day of Week": dayOfWeekName(cursor),
       "Total Sales": totalSales,
+      "Tax (GHS)": dayTax,
       "WoW Growth %": wowPercent(totalSales, priorTotal) / 100,
       "Best Selling Hour": `${String(peak.hour).padStart(2, "0")}:00`,
       "Peak Hour Revenue": peak.revenue,
@@ -880,13 +886,18 @@ async function buildSalesReport(
   });
 
   const totalRevenue = sales.reduce((s, x) => s + Number(x.total), 0);
+  const totalTax = sales.reduce((s, x) => s + Number(x.tax), 0);
+  const totalNetSubtotal = sales.reduce((s, x) => s + Number(x.subtotal), 0);
+
   const salesDetailRows = sales.map((sale) => ({
     "Sale Number": sale.saleNumber,
     Branch: sale.branch?.name || "",
     Date: formatReportDate(sale.saleDate),
     Channel: sale.channel,
-    "Revenue (GHS)": roundMoney(Number(sale.total)),
+    "Tax Mode": taxModeLabel(sale.branch?.taxInclusive ?? false),
+    "Net Subtotal (GHS)": roundMoney(Number(sale.subtotal)),
     "Tax (GHS)": roundMoney(Number(sale.tax)),
+    "Total Collected (GHS)": roundMoney(Number(sale.total)),
     "Line Items": sale.items.length,
   }));
 
@@ -894,6 +905,8 @@ async function buildSalesReport(
     reportName: "Sales & Revenue Report",
     summary: {
       totalRevenue: roundMoney(totalRevenue),
+      totalNetSubtotal: roundMoney(totalNetSubtotal),
+      totalTax: roundMoney(totalTax),
       transactionCount: sales.length,
     },
     salesDetailRows,
@@ -1029,7 +1042,11 @@ async function buildOrdersOverview(
       ...branchFilter,
       createdAt: { gte: input.startDate, lte: input.endDate },
     },
-    include: { branch: { select: { name: true } } },
+    include: {
+      branch: {
+        select: { name: true, taxInclusive: true },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -1042,6 +1059,9 @@ async function buildOrdersOverview(
       Status: o.status,
       "Payment Status": o.paymentStatus,
       "Customer Name": o.customerName || "—",
+      "Tax Mode": taxModeLabel(o.branch?.taxInclusive ?? false),
+      "Net Subtotal (GHS)": roundMoney(Number(o.subtotal)),
+      "Tax (GHS)": roundMoney(Number(o.tax)),
       "Total (GHS)": roundMoney(Number(o.total)),
     };
     return applyCustomerPiiMask(row, role, "Customer Name", "Phone Number");
@@ -1148,6 +1168,9 @@ async function buildPosSalesReport(
     Type: o.type,
     Status: o.status,
     "Payment Method": o.paymentMethod || "—",
+    "Tax Mode": taxModeLabel(o.branch?.taxInclusive ?? false),
+    "Net Subtotal (GHS)": roundMoney(Number(o.subtotal)),
+    "Tax (GHS)": roundMoney(Number(o.tax)),
     "Total (GHS)": roundMoney(Number(o.total)),
   }));
 

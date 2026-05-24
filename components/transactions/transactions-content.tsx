@@ -58,6 +58,7 @@ import {
 } from "@/hooks/use-branch-restrictions";
 import { createTransaction, getTransactions } from "@/lib/actions/transactions";
 import { getBranchTaxRate } from "@/lib/actions/tax";
+import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 import { SalesChannel } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
 
@@ -168,7 +169,8 @@ export function TransactionsContent({
     rate: number;
     name: string;
     enabled: boolean;
-  }>({ rate: 0, name: "Tax", enabled: false });
+    inclusive: boolean;
+  }>({ rate: 0, name: "Tax", enabled: false, inclusive: false });
 
   // Auto-set currency based on selected branch
   useBranchCurrency(selectedBranch, branches);
@@ -257,9 +259,12 @@ export function TransactionsContent({
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const taxRate = taxSettings.enabled ? taxSettings.rate / 100 : 0;
-  const tax = cartTotal * taxRate;
-  const grandTotal = cartTotal + tax;
+  const { tax, total: grandTotal } = computeOrderTaxAmounts({
+    lineTotal: cartTotal,
+    ratePercent: taxSettings.rate,
+    enabled: taxSettings.enabled,
+    inclusive: taxSettings.inclusive,
+  });
 
   const handleSubmitSale = async () => {
     if (cart.length === 0) {
@@ -503,7 +508,9 @@ export function TransactionsContent({
                       {taxSettings.enabled && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">
-                            {taxSettings.name} ({taxSettings.rate}%)
+                            {taxSettings.inclusive
+                              ? `${taxSettings.name} included (${taxSettings.rate}%)`
+                              : `${taxSettings.name} (${taxSettings.rate}%)`}
                           </span>
                           <span>{formatCurrency(tax)}</span>
                         </div>

@@ -18,6 +18,11 @@ import { ChefHat, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sendOrderToKitchen } from "@/lib/actions/orders";
 import { useState } from "react";
+import {
+  receiptTaxLabel,
+  shouldShowInclusiveFootnote,
+  shouldShowTaxBreakdown,
+} from "@/lib/services/receipt-display";
 
 interface OrderItem {
   id: string;
@@ -49,6 +54,11 @@ interface Order {
   branchId: string;
   branchName: string;
   branchCode: string;
+  taxInclusive?: boolean;
+  showTaxOnReceipt?: boolean;
+  taxName?: string;
+  taxRate?: number;
+  taxEnabled?: boolean;
   assignedBy: string | null;
   source: string;
   type: string;
@@ -150,6 +160,15 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: OrderDetailModalProps) {
   const { formatCurrency } = useCurrency();
+  const receiptDisplay = {
+    showTaxOnReceipt: order.showTaxOnReceipt ?? true,
+    taxInclusive: order.taxInclusive ?? false,
+    taxName: order.taxName,
+    taxRate: order.taxRate,
+    tax: order.tax,
+    subtotal: order.subtotal,
+  };
+  const showTaxBreakdown = shouldShowTaxBreakdown(receiptDisplay);
   const [isSendingToKitchen, setIsSendingToKitchen] = useState(false);
 
   const handleSendToKitchen = async () => {
@@ -260,14 +279,18 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
 
           {/* Totals */}
           <div className="border rounded-md p-3 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>{formatCurrency(order.subtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span>{formatCurrency(order.tax)}</span>
-            </div>
+            {showTaxBreakdown ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span>{formatCurrency(order.subtotal)}</span>
+              </div>
+            ) : null}
+            {showTaxBreakdown && order.tax > 0 ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{receiptTaxLabel(receiptDisplay)}</span>
+                <span>{formatCurrency(order.tax)}</span>
+              </div>
+            ) : null}
             {order.discount > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Discount</span>
@@ -286,6 +309,12 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
               <span>{formatCurrency(order.total)}</span>
             </div>
           </div>
+
+          {shouldShowInclusiveFootnote(receiptDisplay) ? (
+            <p className="text-xs text-muted-foreground text-center">
+              Prices include {order.taxName || "tax"}
+            </p>
+          ) : null}
 
           {/* Notes */}
           {order.notes && (
@@ -349,11 +378,18 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
             <TabsContent value="receipt" className="mt-3">
               <ReceiptPanel
                 orderId={order.id}
+                orderNumber={order.orderNumber}
+                branchName={order.branchName}
+                branchCode={order.branchCode}
                 customerName={order.customerName}
                 customerPhone={order.customerPhone}
                 customerEmail={null}
                 paymentMethod={order.paymentMethod}
                 receipt={order.receipt || null}
+                taxInclusive={order.taxInclusive}
+                showTaxOnReceipt={order.showTaxOnReceipt}
+                taxName={order.taxName}
+                taxRate={order.taxRate}
               />
             </TabsContent>
           </Tabs>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,10 @@ interface PaymentModalProps {
   tax?: number;
   taxName?: string;
   taxRate?: number;
+  taxInclusive?: boolean;
+  taxEnabled?: boolean;
+  /** Sum of line prices (customer-facing merchandise total before delivery) */
+  lineTotal?: number;
   onComplete: (paymentData: PaymentData) => void;
   isProcessing?: boolean;
   customers?: Customer[];
@@ -43,6 +47,7 @@ interface PaymentModalProps {
   onOrderTypeChange?: (type: string) => void;
   /** When true: cash only, no delivery type, no new customers (POS offline guardrails). */
   offlineRestricted?: boolean;
+  allowComplimentary?: boolean;
 }
 
 export interface PaymentData {
@@ -53,6 +58,7 @@ export interface PaymentData {
   customerName?: string;
   orderType: string;
   notes?: string;
+  complimentaryReason?: string;
   deliveryAddress?: string;
   deliveryPhone?: string;
   deliveryNotes?: string;
@@ -82,18 +88,23 @@ export function PaymentModal({
   tax,
   taxName = "VAT",
   taxRate = 12.5,
+  taxInclusive = false,
+  taxEnabled = true,
+  lineTotal,
   onComplete,
   isProcessing = false,
   customers = [],
   orderType: initialOrderType = "DINE_IN",
   onOrderTypeChange,
   offlineRestricted = false,
+  allowComplimentary = false,
 }: PaymentModalProps) {
   const { formatCurrency } = useCurrency();
   const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [localOrderType, setLocalOrderType] = useState(initialOrderType);
   const [notes, setNotes] = useState("");
+  const [complimentaryReason, setComplimentaryReason] = useState("");
 
   // Customer combobox state
   const [customerId, setCustomerId] = useState<string>("walk-in");
@@ -103,6 +114,7 @@ export function PaymentModal({
   const [newCustName, setNewCustName] = useState("");
   const [newCustPhone, setNewCustPhone] = useState("");
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const wasOpenRef = useRef(false);
 
   // Delivery fields
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -119,7 +131,12 @@ export function PaymentModal({
 
   const paymentMethodsFiltered = offlineRestricted
     ? paymentMethods.filter((m) => m.value === "CASH")
-    : paymentMethods;
+    : [
+        ...paymentMethods,
+        ...(allowComplimentary
+          ? [{ value: "COMPLIMENTARY", label: "Complimentary", icon: Check, color: "bg-rose-500/10 border-rose-500 text-rose-600" }]
+          : []),
+      ];
 
   const handleOrderTypeChange = (type: string) => {
     setLocalOrderType(type);
@@ -142,14 +159,21 @@ export function PaymentModal({
       const result = await createCustomer({ name: newCustName.trim(), phone: newCustPhone.trim() });
       if (result.error) { toast.error(result.error); return; }
       if (result.data) {
-        const nc = { id: result.data.id, name: result.data.name, phone: result.data.phone };
-        setLocalCustomers((prev) => [nc, ...prev]);
-        setCustomerId(result.data.id);
-        toast.success(`Customer "${result.data.name}" created`);
+        const nc = {
+          id: result.data.id,
+          name: result.data.name,
+          phone: result.data.phone ?? newCustPhone.trim(),
+        };
+        setLocalCustomers((prev) => {
+          const without = prev.filter((c) => c.id !== nc.id);
+          return [nc, ...without];
+        });
+        setCustomerId(nc.id);
         setShowNewCustomer(false);
         setNewCustName("");
         setNewCustPhone("");
         setCustomerOpen(false);
+        toast.success(`Customer "${nc.name}" selected`);
       }
     } catch {
       toast.error("Failed to create customer");
@@ -158,16 +182,18 @@ export function PaymentModal({
     }
   };
 
-  // Reset state when modal opens
+  // Reset payment fields only when the modal opens (not when `customers` prop refreshes after create)
   useEffect(() => {
-    if (open) {
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+
+    const justOpened = !wasOpenRef.current;
+    wasOpenRef.current = true;
+
+    if (justOpened) {
       setPaymentMethod("CASH");
-      const nextType =
-        offlineRestricted && initialOrderType === "DELIVERY" ? "DINE_IN" : initialOrderType;
-      setLocalOrderType(nextType);
-      if (offlineRestricted && initialOrderType === "DELIVERY") {
-        onOrderTypeChange?.("DINE_IN");
-      }
       setAmountPaid("");
       setCustomerId("walk-in");
       setNotes("");
@@ -175,9 +201,23 @@ export function PaymentModal({
       setDeliveryPhone("");
       setDeliveryNotes("");
       setDeliveryFeeStr("");
+      setComplimentaryReason("");
       setShowNewCustomer(false);
-      setLocalCustomers(customers);
     }
+
+    const nextType =
+      offlineRestricted && initialOrderType === "DELIVERY" ? "DINE_IN" : initialOrderType;
+    setLocalOrderType(nextType);
+    if (justOpened && offlineRestricted && initialOrderType === "DELIVERY") {
+      onOrderTypeChange?.("DINE_IN");
+    }
+
+    setLocalCustomers((prev) => {
+      const merged = new Map<string, Customer>();
+      for (const c of customers) merged.set(c.id, c);
+      for (const c of prev) merged.set(c.id, c);
+      return Array.from(merged.values());
+    });
   }, [open, offlineRestricted, initialOrderType, customers, onOrderTypeChange]);
 
   // Update amount when payment method or total changes
@@ -189,7 +229,12 @@ export function PaymentModal({
 
   const amountPaidNum = Math.round((parseFloat(amountPaid) || 0) * 100) / 100;
   const change = Math.round((amountPaidNum - total) * 100) / 100;
-  const isValidPayment = paymentMethod === "CASH" ? amountPaidNum >= Math.round(total * 100) / 100 : true;
+  const isValidPayment =
+    paymentMethod === "COMPLIMENTARY"
+      ? complimentaryReason.trim().length > 0
+      : paymentMethod === "CASH"
+        ? amountPaidNum >= Math.round(total * 100) / 100
+        : true;
 
   const handleComplete = () => {
     if (!isValidPayment) return;
@@ -197,12 +242,14 @@ export function PaymentModal({
     const selectedCustomer = localCustomers.find((c) => c.id === customerId);
     onComplete({
       paymentMethod,
-      amountPaid: paymentMethod === "CASH" ? amountPaidNum : total,
+      amountPaid: paymentMethod === "COMPLIMENTARY" ? 0 : paymentMethod === "CASH" ? amountPaidNum : total,
       change: paymentMethod === "CASH" ? Math.max(0, change) : 0,
       customerId: customerId !== "walk-in" ? customerId : undefined,
       customerName: selectedCustomer?.name || undefined,
       orderType: localOrderType,
       notes: notes.trim() || undefined,
+      complimentaryReason:
+        paymentMethod === "COMPLIMENTARY" ? complimentaryReason.trim() : undefined,
       ...(isDelivery ? {
         deliveryAddress: deliveryAddress.trim() || undefined,
         deliveryPhone: deliveryPhone.trim() || undefined,
@@ -221,8 +268,9 @@ export function PaymentModal({
     setAmountPaid(total.toFixed(2));
   };
 
-  const displaySubtotal = subtotal ?? total / 1.125;
-  const displayTax = tax ?? total - displaySubtotal;
+  const displayTax = tax ?? 0;
+  const displaySubtotal = subtotal ?? (lineTotal != null ? lineTotal - (taxInclusive ? displayTax : 0) : total - displayTax);
+  const merchandiseTotal = lineTotal ?? (taxInclusive ? totalProp : totalProp);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -267,14 +315,37 @@ export function PaymentModal({
 
             {/* Order Summary */}
             <div className="rounded-xl bg-muted/50 p-4 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatCurrency(displaySubtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{taxName} ({taxRate}%)</span>
-                <span>{formatCurrency(displayTax)}</span>
-              </div>
+              {taxInclusive && taxEnabled ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Items total</span>
+                    <span>{formatCurrency(merchandiseTotal)}</span>
+                  </div>
+                  {displayTax > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {taxName} included ({taxRate}%)
+                      </span>
+                      <span>{formatCurrency(displayTax)}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatCurrency(displaySubtotal)}</span>
+                  </div>
+                  {taxEnabled && displayTax > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {taxName} ({taxRate}%)
+                      </span>
+                      <span>{formatCurrency(displayTax)}</span>
+                    </div>
+                  )}
+                </>
+              )}
               {isDelivery && deliveryFee > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Delivery Fee</span>
@@ -324,6 +395,18 @@ export function PaymentModal({
                 })}
               </div>
             </div>
+
+            {paymentMethod === "COMPLIMENTARY" && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Authorization reason *</Label>
+                <Textarea
+                  value={complimentaryReason}
+                  onChange={(e) => setComplimentaryReason(e.target.value)}
+                  placeholder="e.g. CEO approval, staff meal, VIP guest"
+                  rows={2}
+                />
+              </div>
+            )}
 
             {/* Cash Amount Input */}
             {paymentMethod === "CASH" && (

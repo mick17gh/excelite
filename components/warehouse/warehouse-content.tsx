@@ -35,6 +35,7 @@ import {
   Search,
   Plus,
   MoreHorizontal,
+  Pencil,
   CheckCircle2,
   XCircle,
   TruckIcon,
@@ -44,7 +45,23 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateTransferStatus } from "@/lib/actions/warehouse";
-import { CreateWarehouseDialog, CreateWarehouseItemDialog, CreateTransferDialog, BulkTransferToBranchDialog } from "./warehouse-forms";
+import {
+  CreateWarehouseDialog,
+  EditWarehouseDialog,
+  CreateWarehouseItemDialog,
+  EditWarehouseItemDialog,
+  warehouseTypeLabel,
+  type WarehouseFormData,
+  type WarehouseItemFormData,
+  CreateTransferDialog,
+  BulkTransferToBranchDialog,
+  BulkTransferToWarehouseDialog,
+  BulkCommissaryDispatchDialog,
+} from "./warehouse-forms";
+import { DispatchApprovalPanel } from "./dispatch-approval-panel";
+import { MaterialIssuesPanel, type MaterialTransferRow } from "./material-issues-panel";
+import { useRouter } from "next/navigation";
+import { CommissaryProductionPanel } from "@/components/commissary/commissary-production-panel";
 import { SupplierReceivingDialog, WastageDialog } from "./warehouse-dialogs";
 import { WarehouseImportDialog } from "./warehouse-import";
 import { useCurrency } from "@/contexts/currency-context";
@@ -59,6 +76,7 @@ interface WarehouseData {
   phone: string | null;
   email: string | null;
   organizationId: string;
+  warehouseType?: string;
   isActive: boolean;
   itemCount: number;
   transferCount: number;
@@ -76,6 +94,9 @@ interface WarehouseItem {
   currentStock: number;
   minStock: number;
   reorderPoint: number;
+  itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
+  requiresCommissaryProcessing?: boolean;
+  allowDirectToBranch?: boolean;
   isActive: boolean;
   createdAt: string;
 }
@@ -153,6 +174,7 @@ interface WarehouseContentProps {
   warehouses: WarehouseData[];
   items: WarehouseItem[];
   transfers: Transfer[];
+  materialTransfers: MaterialTransferRow[];
   branches: Branch[];
   stats: WarehouseStats;
   inboundRecords: InboundRecord[];
@@ -161,18 +183,25 @@ interface WarehouseContentProps {
 
 const TRANSFER_STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  AWAITING_WAREHOUSE_APPROVAL: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  APPROVED: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
   IN_TRANSIT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-export function WarehouseContent({ warehouses, items, transfers, branches, stats, inboundRecords, wastageRecords }: WarehouseContentProps) {
+export function WarehouseContent({ warehouses, items, transfers, materialTransfers, branches, stats, inboundRecords, wastageRecords }: WarehouseContentProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
   const [showCreateWarehouse, setShowCreateWarehouse] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<WarehouseFormData | null>(null);
   const [showCreateItem, setShowCreateItem] = useState(false);
+  const [editingItem, setEditingItem] = useState<WarehouseItemFormData | null>(null);
   const [showCreateTransfer, setShowCreateTransfer] = useState(false);
   const [showBulkTransfer, setShowBulkTransfer] = useState(false);
+  const [showBulkWhTransfer, setShowBulkWhTransfer] = useState(false);
+  const [showBulkCommissaryDispatch, setShowBulkCommissaryDispatch] = useState(false);
   const [showSupplierReceiving, setShowSupplierReceiving] = useState(false);
   const [showWastage, setShowWastage] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -183,6 +212,8 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
   const [pageWarehouses, setPageWarehouses] = useState(1);
   const [pageInventory, setPageInventory] = useState(1);
   const [pageTransfers, setPageTransfers] = useState(1);
+  const [pageMaterial, setPageMaterial] = useState(1);
+  const [pageApprovals, setPageApprovals] = useState(1);
   const [pageReceiving, setPageReceiving] = useState(1);
   const [pageWastage, setPageWastage] = useState(1);
 
@@ -199,6 +230,23 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
     return transfers.filter((t) => t.warehouseId === selectedWarehouse);
   }, [transfers, selectedWarehouse]);
 
+  const filteredMaterialTransfers = useMemo(() => {
+    if (selectedWarehouse === "all") return materialTransfers;
+    return materialTransfers.filter(
+      (t) =>
+        t.fromWarehouseId === selectedWarehouse ||
+        t.toWarehouseId === selectedWarehouse,
+    );
+  }, [materialTransfers, selectedWarehouse]);
+
+  const openMaterialCount = useMemo(
+    () =>
+      filteredMaterialTransfers.filter(
+        (t) => t.status === "PENDING" || t.status === "IN_TRANSIT",
+      ).length,
+    [filteredMaterialTransfers],
+  );
+
   useEffect(() => {
     setPageInventory(1);
   }, [searchQuery, selectedWarehouse]);
@@ -208,14 +256,29 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
   }, [selectedWarehouse, transfers]);
 
   useEffect(() => {
+    setPageMaterial(1);
+  }, [selectedWarehouse, materialTransfers]);
+
+  useEffect(() => {
+    setPageApprovals(1);
+  }, [selectedWarehouse]);
+
+  useEffect(() => {
     setPageWarehouses(1);
     setPageInventory(1);
     setPageTransfers(1);
+    setPageMaterial(1);
+    setPageApprovals(1);
     setPageReceiving(1);
     setPageWastage(1);
   }, [pageSize]);
 
   const branchMap = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches]);
+
+  const commissaryWarehouse = useMemo(
+    () => warehouses.find((w) => w.warehouseType === "COMMISSARY"),
+    [warehouses],
+  );
 
   const paginatedWarehouses = useMemo(() => {
     const start = (pageWarehouses - 1) * pageSize;
@@ -232,6 +295,11 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
     return filteredTransfers.slice(start, start + pageSize);
   }, [filteredTransfers, pageTransfers, pageSize]);
 
+  const paginatedMaterialTransfers = useMemo(() => {
+    const start = (pageMaterial - 1) * pageSize;
+    return filteredMaterialTransfers.slice(start, start + pageSize);
+  }, [filteredMaterialTransfers, pageMaterial, pageSize]);
+
   const paginatedInbound = useMemo(() => {
     const start = (pageReceiving - 1) * pageSize;
     return inboundRecords.slice(start, start + pageSize);
@@ -245,6 +313,10 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
   const totalPagesWh = Math.max(1, Math.ceil(warehouses.length / pageSize) || 1);
   const totalPagesInv = Math.max(1, Math.ceil(filteredItems.length / pageSize) || 1);
   const totalPagesXfer = Math.max(1, Math.ceil(filteredTransfers.length / pageSize) || 1);
+  const totalPagesMaterial = Math.max(
+    1,
+    Math.ceil(filteredMaterialTransfers.length / pageSize) || 1,
+  );
   const totalPagesRecv = Math.max(1, Math.ceil(inboundRecords.length / pageSize) || 1);
   const totalPagesWaste = Math.max(1, Math.ceil(wastageRecords.length / pageSize) || 1);
 
@@ -258,6 +330,9 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
     if (pageTransfers > totalPagesXfer) setPageTransfers(totalPagesXfer);
   }, [pageTransfers, totalPagesXfer]);
   useEffect(() => {
+    if (pageMaterial > totalPagesMaterial) setPageMaterial(totalPagesMaterial);
+  }, [pageMaterial, totalPagesMaterial]);
+  useEffect(() => {
     if (pageReceiving > totalPagesRecv) setPageReceiving(totalPagesRecv);
   }, [pageReceiving, totalPagesRecv]);
   useEffect(() => {
@@ -267,19 +342,28 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
   const handleApproveTransfer = async (id: string) => {
     const result = await updateTransferStatus(id, "IN_TRANSIT" as TransferStatus);
     if (result.error) toast.error(result.error);
-    else toast.success("Transfer approved");
+    else {
+      toast.success("Transfer approved");
+      router.refresh();
+    }
   };
 
   const handleCompleteTransfer = async (id: string) => {
     const result = await updateTransferStatus(id, "COMPLETED" as TransferStatus);
     if (result.error) toast.error(result.error);
-    else toast.success("Transfer completed");
+    else {
+      toast.success("Transfer completed");
+      router.refresh();
+    }
   };
 
   const handleCancelTransfer = async (id: string) => {
     const result = await updateTransferStatus(id, "CANCELLED" as TransferStatus);
     if (result.error) toast.error(result.error);
-    else toast.success("Transfer cancelled");
+    else {
+      toast.success("Transfer cancelled");
+      router.refresh();
+    }
   };
 
   return (
@@ -332,7 +416,10 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
           <TabsList>
             <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            <TabsTrigger value="transfers">Transfers</TabsTrigger>
+            <TabsTrigger value="transfers">Branch transfers</TabsTrigger>
+            <TabsTrigger value="material">Material issues</TabsTrigger>
+            <TabsTrigger value="approvals">Approvals</TabsTrigger>
+            <TabsTrigger value="production">Production</TabsTrigger>
             <TabsTrigger value="receiving">Supplier Receiving</TabsTrigger>
             <TabsTrigger value="wastage">Wastage</TabsTrigger>
           </TabsList>
@@ -355,6 +442,12 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowBulkTransfer(true)}>
                   <Layers className="mr-2 h-4 w-4" />Bulk transfer to Branch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowBulkWhTransfer(true)}>
+                  <Layers className="mr-2 h-4 w-4" />Bulk material issue (RAW → commissary)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowBulkCommissaryDispatch(true)}>
+                  <Layers className="mr-2 h-4 w-4" />Bulk commissary dispatch
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowSupplierReceiving(true)}>
                   <TruckIcon className="mr-2 h-4 w-4" />Receive from Supplier
@@ -386,22 +479,36 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Code</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>City</TableHead>
                     <TableHead className="text-center">Items</TableHead>
                     <TableHead className="text-center">Transfers</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {warehouses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No warehouses yet</TableCell>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No warehouses yet</TableCell>
                     </TableRow>
                   ) : (
                     paginatedWarehouses.map((wh) => (
                       <TableRow key={wh.id}>
                         <TableCell className="font-medium">{wh.name}</TableCell>
                         <TableCell className="font-mono text-sm">{wh.code}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              wh.warehouseType === "COMMISSARY"
+                                ? "border-violet-300 text-violet-700 dark:text-violet-400"
+                                : "border-slate-300 text-slate-700 dark:text-slate-400"
+                            }
+                          >
+                            {warehouseTypeLabel(wh.warehouseType)}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{wh.city}</TableCell>
                         <TableCell className="text-center"><Badge variant="secondary">{wh.itemCount}</Badge></TableCell>
                         <TableCell className="text-center"><Badge variant="secondary">{wh.transferCount}</Badge></TableCell>
@@ -409,6 +516,29 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                           <Badge className={wh.isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-100 text-red-700"}>
                             {wh.isActive ? "Active" : "Inactive"}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() =>
+                              setEditingWarehouse({
+                                id: wh.id,
+                                name: wh.name,
+                                code: wh.code,
+                                address: wh.address,
+                                city: wh.city,
+                                phone: wh.phone,
+                                email: wh.email,
+                                warehouseType:
+                                  wh.warehouseType === "COMMISSARY" ? "COMMISSARY" : "RAW",
+                                isActive: wh.isActive,
+                              })
+                            }
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -462,12 +592,13 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                     <TableHead className="text-right">Stock</TableHead>
                     <TableHead className="text-right">Unit Cost</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No inventory items</TableCell>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No inventory items</TableCell>
                     </TableRow>
                   ) : (
                     paginatedInventory.map((item) => (
@@ -491,6 +622,34 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                             <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">OK</Badge>
                           )}
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() =>
+                              setEditingItem({
+                                id: item.id,
+                                warehouseId: item.warehouseId,
+                                name: item.name,
+                                sku: item.sku,
+                                category: item.category,
+                                unit: item.unit,
+                                unitCost: item.unitCost,
+                                currentStock: item.currentStock,
+                                minStock: item.minStock,
+                                reorderPoint: item.reorderPoint,
+                                itemStage: item.itemStage,
+                                requiresCommissaryProcessing: item.requiresCommissaryProcessing,
+                                allowDirectToBranch: item.allowDirectToBranch,
+                                isActive: item.isActive,
+                              })
+                            }
+                            aria-label={`Edit ${item.name}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -510,10 +669,31 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
           </Card>
         </TabsContent>
 
-        {/* Transfers Tab */}
+        {/* Branch transfers (warehouse → branch) */}
         <TabsContent value="transfers">
           <Card className="rounded-xl">
             <CardContent className="p-0">
+              <div className="flex flex-col gap-3 px-4 pt-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Warehouse to branch. Commissary dispatches awaiting approval appear in{" "}
+                  <strong>Approvals</strong>; use <strong>Mark shipped</strong> there after approve.
+                </p>
+                {warehouses.length > 1 && (
+                  <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                    <SelectTrigger className="w-full sm:w-48 h-9">
+                      <SelectValue placeholder="Warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All warehouses</SelectItem>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -548,7 +728,11 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{new Date(t.transferDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                         <TableCell>
-                          {(t.status === "PENDING" || t.status === "IN_TRANSIT") && (
+                          {t.status === "AWAITING_WAREHOUSE_APPROVAL" ? (
+                            <span className="text-xs text-muted-foreground">See Approvals</span>
+                          ) : (t.status === "PENDING" ||
+                              t.status === "IN_TRANSIT" ||
+                              t.status === "APPROVED") && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -561,12 +745,16 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
                                     <CheckCircle2 className="mr-2 h-4 w-4" />Approve
                                   </DropdownMenuItem>
                                 )}
-                                {t.status === "IN_TRANSIT" && (
+                                {(t.status === "IN_TRANSIT" || t.status === "APPROVED") && (
                                   <DropdownMenuItem onClick={() => handleCompleteTransfer(t.id)}>
-                                    <CheckCircle2 className="mr-2 h-4 w-4" />Mark Received
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    {t.status === "APPROVED" ? "Mark shipped" : "Mark received"}
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem className="text-red-600" onClick={() => handleCancelTransfer(t.id)}>
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() => handleCancelTransfer(t.id)}
+                                >
                                   <XCircle className="mr-2 h-4 w-4" />Cancel
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -590,6 +778,46 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="material">
+          <MaterialIssuesPanel
+            transfers={paginatedMaterialTransfers}
+            openCount={openMaterialCount}
+            warehouses={warehouses}
+            selectedWarehouse={selectedWarehouse}
+            onWarehouseChange={setSelectedWarehouse}
+            pagination={{
+              currentPage: pageMaterial,
+              totalPages: totalPagesMaterial,
+              totalItems: filteredMaterialTransfers.length,
+              pageSize,
+              onPageChange: setPageMaterial,
+              onPageSizeChange: setPageSize,
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="approvals">
+          <DispatchApprovalPanel
+            warehouses={warehouses}
+            selectedWarehouse={selectedWarehouse}
+            onWarehouseChange={setSelectedWarehouse}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            currentPage={pageApprovals}
+            onPageChange={setPageApprovals}
+          />
+        </TabsContent>
+
+        <TabsContent value="production">
+          {commissaryWarehouse ? (
+            <CommissaryProductionPanel commissaryWarehouseId={commissaryWarehouse.id} />
+          ) : (
+            <p className="text-sm text-muted-foreground p-4">
+              Create a warehouse with type &quot;Commissary / back kitchen&quot; to use production batches.
+            </p>
+          )}
         </TabsContent>
 
         {/* Supplier Receiving Tab */}
@@ -714,9 +942,26 @@ export function WarehouseContent({ warehouses, items, transfers, branches, stats
       </Tabs>
 
       <CreateWarehouseDialog open={showCreateWarehouse} onOpenChange={setShowCreateWarehouse} />
+      <EditWarehouseDialog
+        open={editingWarehouse != null}
+        onOpenChange={(open) => {
+          if (!open) setEditingWarehouse(null);
+        }}
+        warehouse={editingWarehouse}
+      />
       <CreateWarehouseItemDialog open={showCreateItem} onOpenChange={setShowCreateItem} warehouses={warehouses} />
+      <EditWarehouseItemDialog
+        open={editingItem != null}
+        onOpenChange={(open) => {
+          if (!open) setEditingItem(null);
+        }}
+        item={editingItem}
+        warehouseName={warehouses.find((w) => w.id === editingItem?.warehouseId)?.name}
+      />
       <CreateTransferDialog open={showCreateTransfer} onOpenChange={setShowCreateTransfer} warehouses={warehouses} items={items} branches={branches} />
       <BulkTransferToBranchDialog open={showBulkTransfer} onOpenChange={setShowBulkTransfer} warehouses={warehouses} items={items} branches={branches} />
+      <BulkTransferToWarehouseDialog open={showBulkWhTransfer} onOpenChange={setShowBulkWhTransfer} warehouses={warehouses} items={items} />
+      <BulkCommissaryDispatchDialog open={showBulkCommissaryDispatch} onOpenChange={setShowBulkCommissaryDispatch} warehouses={warehouses} items={items} branches={branches} />
       <SupplierReceivingDialog open={showSupplierReceiving} onOpenChange={setShowSupplierReceiving} warehouses={warehouses} items={items} />
       <WastageDialog open={showWastage} onOpenChange={setShowWastage} warehouses={warehouses} items={items} />
       {selectedWarehouseForImport && (

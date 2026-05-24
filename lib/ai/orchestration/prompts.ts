@@ -97,6 +97,8 @@ const ROLE_CONTEXT: Record<Role, string> = {
   CALL_CENTER: 'User is Call Center with access to unified order placement, customers, and delivery coordination.',
   WAREHOUSE_STAFF:
     'User is Warehouse Staff: central warehouse hub stock, inbound, transfers to branches, and warehouse waste. Branch-only retail stock is under Branch inventory.',
+  COMMISSARY_STAFF:
+    'User is Commissary Staff: back kitchen production, material issue from raw warehouse, and branch dispatch requests (requires raw warehouse approval).',
 };
 
 const INTENT_PROMPTS: Record<QueryIntent, string> = {

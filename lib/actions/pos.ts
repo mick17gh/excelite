@@ -13,6 +13,7 @@ import {
 } from "@/lib/menu-selections";
 import { filterOrderItemsForKitchenStation } from "@/lib/kitchen/category-routing";
 import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
+import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,6 +28,10 @@ function serializePosOrder(order: Record<string, any>) {
     total: Number(order.total),
     deliveryLat: order.deliveryLat ? Number(order.deliveryLat) : null,
     deliveryLng: order.deliveryLng ? Number(order.deliveryLng) : null,
+    taxInclusive: order.branch?.taxInclusive ?? false,
+    showTaxOnReceipt: order.branch?.showTaxOnReceipt ?? true,
+    taxName: order.branch?.taxName ?? "VAT",
+    taxRate: order.branch?.taxRate != null ? Number(order.branch.taxRate) : undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     items: order.items?.map((item: Record<string, any>) => ({
       ...JSON.parse(JSON.stringify(item)),
@@ -43,6 +48,10 @@ function serializePosOrder(order: Record<string, any>) {
     branch: order.branch ? {
       ...JSON.parse(JSON.stringify(order.branch)),
       taxRate: Number(order.branch.taxRate),
+      taxInclusive: order.branch.taxInclusive ?? false,
+      showTaxOnReceipt: order.branch.showTaxOnReceipt ?? true,
+      taxName: order.branch.taxName,
+      taxEnabled: order.branch.taxEnabled ?? true,
       latitude: order.branch.latitude ? Number(order.branch.latitude) : null,
       longitude: order.branch.longitude ? Number(order.branch.longitude) : null,
     } : undefined,
@@ -108,9 +117,14 @@ export async function createPosOrder(input: CreatePosOrderInput) {
     // Fetch branch tax settings
     const branch = await db.branch.findUnique({
       where: { id: input.branchId },
-      select: { taxRate: true, taxEnabled: true },
+      select: {
+        taxRate: true,
+        taxName: true,
+        taxEnabled: true,
+        taxInclusive: true,
+        showTaxOnReceipt: true,
+      },
     });
-    const taxRate = branch?.taxEnabled ? Number(branch?.taxRate || 12.5) / 100 : 0;
 
     const resolvedLines: {
       menuItemId: string;
@@ -147,12 +161,17 @@ export async function createPosOrder(input: CreatePosOrderInput) {
       });
     }
 
-    const subtotal = resolvedLines.reduce((s, l) => s + l.lineTotal, 0);
+    const lineTotal = resolvedLines.reduce((s, l) => s + l.lineTotal, 0);
     const discount = input.discount || 0;
     const deliveryFee = input.deliveryFee || 0;
-    const subtotalAfterDiscount = subtotal - discount;
-    const tax = subtotalAfterDiscount * taxRate;
-    const total = subtotalAfterDiscount + tax + deliveryFee;
+    const { subtotal, tax, total } = computeOrderTaxAmounts({
+      lineTotal,
+      discount,
+      deliveryFee,
+      ratePercent: Number(branch?.taxRate ?? 12.5),
+      enabled: branch?.taxEnabled ?? true,
+      inclusive: branch?.taxInclusive ?? false,
+    });
 
     // Create unified Order record with source: POS
     const order = await db.order.create({
@@ -572,6 +591,78 @@ export async function completeOrder(input: CompleteOrderInput) {
 }
 
 // Send order items to kitchen (used from POS UI)
+export interface CompleteComplimentaryOrderInput {
+  orderId: string;
+  reason: string;
+  createSale?: boolean;
+}
+
+/** CEO/management complimentary — $0 payment, full audit, inventory still deducts via sale. */
+export async function completeComplimentaryOrder(input: CompleteComplimentaryOrderInput) {
+  try {
+    const { headers: getHeaders } = await import("next/headers");
+    const { auth } = await import("@/lib/auth");
+    const session = await auth.api.getSession({ headers: await getHeaders() });
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const dbUser = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { organizationId: true },
+    });
+    if (dbUser?.organizationId) {
+      const allowed = await canAuthorizeComplimentary(
+        (session.user.role as string) || "STAFF",
+        dbUser.organizationId,
+      );
+      if (!allowed) {
+        return { success: false, error: "You are not allowed to authorize complimentary orders" };
+      }
+    }
+
+    await db.order.update({
+      where: { id: input.orderId },
+      data: {
+        isComplimentary: true,
+        complimentaryAuthorizedBy: session.user.id,
+        complimentaryReason: input.reason,
+        complimentaryAuthorizedAt: new Date(),
+        subtotal: 0,
+        tax: 0,
+        discount: 0,
+        deliveryFee: 0,
+        total: 0,
+      },
+    });
+
+    const result = await completeOrder({
+      orderId: input.orderId,
+      paymentMethod: "COMPLIMENTARY",
+      amountReceived: 0,
+      tip: 0,
+      createSale: input.createSale !== false,
+    });
+
+    revalidatePath("/pos");
+    revalidatePath("/dashboard/orders");
+    return result;
+  } catch (error) {
+    console.error("[completeComplimentaryOrder]", error);
+    return { success: false, error: "Failed to complete complimentary order" };
+  }
+}
+
+export async function canAuthorizeComplimentary(userRole: string, organizationId: string) {
+  const org = await db.organization.findUnique({
+    where: { id: organizationId },
+    select: { complimentaryApproverRoles: true },
+  });
+  const defaults = ["EXECUTIVE", "ADMIN", "SUPER_ADMIN"];
+  const roles = (org?.complimentaryApproverRoles as string[] | null) || defaults;
+  return roles.includes(userRole);
+}
+
 export async function sendToKitchen(orderId: string, itemIds?: string[], stationId?: string) {
   try {
     const order = await db.order.findUnique({

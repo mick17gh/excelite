@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, useEffect, useCallback } from "react";
+import { useMemo, useState, useTransition, useEffect, useCallback, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,7 @@ import {
 import { OrderStatus } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { playNewOrderSound, unlockKitchenAudio } from "@/lib/kitchen/new-order-sound";
 
 interface Branch {
   id: string;
@@ -123,8 +124,53 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
   const [isPending, startTransition] = useTransition();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [lastTicketCount, setLastTicketCount] = useState(initialTickets.length);
+  const [soundUnlocked, setSoundUnlocked] = useState(false);
+  const knownTicketIdsRef = useRef(new Set(initialTickets.map((t) => t.id)));
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    const unlockOnInteraction = () => {
+      unlockKitchenAudio();
+      setSoundUnlocked(true);
+    };
+    document.addEventListener("click", unlockOnInteraction, { once: true });
+    document.addEventListener("keydown", unlockOnInteraction, { once: true });
+    return () => {
+      document.removeEventListener("click", unlockOnInteraction);
+      document.removeEventListener("keydown", unlockOnInteraction);
+    };
+  }, []);
+
+  const handleSoundToggle = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    if (next) {
+      unlockKitchenAudio();
+      void playNewOrderSound().then((played) => {
+        if (played) {
+          setSoundUnlocked(true);
+        } else {
+          toast.message("Sound enabled", {
+            description: "Click anywhere on this page once if you don't hear the test chime.",
+          });
+        }
+      });
+    }
+  };
+
+  useEffect(() => {
+    knownTicketIdsRef.current = new Set(
+      tickets
+        .filter((t) => {
+          const branchOk = branchId === "all" || t.station.branchId === branchId;
+          const stationOk = stationId === "all" || t.station.id === stationId;
+          return branchOk && stationOk;
+        })
+        .map((t) => t.id)
+    );
+    // Only re-baseline when the user changes filters, not on every poll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId, stationId]);
 
   // Auto-refresh tickets every 10 seconds
   const refreshTickets = useCallback(async () => {
@@ -136,14 +182,30 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
       );
       if (result.success && result.data) {
         const newTickets = result.data as Ticket[];
-        
-        // Check for new tickets and play sound
-        const activeNewTickets = newTickets.filter(t => t.status !== "COMPLETED");
-        if (soundEnabled && activeNewTickets.length > lastTicketCount) {
-          // Visual notification since we can't play audio without user interaction
-          toast.info("New order received!", { duration: 3000 });
+        const unseenNewTickets = newTickets.filter(
+          (t) => t.status === "NEW" && !knownTicketIdsRef.current.has(t.id)
+        );
+
+        if (soundEnabled && unseenNewTickets.length > 0) {
+          const played = await playNewOrderSound();
+          if (!played && !soundUnlocked) {
+            toast.message("New order received", {
+              description: "Click the speaker icon or anywhere on the page to enable sound alerts.",
+              duration: 5000,
+            });
+          } else {
+            toast.info(
+              unseenNewTickets.length === 1
+                ? "New order received!"
+                : `${unseenNewTickets.length} new orders received!`,
+              { duration: 3000 }
+            );
+          }
         }
-        setLastTicketCount(activeNewTickets.length);
+
+        knownTicketIdsRef.current = new Set(
+          newTickets.filter((t) => t.status !== "COMPLETED").map((t) => t.id)
+        );
         setTickets(newTickets);
       }
     } catch (error) {
@@ -151,7 +213,7 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
     } finally {
       setIsRefreshing(false);
     }
-  }, [branchId, stationId, soundEnabled, lastTicketCount]);
+  }, [branchId, stationId, soundEnabled, soundUnlocked]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -254,8 +316,14 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                title={soundEnabled ? "Mute notifications" : "Enable notifications"}
+                onClick={handleSoundToggle}
+                title={
+                  soundEnabled
+                    ? soundUnlocked
+                      ? "Mute notifications"
+                      : "Sound on — click to test / unlock audio"
+                    : "Enable sound notifications"
+                }
               >
                 {soundEnabled ? (
                   <Volume2 className="h-4 w-4" />

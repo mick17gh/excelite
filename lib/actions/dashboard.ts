@@ -21,7 +21,15 @@ export interface KPIData {
   wasteTotal: number;
   previousWasteTotal: number;
   lowStockCount: number;
+  complimentaryCount: number;
+  complimentaryMenuValue: number;
 }
+
+const revenueSaleFilter = {
+  NOT: {
+    transaction: { paymentMethod: "COMPLIMENTARY" as const },
+  },
+};
 
 export interface DashboardData {
   kpi: KPIData;
@@ -80,6 +88,7 @@ export async function getDashboardDataOptimized(filters: DashboardFilters): Prom
       lowStockCount,
       branches,
       staff,
+      complimentaryOrders,
       alerts,
     ] = await Promise.all([
       // Current period sales
@@ -88,6 +97,7 @@ export async function getDashboardDataOptimized(filters: DashboardFilters): Prom
           deletedAt: null,
           ...branchFilter,
           saleDate: { gte: startDate, lte: endDate },
+          ...revenueSaleFilter,
         },
         include: {
           items: { select: { unitCost: true, quantity: true, total: true, menuItemId: true } },
@@ -100,6 +110,7 @@ export async function getDashboardDataOptimized(filters: DashboardFilters): Prom
           deletedAt: null,
           ...branchFilter,
           saleDate: { gte: prevStart, lte: prevEnd },
+          ...revenueSaleFilter,
         },
         include: {
           items: { select: { unitCost: true, quantity: true } },
@@ -150,6 +161,17 @@ export async function getDashboardDataOptimized(filters: DashboardFilters): Prom
         },
         select: { id: true, branchId: true, dutyStatus: true },
       }),
+      // Complimentary orders (non-revenue; menu value from line items)
+      db.order.findMany({
+        where: {
+          isComplimentary: true,
+          ...branchFilter,
+          closedAt: { gte: startDate, lte: endDate },
+        },
+        include: {
+          items: { select: { lineTotal: true } },
+        },
+      }),
       // Active alerts
       db.alert.findMany({
         where: {
@@ -188,6 +210,14 @@ export async function getDashboardDataOptimized(filters: DashboardFilters): Prom
       wasteTotal: Math.round(wasteCurrent.reduce((s, w) => s + Number(w.totalCost), 0) * 100) / 100,
       previousWasteTotal: Math.round(wastePrevious.reduce((s, w) => s + Number(w.totalCost), 0) * 100) / 100,
       lowStockCount,
+      complimentaryCount: complimentaryOrders.length,
+      complimentaryMenuValue: Math.round(
+        complimentaryOrders.reduce(
+          (sum, o) =>
+            sum + o.items.reduce((s, it) => s + Number(it.lineTotal), 0),
+          0,
+        ) * 100,
+      ) / 100,
     };
 
     // Build revenue chart data

@@ -133,12 +133,47 @@ export async function getOrganization(id?: string) {
               })),
             }
           : null,
+        complimentaryApproverRoles: (org.complimentaryApproverRoles as string[] | null) ?? [
+          "EXECUTIVE",
+          "ADMIN",
+          "SUPER_ADMIN",
+        ],
+        enforceCommissaryRouting: org.enforceCommissaryRouting,
         createdAt: org.createdAt.toISOString(),
       },
     };
   } catch (error) {
     console.error("[getOrganization] Error:", error);
     return { data: null };
+  }
+}
+
+export async function updateOrganizationPosPolicies(input: {
+  organizationId: string;
+  complimentaryApproverRoles: Role[];
+  enforceCommissaryRouting?: boolean;
+}) {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user || !hasPermission(session.user.role as Role, "organization:edit")) {
+      return { error: "Forbidden" };
+    }
+
+    await db.organization.update({
+      where: { id: input.organizationId },
+      data: {
+        complimentaryApproverRoles: input.complimentaryApproverRoles,
+        ...(input.enforceCommissaryRouting !== undefined && {
+          enforceCommissaryRouting: input.enforceCommissaryRouting,
+        }),
+      },
+    });
+
+    revalidatePath("/dashboard/settings");
+    return { success: true };
+  } catch (error) {
+    console.error("[updateOrganizationPosPolicies]", error);
+    return { error: "Failed to update policies" };
   }
 }
 

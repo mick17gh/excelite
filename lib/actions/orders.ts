@@ -11,6 +11,7 @@ import {
 } from "@/lib/menu-selections";
 import { filterOrderItemsForKitchenStation } from "@/lib/kitchen/category-routing";
 import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
+import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 
 // Helper to serialize Decimal fields from raw Prisma order objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -118,6 +119,11 @@ export async function getOrders(filters?: {
               id: true,
               name: true,
               code: true,
+              taxInclusive: true,
+              showTaxOnReceipt: true,
+              taxName: true,
+              taxRate: true,
+              taxEnabled: true,
               organization: {
                 select: {
                   features: true,
@@ -155,6 +161,11 @@ export async function getOrders(filters?: {
         branchId: order.branchId,
         branchName: order.branch?.name || "",
         branchCode: order.branch?.code || "",
+        taxInclusive: order.branch?.taxInclusive ?? false,
+        showTaxOnReceipt: order.branch?.showTaxOnReceipt ?? true,
+        taxName: order.branch?.taxName || "VAT",
+        taxRate: order.branch?.taxRate != null ? Number(order.branch.taxRate) : 0,
+        taxEnabled: order.branch?.taxEnabled ?? true,
         assignedBy: order.assignedByUser?.name || null,
         source: order.source,
         type: order.type,
@@ -246,6 +257,11 @@ export async function getOrderById(id: string) {
             id: true,
             name: true,
             code: true,
+            taxInclusive: true,
+            showTaxOnReceipt: true,
+            taxName: true,
+            taxRate: true,
+            taxEnabled: true,
             organization: {
               select: {
                 features: true,
@@ -465,13 +481,20 @@ export async function createOrder(input: CreateOrderInput) {
       });
     }
 
-    // Get branch tax rate
-    const branch = await db.branch.findUnique({ where: { id: input.branchId }, select: { taxRate: true, taxEnabled: true } });
-    const taxRate = branch?.taxEnabled ? Number(branch.taxRate) / 100 : 0;
-    const tax = subtotal * taxRate;
+    const branch = await db.branch.findUnique({
+      where: { id: input.branchId },
+      select: { taxRate: true, taxEnabled: true, taxInclusive: true },
+    });
     const discount = input.discount || 0;
     const deliveryFee = input.deliveryFee || 0;
-    const total = subtotal + tax - discount + deliveryFee;
+    const { subtotal: netSubtotal, tax, total } = computeOrderTaxAmounts({
+      lineTotal: subtotal,
+      discount,
+      deliveryFee,
+      ratePercent: Number(branch?.taxRate ?? 12.5),
+      enabled: branch?.taxEnabled ?? true,
+      inclusive: branch?.taxInclusive ?? false,
+    });
 
     const order = await db.order.create({
       data: {
@@ -482,7 +505,7 @@ export async function createOrder(input: CreateOrderInput) {
         source: input.source,
         type: input.type,
         status: "NEW",
-        subtotal,
+        subtotal: netSubtotal,
         tax,
         discount,
         deliveryFee,

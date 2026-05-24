@@ -3,6 +3,7 @@ import { UsersContent } from "@/components/users/users-content";
 import { getBranches } from "@/lib/actions/branches";
 import { getUsers } from "@/lib/actions/users";
 import { getOrganization } from "@/lib/actions/organization";
+import { getWarehouses } from "@/lib/actions/warehouse";
 
 export const metadata = {
   title: "User Management | ServStack",
@@ -10,11 +11,18 @@ export const metadata = {
 };
 
 export default async function UsersPage() {
-  const [branchesResult, usersResult, orgResult] = await Promise.all([
+  const [branchesResult, usersResult, orgResult, warehousesResult] = await Promise.all([
     getBranches(),
     getUsers(),
     getOrganization(),
+    getWarehouses(),
   ]);
+  const warehouseList = (warehousesResult.data || []).map((w) => ({
+    id: w.id,
+    name: w.name,
+    code: w.code,
+    warehouseType: w.warehouseType,
+  }));
 
   const branchList = (branchesResult.data || []).map((branch: any) => {
     const { taxRate, ...rest } = branch;
@@ -24,12 +32,13 @@ export default async function UsersPage() {
     };
   });
   const rawUsers = usersResult.data || [];
-  const users = rawUsers.map((user: { id: string; name: string; email: string; role: string; branchName?: string | null; isActive: boolean; createdAt: Date }) => ({
+  const users = rawUsers.map((user: { id: string; name: string; email: string; role: string; branchName?: string | null; assignedWarehouseId?: string | null; isActive: boolean; createdAt: Date }) => ({
     id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
     branchName: user.branchName || null,
+    assignedWarehouseId: user.assignedWarehouseId || null,
     isActive: user.isActive,
     lastLogin: user.createdAt,
   }));
@@ -46,7 +55,7 @@ export default async function UsersPage() {
       </div>
 
       <Suspense fallback={<UsersLoadingSkeleton />}>
-        <UsersContent users={users} branches={branchList} currentCount={orgResult.data?.userCount || 0} maxUsers={orgResult.data?.maxUsers || 2} />
+        <UsersContent users={users} branches={branchList} warehouses={warehouseList} currentCount={orgResult.data?.userCount || 0} maxUsers={orgResult.data?.maxUsers || 2} />
       </Suspense>
     </div>
   );

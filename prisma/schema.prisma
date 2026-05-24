@@ -26,6 +26,7 @@ enum Role {
   DEVELOPER
   CALL_CENTER
   WAREHOUSE_STAFF
+  COMMISSARY_STAFF
 }
 
 enum StaffRole {
@@ -149,9 +150,34 @@ enum UnitType {
 
 enum TransferStatus {
   PENDING
+  AWAITING_WAREHOUSE_APPROVAL
+  APPROVED
   IN_TRANSIT
   COMPLETED
   CANCELLED
+}
+
+enum WarehouseType {
+  RAW
+  COMMISSARY
+}
+
+enum InventoryItemStage {
+  RAW
+  PROCESSED
+  BRANCH_READY
+}
+
+enum ProductionBatchStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum WarehouseTransferKind {
+  MATERIAL_ISSUE
+  GENERAL
 }
 
 enum OrderStatus {
@@ -288,15 +314,17 @@ model User {
   image          String?
   phoneNumber    String?
   role           Role      @default(BRANCH_MANAGER)
-  branchId       String?
-  organizationId String?
-  isActive       Boolean   @default(true)
+  branchId            String?
+  assignedWarehouseId String?
+  organizationId      String?
+  isActive            Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
   // Relations
   branch             Branch?            @relation(fields: [branchId], references: [id])
+  assignedWarehouse  Warehouse?         @relation("UserAssignedWarehouse", fields: [assignedWarehouseId], references: [id])
   organization       Organization?      @relation(fields: [organizationId], references: [id])
   sessions           Session[]
   accounts           Account[]
@@ -310,6 +338,7 @@ model User {
   @@index([email])
   @@index([role])
   @@index([branchId])
+  @@index([assignedWarehouseId])
   @@index([organizationId])
   @@map("user")
 }
@@ -387,6 +416,8 @@ model Branch {
   taxRate        Decimal   @default(12.5) @db.Decimal(5, 2)
   taxName        String    @default("VAT")
   taxEnabled     Boolean   @default(true)
+  taxInclusive      Boolean   @default(false)
+  showTaxOnReceipt  Boolean   @default(true)
   organizationId String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -416,7 +447,8 @@ model Branch {
   apiKeys            ApiKey[]
   taxConfigs         TaxConfig[]
   orders             Order[]
-  warehouseTransfers WarehouseBranchTransfer[] @relation("WarehouseTransfers")
+  warehouseTransfers     WarehouseBranchTransfer[] @relation("WarehouseTransfers")
+  branchWarehouseReturns BranchWarehouseTransfer[] @relation("BranchWarehouseReturns")
 
   @@index([code])
   @@index([isActive])
@@ -817,6 +849,7 @@ model InventoryItem {
   transferLogs       TransferLog[]
   ingredients              MenuItemIngredient[]
   menuItemOptionIngredients MenuItemOptionIngredient[]
+  branchWarehouseTransfers BranchWarehouseTransfer[]
 
   @@unique([sku, branchId])
   @@index([branchId])
@@ -1337,8 +1370,10 @@ model Organization {
   instagramUrl       String?
   paystackPublicKey  String?
   paystackSecretKey  String?
-  paystackEnabled    Boolean            @default(false)
-  trialEndsAt        DateTime?
+  paystackEnabled             Boolean            @default(false)
+  complimentaryApproverRoles  Json?
+  enforceCommissaryRouting    Boolean            @default(false)
+  trialEndsAt                 DateTime?
   subscriptionEndsAt DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -1401,26 +1436,38 @@ model SubscriptionPayment {
 // ============================================
 
 model Warehouse {
-  id             String   @id @default(cuid())
-  name           String
-  code           String   @unique
-  address        String
-  city           String
-  phone          String?
-  email          String?
-  organizationId String
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String        @id @default(cuid())
+  name               String
+  code               String        @unique
+  address            String
+  city               String
+  phone              String?
+  email              String?
+  organizationId     String
+  warehouseType      WarehouseType @default(RAW)
+  parentWarehouseId  String?
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   // Relations
-  organization   Organization              @relation(fields: [organizationId], references: [id])
-  inventory      WarehouseInventoryItem[]
-  transfersOut   WarehouseBranchTransfer[]
-  wasteLogs      WarehouseWasteLog[]
-  inboundRecords WarehouseInbound[]
+  organization        Organization              @relation(fields: [organizationId], references: [id])
+  parentWarehouse     Warehouse?                @relation("WarehouseHierarchy", fields: [parentWarehouseId], references: [id])
+  childWarehouses     Warehouse[]               @relation("WarehouseHierarchy")
+  inventory           WarehouseInventoryItem[]
+  transfersOut        WarehouseBranchTransfer[]
+  transfersOutWh      WarehouseTransfer[]       @relation("TransferFromWarehouse")
+  transfersInWh       WarehouseTransfer[]       @relation("TransferToWarehouse")
+  branchTransfersIn   BranchWarehouseTransfer[]
+  wasteLogs           WarehouseWasteLog[]
+  inboundRecords      WarehouseInbound[]
+  productionRecipes   ProductionRecipe[]
+  productionBatches   ProductionBatch[]
+  assignedUsers       User[]                    @relation("UserAssignedWarehouse")
 
   @@index([organizationId])
+  @@index([warehouseType])
+  @@index([parentWarehouseId])
   @@index([code])
   @@map("warehouse")
 }
@@ -1435,16 +1482,23 @@ model WarehouseInventoryItem {
   unitCost     Decimal           @db.Decimal(10, 2)
   currentStock Decimal           @default(0) @db.Decimal(12, 3)
   minStock     Decimal           @default(0) @db.Decimal(12, 3)
-  reorderPoint Decimal           @default(10) @db.Decimal(12, 3)
-  isActive     Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  reorderPoint                 Decimal            @default(10) @db.Decimal(12, 3)
+  itemStage                    InventoryItemStage @default(RAW)
+  requiresCommissaryProcessing Boolean            @default(false)
+  allowDirectToBranch          Boolean            @default(true)
+  isActive                     Boolean            @default(true)
+  createdAt                    DateTime           @default(now())
+  updatedAt                    DateTime           @updatedAt
 
   // Relations
-  warehouse      Warehouse                 @relation(fields: [warehouseId], references: [id])
-  transfers      WarehouseBranchTransfer[]
-  wasteLogs      WarehouseWasteLog[]
-  inboundRecords WarehouseInbound[]
+  warehouse              Warehouse                   @relation(fields: [warehouseId], references: [id])
+  transfers              WarehouseBranchTransfer[]
+  warehouseTransfers     WarehouseTransfer[]
+  wasteLogs              WarehouseWasteLog[]
+  inboundRecords         WarehouseInbound[]
+  productionOutputs      ProductionRecipe[]          @relation("ProductionOutputItem")
+  productionIngredients  ProductionRecipeLine[]
+  productionConsumptions ProductionBatchConsumption[]
 
   @@unique([sku, warehouseId])
   @@index([warehouseId])
@@ -1453,20 +1507,23 @@ model WarehouseInventoryItem {
 }
 
 model WarehouseBranchTransfer {
-  id              String         @id @default(cuid())
-  warehouseId     String
-  warehouseItemId String
-  toBranchId      String
-  quantity        Decimal        @db.Decimal(12, 3)
-  unitCost        Decimal        @db.Decimal(10, 2)
-  totalCost       Decimal        @db.Decimal(12, 2)
-  status          TransferStatus @default(PENDING)
-  transferDate    DateTime
-  approvedBy      String?
-  receivedBy      String?
-  notes           String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id                   String         @id @default(cuid())
+  warehouseId          String
+  warehouseItemId      String
+  toBranchId           String
+  quantity             Decimal        @db.Decimal(12, 3)
+  unitCost             Decimal        @db.Decimal(10, 2)
+  totalCost            Decimal        @db.Decimal(12, 2)
+  status               TransferStatus @default(PENDING)
+  transferDate         DateTime
+  requestedBy          String?
+  warehouseApprovedBy  String?
+  warehouseApprovedAt  DateTime?
+  approvedBy           String?
+  receivedBy           String?
+  notes                String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
   // Relations
   warehouse     Warehouse              @relation(fields: [warehouseId], references: [id])
@@ -1478,6 +1535,130 @@ model WarehouseBranchTransfer {
   @@index([status])
   @@index([transferDate])
   @@map("warehouse_branch_transfer")
+}
+
+model WarehouseTransfer {
+  id              String                @id @default(cuid())
+  fromWarehouseId String
+  toWarehouseId   String
+  warehouseItemId String
+  transferKind    WarehouseTransferKind @default(MATERIAL_ISSUE)
+  quantity        Decimal               @db.Decimal(12, 3)
+  unitCost        Decimal               @db.Decimal(10, 2)
+  totalCost       Decimal               @db.Decimal(12, 2)
+  status          TransferStatus        @default(PENDING)
+  transferDate    DateTime
+  approvedBy      String?
+  receivedBy      String?
+  notes           String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  fromWarehouse Warehouse              @relation("TransferFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse              @relation("TransferToWarehouse", fields: [toWarehouseId], references: [id])
+  warehouseItem WarehouseInventoryItem @relation(fields: [warehouseItemId], references: [id])
+
+  @@index([fromWarehouseId])
+  @@index([toWarehouseId])
+  @@index([status])
+  @@index([transferDate])
+  @@map("warehouse_transfer")
+}
+
+model BranchWarehouseTransfer {
+  id            String         @id @default(cuid())
+  fromBranchId  String
+  toWarehouseId String
+  branchItemId  String
+  quantity      Decimal        @db.Decimal(12, 3)
+  unitCost      Decimal        @db.Decimal(10, 2)
+  totalCost     Decimal        @db.Decimal(12, 2)
+  status        TransferStatus @default(PENDING)
+  transferDate  DateTime
+  approvedBy    String?
+  receivedBy    String?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  fromBranch  Branch        @relation("BranchWarehouseReturns", fields: [fromBranchId], references: [id])
+  toWarehouse Warehouse     @relation(fields: [toWarehouseId], references: [id])
+  branchItem  InventoryItem @relation(fields: [branchItemId], references: [id])
+
+  @@index([fromBranchId])
+  @@index([toWarehouseId])
+  @@index([status])
+  @@map("branch_warehouse_transfer")
+}
+
+model ProductionRecipe {
+  id              String   @id @default(cuid())
+  warehouseId     String
+  name            String
+  outputItemId    String
+  outputQuantity  Decimal  @default(1) @db.Decimal(12, 3)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  warehouse  Warehouse                @relation(fields: [warehouseId], references: [id])
+  outputItem WarehouseInventoryItem   @relation("ProductionOutputItem", fields: [outputItemId], references: [id])
+  lines      ProductionRecipeLine[]
+  batches    ProductionBatch[]
+
+  @@index([warehouseId])
+  @@map("production_recipe")
+}
+
+model ProductionRecipeLine {
+  id              String  @id @default(cuid())
+  recipeId        String
+  ingredientItemId String
+  quantity        Decimal @db.Decimal(12, 3)
+
+  recipe           ProductionRecipe       @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientItem   WarehouseInventoryItem @relation(fields: [ingredientItemId], references: [id])
+
+  @@index([recipeId])
+  @@map("production_recipe_line")
+}
+
+model ProductionBatch {
+  id              String                @id @default(cuid())
+  recipeId        String
+  warehouseId     String
+  status          ProductionBatchStatus @default(DRAFT)
+  plannedOutput   Decimal               @db.Decimal(12, 3)
+  actualOutput    Decimal?              @db.Decimal(12, 3)
+  wasteQuantity   Decimal               @default(0) @db.Decimal(12, 3)
+  producedBy      String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  notes           String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  recipe        ProductionRecipe             @relation(fields: [recipeId], references: [id])
+  warehouse     Warehouse                    @relation(fields: [warehouseId], references: [id])
+  consumptions  ProductionBatchConsumption[]
+
+  @@index([warehouseId])
+  @@index([recipeId])
+  @@index([status])
+  @@map("production_batch")
+}
+
+model ProductionBatchConsumption {
+  id              String  @id @default(cuid())
+  batchId         String
+  ingredientItemId String
+  quantity        Decimal @db.Decimal(12, 3)
+
+  batch            ProductionBatch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  ingredientItem   WarehouseInventoryItem @relation(fields: [ingredientItemId], references: [id])
+
+  @@index([batchId])
+  @@map("production_batch_consumption")
 }
 
 model WarehouseWasteLog {
@@ -1592,6 +1773,10 @@ model Order {
   openedAt        DateTime      @default(now())
   orderReceivedTime DateTime?
   closedAt        DateTime?
+  isComplimentary Boolean       @default(false)
+  complimentaryAuthorizedBy String?
+  complimentaryReason       String?
+  complimentaryAuthorizedAt DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   offlineClientMutationId String? @unique

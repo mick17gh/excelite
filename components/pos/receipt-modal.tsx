@@ -14,34 +14,27 @@ import { Receipt, Printer, Download } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
 import { format } from "date-fns";
 import QRCode from "qrcode";
+import {
+  receiptLineAmount,
+  receiptTaxLabel,
+  shouldShowInclusiveFootnote,
+  shouldShowTaxBreakdown,
+  type ReceiptDisplayOrder,
+  type ReceiptLineItem,
+} from "@/lib/services/receipt-display";
+import { printOrderReceipt, receiptLineLabel } from "@/lib/services/receipt-print";
 
-type ReceiptLineItem = {
-  quantity?: number;
-  unitPrice?: number;
-  configurationLabel?: string | null;
-  menuItem?: { name?: string };
-};
-
-function receiptLineLabel(item: ReceiptLineItem): string {
-  const qty = item.quantity ?? 0;
-  const base = item.menuItem?.name || "Item";
-  const suffix = item.configurationLabel ? ` (${item.configurationLabel})` : "";
-  return `${qty}x ${base}${suffix}`;
-}
-
-type ReceiptOrderShape = Record<string, unknown> & {
+type ReceiptOrderShape = Record<string, unknown> & ReceiptDisplayOrder & {
   orderNumber?: string;
   type?: string;
   paymentMethod?: string;
   customerName?: string;
   createdAt?: string;
   branch?: { name?: string; code?: string };
-  items?: ReceiptLineItem[];
-  subtotal?: number;
-  tax?: number;
-  discount?: number;
-  deliveryFee?: number;
-  total?: number;
+  items?: (ReceiptLineItem & {
+    configurationLabel?: string | null;
+    menuItem?: { name?: string };
+  })[];
   notes?: string;
   syncPending?: boolean;
 };
@@ -54,6 +47,49 @@ interface ReceiptModalProps {
   order: ReceiptOrderShape;
   onClose: () => void;
   storefrontQr?: StorefrontQr;
+}
+
+function ReceiptTotalsBlock({
+  order,
+  formatCurrency,
+}: {
+  order: ReceiptOrderShape;
+  formatCurrency: (amount: number) => string;
+}) {
+  const showBreakdown = shouldShowTaxBreakdown(order);
+
+  return (
+    <div className="space-y-1 text-xs">
+      {showBreakdown ? (
+        <div className="flex justify-between">
+          <span>Subtotal:</span>
+          <span>{formatCurrency(Number(order.subtotal))}</span>
+        </div>
+      ) : null}
+      {Number(order.discount) > 0 && (
+        <div className="flex justify-between text-muted-foreground">
+          <span>Discount:</span>
+          <span>-{formatCurrency(Number(order.discount))}</span>
+        </div>
+      )}
+      {showBreakdown && Number(order.tax) > 0 ? (
+        <div className="flex justify-between">
+          <span>{receiptTaxLabel(order)}:</span>
+          <span>{formatCurrency(Number(order.tax))}</span>
+        </div>
+      ) : null}
+      {Number(order.deliveryFee) > 0 && (
+        <div className="flex justify-between">
+          <span>Delivery Fee:</span>
+          <span>{formatCurrency(Number(order.deliveryFee))}</span>
+        </div>
+      )}
+      <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
+        <span>TOTAL:</span>
+        <span>{formatCurrency(Number(order.total))}</span>
+      </div>
+    </div>
+  );
 }
 
 export function ReceiptModal({
@@ -87,17 +123,10 @@ export function ReceiptModal({
   }, [storefrontQr?.url]);
 
   const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    const receiptHtml = generateReceiptHTML(order, formatCurrency, qrDataUrl, storefrontQr?.url ?? null);
-    printWindow.document.write(receiptHtml);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
+    printOrderReceipt(order, formatCurrency, {
+      qrDataUrl,
+      storefrontUrl: storefrontQr?.url ?? null,
+    });
   };
 
   const handleDownload = () => {
@@ -182,39 +211,14 @@ export function ReceiptModal({
                       </div>
                     </div>
                     <div className="ml-2">
-                      {formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}
+                      {formatCurrency(receiptLineAmount(item))}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>{formatCurrency(Number(order.subtotal))}</span>
-              </div>
-              {Number(order.discount) > 0 && (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Discount:</span>
-                  <span>-{formatCurrency(Number(order.discount))}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span>Tax (12.5%):</span>
-                <span>{formatCurrency(Number(order.tax))}</span>
-              </div>
-              {Number(order.deliveryFee) > 0 && (
-                <div className="flex justify-between">
-                  <span>Delivery Fee:</span>
-                  <span>{formatCurrency(Number(order.deliveryFee))}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
-                <span>TOTAL:</span>
-                <span>{formatCurrency(Number(order.total))}</span>
-              </div>
-            </div>
+            <ReceiptTotalsBlock order={order} formatCurrency={formatCurrency} />
 
             {order.notes && (
               <div className="border-t pt-2 mt-3 text-xs">
@@ -234,6 +238,11 @@ export function ReceiptModal({
               </div>
             ) : null}
 
+            {shouldShowInclusiveFootnote(order) ? (
+              <p className="text-center text-[10px] text-muted-foreground">
+                Prices include {order.taxName || "tax"}
+              </p>
+            ) : null}
             <div className="text-center text-xs text-muted-foreground border-t pt-3 mt-3">
               Thank you for your business!
             </div>
@@ -258,78 +267,27 @@ export function ReceiptModal({
   );
 }
 
-function qrReceiptBlock(qrDataUrl: string | null, storefrontUrl: string | null): string {
-  if (!qrDataUrl || !storefrontUrl) return "";
-  return `
-  <div style="text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid #000;">
-    <img src="${qrDataUrl}" alt="Order online" width="70" height="70" />
-    <p style="font-size:10px;margin:8px 0 4px;">Scan to order online</p>
-    <p style="font-size:9px;word-break:break-all;">${storefrontUrl}</p>
-  </div>`;
-}
-
-function generateReceiptHTML(
-  order: ReceiptOrderShape,
-  formatCurrency: (amount: number) => string,
-  qrDataUrl: string | null,
-  storefrontUrl: string | null
-): string {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Receipt - ${order.orderNumber}</title>
-  <style>
-    body { font-family: monospace; font-size: 12px; padding: 20px; max-width: 300px; margin: 0 auto; }
-    .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
-    .item { display: flex; justify-content: space-between; margin: 5px 0; }
-    .total { border-top: 1px solid #000; padding-top: 10px; margin-top: 10px; font-weight: bold; }
-    .footer { text-align: center; margin-top: 20px; font-size: 10px; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h2>${order.branch?.name || "Restaurant"}</h2>
-    <p>Order #${order.orderNumber}</p>
-    <p>${order.createdAt ? format(new Date(String(order.createdAt)), "MMM dd, yyyy HH:mm") : "—"}</p>
-  </div>
-  ${order.items?.map((item) => `
-    <div class="item">
-      <span>${receiptLineLabel(item)}</span>
-      <span>${formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}</span>
-    </div>
-  `).join("")}
-  <div class="total">
-    <div class="item">
-      <span>Subtotal:</span>
-      <span>${formatCurrency(Number(order.subtotal))}</span>
-    </div>
-    <div class="item">
-      <span>Tax:</span>
-      <span>${formatCurrency(Number(order.tax))}</span>
-    </div>
-    ${Number(order.deliveryFee) > 0 ? `
-    <div class="item">
-      <span>Delivery Fee:</span>
-      <span>${formatCurrency(Number(order.deliveryFee))}</span>
-    </div>` : ""}
-    <div class="item">
-      <span>TOTAL:</span>
-      <span>${formatCurrency(Number(order.total))}</span>
-    </div>
-  </div>
-  ${qrReceiptBlock(qrDataUrl, storefrontUrl)}
-  <div class="footer">Thank you for your business!</div>
-</body>
-</html>
-  `;
-}
-
 function generateReceiptText(
   order: ReceiptOrderShape,
   formatCurrency: (amount: number) => string,
   storefrontUrl: string | null
 ): string {
+  const showBreakdown = shouldShowTaxBreakdown(order);
+  const totalLines: string[] = [];
+
+  if (showBreakdown) {
+    totalLines.push(`Subtotal:${" ".repeat(25)}${formatCurrency(Number(order.subtotal))}`);
+    if (Number(order.tax) > 0) {
+      totalLines.push(
+        `${receiptTaxLabel(order)}:${" ".repeat(Math.max(1, 38 - receiptTaxLabel(order).length))}${formatCurrency(Number(order.tax))}`
+      );
+    }
+  }
+  if (Number(order.deliveryFee) > 0) {
+    totalLines.push(`Delivery Fee:${" ".repeat(21)}${formatCurrency(Number(order.deliveryFee))}`);
+  }
+  totalLines.push(`TOTAL:${" ".repeat(28)}${formatCurrency(Number(order.total))}`);
+
   const lines = [
     "=".repeat(40),
     `  ${order.branch?.name || "Restaurant"}`,
@@ -344,13 +302,10 @@ function generateReceiptText(
     order.paymentMethod ? `Payment: ${String(order.paymentMethod).replace(/_/g, " ")}` : "",
     "-".repeat(40),
     ...order.items?.map((item) =>
-      `${receiptLineLabel(item)}${" ".repeat(20)}${formatCurrency(Number(item.unitPrice ?? 0) * (item.quantity ?? 0))}`
+      `${receiptLineLabel(item)}${" ".repeat(20)}${formatCurrency(receiptLineAmount(item))}`
     ) || [],
     "-".repeat(40),
-    `Subtotal:${" ".repeat(25)}${formatCurrency(Number(order.subtotal))}`,
-    `Tax (12.5%):${" ".repeat(22)}${formatCurrency(Number(order.tax))}`,
-    Number(order.deliveryFee) > 0 ? `Delivery Fee:${" ".repeat(21)}${formatCurrency(Number(order.deliveryFee))}` : "",
-    `TOTAL:${" ".repeat(28)}${formatCurrency(Number(order.total))}`,
+    ...totalLines,
     storefrontUrl ? "-".repeat(40) : "",
     storefrontUrl ? "Order online:" : "",
     storefrontUrl ?? "",

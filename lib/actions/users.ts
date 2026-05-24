@@ -28,6 +28,7 @@ export interface CreateUserInput {
   password: string;
   role: Role;
   branchId?: string;
+  assignedWarehouseId?: string;
   phoneNumber?: string;
   isActive: boolean;
 }
@@ -38,6 +39,7 @@ export interface UpdateUserInput {
   email?: string;
   role?: Role;
   branchId?: string;
+  assignedWarehouseId?: string | null;
   phoneNumber?: string;
   isActive?: boolean;
 }
@@ -63,6 +65,7 @@ export async function createUser(input: CreateUserInput) {
         email: input.email,
         role: input.role,
         branchId: input.branchId,
+        assignedWarehouseId: input.assignedWarehouseId,
         phoneNumber: input.phoneNumber,
         isActive: input.isActive,
         emailVerified: false,
@@ -148,6 +151,7 @@ export async function getUsers(
       role: user.role,
       branchId: user.branchId,
       branchName: user.branch?.name || null,
+      assignedWarehouseId: user.assignedWarehouseId,
       isActive: user.isActive,
       createdAt: user.createdAt,
     }));
