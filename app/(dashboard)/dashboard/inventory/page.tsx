@@ -4,6 +4,7 @@ import { getInventoryItems, getSuppliers, getOutboundRecords, getTransferRecords
 import { getWarehouseTransfers } from "@/lib/actions/warehouse";
 import { getBranches } from "@/lib/actions/branches";
 import { getWarehouses } from "@/lib/actions/warehouse";
+import { getBranchWarehouseTransfers } from "@/lib/actions/stock-transfers";
 
 export const metadata = {
   title: "Inventory Management | ServStack",
@@ -27,6 +28,7 @@ export default async function InventoryPage() {
   };
   type OutboundRecord = {
     id: string;
+    branchId?: string;
     quantity: number;
     movementType: string;
     reason: string | null;
@@ -36,6 +38,8 @@ export default async function InventoryPage() {
   };
   type TransferRecord = {
     id: string;
+    fromBranchId?: string;
+    toBranchId?: string;
     quantity: number;
     unitCost: number;
     totalCost: number;
@@ -70,7 +74,16 @@ export default async function InventoryPage() {
     createdAt: string;
   };
 
-  const [branchesResult, inventoryResult, suppliersResult, outboundResult, transferResult, warehouseTransfersResult, warehousesResult] = await Promise.all([
+  const [
+    branchesResult,
+    inventoryResult,
+    suppliersResult,
+    outboundResult,
+    transferResult,
+    warehouseTransfersResult,
+    warehousesResult,
+    branchReturnsResult,
+  ] = await Promise.all([
     getBranches(),
     getInventoryItems(undefined, { page: 1, pageSize: 1000 }),
     getSuppliers(),
@@ -78,6 +91,7 @@ export default async function InventoryPage() {
     getTransferRecords(),
     getWarehouseTransfers(),
     getWarehouses(),
+    getBranchWarehouseTransfers({ limit: 200 }),
   ]);
   const warehouseList = (warehousesResult.data || []).map((w) => ({
     id: w.id,
@@ -96,6 +110,7 @@ export default async function InventoryPage() {
   const outboundRecords = (outboundResult.data || []) as OutboundRecord[];
   const transferRecords = (transferResult.data || []) as TransferRecord[];
   const warehouseTransfers = (warehouseTransfersResult.data || []) as WarehouseTransfer[];
+  const branchReturns = branchReturnsResult.data || [];
   const items = rawItems.map((item) => {
     const currentStock = typeof item.currentStock === 'object' && item.currentStock.toNumber ? item.currentStock.toNumber() : Number(item.currentStock);
     const minStock = typeof item.minStock === 'object' && item.minStock.toNumber ? item.minStock.toNumber() : Number(item.minStock);
@@ -143,6 +158,7 @@ export default async function InventoryPage() {
           outboundRecords={outboundRecords}
           transferRecords={transferRecords}
           warehouseTransfers={warehouseTransfers}
+          branchReturns={branchReturns}
         />
       </Suspense>
     </div>

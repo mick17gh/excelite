@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -50,7 +51,6 @@ import {
   OutboundStockForm,
   WasteLogForm,
   TransferForm,
-  AddInventoryItemForm,
   BranchReturnToWarehouseDialog,
 } from "@/components/inventory/inventory-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
@@ -63,6 +63,7 @@ import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { useBranchRestrictions } from "@/hooks/use-branch-restrictions";
 import { EmptyState } from "@/components/ui/empty-state";
 import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
+import { formatDisplayDate } from "@/lib/utils/date-display";
 import { TablePagination } from "@/components/ui/table-pagination";
 
 interface InventoryItem {
@@ -89,6 +90,7 @@ interface Branch {
 
 interface OutboundRecord {
   id: string;
+  branchId?: string;
   quantity: number;
   movementType: string;
   reason: string | null;
@@ -99,6 +101,8 @@ interface OutboundRecord {
 
 interface TransferRecord {
   id: string;
+  fromBranchId?: string;
+  toBranchId?: string;
   quantity: number;
   unitCost: number;
   totalCost: number;
@@ -137,9 +141,30 @@ interface WarehouseTransfer {
 const TRANSFER_STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   IN_TRANSIT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  AWAITING_WAREHOUSE_APPROVAL:
+    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
+
+interface BranchWarehouseReturn {
+  id: string;
+  fromBranchId: string;
+  toWarehouseId: string;
+  branchItemId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  status: string;
+  transferDate: string;
+  notes: string | null;
+  createdAt: string;
+  branchName: string;
+  warehouseName: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+}
 
 interface WarehouseOption {
   id: string;
@@ -154,6 +179,7 @@ interface InventoryContentProps {
   outboundRecords?: OutboundRecord[];
   transferRecords?: TransferRecord[];
   warehouseTransfers?: WarehouseTransfer[];
+  branchReturns?: BranchWarehouseReturn[];
 }
 
 export function InventoryContent({ 
@@ -162,8 +188,10 @@ export function InventoryContent({
   warehouses = [],
   outboundRecords = [], 
   transferRecords = [],
-  warehouseTransfers = []
+  warehouseTransfers = [],
+  branchReturns = [],
 }: InventoryContentProps) {
+  const router = useRouter();
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
   
@@ -174,9 +202,21 @@ export function InventoryContent({
     !authLoading && !canViewAllBranches && userBranchId ? userBranchId : "all"
   );
   
-  // Pagination state
+  // Pagination state (shared page size across tabs)
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageWarehouse, setPageWarehouse] = useState(1);
+  const [pageOutbound, setPageOutbound] = useState(1);
+  const [pageTransfers, setPageTransfers] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [pageToWarehouse, setPageToWarehouse] = useState(1);
+  const [warehouseBranchFilter, setWarehouseBranchFilter] = useState("all");
+  const [warehouseStatusFilter, setWarehouseStatusFilter] = useState("all");
+  const [outboundBranchFilter, setOutboundBranchFilter] = useState("all");
+  const [transferBranchFilter, setTransferBranchFilter] = useState("all");
+  const [transferStatusFilter, setTransferStatusFilter] = useState("all");
+  const [returnStatusFilter, setReturnStatusFilter] = useState<string>("all");
+  const [returnWarehouseFilter, setReturnWarehouseFilter] = useState<string>("all");
+  const [returnBranchFilter, setReturnBranchFilter] = useState("all");
 
   // Set currency based on selected branch filter
   const selectedBranchId = branchFilter !== "all" ? branchFilter : null;
@@ -187,8 +227,176 @@ export function InventoryContent({
   const [isWasteOpen, setIsWasteOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isBranchReturnOpen, setIsBranchReturnOpen] = useState(false);
-  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+
+  const resetAllPages = () => {
+    setCurrentPage(1);
+    setPageWarehouse(1);
+    setPageOutbound(1);
+    setPageTransfers(1);
+    setPageToWarehouse(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    resetAllPages();
+  };
+
+  const visibleBranchReturns = useMemo(() => {
+    let list = branchReturns;
+    if (!canViewAllBranches && userBranchId) {
+      list = list.filter((r) => r.fromBranchId === userBranchId);
+    } else if (returnBranchFilter !== "all") {
+      list = list.filter((r) => r.fromBranchId === returnBranchFilter);
+    }
+    if (returnWarehouseFilter !== "all") {
+      list = list.filter((r) => r.toWarehouseId === returnWarehouseFilter);
+    }
+    if (returnStatusFilter !== "all") {
+      list = list.filter((r) => r.status === returnStatusFilter);
+    }
+    return list;
+  }, [
+    branchReturns,
+    canViewAllBranches,
+    userBranchId,
+    returnBranchFilter,
+    returnWarehouseFilter,
+    returnStatusFilter,
+  ]);
+
+  const paginatedBranchReturns = useMemo(() => {
+    const start = (pageToWarehouse - 1) * pageSize;
+    return visibleBranchReturns.slice(start, start + pageSize);
+  }, [visibleBranchReturns, pageToWarehouse, pageSize]);
+
+  const totalPagesToWarehouse = Math.max(
+    1,
+    Math.ceil(visibleBranchReturns.length / pageSize) || 1,
+  );
+
+  const returnStatusOptions = useMemo(() => {
+    const statuses = new Set(branchReturns.map((r) => r.status));
+    return Array.from(statuses).sort();
+  }, [branchReturns]);
+
+  const warehouseStatusOptions = useMemo(
+    () => Array.from(new Set(warehouseTransfers.map((t) => t.status))).sort(),
+    [warehouseTransfers],
+  );
+
+  const transferStatusOptions = useMemo(
+    () => Array.from(new Set(transferRecords.map((t) => t.status))).sort(),
+    [transferRecords],
+  );
+
+  const filteredWarehouseTransfers = useMemo(() => {
+    let list = warehouseTransfers;
+    if (!canViewAllBranches && userBranchId) {
+      list = list.filter((t) => t.toBranchId === userBranchId);
+    } else if (warehouseBranchFilter !== "all") {
+      list = list.filter((t) => t.toBranchId === warehouseBranchFilter);
+    }
+    if (warehouseStatusFilter !== "all") {
+      list = list.filter((t) => t.status === warehouseStatusFilter);
+    }
+    return list;
+  }, [
+    warehouseTransfers,
+    canViewAllBranches,
+    userBranchId,
+    warehouseBranchFilter,
+    warehouseStatusFilter,
+  ]);
+
+  const filteredOutboundRecords = useMemo(() => {
+    let list = outboundRecords;
+    if (!canViewAllBranches && userBranchId) {
+      const branchName = branches.find((b) => b.id === userBranchId)?.name;
+      list = list.filter(
+        (r) => r.branchId === userBranchId || r.branch?.name === branchName,
+      );
+    } else if (outboundBranchFilter !== "all") {
+      const branchName = branches.find((b) => b.id === outboundBranchFilter)?.name;
+      list = list.filter(
+        (r) =>
+          r.branchId === outboundBranchFilter || r.branch?.name === branchName,
+      );
+    }
+    return list;
+  }, [outboundRecords, canViewAllBranches, userBranchId, outboundBranchFilter, branches]);
+
+  const filteredTransferRecords = useMemo(() => {
+    let list = transferRecords;
+    if (!canViewAllBranches && userBranchId) {
+      list = list.filter(
+        (r) =>
+          r.fromBranchId === userBranchId || r.toBranchId === userBranchId,
+      );
+    } else if (transferBranchFilter !== "all") {
+      list = list.filter(
+        (r) =>
+          r.fromBranchId === transferBranchFilter ||
+          r.toBranchId === transferBranchFilter,
+      );
+    }
+    if (transferStatusFilter !== "all") {
+      list = list.filter((r) => r.status === transferStatusFilter);
+    }
+    return list;
+  }, [
+    transferRecords,
+    canViewAllBranches,
+    userBranchId,
+    transferBranchFilter,
+    transferStatusFilter,
+  ]);
+
+  const paginatedWarehouseTransfers = useMemo(() => {
+    const start = (pageWarehouse - 1) * pageSize;
+    return filteredWarehouseTransfers.slice(start, start + pageSize);
+  }, [filteredWarehouseTransfers, pageWarehouse, pageSize]);
+
+  const paginatedOutboundRecords = useMemo(() => {
+    const start = (pageOutbound - 1) * pageSize;
+    return filteredOutboundRecords.slice(start, start + pageSize);
+  }, [filteredOutboundRecords, pageOutbound, pageSize]);
+
+  const paginatedTransferRecords = useMemo(() => {
+    const start = (pageTransfers - 1) * pageSize;
+    return filteredTransferRecords.slice(start, start + pageSize);
+  }, [filteredTransferRecords, pageTransfers, pageSize]);
+
+  const totalPagesWarehouse = Math.max(
+    1,
+    Math.ceil(filteredWarehouseTransfers.length / pageSize) || 1,
+  );
+  const totalPagesOutbound = Math.max(
+    1,
+    Math.ceil(filteredOutboundRecords.length / pageSize) || 1,
+  );
+  const totalPagesTransfers = Math.max(
+    1,
+    Math.ceil(filteredTransferRecords.length / pageSize) || 1,
+  );
+
+  useEffect(() => {
+    resetAllPages();
+  }, [
+    branchFilter,
+    statusFilter,
+    categoryFilter,
+    searchQuery,
+    warehouseBranchFilter,
+    warehouseStatusFilter,
+    outboundBranchFilter,
+    transferBranchFilter,
+    transferStatusFilter,
+    returnStatusFilter,
+    returnWarehouseFilter,
+    returnBranchFilter,
+    branchReturns.length,
+  ]);
 
   const filteredItems = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -199,20 +407,49 @@ export function InventoryContent({
         statusFilter === "all" || item.status === statusFilter;
       const matchesCategory =
         categoryFilter === "all" || item.category === categoryFilter;
+      const effectiveBranch =
+        !canViewAllBranches && userBranchId ? userBranchId : branchFilter;
       const matchesBranch =
-        branchFilter === "all" || item.branchId === branchFilter;
+        effectiveBranch === "all" || item.branchId === effectiveBranch;
       return matchesSearch && matchesStatus && matchesCategory && matchesBranch;
     });
-    
+
     return filtered;
-  }, [items, searchQuery, statusFilter, categoryFilter, branchFilter]);
+  }, [
+    items,
+    searchQuery,
+    statusFilter,
+    categoryFilter,
+    branchFilter,
+    canViewAllBranches,
+    userBranchId,
+  ]);
 
   // Paginated items
-  const totalPages = Math.ceil(filteredItems.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize) || 1);
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredItems.slice(startIndex, startIndex + pageSize);
   }, [filteredItems, currentPage, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (pageToWarehouse > totalPagesToWarehouse) setPageToWarehouse(totalPagesToWarehouse);
+    if (pageWarehouse > totalPagesWarehouse) setPageWarehouse(totalPagesWarehouse);
+    if (pageOutbound > totalPagesOutbound) setPageOutbound(totalPagesOutbound);
+    if (pageTransfers > totalPagesTransfers) setPageTransfers(totalPagesTransfers);
+  }, [
+    currentPage,
+    totalPages,
+    pageToWarehouse,
+    totalPagesToWarehouse,
+    pageWarehouse,
+    totalPagesWarehouse,
+    pageOutbound,
+    totalPagesOutbound,
+    pageTransfers,
+    totalPagesTransfers,
+  ]);
 
   const categories = [...new Set(items.map((i) => i.category))];
 
@@ -344,6 +581,7 @@ export function InventoryContent({
             <TabsTrigger value="warehouse" className="text-xs h-7">From Warehouse</TabsTrigger>
             <TabsTrigger value="outbound" className="text-xs h-7">Outbound</TabsTrigger>
             <TabsTrigger value="transfers" className="text-xs h-7">Branch Transfers</TabsTrigger>
+            <TabsTrigger value="to-warehouse" className="text-xs h-7">To Warehouse</TabsTrigger>
           </TabsList>
 
           <div className="flex gap-2">
@@ -407,59 +645,83 @@ export function InventoryContent({
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center mt-4">
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search items..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="pl-9"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="low">Low Stock</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-              <SelectItem value="overstock">Overstock</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setCurrentPage(1); }}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Branch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Branches</SelectItem>
-              {branches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         <TabsContent value="all" className="mt-6">
           <Card className="glass">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <CardTitle>All inventory items</CardTitle>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <div className="relative w-full sm:w-44">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search items..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 pl-8 text-xs"
+                  />
+                </div>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => {
+                    setStatusFilter(v);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All status</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="low">Low stock</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="overstock">Overstock</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={categoryFilter}
+                  onValueChange={(v) => {
+                    setCategoryFilter(v);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {canViewAllBranches && (
+                  <Select
+                    value={branchFilter}
+                    onValueChange={(v) => {
+                      setBranchFilter(v);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+                      <SelectValue placeholder="Branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All branches</SelectItem>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
@@ -480,11 +742,7 @@ export function InventoryContent({
                         <EmptyState
                           icon={<Package className="h-8 w-8 text-muted-foreground" />}
                           title="No inventory items found"
-                          description="Try adjusting your filters or add a new inventory item."
-                          action={{
-                            label: "Add Item",
-                            onClick: () => setIsAddItemOpen(true),
-                          }}
+                          description="Try adjusting your filters. Branch stock is added via warehouse transfers."
                         />
                       </TableCell>
                     </TableRow>
@@ -539,10 +797,7 @@ export function InventoryContent({
                 totalItems={filteredItems.length}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setCurrentPage(1);
-                }}
+                onPageSizeChange={handlePageSizeChange}
               />
             </CardContent>
           </Card>
@@ -550,11 +805,59 @@ export function InventoryContent({
 
         <TabsContent value="warehouse" className="mt-6">
           <Card className="glass">
-            <CardHeader>
-              <CardTitle>Warehouse to Branch Transfers</CardTitle>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Warehouse to branch transfers</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Incoming stock from warehouses to branches.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {canViewAllBranches && (
+                  <Select
+                    value={warehouseBranchFilter}
+                    onValueChange={(v) => {
+                      setWarehouseBranchFilter(v);
+                      setPageWarehouse(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                      <SelectValue placeholder="Branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All branches</SelectItem>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Select
+                  value={warehouseStatusFilter}
+                  onValueChange={(v) => {
+                    setWarehouseStatusFilter(v);
+                    setPageWarehouse(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[130px] text-xs">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {warehouseStatusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
-              {warehouseTransfers.length > 0 ? (
+              {filteredWarehouseTransfers.length > 0 ? (
+                <>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -569,7 +872,7 @@ export function InventoryContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {warehouseTransfers.map((record) => (
+                    {paginatedWarehouseTransfers.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
                           <div>
@@ -619,6 +922,15 @@ export function InventoryContent({
                     ))}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  currentPage={pageWarehouse}
+                  totalPages={totalPagesWarehouse}
+                  totalItems={filteredWarehouseTransfers.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageWarehouse}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+                </>
               ) : (
                 <div className="p-6">
                   <p className="text-muted-foreground">
@@ -632,11 +944,38 @@ export function InventoryContent({
 
         <TabsContent value="outbound" className="mt-6">
           <Card className="glass">
-            <CardHeader>
-              <CardTitle>Recent Outbound Stock</CardTitle>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Recent outbound stock</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Sales, waste, and adjustments that reduced branch stock.
+                </p>
+              </div>
+              {canViewAllBranches && (
+                <Select
+                  value={outboundBranchFilter}
+                  onValueChange={(v) => {
+                    setOutboundBranchFilter(v);
+                    setPageOutbound(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectValue placeholder="Branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All branches</SelectItem>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </CardHeader>
-            <CardContent>
-              {outboundRecords.length > 0 ? (
+            <CardContent className="p-0">
+              {filteredOutboundRecords.length > 0 ? (
+                <>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -649,7 +988,7 @@ export function InventoryContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {outboundRecords.map((record) => (
+                    {paginatedOutboundRecords.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
                           <div>
@@ -670,8 +1009,17 @@ export function InventoryContent({
                     ))}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  currentPage={pageOutbound}
+                  totalPages={totalPagesOutbound}
+                  totalItems={filteredOutboundRecords.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageOutbound}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+                </>
               ) : (
-                <p className="text-muted-foreground">
+                <p className="p-6 text-muted-foreground">
                   No outbound stock records found. Records will appear here when items are sold, wasted, or adjusted.
                 </p>
               )}
@@ -681,11 +1029,59 @@ export function InventoryContent({
 
         <TabsContent value="transfers" className="mt-6">
           <Card className="glass">
-            <CardHeader>
-              <CardTitle>Branch-to-Branch Transfers</CardTitle>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Branch-to-branch transfers</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Stock moved between branches.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {canViewAllBranches && (
+                  <Select
+                    value={transferBranchFilter}
+                    onValueChange={(v) => {
+                      setTransferBranchFilter(v);
+                      setPageTransfers(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                      <SelectValue placeholder="Branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All branches</SelectItem>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Select
+                  value={transferStatusFilter}
+                  onValueChange={(v) => {
+                    setTransferStatusFilter(v);
+                    setPageTransfers(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[130px] text-xs">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {transferStatusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
-              {transferRecords.length > 0 ? (
+              {filteredTransferRecords.length > 0 ? (
+                <>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -700,7 +1096,7 @@ export function InventoryContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transferRecords.map((record) => (
+                    {paginatedTransferRecords.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
                           <div>
@@ -758,11 +1154,176 @@ export function InventoryContent({
                     ))}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  currentPage={pageTransfers}
+                  totalPages={totalPagesTransfers}
+                  totalItems={filteredTransferRecords.length}
+                  pageSize={pageSize}
+                  onPageChange={setPageTransfers}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+                </>
               ) : (
                 <div className="p-6">
                   <p className="text-muted-foreground">
                     No transfer records found. Use the Transfer Stock button to initiate inter-branch transfers.
                   </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="to-warehouse" className="mt-6">
+          <Card className="glass">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Returns to warehouse</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Branch stock sent back to warehouses. Pending returns are received or
+                  rejected in the Warehouse section.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {canViewAllBranches && (
+                  <Select
+                    value={returnBranchFilter}
+                    onValueChange={(v) => {
+                      setReturnBranchFilter(v);
+                      setPageToWarehouse(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                      <SelectValue placeholder="Branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All branches</SelectItem>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {warehouses.length > 1 && canViewAllBranches && (
+                  <Select
+                    value={returnWarehouseFilter}
+                    onValueChange={(v) => {
+                      setReturnWarehouseFilter(v);
+                      setPageToWarehouse(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[160px] text-xs">
+                      <SelectValue placeholder="Warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All warehouses</SelectItem>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Select
+                  value={returnStatusFilter}
+                  onValueChange={(v) => {
+                    setReturnStatusFilter(v);
+                    setPageToWarehouse(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {returnStatusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {visibleBranchReturns.length > 0 ? (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>From branch</TableHead>
+                        <TableHead>To warehouse</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedBranchReturns.map((record) => (
+                        <TableRow key={record.id}>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDisplayDate(record.transferDate)}
+                          </TableCell>
+                          <TableCell>{record.branchName}</TableCell>
+                          <TableCell>{record.warehouseName}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{record.itemName}</p>
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {record.itemSku}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {record.quantity} {record.itemUnit}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(record.totalCost)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={
+                                TRANSFER_STATUS_COLORS[record.status] || ""
+                              }
+                            >
+                              {record.status.replace(/_/g, " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
+                            {record.notes || "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <TablePagination
+                    currentPage={pageToWarehouse}
+                    totalPages={totalPagesToWarehouse}
+                    totalItems={visibleBranchReturns.length}
+                    pageSize={pageSize}
+                    onPageChange={setPageToWarehouse}
+                    onPageSizeChange={handlePageSizeChange}
+                  />
+                </>
+              ) : (
+                <div className="p-6">
+                  <EmptyState
+                    icon={
+                      <ArrowUpFromLine className="h-8 w-8 text-muted-foreground" />
+                    }
+                    title="No returns to warehouse"
+                    description={
+                      canViewAllBranches
+                        ? "Branch returns will appear here when staff use Return to Warehouse from the actions menu."
+                        : "Create a return with Return to Warehouse in the actions menu, or check back after submitting one."
+                    }
+                  />
                 </div>
               )}
             </CardContent>
@@ -789,17 +1350,13 @@ export function InventoryContent({
         branches={branches}
         items={items}
       />
-      <AddInventoryItemForm
-        open={isAddItemOpen}
-        onOpenChange={setIsAddItemOpen}
-        branches={branches}
-      />
       <BranchReturnToWarehouseDialog
         open={isBranchReturnOpen}
         onOpenChange={setIsBranchReturnOpen}
         branches={branches}
         warehouses={warehouses}
         items={items}
+        onCreated={() => router.refresh()}
       />
 
       {/* Bulk Import Dialog */}

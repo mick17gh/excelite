@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { getSessionOrganizationId } from "@/lib/actions/organization";
 
 export interface UpdateProfileInput {
   name: string;
@@ -47,6 +48,9 @@ export async function getCurrentUser() {
       return { success: false, error: "User not found" };
     }
 
+    const organizationId =
+      user.organizationId ?? (await getSessionOrganizationId());
+
     return {
       success: true,
       data: {
@@ -58,7 +62,7 @@ export async function getCurrentUser() {
         image: user.image,
         branchId: user.branchId,
         branchName: user.branch?.name || null,
-        organizationId: user.organizationId,
+        organizationId,
         isActive: user.isActive,
       },
     };

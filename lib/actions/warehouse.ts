@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { InventoryCategory, UnitType, TransferStatus } from "@/lib/generated/prisma/client";
+import { assertWarehouseMutationAllowed } from "@/lib/actions/warehouse-auth";
 
 /** Prisma Decimal → plain number (RSC props and server-action responses must be JSON-serializable) */
 function decimalToNumber(value: unknown): number {
@@ -329,6 +330,10 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
     const existing = await db.warehouseBranchTransfer.findUnique({ where: { id } });
     if (!existing) return { error: "Transfer not found" };
 
+    const auth = await assertWarehouseMutationAllowed(existing.warehouseId);
+    if (!auth.ok) return { error: auth.error };
+    const actorId = userId ?? auth.ctx.userId;
+
     if (status === "IN_TRANSIT" && existing.status === "APPROVED") {
       // ok
     } else if (status === "COMPLETED" && !["PENDING", "APPROVED", "IN_TRANSIT"].includes(existing.status)) {
@@ -337,12 +342,18 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
 
     const data: Record<string, unknown> = { status };
 
+    if (status === "CANCELLED") {
+      if (!["PENDING", "APPROVED", "IN_TRANSIT"].includes(existing.status)) {
+        return { error: "This transfer can no longer be cancelled" };
+      }
+    }
+
     if (status === "IN_TRANSIT" && !existing.approvedBy) {
-      data.approvedBy = userId || null;
+      data.approvedBy = actorId;
     }
 
     if (status === "COMPLETED") {
-      data.receivedBy = userId || null;
+      data.receivedBy = actorId;
 
       const transfer = await db.warehouseBranchTransfer.findUnique({
         where: { id },

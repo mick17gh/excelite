@@ -828,10 +828,10 @@ export function SettingsContent() {
 
       <TabsContent value="organization">
         <div className="space-y-4">
-          <OrganizationTab />
-          {user?.organizationId && (
+          <OrganizationTab organizationId={user?.organizationId ?? undefined} />
+          {user?.organizationId ? (
             <PosPoliciesTab organizationId={user.organizationId} />
-          )}
+          ) : null}
         </div>
       </TabsContent>
 

@@ -37,7 +37,11 @@ const TIER_COLORS: Record<string, string> = {
   ENTERPRISE: "bg-amber-100 text-amber-700",
 };
 
-export function OrganizationTab() {
+interface OrganizationTabProps {
+  organizationId?: string;
+}
+
+export function OrganizationTab({ organizationId }: OrganizationTabProps) {
   const [org, setOrg] = useState<OrgData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,12 +49,12 @@ export function OrganizationTab() {
 
   useEffect(() => {
     loadOrg();
-  }, []);
+  }, [organizationId]);
 
   const loadOrg = async () => {
     setIsLoading(true);
     try {
-      const result = await getOrganization();
+      const result = await getOrganization(organizationId);
       if (result.data) {
         setOrg(result.data as OrgData);
         setName(result.data.name);

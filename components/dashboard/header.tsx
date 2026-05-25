@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { NotificationBell } from "@/components/dashboard/notification-bell";
+import {
+  NotificationBell,
+  type DashboardNotification,
+} from "@/components/dashboard/notification-bell";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -22,9 +25,15 @@ import Link from "next/link";
 
 interface HeaderProps {
   onMenuClick?: () => void;
+  initialNotifications?: DashboardNotification[];
+  initialUnreadCount?: number;
 }
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({
+  onMenuClick,
+  initialNotifications,
+  initialUnreadCount,
+}: HeaderProps) {
   const { data: session } = authClient.useSession();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -78,7 +87,10 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="flex items-center gap-2">
         <ThemeToggle />
 
-        <NotificationBell />
+        <NotificationBell
+          initialNotifications={initialNotifications}
+          initialUnreadCount={initialUnreadCount}
+        />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

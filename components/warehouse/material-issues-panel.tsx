@@ -31,6 +31,7 @@ import { updateWarehouseTransferStatus } from "@/lib/actions/stock-transfers";
 import type { TransferStatus } from "@/lib/generated/prisma/client";
 import { useCurrency } from "@/contexts/currency-context";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { formatDisplayDate } from "@/lib/utils/date-display";
 
 export interface MaterialTransferRow {
   id: string;
@@ -62,6 +63,7 @@ interface WarehouseOption {
 interface MaterialIssuesPanelProps {
   transfers: MaterialTransferRow[];
   openCount: number;
+  canMutate?: boolean;
   warehouses?: WarehouseOption[];
   selectedWarehouse?: string;
   onWarehouseChange?: (value: string) => void;
@@ -78,6 +80,7 @@ interface MaterialIssuesPanelProps {
 export function MaterialIssuesPanel({
   transfers,
   openCount,
+  canMutate = false,
   warehouses,
   selectedWarehouse,
   onWarehouseChange,
@@ -176,10 +179,10 @@ export function MaterialIssuesPanel({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(t.transferDate).toLocaleDateString()}
+                    {formatDisplayDate(t.transferDate)}
                   </TableCell>
                   <TableCell>
-                    {(t.status === "PENDING" || t.status === "IN_TRANSIT") && (
+                    {canMutate && (t.status === "PENDING" || t.status === "IN_TRANSIT") && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">

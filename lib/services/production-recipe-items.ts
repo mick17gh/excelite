@@ -18,3 +18,25 @@ export function isRecipeIngredientItem(
   if (excludeItemId && item.id === excludeItemId) return false;
   return item.itemStage === "RAW" || item.itemStage === "PROCESSED";
 }
+
+export type RecipeIngredientLineSummary = {
+  ingredientItemId: string;
+  quantity: number;
+  ingredientItem?: { name: string; sku: string; unit: string };
+};
+
+/** One-line summary for lists and combobox descriptions. */
+export function formatRecipeIngredientSummary(
+  lines: RecipeIngredientLineSummary[],
+  options?: { maxItems?: number },
+): string {
+  if (!lines.length) return "No ingredients";
+  const max = options?.maxItems ?? lines.length;
+  const parts = lines.slice(0, max).map((line) => {
+    const label = line.ingredientItem?.name || line.ingredientItem?.sku || "Item";
+    const unit = line.ingredientItem?.unit ?? "";
+    return `${label}: ${line.quantity}${unit ? ` ${unit}` : ""}`;
+  });
+  if (lines.length > max) parts.push(`+${lines.length - max} more`);
+  return parts.join(" · ");
+}

@@ -39,6 +39,8 @@ interface DispatchApprovalPanelProps {
   warehouses: WarehouseOption[];
   selectedWarehouse: string;
   onWarehouseChange: (value: string) => void;
+  canApprove?: boolean;
+  canComplete?: boolean;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   currentPage: number;
@@ -49,6 +51,8 @@ export function DispatchApprovalPanel({
   warehouses,
   selectedWarehouse,
   onWarehouseChange,
+  canApprove = false,
+  canComplete = false,
   pageSize,
   onPageSizeChange,
   currentPage,
@@ -161,16 +165,16 @@ export function DispatchApprovalPanel({
               </div>
               <div className="flex gap-2 items-center">
                 <Badge variant="outline">{t.status.replace(/_/g, " ")}</Badge>
-                {t.status === "AWAITING_WAREHOUSE_APPROVAL" && (
+                {t.status === "AWAITING_WAREHOUSE_APPROVAL" && canApprove ? (
                   <Button size="sm" onClick={() => handleApprove(t.id)}>
                     Approve
                   </Button>
-                )}
-                {t.status === "APPROVED" && (
+                ) : null}
+                {t.status === "APPROVED" && canComplete ? (
                   <Button size="sm" variant="secondary" onClick={() => handleComplete(t.id)}>
                     Mark shipped
                   </Button>
-                )}
+                ) : null}
               </div>
             </div>
           ))

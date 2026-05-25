@@ -1,16 +1,39 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { WarehouseContent } from "@/components/warehouse/warehouse-content";
 import { getWarehouses, getWarehouseInventory, getWarehouseTransfers, getWarehouseStats, getWarehouseInboundRecords, getWarehouseWasteLogs } from "@/lib/actions/warehouse";
-import { getWarehouseTransfers as getWarehouseMaterialTransfers } from "@/lib/actions/stock-transfers";
+import {
+  getBranchWarehouseTransfers,
+  getWarehouseTransfers as getWarehouseMaterialTransfers,
+} from "@/lib/actions/stock-transfers";
 import { getBranches } from "@/lib/actions/branches";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import type { Role } from "@/lib/generated/prisma/client";
 
 export const metadata = {
   title: "Warehouse | ServStack",
   description: "Manage warehouse inventory and branch transfers",
 };
 
+const EMPTY_STATS = {
+  totalWarehouses: 0,
+  totalItems: 0,
+  pendingTransfers: 0,
+};
+
 export default async function WarehousePage() {
-  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult] = await Promise.all([
+  const session = await auth.api.getSession({ headers: await headers() });
+  const dbUser = session?.user?.id
+    ? await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true, assignedWarehouseId: true },
+      })
+    : null;
+  const userRole = (dbUser?.role as Role) ?? "STAFF";
+  const assignedWarehouseId = dbUser?.assignedWarehouseId ?? null;
+
+  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult, branchReturnsResult] = await Promise.all([
     getWarehouses(),
     getWarehouseTransfers(),
     getWarehouseMaterialTransfers(),
@@ -18,6 +41,7 @@ export default async function WarehousePage() {
     getBranches(),
     getWarehouseInboundRecords(),
     getWarehouseWasteLogs(),
+    getBranchWarehouseTransfers({ limit: 200 }),
   ]);
 
   const warehouses = warehousesResult.data || [];
@@ -36,16 +60,16 @@ export default async function WarehousePage() {
     status: t.status,
     transferDate: t.transferDate,
   }));
-  const stats = statsResult.data;
+  const stats = statsResult.data ?? EMPTY_STATS;
   const inboundRecords = inboundResult.data || [];
   const wastageRecords = wastageResult.data || [];
-  const branches = (branchesResult.data || []).map((b: any) => ({
+  const branchReturns = branchReturnsResult.data || [];
+  const branches = (branchesResult.data || []).map((b: { id: string; name: string; code: string }) => ({
     id: b.id,
     name: b.name,
     code: b.code,
   }));
 
-  // Fetch inventory for all warehouses
   const allItems = [];
   for (const wh of warehouses) {
     const inv = await getWarehouseInventory(wh.id);
@@ -67,10 +91,13 @@ export default async function WarehousePage() {
           items={allItems}
           transfers={transfers}
           materialTransfers={materialTransfers}
+          branchReturns={branchReturns}
           branches={branches}
           stats={stats}
           inboundRecords={inboundRecords}
           wastageRecords={wastageRecords}
+          userRole={userRole}
+          assignedWarehouseId={assignedWarehouseId}
         />
       </Suspense>
     </div>

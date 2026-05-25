@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { Role } from "@/lib/generated/prisma/client";
 import bcrypt from "bcryptjs";
+import { resolveOrganizationIdForUser } from "@/lib/users/organization-link";
 
 export interface PaginationParams {
   page?: number;
@@ -58,6 +59,11 @@ export async function createUser(input: CreateUserInput) {
     // Hash password
     const hashedPassword = await bcrypt.hash(input.password, 10);
 
+    const organizationId = await resolveOrganizationIdForUser({
+      branchId: input.branchId,
+      assignedWarehouseId: input.assignedWarehouseId,
+    });
+
     // Create user
     const user = await db.user.create({
       data: {
@@ -66,6 +72,7 @@ export async function createUser(input: CreateUserInput) {
         role: input.role,
         branchId: input.branchId,
         assignedWarehouseId: input.assignedWarehouseId,
+        organizationId,
         phoneNumber: input.phoneNumber,
         isActive: input.isActive,
         emailVerified: false,
@@ -92,10 +99,29 @@ export async function createUser(input: CreateUserInput) {
 
 export async function updateUser(input: UpdateUserInput) {
   try {
-    const { id, ...data } = input;
+    const { id, branchId, assignedWarehouseId, ...rest } = input;
+    const data: Record<string, unknown> = { ...rest };
+
+    if (branchId !== undefined) data.branchId = branchId;
+    if (assignedWarehouseId !== undefined) data.assignedWarehouseId = assignedWarehouseId;
+
+    if (branchId !== undefined || assignedWarehouseId !== undefined) {
+      const existing = await db.user.findUnique({
+        where: { id },
+        select: { branchId: true, assignedWarehouseId: true },
+      });
+      data.organizationId = await resolveOrganizationIdForUser({
+        branchId: (branchId !== undefined ? branchId : existing?.branchId) ?? null,
+        assignedWarehouseId:
+          (assignedWarehouseId !== undefined
+            ? assignedWarehouseId
+            : existing?.assignedWarehouseId) ?? null,
+      });
+    }
+
     const user = await db.user.update({
       where: { id },
-      data,
+      data: data as Parameters<typeof db.user.update>[0]["data"],
     });
 
     revalidatePath("/dashboard/users");

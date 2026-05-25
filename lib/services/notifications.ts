@@ -61,6 +61,19 @@ export async function createNotification(input: CreateNotificationInput) {
 /**
  * Get notifications for the current user
  */
+function resolveAlertScope(sessionUser: {
+  id: string;
+  role?: string | null;
+  branchId?: string | null;
+}) {
+  const role = sessionUser.role ?? "STAFF";
+  const branchId = sessionUser.branchId ?? null;
+  if (branchId && !isGlobalAlertRole(role)) {
+    return { branchId };
+  }
+  return {};
+}
+
 export async function getNotifications(limit: number = 20) {
   try {
     const session = await auth.api.getSession({
@@ -68,26 +81,20 @@ export async function getNotifications(limit: number = 20) {
     });
 
     if (!session?.user?.id) {
-      return { success: false, error: "Not authenticated", data: [] };
+      return { success: true, data: [] };
     }
 
-    // Get user's branch if any
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { branchId: true, role: true },
+    const scope = resolveAlertScope({
+      id: session.user.id,
+      role: session.user.role,
+      branchId: session.user.branchId,
     });
 
     // Get alerts as notifications
     const alerts = await db.alert.findMany({
       where: {
         status: { in: ["ACTIVE", "ACKNOWLEDGED"] },
-        // Filter by branch for branch-level users
-        ...(user?.branchId &&
-          user.role !== "SUPER_ADMIN" &&
-          user.role !== "EXECUTIVE" &&
-          user.role !== "OPERATIONS_MANAGER"
-          ? { branchId: user.branchId }
-          : {}),
+        ...scope,
       },
       orderBy: { triggeredAt: "desc" },
       take: limit,
@@ -104,16 +111,20 @@ export async function getNotifications(limit: number = 20) {
       priority: mapSeverityToPriority(alert.severity),
       title: alert.title,
       message: alert.message,
-      branchName: alert.branch?.name,
-      createdAt: alert.triggeredAt,
+      branchName: alert.branch?.name ?? undefined,
+      createdAt: alert.triggeredAt.toISOString(),
       isRead: alert.status === "ACKNOWLEDGED" || alert.status === "RESOLVED",
       actionUrl: getActionUrl(alert.type, alert.branchId),
     }));
 
     return { success: true, data: notifications };
-  } catch (error) {
+  } catch (error: unknown) {
+    if (isConnectionPoolTimeout(error)) {
+      console.warn("[getNotifications] Connection pool timeout, returning empty list");
+      return { success: true, data: [] };
+    }
     console.error("[getNotifications] Error:", error);
-    return { success: false, error: "Failed to fetch notifications", data: [] };
+    return { success: true, data: [] };
   }
 }
 
@@ -148,20 +159,16 @@ export async function markAllNotificationsAsRead() {
       return { success: false, error: "Not authenticated" };
     }
 
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { branchId: true, role: true },
+    const scope = resolveAlertScope({
+      id: session.user.id,
+      role: session.user.role,
+      branchId: session.user.branchId,
     });
 
     await db.alert.updateMany({
       where: {
         status: "ACTIVE",
-        ...(user?.branchId &&
-          user.role !== "SUPER_ADMIN" &&
-          user.role !== "EXECUTIVE" &&
-          user.role !== "OPERATIONS_MANAGER"
-          ? { branchId: user.branchId }
-          : {}),
+        ...scope,
       },
       data: { status: "ACKNOWLEDGED" },
     });
@@ -184,37 +191,30 @@ export async function getUnreadCount() {
     });
 
     if (!session?.user?.id) {
-      return { success: false, count: 0 };
+      return { success: true, count: 0 };
     }
 
-    // Single query: fetch user role/branch and count alerts together
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { branchId: true, role: true },
+    const scope = resolveAlertScope({
+      id: session.user.id,
+      role: session.user.role,
+      branchId: session.user.branchId,
     });
-
-    if (!user) {
-      return { success: false, count: 0 };
-    }
-
-    const isGlobalRole = ["SUPER_ADMIN", "EXECUTIVE", "OPERATIONS_MANAGER"].includes(user.role);
 
     const count = await db.alert.count({
       where: {
         status: "ACTIVE",
-        ...(!isGlobalRole && user.branchId ? { branchId: user.branchId } : {}),
+        ...scope,
       },
     });
 
     return { success: true, count };
-  } catch (error: any) {
-    // Gracefully handle connection pool timeouts (P2024)
-    if (error?.code === "P2024") {
+  } catch (error: unknown) {
+    if (isConnectionPoolTimeout(error)) {
       console.warn("[getUnreadCount] Connection pool timeout, returning 0");
     } else {
       console.error("[getUnreadCount] Error:", error);
     }
-    return { success: false, count: 0 };
+    return { success: true, count: 0 };
   }
 }
 
@@ -280,8 +280,24 @@ function mapPriorityToSeverity(priority: NotificationPriority): AlertSeverity {
   }
 }
 
+function isGlobalAlertRole(role: string): boolean {
+  return ["SUPER_ADMIN", "ADMIN", "EXECUTIVE", "OPERATIONS_MANAGER", "AUDITOR"].includes(
+    role,
+  );
+}
+
+function isConnectionPoolTimeout(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: string }).code === "P2024"
+  );
+}
+
 function mapSeverityToPriority(severity: string): NotificationPriority {
-  switch (severity) {
+  const normalized = severity.toLowerCase();
+  switch (normalized) {
     case "low":
       return "low";
     case "medium":

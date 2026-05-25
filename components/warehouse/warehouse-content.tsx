@@ -45,12 +45,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateTransferStatus } from "@/lib/actions/warehouse";
+import { updateBranchWarehouseTransferStatus } from "@/lib/actions/stock-transfers";
+import type { Role } from "@/lib/generated/prisma/client";
+import { canMutateWarehouseOps, hasPermission } from "@/lib/permissions";
 import {
   CreateWarehouseDialog,
   EditWarehouseDialog,
   CreateWarehouseItemDialog,
   EditWarehouseItemDialog,
   warehouseTypeLabel,
+  itemStageLabel,
   type WarehouseFormData,
   type WarehouseItemFormData,
   CreateTransferDialog,
@@ -66,6 +70,7 @@ import { SupplierReceivingDialog, WastageDialog } from "./warehouse-dialogs";
 import { WarehouseImportDialog } from "./warehouse-import";
 import { useCurrency } from "@/contexts/currency-context";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { formatDisplayDate } from "@/lib/utils/date-display";
 
 interface WarehouseData {
   id: string;
@@ -170,16 +175,65 @@ interface WastageRecord {
   createdAt: string;
 }
 
+interface BranchReturnRow {
+  id: string;
+  fromBranchId: string;
+  toWarehouseId: string;
+  branchItemId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  status: string;
+  transferDate: string;
+  notes: string | null;
+  createdAt: string;
+  branchName: string;
+  warehouseName: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+}
+
 interface WarehouseContentProps {
   warehouses: WarehouseData[];
   items: WarehouseItem[];
   transfers: Transfer[];
   materialTransfers: MaterialTransferRow[];
+  branchReturns: BranchReturnRow[];
   branches: Branch[];
   stats: WarehouseStats;
   inboundRecords: InboundRecord[];
   wastageRecords: WastageRecord[];
+  userRole: Role;
+  assignedWarehouseId: string | null;
 }
+
+/** Stable tab labels — single source of truth to avoid SSR/client text drift. */
+const WAREHOUSE_TABS = [
+  { value: "warehouses", label: "Warehouses" },
+  { value: "inventory", label: "Inventory" },
+  { value: "transfers", label: "Branch transfers" },
+  { value: "branch-returns", label: "Branch returns" },
+  { value: "material", label: "Material issues" },
+  { value: "approvals", label: "Approvals" },
+  { value: "production", label: "Production" },
+  { value: "receiving", label: "Supplier Receiving" },
+  { value: "wastage", label: "Wastage" },
+] as const;
+
+function visibleWarehouseTabs(role: Role) {
+  return WAREHOUSE_TABS.filter((tab) => {
+    if (tab.value === "production") return hasPermission(role, "commissary:production");
+    if (tab.value === "receiving") return role !== "COMMISSARY_STAFF";
+    return true;
+  });
+}
+
+const ITEM_STAGE_STYLES: Record<string, string> = {
+  RAW: "border-slate-300 text-slate-700 dark:text-slate-400",
+  PROCESSED: "border-blue-300 text-blue-700 dark:text-blue-400",
+  BRANCH_READY: "border-violet-300 text-violet-700 dark:text-violet-400",
+};
 
 const TRANSFER_STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
@@ -190,8 +244,27 @@ const TRANSFER_STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-export function WarehouseContent({ warehouses, items, transfers, materialTransfers, branches, stats, inboundRecords, wastageRecords }: WarehouseContentProps) {
+export function WarehouseContent({
+  warehouses,
+  items,
+  transfers,
+  materialTransfers,
+  branchReturns,
+  branches,
+  stats,
+  inboundRecords,
+  wastageRecords,
+  userRole,
+  assignedWarehouseId,
+}: WarehouseContentProps) {
   const router = useRouter();
+  const canMutate = canMutateWarehouseOps(userRole);
+  const canCreateWarehouse = canMutate && hasPermission(userRole, "warehouse:create");
+  const canTransfer = canMutate && hasPermission(userRole, "warehouse:transfer");
+  const canApproveDispatch =
+    canMutate && hasPermission(userRole, "warehouse:approve_dispatch");
+  const canLogWastage = canMutate && hasPermission(userRole, "warehouse:edit");
+  const tabs = useMemo(() => visibleWarehouseTabs(userRole), [userRole]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
   const [showCreateWarehouse, setShowCreateWarehouse] = useState(false);
@@ -212,10 +285,17 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
   const [pageWarehouses, setPageWarehouses] = useState(1);
   const [pageInventory, setPageInventory] = useState(1);
   const [pageTransfers, setPageTransfers] = useState(1);
+  const [pageBranchReturns, setPageBranchReturns] = useState(1);
   const [pageMaterial, setPageMaterial] = useState(1);
+  const [processingBranchReturnId, setProcessingBranchReturnId] = useState<string | null>(null);
   const [pageApprovals, setPageApprovals] = useState(1);
   const [pageReceiving, setPageReceiving] = useState(1);
   const [pageWastage, setPageWastage] = useState(1);
+  const [tabsReady, setTabsReady] = useState(false);
+
+  useEffect(() => {
+    setTabsReady(true);
+  }, []);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -239,6 +319,27 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
     );
   }, [materialTransfers, selectedWarehouse]);
 
+  const filteredBranchReturns = useMemo(() => {
+    if (selectedWarehouse === "all") return branchReturns;
+    return branchReturns.filter((t) => t.toWarehouseId === selectedWarehouse);
+  }, [branchReturns, selectedWarehouse]);
+
+  const pendingBranchReturnsCount = useMemo(
+    () =>
+      filteredBranchReturns.filter((t) => t.status === "PENDING").length,
+    [filteredBranchReturns],
+  );
+
+  const paginatedBranchReturns = useMemo(() => {
+    const start = (pageBranchReturns - 1) * pageSize;
+    return filteredBranchReturns.slice(start, start + pageSize);
+  }, [filteredBranchReturns, pageBranchReturns, pageSize]);
+
+  const totalPagesBranchReturns = Math.max(
+    1,
+    Math.ceil(filteredBranchReturns.length / pageSize) || 1,
+  );
+
   const openMaterialCount = useMemo(
     () =>
       filteredMaterialTransfers.filter(
@@ -256,6 +357,10 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
   }, [selectedWarehouse, transfers]);
 
   useEffect(() => {
+    setPageBranchReturns(1);
+  }, [selectedWarehouse, branchReturns]);
+
+  useEffect(() => {
     setPageMaterial(1);
   }, [selectedWarehouse, materialTransfers]);
 
@@ -267,6 +372,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
     setPageWarehouses(1);
     setPageInventory(1);
     setPageTransfers(1);
+    setPageBranchReturns(1);
     setPageMaterial(1);
     setPageApprovals(1);
     setPageReceiving(1);
@@ -330,6 +436,11 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
     if (pageTransfers > totalPagesXfer) setPageTransfers(totalPagesXfer);
   }, [pageTransfers, totalPagesXfer]);
   useEffect(() => {
+    if (pageBranchReturns > totalPagesBranchReturns) {
+      setPageBranchReturns(totalPagesBranchReturns);
+    }
+  }, [pageBranchReturns, totalPagesBranchReturns]);
+  useEffect(() => {
     if (pageMaterial > totalPagesMaterial) setPageMaterial(totalPagesMaterial);
   }, [pageMaterial, totalPagesMaterial]);
   useEffect(() => {
@@ -366,6 +477,31 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
     }
   };
 
+  const handleBranchReturnStatus = async (id: string, status: TransferStatus) => {
+    setProcessingBranchReturnId(id);
+    const result = await updateBranchWarehouseTransferStatus(id, status);
+    setProcessingBranchReturnId(null);
+    if (result.error) toast.error(result.error);
+    else {
+      toast.success(
+        status === "COMPLETED" ? "Return received — stock updated" : "Return rejected",
+      );
+      router.refresh();
+    }
+  };
+
+  const canActOnBranchReturn = (toWarehouseId: string) => {
+    if (!canMutate) return false;
+    if (
+      assignedWarehouseId &&
+      (userRole === "WAREHOUSE_STAFF" || userRole === "COMMISSARY_STAFF") &&
+      assignedWarehouseId !== toWarehouseId
+    ) {
+      return false;
+    }
+    return true;
+  };
+
   return (
     <div className="space-y-4">
       {/* KPI Cards */}
@@ -400,8 +536,14 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Pending Transfers</p>
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Pending outbound</p>
                 <p className="text-base font-bold mt-0.5 text-amber-600">{stats.pendingTransfers}</p>
+                {pendingBranchReturnsCount > 0 ? (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    +{pendingBranchReturnsCount} branch return
+                    {pendingBranchReturnsCount === 1 ? "" : "s"}
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-lg p-1.5 shrink-0 bg-amber-100 dark:bg-amber-900/30">
                 <ArrowRightLeft className="h-4 w-4 text-amber-600" />
@@ -413,61 +555,99 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
 
       <Tabs defaultValue="warehouses" className="space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList>
-            <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            <TabsTrigger value="transfers">Branch transfers</TabsTrigger>
-            <TabsTrigger value="material">Material issues</TabsTrigger>
-            <TabsTrigger value="approvals">Approvals</TabsTrigger>
-            <TabsTrigger value="production">Production</TabsTrigger>
-            <TabsTrigger value="receiving">Supplier Receiving</TabsTrigger>
-            <TabsTrigger value="wastage">Wastage</TabsTrigger>
-          </TabsList>
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />Actions
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowCreateWarehouse(true)}>
-                  <WarehouseIcon className="mr-2 h-4 w-4" />New Warehouse
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowCreateItem(true)}>
-                  <Package className="mr-2 h-4 w-4" />New Item
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowCreateTransfer(true)}>
-                  <ArrowRightLeft className="mr-2 h-4 w-4" />Transfer to Branch
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowBulkTransfer(true)}>
-                  <Layers className="mr-2 h-4 w-4" />Bulk transfer to Branch
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowBulkWhTransfer(true)}>
-                  <Layers className="mr-2 h-4 w-4" />Bulk material issue (RAW → commissary)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowBulkCommissaryDispatch(true)}>
-                  <Layers className="mr-2 h-4 w-4" />Bulk commissary dispatch
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowSupplierReceiving(true)}>
-                  <TruckIcon className="mr-2 h-4 w-4" />Receive from Supplier
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowWastage(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />Log Wastage
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  if (warehouses.length > 0) {
-                    setSelectedWarehouseForImport({ id: warehouses[0].id, name: warehouses[0].name });
-                    setShowBulkImport(true);
-                  } else {
-                    toast.error("Please create a warehouse first");
-                  }
-                }}>
-                  <Upload className="mr-2 h-4 w-4" />Bulk Import
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {tabsReady ? (
+            <TabsList>
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          ) : (
+            <div
+              className="bg-muted text-muted-foreground inline-flex h-9 w-fit max-w-full flex-wrap items-center justify-center gap-0.5 rounded-lg p-[3px]"
+              aria-hidden
+            >
+              {tabs.map((tab) => (
+                <span
+                  key={tab.value}
+                  className="inline-flex h-[calc(100%-1px)] items-center justify-center rounded-md px-2 py-1 text-sm font-medium whitespace-nowrap"
+                >
+                  {tab.label}
+                </span>
+              ))}
+            </div>
+          )}
+          {canMutate ? (
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Plus className="mr-2 h-4 w-4" />Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canCreateWarehouse ? (
+                    <DropdownMenuItem onClick={() => setShowCreateWarehouse(true)}>
+                      <WarehouseIcon className="mr-2 h-4 w-4" />New Warehouse
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canCreateWarehouse ? (
+                    <DropdownMenuItem onClick={() => setShowCreateItem(true)}>
+                      <Package className="mr-2 h-4 w-4" />New Item
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canTransfer ? (
+                    <DropdownMenuItem onClick={() => setShowCreateTransfer(true)}>
+                      <ArrowRightLeft className="mr-2 h-4 w-4" />Transfer to Branch
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canTransfer ? (
+                    <DropdownMenuItem onClick={() => setShowBulkTransfer(true)}>
+                      <Layers className="mr-2 h-4 w-4" />Bulk transfer to Branch
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canTransfer ? (
+                    <DropdownMenuItem onClick={() => setShowBulkWhTransfer(true)}>
+                      <Layers className="mr-2 h-4 w-4" />Bulk material issue (RAW → commissary)
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canTransfer ? (
+                    <DropdownMenuItem onClick={() => setShowBulkCommissaryDispatch(true)}>
+                      <Layers className="mr-2 h-4 w-4" />Bulk commissary dispatch
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canCreateWarehouse ? (
+                    <DropdownMenuItem onClick={() => setShowSupplierReceiving(true)}>
+                      <TruckIcon className="mr-2 h-4 w-4" />Receive from Supplier
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canLogWastage ? (
+                    <DropdownMenuItem onClick={() => setShowWastage(true)}>
+                      <Trash2 className="mr-2 h-4 w-4" />Log Wastage
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canCreateWarehouse ? (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (warehouses.length > 0) {
+                          setSelectedWarehouseForImport({
+                            id: warehouses[0].id,
+                            name: warehouses[0].name,
+                          });
+                          setShowBulkImport(true);
+                        } else {
+                          toast.error("Please create a warehouse first");
+                        }
+                      }}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />Bulk Import
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : null}
         </div>
 
         {/* Warehouses Tab */}
@@ -518,6 +698,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          {canCreateWarehouse ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -539,6 +720,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))
@@ -588,6 +770,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                     <TableHead>Name</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Stage</TableHead>
                     <TableHead>Unit</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
                     <TableHead className="text-right">Unit Cost</TableHead>
@@ -598,7 +781,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                 <TableBody>
                   {filteredItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No inventory items</TableCell>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No inventory items</TableCell>
                     </TableRow>
                   ) : (
                     paginatedInventory.map((item) => (
@@ -606,6 +789,17 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell className="font-mono text-sm">{item.sku}</TableCell>
                         <TableCell><Badge variant="outline">{item.category}</Badge></TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              ITEM_STAGE_STYLES[item.itemStage || "RAW"] ||
+                              ITEM_STAGE_STYLES.RAW
+                            }
+                          >
+                            {itemStageLabel(item.itemStage)}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{item.unit}</TableCell>
                         <TableCell className="text-right">
                           <span className={item.currentStock <= item.minStock ? "text-red-600 font-medium" : item.currentStock <= item.reorderPoint ? "text-amber-600 font-medium" : ""}>
@@ -623,6 +817,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                           )}
                         </TableCell>
                         <TableCell>
+                          {canCreateWarehouse ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -649,6 +844,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))
@@ -726,11 +922,12 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                         <TableCell>
                           <Badge className={TRANSFER_STATUS_COLORS[t.status] || ""}>{t.status}</Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{new Date(t.transferDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatDisplayDate(t.transferDate)}</TableCell>
                         <TableCell>
                           {t.status === "AWAITING_WAREHOUSE_APPROVAL" ? (
                             <span className="text-xs text-muted-foreground">See Approvals</span>
-                          ) : (t.status === "PENDING" ||
+                          ) : canTransfer &&
+                            (t.status === "PENDING" ||
                               t.status === "IN_TRANSIT" ||
                               t.status === "APPROVED") && (
                             <DropdownMenu>
@@ -766,16 +963,135 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                   )}
                 </TableBody>
               </Table>
-              {filteredTransfers.length > 0 && (
-                <TablePagination
-                  currentPage={pageTransfers}
-                  totalPages={totalPagesXfer}
-                  totalItems={filteredTransfers.length}
-                  pageSize={pageSize}
-                  onPageChange={setPageTransfers}
-                  onPageSizeChange={setPageSize}
-                />
-              )}
+              <TablePagination
+                currentPage={pageTransfers}
+                totalPages={totalPagesXfer}
+                totalItems={filteredTransfers.length}
+                pageSize={pageSize}
+                onPageChange={setPageTransfers}
+                onPageSizeChange={setPageSize}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="branch-returns">
+          <Card className="rounded-xl">
+            <CardContent className="p-0">
+              <div className="flex flex-col gap-3 px-4 pt-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Stock returns from branches. Receive to add warehouse stock (deducts branch
+                  stock). Reject to cancel with no stock movement.
+                </p>
+                {warehouses.length > 1 && (
+                  <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                    <SelectTrigger className="w-full sm:w-48 h-9">
+                      <SelectValue placeholder="Warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All warehouses</SelectItem>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>From branch</TableHead>
+                    <TableHead>To warehouse</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredBranchReturns.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        No branch returns
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedBranchReturns.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDisplayDate(t.transferDate)}
+                        </TableCell>
+                        <TableCell>{t.branchName}</TableCell>
+                        <TableCell>{t.warehouseName}</TableCell>
+                        <TableCell>
+                          <span className="text-sm">{t.itemName}</span>
+                          <span className="block text-xs text-muted-foreground font-mono">
+                            {t.itemSku}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {t.quantity} {t.itemUnit}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={TRANSFER_STATUS_COLORS[t.status] || ""}>
+                            {t.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {(t.status === "PENDING" || t.status === "IN_TRANSIT") &&
+                          canActOnBranchReturn(t.toWarehouseId) ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  disabled={processingBranchReturnId === t.id}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleBranchReturnStatus(t.id, "COMPLETED" as TransferStatus)
+                                  }
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Receive
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() =>
+                                    handleBranchReturnStatus(t.id, "CANCELLED" as TransferStatus)
+                                  }
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Reject
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={pageBranchReturns}
+                totalPages={totalPagesBranchReturns}
+                totalItems={filteredBranchReturns.length}
+                pageSize={pageSize}
+                onPageChange={setPageBranchReturns}
+                onPageSizeChange={setPageSize}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -784,6 +1100,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
           <MaterialIssuesPanel
             transfers={paginatedMaterialTransfers}
             openCount={openMaterialCount}
+            canMutate={canTransfer}
             warehouses={warehouses}
             selectedWarehouse={selectedWarehouse}
             onWarehouseChange={setSelectedWarehouse}
@@ -803,6 +1120,8 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
             warehouses={warehouses}
             selectedWarehouse={selectedWarehouse}
             onWarehouseChange={setSelectedWarehouse}
+            canApprove={canApproveDispatch}
+            canComplete={canTransfer}
             pageSize={pageSize}
             onPageSizeChange={setPageSize}
             currentPage={pageApprovals}
@@ -849,7 +1168,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                   ) : (
                     paginatedInbound.map((record) => (
                       <TableRow key={record.id}>
-                        <TableCell>{new Date(record.deliveryDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDisplayDate(record.deliveryDate)}</TableCell>
                         <TableCell>{record.warehouseName}</TableCell>
                         <TableCell>
                           <div>
@@ -909,7 +1228,7 @@ export function WarehouseContent({ warehouses, items, transfers, materialTransfe
                   ) : (
                     paginatedWastage.map((record) => (
                       <TableRow key={record.id}>
-                        <TableCell>{new Date(record.wasteDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDisplayDate(record.wasteDate)}</TableCell>
                         <TableCell>{record.warehouseName}</TableCell>
                         <TableCell>
                           <div>

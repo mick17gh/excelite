@@ -59,7 +59,12 @@ async function validateRecipeItems(
     return { ok: false, error: "At least one ingredient line is required" };
   }
 
-  const itemIds = [outputItemId, ...lines.map((l) => l.ingredientItemId)];
+  const ingredientIds = lines.map((l) => l.ingredientItemId);
+  if (new Set(ingredientIds).size !== ingredientIds.length) {
+    return { ok: false, error: "Each ingredient can only appear once in the recipe" };
+  }
+
+  const itemIds = [outputItemId, ...ingredientIds];
   const items = await db.warehouseInventoryItem.findMany({
     where: { id: { in: itemIds }, warehouseId },
     select: { id: true, name: true, sku: true, itemStage: true },
@@ -262,6 +267,38 @@ type RecipeWithRelations = Awaited<
   >
 >[number];
 
+function serializeProductionBatch(batch: {
+  id: string;
+  recipeId: string;
+  warehouseId: string;
+  status: ProductionBatchStatus;
+  plannedOutput: unknown;
+  actualOutput: unknown | null;
+  wasteQuantity: unknown;
+  producedBy: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: batch.id,
+    recipeId: batch.recipeId,
+    warehouseId: batch.warehouseId,
+    status: batch.status,
+    plannedOutput: dec(batch.plannedOutput),
+    actualOutput: batch.actualOutput != null ? dec(batch.actualOutput) : null,
+    wasteQuantity: dec(batch.wasteQuantity),
+    producedBy: batch.producedBy,
+    startedAt: batch.startedAt?.toISOString() ?? null,
+    completedAt: batch.completedAt?.toISOString() ?? null,
+    notes: batch.notes,
+    createdAt: batch.createdAt.toISOString(),
+    updatedAt: batch.updatedAt.toISOString(),
+  };
+}
+
 function serializeProductionRecipe(recipe: RecipeWithRelations) {
   return {
     id: recipe.id,
@@ -345,23 +382,7 @@ export async function startProductionBatch(input: {
     });
 
     revalidatePath("/dashboard/warehouse");
-    return {
-      data: {
-        id: batch.id,
-        recipeId: batch.recipeId,
-        warehouseId: batch.warehouseId,
-        status: batch.status,
-        plannedOutput: dec(batch.plannedOutput),
-        actualOutput: batch.actualOutput != null ? dec(batch.actualOutput) : null,
-        wasteQuantity: dec(batch.wasteQuantity),
-        producedBy: batch.producedBy,
-        startedAt: batch.startedAt?.toISOString() ?? null,
-        completedAt: batch.completedAt?.toISOString() ?? null,
-        notes: batch.notes,
-        createdAt: batch.createdAt.toISOString(),
-        updatedAt: batch.updatedAt.toISOString(),
-      },
-    };
+    return { data: serializeProductionBatch(batch) };
   } catch (error) {
     console.error("[startProductionBatch]", error);
     return { error: "Failed to start batch" };
@@ -440,7 +461,7 @@ export async function completeProductionBatch(input: {
     });
 
     revalidatePath("/dashboard/warehouse");
-    return { data: updated };
+    return { data: serializeProductionBatch(updated) };
   } catch (error) {
     console.error("[completeProductionBatch]", error);
     return { error: "Failed to complete batch" };

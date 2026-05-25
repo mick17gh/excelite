@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { authClient } from "@/lib/auth-client";
 import {
   getNotifications,
   markNotificationAsRead,
@@ -31,76 +32,91 @@ import {
   getUnreadCount,
 } from "@/lib/services/notifications";
 
-interface Notification {
+export interface DashboardNotification {
   id: string;
   type: string;
   priority: string;
   title: string;
   message: string;
   branchName?: string;
-  createdAt: Date;
+  createdAt: string;
   isRead: boolean;
   actionUrl?: string;
 }
 
-export function NotificationBell() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+interface NotificationBellProps {
+  initialNotifications?: DashboardNotification[];
+  initialUnreadCount?: number;
+}
+
+export function NotificationBell({
+  initialNotifications = [],
+  initialUnreadCount = 0,
+}: NotificationBellProps) {
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const [notifications, setNotifications] = useState<DashboardNotification[]>(
+    initialNotifications,
+  );
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
 
-  // Load notifications on mount and periodically
-  useEffect(() => {
-    loadNotifications();
-    loadUnreadCount();
+  const sessionReady = !sessionPending && Boolean(session?.user?.id);
 
-    // Refresh every 30 seconds
-    const interval = setInterval(() => {
-      loadUnreadCount();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Load notifications when popover opens
-  useEffect(() => {
-    if (isOpen) {
-      loadNotifications();
-    }
-  }, [isOpen]);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
+    if (!session?.user?.id) return;
     setLoading(true);
     try {
       const result = await getNotifications(20);
       if (result.success && result.data) {
-        setNotifications(result.data as Notification[]);
+        setNotifications(result.data as DashboardNotification[]);
+      } else {
+        setNotifications([]);
       }
     } catch {
-      console.error("Failed to load notifications");
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.user?.id]);
 
-  const loadUnreadCount = async () => {
+  const loadUnreadCount = useCallback(async () => {
+    if (!session?.user?.id) return;
     try {
       const result = await getUnreadCount();
       if (result.success) {
         setUnreadCount(result.count);
       }
     } catch {
-      console.error("Failed to load unread count");
+      setUnreadCount(0);
     }
-  };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!sessionReady) return;
+
+    void loadUnreadCount();
+
+    const interval = setInterval(() => {
+      void loadUnreadCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [sessionReady, loadUnreadCount]);
+
+  useEffect(() => {
+    if (isOpen && sessionReady) {
+      void loadNotifications();
+    }
+  }, [isOpen, sessionReady, loadNotifications]);
 
   const handleMarkAsRead = async (id: string) => {
     startTransition(async () => {
       const result = await markNotificationAsRead(id);
       if (result.success) {
         setNotifications((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
       }
@@ -220,14 +236,14 @@ export function NotificationBell() {
                   key={notification.id}
                   className={cn(
                     "px-4 py-3 transition-colors hover:bg-muted/50",
-                    !notification.isRead && "bg-muted/30"
+                    !notification.isRead && "bg-muted/30",
                   )}
                 >
                   <div className="flex gap-3">
                     <div
                       className={cn(
                         "mt-0.5 rounded-full p-1.5 border",
-                        getPriorityColor(notification.priority)
+                        getPriorityColor(notification.priority),
                       )}
                     >
                       <div className={getIconColor(notification.type)}>
@@ -236,10 +252,12 @@ export function NotificationBell() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={cn(
-                          "text-sm truncate",
-                          !notification.isRead && "font-medium"
-                        )}>
+                        <p
+                          className={cn(
+                            "text-sm truncate",
+                            !notification.isRead && "font-medium",
+                          )}
+                        >
                           {notification.title}
                         </p>
                         <div className="flex items-center gap-1 shrink-0">
@@ -270,12 +288,18 @@ export function NotificationBell() {
                       </p>
                       <div className="flex items-center gap-2 mt-1.5">
                         {notification.branchName && (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] h-4 px-1.5"
+                          >
                             {notification.branchName}
                           </Badge>
                         )}
                         <span className="text-[10px] text-muted-foreground">
-                          {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                          {formatDistanceToNow(
+                            new Date(notification.createdAt),
+                            { addSuffix: true },
+                          )}
                         </span>
                       </div>
                     </div>

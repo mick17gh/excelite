@@ -7,6 +7,10 @@ import {
   assertWarehouseTypes,
   validateDirectToBranchTransfer,
 } from "@/lib/services/stock-transfer-rules";
+import {
+  assertWarehouseDispatchApprovalAllowed,
+  assertWarehouseMutationAllowed,
+} from "@/lib/actions/warehouse-auth";
 
 function decimalToNumber(value: unknown): number {
   if (value == null) return 0;
@@ -82,14 +86,33 @@ export async function updateWarehouseTransferStatus(
   userId?: string,
 ) {
   try {
+    const existing = await db.warehouseTransfer.findUnique({ where: { id } });
+    if (!existing) return { error: "Transfer not found" };
+
+    const auth = await assertWarehouseMutationAllowed(existing.toWarehouseId);
+    if (!auth.ok) return { error: auth.error };
+    const actorId = userId ?? auth.ctx.userId;
+
     const data: Record<string, unknown> = { status };
 
     if (status === "IN_TRANSIT") {
-      data.approvedBy = userId || null;
+      if (existing.status !== "PENDING") {
+        return { error: "Only pending transfers can be approved" };
+      }
+      data.approvedBy = actorId;
+    }
+
+    if (status === "CANCELLED") {
+      if (!["PENDING", "IN_TRANSIT"].includes(existing.status)) {
+        return { error: "Only pending or in-transit transfers can be cancelled" };
+      }
     }
 
     if (status === "COMPLETED") {
-      data.receivedBy = userId || null;
+      if (!["PENDING", "IN_TRANSIT"].includes(existing.status)) {
+        return { error: "Invalid status transition" };
+      }
+      data.receivedBy = actorId;
       const transfer = await db.warehouseTransfer.findUnique({
         where: { id },
         include: { warehouseItem: true },
@@ -223,17 +246,31 @@ export async function updateBranchWarehouseTransferStatus(
   userId?: string,
 ) {
   try {
-    const data: Record<string, unknown> = { status };
-    if (status === "COMPLETED") {
-      data.receivedBy = userId || null;
-      const transfer = await db.branchWarehouseTransfer.findUnique({
-        where: { id },
-        include: { branchItem: true },
-      });
-      if (!transfer) return { error: "Transfer not found" };
+    const existing = await db.branchWarehouseTransfer.findUnique({
+      where: { id },
+      include: { branchItem: true },
+    });
+    if (!existing) return { error: "Transfer not found" };
 
-      const qty = Number(transfer.quantity);
-      const bi = transfer.branchItem;
+    const auth = await assertWarehouseMutationAllowed(existing.toWarehouseId);
+    if (!auth.ok) return { error: auth.error };
+    const actorId = userId ?? auth.ctx.userId;
+
+    const openStatuses = ["PENDING", "IN_TRANSIT"];
+    if (status === "COMPLETED" || status === "CANCELLED") {
+      if (!openStatuses.includes(existing.status)) {
+        return { error: "This return can no longer be updated" };
+      }
+    } else {
+      return { error: "Invalid status for branch return" };
+    }
+
+    if (status === "COMPLETED") {
+      const qty = Number(existing.quantity);
+      const bi = existing.branchItem;
+      if (Number(bi.currentStock) < qty) {
+        return { error: "Insufficient branch stock to complete this return" };
+      }
 
       await db.inventoryItem.update({
         where: { id: bi.id },
@@ -241,7 +278,7 @@ export async function updateBranchWarehouseTransferStatus(
       });
 
       const whItem = await db.warehouseInventoryItem.findFirst({
-        where: { sku: bi.sku, warehouseId: transfer.toWarehouseId },
+        where: { sku: bi.sku, warehouseId: existing.toWarehouseId },
       });
 
       if (whItem) {
@@ -252,7 +289,7 @@ export async function updateBranchWarehouseTransferStatus(
       } else {
         await db.warehouseInventoryItem.create({
           data: {
-            warehouseId: transfer.toWarehouseId,
+            warehouseId: existing.toWarehouseId,
             name: bi.name,
             sku: bi.sku,
             category: bi.category,
@@ -266,7 +303,13 @@ export async function updateBranchWarehouseTransferStatus(
       }
     }
 
-    const updated = await db.branchWarehouseTransfer.update({ where: { id }, data });
+    const updated = await db.branchWarehouseTransfer.update({
+      where: { id },
+      data: {
+        status,
+        ...(status === "COMPLETED" ? { receivedBy: actorId } : {}),
+      },
+    });
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/warehouse");
     return { data: serializeBranchWhTransfer(updated) };
@@ -276,17 +319,38 @@ export async function updateBranchWarehouseTransferStatus(
   }
 }
 
-export async function getBranchWarehouseTransfers(branchId?: string) {
+export interface BranchWarehouseTransferFilters {
+  fromBranchId?: string;
+  toWarehouseId?: string;
+  statuses?: TransferStatus[];
+  limit?: number;
+}
+
+export async function getBranchWarehouseTransfers(
+  filters?: BranchWarehouseTransferFilters | string,
+) {
   try {
+    const resolved: BranchWarehouseTransferFilters =
+      typeof filters === "string" ? { fromBranchId: filters } : filters ?? {};
+
+    const where: {
+      fromBranchId?: string;
+      toWarehouseId?: string;
+      status?: { in: TransferStatus[] };
+    } = {};
+    if (resolved.fromBranchId) where.fromBranchId = resolved.fromBranchId;
+    if (resolved.toWarehouseId) where.toWarehouseId = resolved.toWarehouseId;
+    if (resolved.statuses?.length) where.status = { in: resolved.statuses };
+
     const transfers = await db.branchWarehouseTransfer.findMany({
-      where: branchId ? { fromBranchId: branchId } : undefined,
+      where: Object.keys(where).length > 0 ? where : undefined,
       include: {
         fromBranch: { select: { name: true, code: true } },
         toWarehouse: { select: { name: true, code: true } },
         branchItem: { select: { name: true, sku: true, unit: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: resolved.limit ?? 100,
     });
     return {
       data: transfers.map((t) => ({
@@ -295,6 +359,7 @@ export async function getBranchWarehouseTransfers(branchId?: string) {
         warehouseName: t.toWarehouse.name,
         itemName: t.branchItem.name,
         itemSku: t.branchItem.sku,
+        itemUnit: t.branchItem.unit,
       })),
     };
   } catch (error) {
@@ -364,9 +429,6 @@ async function getSessionUserId(): Promise<string | null> {
 
 export async function approveCommissaryDispatch(transferId: string, userId?: string) {
   try {
-    const approverId = userId ?? (await getSessionUserId());
-    if (!approverId) return { error: "Unauthorized" };
-
     const transfer = await db.warehouseBranchTransfer.findUnique({
       where: { id: transferId },
       include: { warehouse: true },
@@ -374,6 +436,18 @@ export async function approveCommissaryDispatch(transferId: string, userId?: str
     if (!transfer) return { error: "Transfer not found" };
     if (transfer.status !== "AWAITING_WAREHOUSE_APPROVAL") {
       return { error: "Transfer is not awaiting warehouse approval" };
+    }
+
+    const auth = await assertWarehouseDispatchApprovalAllowed();
+    if (!auth.ok) return { error: auth.error };
+    const approverId = userId ?? auth.ctx.userId;
+
+    if (
+      auth.ctx.assignedWarehouseId &&
+      (auth.ctx.role === "WAREHOUSE_STAFF" || auth.ctx.role === "COMMISSARY_STAFF") &&
+      auth.ctx.assignedWarehouseId !== transfer.warehouseId
+    ) {
+      return { error: "This action is limited to your assigned warehouse" };
     }
 
     const updated = await db.warehouseBranchTransfer.update({

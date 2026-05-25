@@ -64,6 +64,18 @@ export function warehouseTypeLabel(type?: string): string {
   return "Raw materials";
 }
 
+export function itemStageLabel(stage?: string): string {
+  switch (stage) {
+    case "PROCESSED":
+      return "Processed";
+    case "BRANCH_READY":
+      return "Branch-ready";
+    case "RAW":
+    default:
+      return "Raw";
+  }
+}
+
 export interface WarehouseItemFormData {
   id: string;
   warehouseId: string;

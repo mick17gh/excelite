@@ -817,6 +817,7 @@ interface BranchReturnToWarehouseDialogProps {
   branches: Branch[];
   warehouses: WarehouseOption[];
   items: InventoryItem[];
+  onCreated?: () => void;
 }
 
 export function BranchReturnToWarehouseDialog({
@@ -825,6 +826,7 @@ export function BranchReturnToWarehouseDialog({
   branches,
   warehouses,
   items,
+  onCreated,
 }: BranchReturnToWarehouseDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fromBranchId, setFromBranchId] = useState("");
@@ -858,6 +860,7 @@ export function BranchReturnToWarehouseDialog({
       else {
         toast.success("Return transfer created");
         onOpenChange(false);
+        onCreated?.();
       }
     } catch {
       toast.error("Failed to create return");

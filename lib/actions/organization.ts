@@ -17,6 +17,14 @@ import {
 import { normalizeStorefrontUrl } from "@/lib/storefront/url";
 import { headers } from "next/headers";
 
+function isDynamicServerUsageError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const digest = "digest" in error ? String((error as { digest?: string }).digest) : "";
+  if (digest === "DYNAMIC_SERVER_USAGE") return true;
+  const message = "message" in error ? String((error as { message?: string }).message) : "";
+  return message.includes("Dynamic server usage");
+}
+
 export interface UpdateOrganizationInput {
   id: string;
   name?: string;
@@ -53,11 +61,69 @@ export interface UpdateOrganizationInput {
   paystackEnabled?: boolean;
 }
 
+/** Resolves org from user.organizationId, else branch/warehouse; may backfill user.organizationId. */
+export async function getSessionOrganizationId(): Promise<string | null> {
+  let session;
+  try {
+    session = await auth.api.getSession({ headers: await headers() });
+  } catch (error) {
+    if (isDynamicServerUsageError(error)) return null;
+    throw error;
+  }
+  if (!session?.user?.id) return null;
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { organizationId: true, branchId: true, assignedWarehouseId: true },
+  });
+  if (!user) return null;
+
+  if (user.organizationId) return user.organizationId;
+
+  let resolved: string | null = null;
+  if (user.branchId) {
+    const homeBranch = await db.branch.findUnique({
+      where: { id: user.branchId },
+      select: { organizationId: true },
+    });
+    resolved = homeBranch?.organizationId ?? null;
+  }
+  if (!resolved && user.assignedWarehouseId) {
+    const warehouse = await db.warehouse.findUnique({
+      where: { id: user.assignedWarehouseId },
+      select: { organizationId: true },
+    });
+    resolved = warehouse?.organizationId ?? null;
+  }
+
+  if (!resolved) {
+    const orgs = await db.organization.findMany({
+      select: { id: true },
+      take: 2,
+      orderBy: { createdAt: "asc" },
+    });
+    if (orgs.length === 1) {
+      resolved = orgs[0].id;
+    }
+  }
+
+  if (resolved) {
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { organizationId: resolved },
+    });
+  }
+
+  return resolved;
+}
+
 export async function getOrganization(id?: string) {
   try {
-    const where = id ? { id } : {};
+    const orgId = id ?? (await getSessionOrganizationId());
+    if (!orgId) return { data: null };
+
     const org = await db.organization.findFirst({
-      where,
+      where: { id: orgId },
       include: {
         _count: { select: { users: true, branches: true, warehouses: true } },
         subscription: {
@@ -143,7 +209,9 @@ export async function getOrganization(id?: string) {
       },
     };
   } catch (error) {
-    console.error("[getOrganization] Error:", error);
+    if (!isDynamicServerUsageError(error)) {
+      console.error("[getOrganization] Error:", error);
+    }
     return { data: null };
   }
 }
@@ -156,6 +224,11 @@ export async function updateOrganizationPosPolicies(input: {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user || !hasPermission(session.user.role as Role, "organization:edit")) {
+      return { error: "Forbidden" };
+    }
+
+    const sessionOrgId = await getSessionOrganizationId();
+    if (sessionOrgId && sessionOrgId !== input.organizationId) {
       return { error: "Forbidden" };
     }
 
@@ -475,28 +548,9 @@ export async function getAllOrganizations() {
   }
 }
 
-async function resolveSessionOrganizationId(): Promise<string | null> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) return null;
-
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { organizationId: true, branchId: true },
-  });
-  if (!user) return null;
-  if (user.organizationId) return user.organizationId;
-  if (!user.branchId) return null;
-
-  const homeBranch = await db.branch.findUnique({
-    where: { id: user.branchId },
-    select: { organizationId: true },
-  });
-  return homeBranch?.organizationId ?? null;
-}
-
 export async function getPosStorefrontQrContext() {
   try {
-    const organizationId = await resolveSessionOrganizationId();
+    const organizationId = await getSessionOrganizationId();
     if (!organizationId) {
       return { data: { showQr: false, storefrontUrl: null as string | null } };
     }

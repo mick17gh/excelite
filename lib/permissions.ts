@@ -467,6 +467,31 @@ const rolePermissions: Record<Role, Permission[]> = {
   ],
 };
 
+const WAREHOUSE_OPS_MUTATE_ROLES: Role[] = [
+  "SUPER_ADMIN",
+  "ADMIN",
+  "WAREHOUSE_STAFF",
+  "COMMISSARY_STAFF",
+];
+
+const WAREHOUSE_OPS_READ_ONLY_ROLES: Role[] = [
+  "EXECUTIVE",
+  "OPERATIONS_MANAGER",
+  "AUDITOR",
+];
+
+/** Approve/receive/reject transfers and other warehouse stock mutations. */
+export function canMutateWarehouseOps(role: Role | undefined | null): boolean {
+  if (!role) return false;
+  return WAREHOUSE_OPS_MUTATE_ROLES.includes(role);
+}
+
+/** See warehouse ops tables but not action menus (Exec, Ops, Auditor). */
+export function isWarehouseOpsReadOnly(role: Role | undefined | null): boolean {
+  if (!role) return false;
+  return WAREHOUSE_OPS_READ_ONLY_ROLES.includes(role);
+}
+
 export function hasPermission(
   role: Role | undefined | null,
   permission: Permission,

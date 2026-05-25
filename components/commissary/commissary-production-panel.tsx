@@ -23,11 +23,15 @@ import {
   findStockShortages,
   type RecipeForStock,
 } from "@/lib/services/production-stock";
-import type { ProductionItemStage } from "@/lib/services/production-recipe-items";
+import {
+  formatRecipeIngredientSummary,
+  type ProductionItemStage,
+} from "@/lib/services/production-recipe-items";
 import {
   ProductionRecipeDialog,
   type RecipeForEdit,
 } from "@/components/commissary/production-recipe-dialog";
+import { formatDisplayDateTime } from "@/lib/utils/date-display";
 interface CommissaryProductionPanelProps {
   commissaryWarehouseId: string;
 }
@@ -65,6 +69,15 @@ interface BatchRow {
   actualOutput: number | null;
   startedAt: string | null;
   completedAt: string | null;
+}
+
+/** Parsed qty from a controlled number input; empty string is not zero. */
+function parseOutputQty(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return null;
+  return n;
 }
 
 function buildRecipeForStock(
@@ -154,9 +167,9 @@ export function CommissaryProductionPanel({
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   const [recipeId, setRecipeId] = useState("");
-  const [plannedOutput, setPlannedOutput] = useState(1);
+  const [plannedOutputInput, setPlannedOutputInput] = useState("");
   const [selectedBatchId, setSelectedBatchId] = useState("");
-  const [actualOutput, setActualOutput] = useState(1);
+  const [actualOutputInput, setActualOutputInput] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [startingBatch, setStartingBatch] = useState(false);
@@ -238,17 +251,35 @@ export function CommissaryProductionPanel({
     if (!stillValid) {
       const next = inProgressBatches[0];
       setSelectedBatchId(next.id);
-      setActualOutput(next.plannedOutput);
+      setActualOutputInput(String(next.plannedOutput));
     }
   }, [inProgressBatches, selectedBatchId]);
 
+  const plannedOutputQty = useMemo(
+    () => parseOutputQty(plannedOutputInput),
+    [plannedOutputInput],
+  );
+
+  const actualOutputQty = useMemo(
+    () => parseOutputQty(actualOutputInput),
+    [actualOutputInput],
+  );
+
+  const recipeIdsWithActiveBatch = useMemo(
+    () => new Set(inProgressBatches.map((b) => b.recipeId)),
+    [inProgressBatches],
+  );
+
   const recipeOptions = useMemo(
     () =>
-      recipes.map((r) => ({
-        value: r.id,
-        label: r.name,
-        description: `→ ${r.outputItem.name} (${r.outputItem.sku}) · ${r.outputItem.unit}`,
-      })),
+      recipes.map((r) => {
+        const uses = formatRecipeIngredientSummary(r.lines, { maxItems: 3 });
+        return {
+          value: r.id,
+          label: r.name,
+          description: `Uses: ${uses} → ${r.outputItem.name} (${r.outputItem.sku})`,
+        };
+      }),
     [recipes],
   );
 
@@ -257,7 +288,7 @@ export function CommissaryProductionPanel({
       inProgressBatches.map((b) => ({
         value: b.id,
         label: `${b.recipeName} — ${b.outputName}`,
-        description: `Planned: ${b.plannedOutput} · started ${b.startedAt ? new Date(b.startedAt).toLocaleString() : "—"}`,
+        description: `Planned: ${b.plannedOutput} · started ${formatDisplayDateTime(b.startedAt)}`,
       })),
     [inProgressBatches],
   );
@@ -277,21 +308,21 @@ export function CommissaryProductionPanel({
 
   const startRequirements = useMemo(() => {
     const stock = buildRecipeForStock(selectedRecipe, inventory);
-    if (!stock || plannedOutput <= 0) return [];
-    return computeIngredientRequirements(stock, plannedOutput);
-  }, [selectedRecipe, inventory, plannedOutput]);
+    if (!stock || !plannedOutputQty || plannedOutputQty <= 0) return [];
+    return computeIngredientRequirements(stock, plannedOutputQty);
+  }, [selectedRecipe, inventory, plannedOutputQty]);
 
   const completeRequirements = useMemo(() => {
     const stock = buildRecipeForStock(batchRecipe, inventory);
-    if (!stock || actualOutput < 0) return [];
-    return computeIngredientRequirements(stock, actualOutput);
-  }, [batchRecipe, inventory, actualOutput]);
+    if (!stock || !actualOutputQty || actualOutputQty < 0) return [];
+    return computeIngredientRequirements(stock, actualOutputQty);
+  }, [batchRecipe, inventory, actualOutputQty]);
 
   const completeHasShortage = useMemo(() => {
     const stock = buildRecipeForStock(batchRecipe, inventory);
-    if (!stock) return false;
-    return findStockShortages(stock, actualOutput).length > 0;
-  }, [batchRecipe, inventory, actualOutput]);
+    if (!stock || !actualOutputQty || actualOutputQty < 0) return false;
+    return findStockShortages(stock, actualOutputQty).length > 0;
+  }, [batchRecipe, inventory, actualOutputQty]);
 
   const startHasShortage = startRequirements.some((r) => r.available < r.needed);
 
@@ -299,13 +330,14 @@ export function CommissaryProductionPanel({
     const q = recipeSearchQuery.trim().toLowerCase();
     if (!q) return recipes;
     return recipes.filter((r) => {
-      const line = r.lines[0];
       const haystack = [
         r.name,
         r.outputItem.name,
         r.outputItem.sku,
-        line?.ingredientItem.name,
-        line?.ingredientItem.sku,
+        ...r.lines.flatMap((line) => [
+          line.ingredientItem.name,
+          line.ingredientItem.sku,
+        ]),
       ]
         .filter(Boolean)
         .join(" ")
@@ -316,27 +348,33 @@ export function CommissaryProductionPanel({
 
   const handleStart = async () => {
     if (!recipeId) return toast.error("Select a recipe");
-    if (plannedOutput <= 0) return toast.error("Planned output must be greater than 0");
+    if (!plannedOutputQty || plannedOutputQty <= 0) {
+      return toast.error("Planned output must be greater than 0");
+    }
     setStartingBatch(true);
-    const res = await startProductionBatch({ recipeId, plannedOutput });
+    const res = await startProductionBatch({ recipeId, plannedOutput: plannedOutputQty });
     setStartingBatch(false);
     if (res.error) toast.error(res.error);
     else {
       toast.success("Batch started — enter actual output below to complete");
       const newId = res.data?.id || "";
+      setRecipeId("");
+      setPlannedOutputInput("");
       setSelectedBatchId(newId);
-      setActualOutput(plannedOutput);
+      setActualOutputInput(String(plannedOutputQty));
       await load();
     }
   };
 
   const handleComplete = async () => {
     if (!selectedBatchId) return toast.error("Select an active batch");
-    if (actualOutput < 0) return toast.error("Actual output cannot be negative");
+    if (actualOutputQty == null) return toast.error("Enter actual output quantity");
+    if (actualOutputQty < 0) return toast.error("Actual output cannot be negative");
+    if (actualOutputQty <= 0) return toast.error("Actual output must be greater than 0");
     setCompletingBatch(true);
     const res = await completeProductionBatch({
       batchId: selectedBatchId,
-      actualOutput,
+      actualOutput: actualOutputQty,
     });
     setCompletingBatch(false);
     if (res.error) toast.error(res.error);
@@ -362,7 +400,7 @@ export function CommissaryProductionPanel({
   const handleSelectBatch = (batchId: string) => {
     setSelectedBatchId(batchId);
     const batch = batches.find((b) => b.id === batchId);
-    if (batch) setActualOutput(batch.plannedOutput);
+    if (batch) setActualOutputInput(String(batch.plannedOutput));
   };
 
   const openCreateRecipe = () => {
@@ -438,11 +476,23 @@ export function CommissaryProductionPanel({
               </div>
             )}
             {selectedBatch && (
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{selectedBatch.recipeName}</span>
-                {" · "}
-                planned {selectedBatch.plannedOutput} {selectedBatch.outputName}
-              </p>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>
+                  <span className="font-medium text-foreground">{selectedBatch.recipeName}</span>
+                  {" · "}
+                  planned {selectedBatch.plannedOutput} {selectedBatch.outputName}
+                </p>
+                {batchRecipe && batchRecipe.lines.length > 0 ? (
+                  <p className="text-xs">
+                    Uses: {formatRecipeIngredientSummary(batchRecipe.lines, { maxItems: 5 })}
+                  </p>
+                ) : null}
+                {recipeIdsWithActiveBatch.has(selectedBatch.recipeId) ? (
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Recipe is locked until this batch is completed or cancelled.
+                  </p>
+                ) : null}
+              </div>
             )}
             <div className="space-y-1.5">
               <Label className="text-xs">Actual output qty</Label>
@@ -450,8 +500,8 @@ export function CommissaryProductionPanel({
                 type="number"
                 min={0}
                 step="any"
-                value={actualOutput}
-                onChange={(e) => setActualOutput(Number(e.target.value))}
+                value={actualOutputInput}
+                onChange={(e) => setActualOutputInput(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground">
                 Stock is checked against this amount (not just planned). Lower it if you had waste, or
@@ -461,7 +511,7 @@ export function CommissaryProductionPanel({
             {batchRecipe && completeRequirements.length > 0 && (
               <StockRequirementPreview
                 requirements={completeRequirements}
-                outputUnits={actualOutput}
+                outputUnits={actualOutputQty ?? 0}
                 outputUnit={selectedBatch?.outputUnit || batchRecipe.outputItem.unit}
               />
             )}
@@ -469,7 +519,13 @@ export function CommissaryProductionPanel({
               <Button
                 size="sm"
                 onClick={handleComplete}
-                disabled={completingBatch || !selectedBatchId || completeHasShortage}
+                disabled={
+                  completingBatch ||
+                  !selectedBatchId ||
+                  !actualOutputQty ||
+                  actualOutputQty <= 0 ||
+                  completeHasShortage
+                }
               >
                 {completingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Complete batch
@@ -514,23 +570,30 @@ export function CommissaryProductionPanel({
             <Label className="text-xs">Planned output qty</Label>
             <Input
               type="number"
-              min={0.001}
+              min={0}
               step="any"
-              value={plannedOutput}
-              onChange={(e) => setPlannedOutput(Number(e.target.value))}
+              placeholder="e.g. 50"
+              value={plannedOutputInput}
+              onChange={(e) => setPlannedOutputInput(e.target.value)}
             />
           </div>
           {selectedRecipe && startRequirements.length > 0 && (
             <StockRequirementPreview
               requirements={startRequirements}
-              outputUnits={plannedOutput}
+              outputUnits={plannedOutputQty ?? 0}
               outputUnit={selectedRecipe.outputItem.unit}
             />
           )}
           <Button
             size="sm"
             onClick={handleStart}
-            disabled={startingBatch || !recipeId || startHasShortage}
+            disabled={
+              startingBatch ||
+              !recipeId ||
+              !plannedOutputQty ||
+              plannedOutputQty <= 0 ||
+              startHasShortage
+            }
           >
             {startingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Start batch
@@ -572,7 +635,7 @@ export function CommissaryProductionPanel({
           ) : (
             <ul className="space-y-2">
               {filteredRecipes.map((r) => {
-                const line = r.lines[0];
+                const locked = recipeIdsWithActiveBatch.has(r.id);
                 return (
                   <li
                     key={r.id}
@@ -580,17 +643,38 @@ export function CommissaryProductionPanel({
                   >
                     <div className="min-w-0">
                       <p className="font-medium">{r.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {line
-                          ? `${line.ingredientItem.name} (${line.ingredientItem.sku}): ${line.quantity} ${line.ingredientItem.unit} per ${r.outputItem.unit} → ${r.outputItem.name} (${r.outputItem.sku})`
-                          : "No ingredients"}
+                      {r.lines.length > 0 ? (
+                        <ul className="text-xs text-muted-foreground mt-1 space-y-0.5 list-disc pl-4">
+                          {r.lines.map((line) => (
+                            <li key={line.ingredientItemId}>
+                              {line.ingredientItem.name} ({line.ingredientItem.sku}):{" "}
+                              {line.quantity} {line.ingredientItem.unit} per {r.outputItem.unit}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-0.5">No ingredients</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        → {r.outputItem.name} ({r.outputItem.sku})
                       </p>
+                      {locked ? (
+                        <p className="text-[11px] text-amber-800 dark:text-amber-200 mt-1">
+                          Active batch in progress — edit after complete or cancel
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => openEditRecipe(r)}
+                        disabled={locked}
+                        title={
+                          locked
+                            ? "Complete or cancel the active batch first"
+                            : "Edit recipe"
+                        }
                       >
                         <Pencil className="h-3.5 w-3.5 mr-1" />
                         Edit
@@ -600,7 +684,12 @@ export function CommissaryProductionPanel({
                         variant="ghost"
                         className="text-red-600 hover:text-red-700"
                         onClick={() => handleDeactivateRecipe(r.id)}
-                        disabled={deactivatingRecipeId === r.id}
+                        disabled={locked || deactivatingRecipeId === r.id}
+                        title={
+                          locked
+                            ? "Complete or cancel the active batch first"
+                            : "Remove recipe"
+                        }
                       >
                         {deactivatingRecipeId === r.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -656,9 +745,9 @@ export function CommissaryProductionPanel({
                       Planned {b.plannedOutput}
                       {b.actualOutput != null ? ` → actual ${b.actualOutput}` : ""}
                       {b.completedAt
-                        ? ` · ${new Date(b.completedAt).toLocaleString()}`
+                        ? ` · ${formatDisplayDateTime(b.completedAt)}`
                         : b.startedAt
-                          ? ` · started ${new Date(b.startedAt).toLocaleString()}`
+                          ? ` · started ${formatDisplayDateTime(b.startedAt)}`
                           : ""}
                     </p>
                   </div>
