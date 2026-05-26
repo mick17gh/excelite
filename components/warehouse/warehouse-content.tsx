@@ -260,6 +260,7 @@ export function WarehouseContent({
 }: WarehouseContentProps) {
   const router = useRouter();
   const canMutate = canMutateWarehouseOps(userRole);
+  const showActionsMenu = canMutate && userRole !== "COMMISSARY_STAFF";
   const canCreateWarehouse = canMutate && hasPermission(userRole, "warehouse:create");
   const canTransfer = canMutate && hasPermission(userRole, "warehouse:transfer");
   const canApproveDispatch =
@@ -578,7 +579,7 @@ export function WarehouseContent({
               ))}
             </div>
           )}
-          {canMutate ? (
+          {showActionsMenu ? (
             <div className="flex gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
