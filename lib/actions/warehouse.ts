@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { InventoryCategory, UnitType, TransferStatus } from "@/lib/generated/prisma/client";
 import { assertWarehouseMutationAllowed } from "@/lib/actions/warehouse-auth";
+import {
+  branchLimitsFromWarehouseItem,
+  normalizeWarehouseMaxStock,
+} from "@/lib/inventory/branch-stock-limits";
 
 /** Prisma Decimal → plain number (RSC props and server-action responses must be JSON-serializable) */
 function decimalToNumber(value: unknown): number {
@@ -50,6 +54,7 @@ export interface CreateWarehouseItemInput {
   currentStock?: number;
   minStock?: number;
   reorderPoint?: number;
+  maxStock?: number | null;
   itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
   requiresCommissaryProcessing?: boolean;
   allowDirectToBranch?: boolean;
@@ -121,6 +126,7 @@ export async function getWarehouseInventory(warehouseId: string) {
         currentStock: decimalToNumber(item.currentStock),
         minStock: decimalToNumber(item.minStock),
         reorderPoint: decimalToNumber(item.reorderPoint),
+        maxStock: item.maxStock != null ? decimalToNumber(item.maxStock) : null,
         itemStage: item.itemStage,
         requiresCommissaryProcessing: item.requiresCommissaryProcessing,
         allowDirectToBranch: item.allowDirectToBranch,
@@ -250,6 +256,7 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
         currentStock: input.currentStock || 0,
         minStock: input.minStock || 0,
         reorderPoint: input.reorderPoint || 10,
+        maxStock: normalizeWarehouseMaxStock(input.maxStock),
         itemStage: input.itemStage || "RAW",
         requiresCommissaryProcessing: input.requiresCommissaryProcessing ?? false,
         allowDirectToBranch: input.allowDirectToBranch ?? true,
@@ -269,6 +276,7 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
         currentStock: decimalToNumber(item.currentStock),
         minStock: decimalToNumber(item.minStock),
         reorderPoint: decimalToNumber(item.reorderPoint),
+        maxStock: item.maxStock != null ? decimalToNumber(item.maxStock) : null,
         itemStage: item.itemStage,
         requiresCommissaryProcessing: item.requiresCommissaryProcessing,
         allowDirectToBranch: item.allowDirectToBranch,
@@ -370,7 +378,14 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
           data: { currentStock: { decrement: qty } },
         });
 
-        // 2. Find or create branch inventory item
+        // 2. Find or create branch inventory item (sync par limits from warehouse each receive)
+        const branchLimits = branchLimitsFromWarehouseItem({
+          minStock: decimalToNumber(whItem.minStock),
+          reorderPoint: decimalToNumber(whItem.reorderPoint),
+          maxStock:
+            whItem.maxStock != null ? decimalToNumber(whItem.maxStock) : null,
+        });
+
         const branchItem = await db.inventoryItem.findFirst({
           where: { sku: whItem.sku, branchId: transfer.toBranchId },
         });
@@ -378,7 +393,13 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
         if (branchItem) {
           await db.inventoryItem.update({
             where: { id: branchItem.id },
-            data: { currentStock: { increment: qty }, lastRestockDate: new Date() },
+            data: {
+              currentStock: { increment: qty },
+              lastRestockDate: new Date(),
+              minStock: branchLimits.minStock,
+              reorderPoint: branchLimits.reorderPoint,
+              maxStock: branchLimits.maxStock,
+            },
           });
         } else {
           await db.inventoryItem.create({
@@ -389,9 +410,9 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
               unit: whItem.unit,
               unitCost: whItem.unitCost,
               currentStock: qty,
-              minStock: Number(whItem.minStock),
-              maxStock: Number(whItem.reorderPoint) * 5 || 100, // Use 5x reorder point as max, or 100 as fallback
-              reorderPoint: Number(whItem.reorderPoint),
+              minStock: branchLimits.minStock,
+              maxStock: branchLimits.maxStock,
+              reorderPoint: branchLimits.reorderPoint,
               branchId: transfer.toBranchId,
               lastRestockDate: new Date(),
             },
@@ -671,6 +692,11 @@ export interface BulkWarehouseItemInput {
   currentStock?: number;
   minStock?: number;
   reorderPoint?: number;
+  maxStock?: number | null;
+  itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
+  requiresCommissaryProcessing?: boolean;
+  allowDirectToBranch?: boolean;
+  isActive?: boolean;
 }
 
 export async function bulkCreateWarehouseItems(
@@ -712,6 +738,11 @@ export async function bulkCreateWarehouseItems(
         currentStock: item.currentStock || 0,
         minStock: item.minStock || 0,
         reorderPoint: item.reorderPoint || 10,
+        maxStock: normalizeWarehouseMaxStock(item.maxStock),
+        itemStage: item.itemStage ?? "RAW",
+        requiresCommissaryProcessing: item.requiresCommissaryProcessing ?? false,
+        allowDirectToBranch: item.allowDirectToBranch ?? true,
+        isActive: item.isActive ?? true,
       })),
     });
 
@@ -736,6 +767,7 @@ export interface UpdateWarehouseItemInput {
   currentStock?: number;
   minStock?: number;
   reorderPoint?: number;
+  maxStock?: number | null;
   itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
   requiresCommissaryProcessing?: boolean;
   allowDirectToBranch?: boolean;
@@ -753,6 +785,9 @@ export async function updateWarehouseItem(input: UpdateWarehouseItemInput) {
     if (fields.currentStock !== undefined) data.currentStock = fields.currentStock;
     if (fields.minStock !== undefined) data.minStock = fields.minStock;
     if (fields.reorderPoint !== undefined) data.reorderPoint = fields.reorderPoint;
+    if (fields.maxStock !== undefined) {
+      data.maxStock = normalizeWarehouseMaxStock(fields.maxStock);
+    }
     if (fields.itemStage !== undefined) data.itemStage = fields.itemStage;
     if (fields.requiresCommissaryProcessing !== undefined) {
       data.requiresCommissaryProcessing = fields.requiresCommissaryProcessing;
@@ -777,6 +812,7 @@ export async function updateWarehouseItem(input: UpdateWarehouseItemInput) {
         currentStock: decimalToNumber(item.currentStock),
         minStock: decimalToNumber(item.minStock),
         reorderPoint: decimalToNumber(item.reorderPoint),
+        maxStock: item.maxStock != null ? decimalToNumber(item.maxStock) : null,
         itemStage: item.itemStage,
         requiresCommissaryProcessing: item.requiresCommissaryProcessing,
         allowDirectToBranch: item.allowDirectToBranch,

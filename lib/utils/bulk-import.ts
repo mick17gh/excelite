@@ -287,38 +287,183 @@ export interface BulkWarehouseItemInput {
   currentStock?: number;
   minStock?: number;
   reorderPoint?: number;
+  maxStock?: number | null;
+  itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
+  requiresCommissaryProcessing?: boolean;
+  allowDirectToBranch?: boolean;
+  isActive?: boolean;
 }
 
 export function parseWarehouseCSV(rows: ParsedCSVRow[]): BulkWarehouseItemInput[] {
-  return rows.map((row) => ({
-    name: row.name || row.Name || "",
-    sku: row.sku || row.SKU || "",
-    category: (row.category || row.Category || "FOOD") as InventoryCategory,
-    unit: (row.unit || row.Unit || "UNIT") as UnitType,
-    unitCost: parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0"),
-    currentStock: row.currentStock || row["Current Stock"]
-      ? parseFloat(row.currentStock || row["Current Stock"])
-      : undefined,
-    minStock: row.minStock || row["Min Stock"]
-      ? parseFloat(row.minStock || row["Min Stock"])
-      : undefined,
-    reorderPoint: row.reorderPoint || row["Reorder Point"]
-      ? parseFloat(row.reorderPoint || row["Reorder Point"])
-      : undefined,
-  })).filter((item) => item.name && item.sku);
+  const parseBool = (v: string | undefined, fallback: boolean): boolean => {
+    if (v == null || String(v).trim() === "") return fallback;
+    const s = String(v).trim().toLowerCase();
+    if (["true", "t", "yes", "y", "1"].includes(s)) return true;
+    if (["false", "f", "no", "n", "0"].includes(s)) return false;
+    return fallback;
+  };
+
+  const parseNum = (v: string | undefined): number | undefined => {
+    if (v == null || String(v).trim() === "") return undefined;
+    const n = parseFloat(String(v));
+    return Number.isFinite(n) ? n : undefined;
+  };
+
+  const normalizeStage = (v: string | undefined): BulkWarehouseItemInput["itemStage"] => {
+    if (v == null || String(v).trim() === "") return undefined;
+    const s = String(v).trim().toUpperCase();
+    if (s === "RAW") return "RAW";
+    if (s === "PROCESSED") return "PROCESSED";
+    if (s === "BRANCH_READY" || s === "BRANCH-READY" || s === "BRANCH READY") {
+      return "BRANCH_READY";
+    }
+    return undefined;
+  };
+
+  return rows
+    .map((row) => ({
+      name: row.name || row.Name || "",
+      sku: row.sku || row.SKU || "",
+      category: (row.category || row.Category || "FOOD") as InventoryCategory,
+      unit: (row.unit || row.Unit || "UNIT") as UnitType,
+      unitCost: parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0"),
+      currentStock: parseNum(row.currentStock || row["Current Stock"]),
+      minStock: parseNum(row.minStock || row["Min Stock"]),
+      reorderPoint: parseNum(row.reorderPoint || row["Reorder Point"]),
+      maxStock: parseNum(row.maxStock || row["Max Stock"]),
+      itemStage: normalizeStage(row.itemStage || row.stage || row.Stage || row["Item Stage"]),
+      requiresCommissaryProcessing: parseBool(
+        row.requiresCommissaryProcessing ||
+          row["Requires Commissary Processing"] ||
+          row.commissaryProcessing ||
+          row["Commissary Processing"],
+        false,
+      ),
+      allowDirectToBranch: parseBool(
+        row.allowDirectToBranch || row["Allow Direct To Branch"] || row.directToBranch,
+        true,
+      ),
+      isActive: parseBool(row.isActive || row.Active, true),
+    }))
+    .filter((item) => item.name && item.sku);
 }
 
 export function getWarehouseCSVTemplate(): string {
-  const headers = ["name", "sku", "category", "unit", "unitCost", "currentStock", "minStock", "reorderPoint"];
-  const examples = [
-    ["Chicken Breast", "CHKN-001", "FOOD", "KG", "15.50", "100", "20", "30"],
-    ["Rice", "RICE-001", "FOOD", "KG", "5.00", "500", "100", "150"],
-    ["Cooking Oil", "OIL-001", "FOOD", "LITER", "12.00", "50", "10", "20"],
-    ["Soft Drinks", "DRK-001", "BEVERAGE", "CASE", "10.00", "120", "30", "50"],
-    ["Plastic Cups", "CUP-001", "PACKAGING", "PACK", "8.00", "200", "50", "80"],
-    ["Detergent", "CLN-001", "CLEANING", "PIECE", "5.00", "30", "10", "15"],
+  const headers = [
+    "name",
+    "sku",
+    "category",
+    "unit",
+    "unitCost",
+    "currentStock",
+    "minStock",
+    "reorderPoint",
+    "maxStock",
+    "itemStage",
+    "requiresCommissaryProcessing",
+    "allowDirectToBranch",
+    "isActive",
   ];
-  const note = "# Valid categories: FOOD, BEVERAGE, PACKAGING, CLEANING, EQUIPMENT, OTHER";
-  const note2 = "# Valid units: KG, GRAM, MG, TON, LITER, ML, CL, GALLON, PIECE, UNIT, ITEM, BOX, CARTON, CASE, PACK, BAG, SACK, CRATE, TRAY, BOTTLE, CAN, JAR, CUP, TABLESPOON, TEASPOON, SLICE, PORTION, SERVING, PLATE";
-  return [note, note2, headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
+  const examples = [
+    [
+      "Chicken Breast",
+      "CHKN-001",
+      "FOOD",
+      "KG",
+      "15.50",
+      "100",
+      "20",
+      "30",
+      "75",
+      "RAW",
+      "false",
+      "true",
+      "true",
+    ],
+    [
+      "Rice",
+      "RICE-001",
+      "FOOD",
+      "KG",
+      "5.00",
+      "500",
+      "100",
+      "150",
+      "",
+      "RAW",
+      "false",
+      "true",
+      "true",
+    ],
+    [
+      "Cooking Oil",
+      "OIL-001",
+      "FOOD",
+      "LITER",
+      "12.00",
+      "50",
+      "10",
+      "20",
+      "100",
+      "RAW",
+      "false",
+      "true",
+      "true",
+    ],
+    [
+      "Soft Drinks",
+      "DRK-001",
+      "BEVERAGE",
+      "CASE",
+      "10.00",
+      "120",
+      "30",
+      "50",
+      "250",
+      "BRANCH_READY",
+      "false",
+      "true",
+      "true",
+    ],
+    [
+      "Plastic Cups",
+      "CUP-001",
+      "PACKAGING",
+      "PACK",
+      "8.00",
+      "200",
+      "50",
+      "80",
+      "400",
+      "RAW",
+      "false",
+      "true",
+      "true",
+    ],
+    [
+      "Detergent",
+      "CLN-001",
+      "CLEANING",
+      "PIECE",
+      "5.00",
+      "30",
+      "10",
+      "15",
+      "",
+      "RAW",
+      "false",
+      "true",
+      "true",
+    ],
+  ];
+  const notes = [
+    "# --- Reference (rows below are ignored on import) ---",
+    "# Columns: name, sku, category, unit, unitCost, currentStock, minStock, reorderPoint, maxStock, itemStage, requiresCommissaryProcessing, allowDirectToBranch, isActive",
+    "# maxStock: branch par level when sending to branches (optional; blank uses 5x reorder point on transfer)",
+    "# Valid categories: FOOD, BEVERAGE, PACKAGING, CLEANING, EQUIPMENT, OTHER",
+    "# Valid units: KG, GRAM, MG, TON, LITER, ML, CL, GALLON, PIECE, UNIT, ITEM, BOX, CARTON, CASE, PACK, BAG, SACK, CRATE, TRAY, BOTTLE, CAN, JAR, CUP, TABLESPOON, TEASPOON, SLICE, PORTION, SERVING, PLATE",
+    "# Valid itemStage: RAW, PROCESSED, BRANCH_READY",
+    "# Booleans (requiresCommissaryProcessing, allowDirectToBranch, isActive): true/false (also yes/no, 1/0)",
+  ];
+  return [headers.join(","), ...examples.map((e) => e.join(",")), "", ...notes].join("\n");
 }

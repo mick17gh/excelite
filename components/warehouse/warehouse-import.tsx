@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useEffect, useState, useRef, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,8 +53,8 @@ import { INVENTORY_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants/categorie
 interface WarehouseImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  warehouseId: string;
-  warehouseName?: string;
+  warehouses: Array<{ id: string; name: string }>;
+  defaultWarehouseId?: string;
 }
 
 interface ParsedRow extends BulkWarehouseItemInput {
@@ -63,13 +63,38 @@ interface ParsedRow extends BulkWarehouseItemInput {
   _index: number;
 }
 
-export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehouseName }: WarehouseImportDialogProps) {
+const VALID_STAGES = ["RAW", "PROCESSED", "BRANCH_READY"] as const;
+
+export function WarehouseImportDialog({
+  open,
+  onOpenChange,
+  warehouses,
+  defaultWarehouseId,
+}: WarehouseImportDialogProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [warehouseId, setWarehouseId] = useState<string>("");
+
+  const warehouseName =
+    warehouses.find((w) => w.id === warehouseId)?.name || undefined;
+
+  // Default selection when opening the dialog.
+  // Prefer the passed default, otherwise first warehouse.
+  // Reset selection if the current one is no longer available.
+  useEffect(() => {
+    if (!open) return;
+    const exists = warehouseId && warehouses.some((w) => w.id === warehouseId);
+    if (exists) return;
+    if (defaultWarehouseId && warehouses.some((w) => w.id === defaultWarehouseId)) {
+      setWarehouseId(defaultWarehouseId);
+      return;
+    }
+    setWarehouseId(warehouses[0]?.id ?? "");
+  }, [open, warehouseId, warehouses, defaultWarehouseId]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -126,6 +151,19 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
         if (item.reorderPoint !== undefined && (isNaN(item.reorderPoint) || item.reorderPoint < 0)) {
           errors.push("Reorder point must be non-negative");
         }
+        if (
+          item.maxStock != null &&
+          item.maxStock !== undefined &&
+          (isNaN(item.maxStock) || item.maxStock < 0)
+        ) {
+          errors.push("Max stock must be non-negative");
+        }
+
+        if (item.itemStage != null) {
+          if (!VALID_STAGES.includes(item.itemStage as any)) {
+            errors.push(`Invalid stage. Must be one of: ${VALID_STAGES.join(", ")}`);
+          }
+        }
 
         return {
           ...item,
@@ -163,7 +201,12 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
   };
 
   const parseCSVText = (text: string): Record<string, string>[] => {
-    const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    const lines = text
+      .replace(/^\uFEFF/, "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith("#"));
+
     if (lines.length < 2) return [];
 
     const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
@@ -209,7 +252,8 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "warehouse_items_template.csv";
+    const safeName = (warehouseName || "warehouse").replace(/[^a-z0-9-_]+/gi, "_");
+    a.download = `${safeName}_items_template.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -236,6 +280,11 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
         errors.push("Valid unit is required");
       }
       if (isNaN(item.unitCost) || item.unitCost <= 0) errors.push("Valid unit cost required");
+      if (item.itemStage != null) {
+        if (!VALID_STAGES.includes(item.itemStage as any)) {
+          errors.push(`Valid stage is required (${VALID_STAGES.join(", ")})`);
+        }
+      }
       
       updated[index]._valid = errors.length === 0;
       updated[index]._errors = errors;
@@ -245,6 +294,10 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
   };
 
   const handleImport = () => {
+    if (!warehouseId) {
+      toast.error("Select a warehouse to import into");
+      return;
+    }
     const validItems = parsedData.filter((item) => item._valid);
     
     if (validItems.length === 0) {
@@ -280,7 +333,13 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
   const invalidCount = parsedData.filter((r) => !r._valid).length;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); onOpenChange(o); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) resetForm();
+        onOpenChange(o);
+      }}
+    >
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -288,11 +347,33 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
             Import Warehouse Items from CSV
           </DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk import items for {warehouseName || "warehouse"}. Download the template for the correct format.
+            Upload a CSV for {warehouseName || "the selected warehouse"}. The template
+            includes stock limits, branch par (maxStock), item stage, and commissary
+            flags — same fields as Add Warehouse Item.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 space-y-4">
+          {/* Warehouse picker */}
+          <div className="grid gap-2">
+            <span className="text-sm font-medium">Warehouse</span>
+            <Select value={warehouseId} onValueChange={setWarehouseId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Imported items will be created in the selected warehouse.
+            </p>
+          </div>
+
           {/* Upload Section */}
           {!file && (
             <div className="space-y-4">
@@ -311,10 +392,20 @@ export function WarehouseImportDialog({ open, onOpenChange, warehouseId, warehou
                 className="hidden"
                 onChange={handleFileSelect}
               />
-              <Button variant="outline" onClick={handleDownloadTemplate} className="w-full">
+              <Button
+                variant="outline"
+                onClick={handleDownloadTemplate}
+                className="w-full"
+                disabled={!warehouseId}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Download CSV Template
               </Button>
+              <p className="text-xs text-muted-foreground">
+                Columns: name, sku, category, unit, unitCost, currentStock, minStock,
+                reorderPoint, maxStock, itemStage, requiresCommissaryProcessing,
+                allowDirectToBranch, isActive
+              </p>
             </div>
           )}
 

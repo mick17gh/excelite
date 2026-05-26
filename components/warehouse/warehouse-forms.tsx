@@ -87,6 +87,7 @@ export interface WarehouseItemFormData {
   currentStock: number;
   minStock: number;
   reorderPoint: number;
+  maxStock?: number | null;
   itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
   requiresCommissaryProcessing?: boolean;
   allowDirectToBranch?: boolean;
@@ -405,6 +406,7 @@ export function CreateWarehouseItemDialog({
   const [currentStock, setCurrentStock] = useState(0);
   const [minStock, setMinStock] = useState(0);
   const [reorderPoint, setReorderPoint] = useState(10);
+  const [maxStock, setMaxStock] = useState<string>("");
   const [itemStage, setItemStage] = useState<"RAW" | "PROCESSED" | "BRANCH_READY">("RAW");
   const [requiresCommissaryProcessing, setRequiresCommissaryProcessing] = useState(false);
   const [allowDirectToBranch, setAllowDirectToBranch] = useState(true);
@@ -426,6 +428,7 @@ export function CreateWarehouseItemDialog({
         currentStock,
         minStock,
         reorderPoint,
+        maxStock: maxStock.trim() ? Number(maxStock) : null,
         itemStage,
         requiresCommissaryProcessing,
         allowDirectToBranch,
@@ -438,6 +441,7 @@ export function CreateWarehouseItemDialog({
         setSku("");
         setUnitCost(0);
         setCurrentStock(0);
+        setMaxStock("");
         setItemStage("RAW");
         setRequiresCommissaryProcessing(false);
         setAllowDirectToBranch(true);
@@ -562,6 +566,19 @@ export function CreateWarehouseItemDialog({
             </div>
           </div>
           <div className="grid gap-2">
+            <Label>Branch par level (max stock)</Label>
+            <Input
+              type="number"
+              min={0}
+              value={maxStock}
+              onChange={(e) => setMaxStock(e.target.value)}
+              placeholder="Optional"
+            />
+            <p className="text-xs text-muted-foreground">
+              Used when sending stock to branches. Leave empty to use 5× reorder point.
+            </p>
+          </div>
+          <div className="grid gap-2">
             <Label>Item stage</Label>
             <Select
               value={itemStage}
@@ -627,6 +644,7 @@ export function EditWarehouseItemDialog({
   const [currentStock, setCurrentStock] = useState(0);
   const [minStock, setMinStock] = useState(0);
   const [reorderPoint, setReorderPoint] = useState(10);
+  const [maxStock, setMaxStock] = useState<string>("");
   const [itemStage, setItemStage] = useState<"RAW" | "PROCESSED" | "BRANCH_READY">("RAW");
   const [requiresCommissaryProcessing, setRequiresCommissaryProcessing] = useState(false);
   const [allowDirectToBranch, setAllowDirectToBranch] = useState(true);
@@ -641,6 +659,9 @@ export function EditWarehouseItemDialog({
     setCurrentStock(item.currentStock);
     setMinStock(item.minStock);
     setReorderPoint(item.reorderPoint);
+    setMaxStock(
+      item.maxStock != null && item.maxStock > 0 ? String(item.maxStock) : "",
+    );
     setItemStage(item.itemStage || "RAW");
     setRequiresCommissaryProcessing(item.requiresCommissaryProcessing ?? false);
     setAllowDirectToBranch(item.allowDirectToBranch ?? true);
@@ -664,6 +685,7 @@ export function EditWarehouseItemDialog({
         currentStock,
         minStock,
         reorderPoint,
+        maxStock: maxStock.trim() ? Number(maxStock) : null,
         itemStage,
         requiresCommissaryProcessing,
         allowDirectToBranch,
@@ -764,6 +786,19 @@ export function EditWarehouseItemDialog({
                 onChange={(e) => setReorderPoint(Number(e.target.value))}
               />
             </div>
+          </div>
+          <div className="grid gap-2">
+            <Label>Branch par level (max stock)</Label>
+            <Input
+              type="number"
+              min={0}
+              value={maxStock}
+              onChange={(e) => setMaxStock(e.target.value)}
+              placeholder="Optional"
+            />
+            <p className="text-xs text-muted-foreground">
+              Used when sending stock to branches. Leave empty to use 5× reorder point.
+            </p>
           </div>
           <div className="grid gap-2">
             <Label>Item stage</Label>

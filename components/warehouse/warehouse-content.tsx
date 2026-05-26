@@ -99,6 +99,7 @@ interface WarehouseItem {
   currentStock: number;
   minStock: number;
   reorderPoint: number;
+  maxStock?: number | null;
   itemStage?: "RAW" | "PROCESSED" | "BRANCH_READY";
   requiresCommissaryProcessing?: boolean;
   allowDirectToBranch?: boolean;
@@ -278,7 +279,6 @@ export function WarehouseContent({
   const [showSupplierReceiving, setShowSupplierReceiving] = useState(false);
   const [showWastage, setShowWastage] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
-  const [selectedWarehouseForImport, setSelectedWarehouseForImport] = useState<{id: string, name: string} | null>(null);
   const { formatCurrency } = useCurrency();
 
   const [pageSize, setPageSize] = useState(10);
@@ -630,15 +630,12 @@ export function WarehouseContent({
                   {canCreateWarehouse ? (
                     <DropdownMenuItem
                       onClick={() => {
-                        if (warehouses.length > 0) {
-                          setSelectedWarehouseForImport({
-                            id: warehouses[0].id,
-                            name: warehouses[0].name,
-                          });
-                          setShowBulkImport(true);
-                        } else {
+                        if (warehouses.length === 0) {
                           toast.error("Please create a warehouse first");
+                          return;
                         }
+
+                        setShowBulkImport(true);
                       }}
                     >
                       <Upload className="mr-2 h-4 w-4" />Bulk Import
@@ -834,6 +831,7 @@ export function WarehouseContent({
                                 currentStock: item.currentStock,
                                 minStock: item.minStock,
                                 reorderPoint: item.reorderPoint,
+                                maxStock: item.maxStock,
                                 itemStage: item.itemStage,
                                 requiresCommissaryProcessing: item.requiresCommissaryProcessing,
                                 allowDirectToBranch: item.allowDirectToBranch,
@@ -1283,14 +1281,12 @@ export function WarehouseContent({
       <BulkCommissaryDispatchDialog open={showBulkCommissaryDispatch} onOpenChange={setShowBulkCommissaryDispatch} warehouses={warehouses} items={items} branches={branches} />
       <SupplierReceivingDialog open={showSupplierReceiving} onOpenChange={setShowSupplierReceiving} warehouses={warehouses} items={items} />
       <WastageDialog open={showWastage} onOpenChange={setShowWastage} warehouses={warehouses} items={items} />
-      {selectedWarehouseForImport && (
-        <WarehouseImportDialog 
-          open={showBulkImport} 
-          onOpenChange={setShowBulkImport} 
-          warehouseId={selectedWarehouseForImport.id}
-          warehouseName={selectedWarehouseForImport.name}
-        />
-      )}
+      <WarehouseImportDialog
+        open={showBulkImport}
+        onOpenChange={setShowBulkImport}
+        warehouses={warehouses}
+        defaultWarehouseId={selectedWarehouse !== "all" ? selectedWarehouse : undefined}
+      />
     </div>
   );
 }
