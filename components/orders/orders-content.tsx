@@ -80,6 +80,7 @@ interface Order {
   branchName: string;
   branchCode: string;
   assignedBy: string | null;
+  placedBy?: string | null;
   tableLabel?: string | null;
   tableSection?: string | null;
   tableCovers?: number | null;
@@ -214,7 +215,13 @@ export function OrdersContent({
     // Refresh orders to get the new order
     await fetchOrders(false);
     // Find and select the new order
-    const result = await getOrders({ page, pageSize });
+    const result = await getOrders({
+      page,
+      pageSize,
+      branchId: branchFilter !== "all" ? branchFilter : undefined,
+      status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+      source: sourceFilter !== "all" ? (sourceFilter as any) : undefined,
+    });
     if (result.data) {
       const newOrder = result.data.find((o: any) => o.id === orderId);
       if (newOrder) {
@@ -268,7 +275,13 @@ export function OrdersContent({
   const fetchOrders = useCallback(async (showLoading = true) => {
     if (showLoading) setIsRefreshing(true);
     try {
-      const result = await getOrders({ page, pageSize });
+      const result = await getOrders({
+        page,
+        pageSize,
+        branchId: branchFilter !== "all" ? branchFilter : undefined,
+        status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+        source: sourceFilter !== "all" ? (sourceFilter as any) : undefined,
+      });
       if (result.data) {
         setOrders(result.data);
         setTotal(result.total || 0);
@@ -278,7 +291,7 @@ export function OrdersContent({
     } finally {
       if (showLoading) setIsRefreshing(false);
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, branchFilter, statusFilter, sourceFilter]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -288,10 +301,15 @@ export function OrdersContent({
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  // Fetch when page or pageSize changes
+  // Reset paging when server filters change
+  useEffect(() => {
+    setPage(1);
+  }, [branchFilter, statusFilter, sourceFilter]);
+
+  // Fetch when pagination/filter changes
   useEffect(() => {
     fetchOrders();
-  }, [page, pageSize, fetchOrders]);
+  }, [page, pageSize, branchFilter, statusFilter, sourceFilter, fetchOrders]);
 
   // Handle Paystack callback verification after redirect back from Paystack
   useEffect(() => {
@@ -423,19 +441,17 @@ export function OrdersContent({
               <SelectItem value="POS">POS</SelectItem>
             </SelectContent>
           </Select>
-          {branches.length > 1 && (
-            <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Branch" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select value={branchFilter} onValueChange={setBranchFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Branches</SelectItem>
+              {branches.map((b) => (
+                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button onClick={() => setShowCreateDialog(true)} size="sm">
           <Plus className="mr-2 h-4 w-4" />
@@ -640,7 +656,13 @@ export function OrdersContent({
           open={!!selectedOrder}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
           onRefresh={async () => {
-            const result = await getOrders({ page, pageSize });
+            const result = await getOrders({
+              page,
+              pageSize,
+              branchId: branchFilter !== "all" ? branchFilter : undefined,
+              status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+              source: sourceFilter !== "all" ? (sourceFilter as any) : undefined,
+            });
             if (result.data) {
               setOrders(result.data);
               setTotal(result.total || 0);

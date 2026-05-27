@@ -143,6 +143,7 @@ export async function getOrders(filters?: {
           notifications: true,
           receipt: true,
           assignedByUser: { select: { id: true, name: true } },
+          cashier: { select: { id: true, name: true } },
           tableSession: {
             select: {
               guestCount: true,
@@ -174,6 +175,7 @@ export async function getOrders(filters?: {
         taxRate: order.branch?.taxRate != null ? Number(order.branch.taxRate) : 0,
         taxEnabled: order.branch?.taxEnabled ?? true,
         assignedBy: order.assignedByUser?.name || null,
+        placedBy: order.cashier?.name || order.assignedByUser?.name || null,
         tableLabel: order.tableSession?.table.label ?? null,
         tableSection: order.tableSession?.table.section?.name ?? null,
         tableCovers: order.tableSession?.guestCount ?? null,
@@ -292,6 +294,7 @@ export async function getOrderById(id: string) {
         notifications: { orderBy: { createdAt: "desc" } },
         receipt: true,
         assignedByUser: { select: { id: true, name: true } },
+        cashier: { select: { id: true, name: true } },
       },
     });
 
@@ -304,6 +307,7 @@ export async function getOrderById(id: string) {
         customerId: order.customerId,
         branchId: order.branchId,
         assignedBy: order.assignedBy,
+        placedBy: order.cashier?.name || order.assignedByUser?.name || null,
         source: order.source,
         type: order.type,
         status: order.status,

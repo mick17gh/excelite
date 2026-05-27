@@ -60,6 +60,7 @@ interface Order {
   taxRate?: number;
   taxEnabled?: boolean;
   assignedBy: string | null;
+  placedBy?: string | null;
   source: string;
   type: string;
   status: string;
@@ -218,6 +219,10 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
             <div>
               <p className="text-muted-foreground">Date</p>
               <p className="font-medium">{new Date(order.createdAt).toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Placed By</p>
+              <p className="font-medium">{order.placedBy || order.assignedBy || "—"}</p>
             </div>
           </div>
 
