@@ -4,6 +4,8 @@ import { getOrders, getOrderStats } from "@/lib/actions/orders";
 import { getBranches } from "@/lib/actions/branches";
 import { getMenuItems } from "@/lib/actions/menu";
 import { getCustomers } from "@/lib/actions/customers";
+import { isTableManagementEnabled } from "@/lib/features/table-management";
+import { db } from "@/lib/db";
 
 export const metadata = {
   title: "Orders | ServStack",
@@ -11,13 +13,18 @@ export const metadata = {
 };
 
 export default async function OrdersPage() {
-  const [ordersResult, statsResult, branchesResult, menuResult, customersResult] = await Promise.all([
-    getOrders({ pageSize: 50, page: 1 }),
-    getOrderStats(),
-    getBranches(),
-    getMenuItems(),
-    getCustomers(),
-  ]);
+  const [ordersResult, statsResult, branchesResult, menuResult, customersResult, org] =
+    await Promise.all([
+      getOrders({ pageSize: 50, page: 1 }),
+      getOrderStats(),
+      getBranches(),
+      getMenuItems(),
+      getCustomers(),
+      db.organization.findFirst({ select: { id: true } }),
+    ]);
+  const tableManagementEnabled = org?.id
+    ? await isTableManagementEnabled(org.id)
+    : false;
 
   const orders = ordersResult.data || [];
   const total = ordersResult.total || 0;
@@ -63,6 +70,7 @@ export default async function OrdersPage() {
           initialTotal={total}
           initialPage={page}
           initialPageSize={pageSize}
+          tableManagementEnabled={tableManagementEnabled}
         />
       </Suspense>
     </div>

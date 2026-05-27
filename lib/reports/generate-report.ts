@@ -25,6 +25,12 @@ import {
 } from "@/lib/reports/aggregations";
 import { getReportExportConfig } from "@/lib/reports/sheet-config";
 import { Role } from "@/lib/generated/prisma/client";
+import {
+  fetchClosedTableSessions,
+  fetchWaiterPerformance,
+  fetchSectionPerformance,
+} from "@/lib/reports/table-aggregations";
+import { isTableManagementEnabled } from "@/lib/features/table-management";
 
 export interface GenerateReportInput {
   reportId: ReportId;
@@ -133,6 +139,12 @@ export async function buildReportData(
       return buildManualEntries(input, base, branchFilter);
     case "pos-sales-report":
       return buildPosSalesReport(input, base, branchFilter);
+    case "dine-in-service":
+      return buildDineInServiceReport(input, base, branchFilter);
+    case "waiter-performance":
+      return buildWaiterPerformanceReport(input, base, branchFilter);
+    case "table-section-performance":
+      return buildTableSectionPerformanceReport(input, base, branchFilter);
     default:
       throw new Error("Report type not implemented");
   }
@@ -1037,6 +1049,9 @@ async function buildOrdersOverview(
   branchFilter: { branchId?: string },
   role: Role
 ): Promise<ReportDataPayload> {
+  const orgId = await organizationIdForBranch(input.branchId);
+  const tableModuleOn = orgId ? await isTableManagementEnabled(orgId) : false;
+
   const orders = await db.order.findMany({
     where: {
       ...branchFilter,
@@ -1046,12 +1061,29 @@ async function buildOrdersOverview(
       branch: {
         select: { name: true, taxInclusive: true },
       },
+      tableSession: {
+        select: {
+          guestCount: true,
+          openedAt: true,
+          closedAt: true,
+          table: { select: { label: true, section: { select: { name: true } } } },
+          opener: { select: { name: true } },
+        },
+      },
+      assignedByUser: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
   });
 
   const orderRows = orders.map((o) => {
-    const row = {
+    const session = o.tableSession;
+    const durationMin =
+      session?.closedAt && session.openedAt
+        ? Math.round(
+            (session.closedAt.getTime() - session.openedAt.getTime()) / 60000,
+          )
+        : null;
+    const row: Record<string, string | number> = {
       "Order ID": o.orderNumber,
       Date: formatReportDate(o.createdAt),
       Branch: o.branch?.name || "",
@@ -1064,6 +1096,13 @@ async function buildOrdersOverview(
       "Tax (GHS)": roundMoney(Number(o.tax)),
       "Total (GHS)": roundMoney(Number(o.total)),
     };
+    if (tableModuleOn) {
+      row.Table = session?.table.label ?? (o.type === "DINE_IN" ? "Counter" : "—");
+      row.Section = session?.table.section?.name ?? "—";
+      row.Waiter = o.assignedByUser?.name ?? session?.opener?.name ?? "—";
+      row.Covers = session?.guestCount ?? "—";
+      row["Session (min)"] = durationMin ?? "—";
+    }
     return applyCustomerPiiMask(row, role, "Customer Name", "Phone Number");
   });
 
@@ -1178,5 +1217,87 @@ async function buildPosSalesReport(
     reportName: "POS Terminal Sales",
     summary: { ticketCount: posOrders.length },
     posTicketRows,
+  });
+}
+
+async function buildDineInServiceReport(
+  input: GenerateReportInput,
+  base: ReportBase,
+  branchFilter: { branchId?: string },
+): Promise<ReportDataPayload> {
+  const sessions = await fetchClosedTableSessions({
+    branchId: branchFilter.branchId,
+    startDate: input.startDate,
+    endDate: input.endDate,
+  });
+
+  const totalRevenue = sessions.reduce((s, r) => s + r.revenue, 0);
+  const totalCovers = sessions.reduce((s, r) => s + r.covers, 0);
+  const avgTurn =
+    sessions.length > 0
+      ? Math.round(
+          sessions.reduce((s, r) => s + r.durationMinutes, 0) / sessions.length,
+        )
+      : 0;
+
+  const sessionRows = sessions.map((r) => ({
+    Branch: r.branchName,
+    Section: r.sectionName,
+    Table: r.tableLabel,
+    Waiter: r.waiterName,
+    Covers: r.covers,
+    Orders: r.orderCount,
+    "Revenue (GHS)": r.revenue,
+    "Duration (min)": r.durationMinutes,
+    Opened: formatReportDate(r.openedAt),
+    Closed: formatReportDate(r.closedAt),
+  }));
+
+  return mergeReport(base, {
+    reportName: "Dine-In & Table Service",
+    summary: {
+      sessions: sessions.length,
+      covers: totalCovers,
+      dineInRevenue: roundMoney(totalRevenue),
+      revenuePerCover: totalCovers > 0 ? roundMoney(totalRevenue / totalCovers) : 0,
+      avgTurnMinutes: avgTurn,
+    },
+    sessionRows,
+  });
+}
+
+async function buildWaiterPerformanceReport(
+  input: GenerateReportInput,
+  base: ReportBase,
+  branchFilter: { branchId?: string },
+): Promise<ReportDataPayload> {
+  const waiterRows = await fetchWaiterPerformance({
+    branchId: branchFilter.branchId,
+    startDate: input.startDate,
+    endDate: input.endDate,
+  });
+
+  return mergeReport(base, {
+    reportName: "Waiter Performance",
+    summary: { waiterCount: waiterRows.length },
+    waiterRows,
+  });
+}
+
+async function buildTableSectionPerformanceReport(
+  input: GenerateReportInput,
+  base: ReportBase,
+  branchFilter: { branchId?: string },
+): Promise<ReportDataPayload> {
+  const sectionRows = await fetchSectionPerformance({
+    branchId: branchFilter.branchId,
+    startDate: input.startDate,
+    endDate: input.endDate,
+  });
+
+  return mergeReport(base, {
+    reportName: "Table Section Performance",
+    summary: { sectionCount: sectionRows.length },
+    sectionRows,
   });
 }

@@ -109,7 +109,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
     }
   };
 
-  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF"].includes(formData.role);
+  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF", "WAITER"].includes(formData.role);
   const requiresWarehouse = ["WAREHOUSE_STAFF", "COMMISSARY_STAFF"].includes(formData.role);
   const filteredWarehouses = warehouses.filter((w) =>
     formData.role === "COMMISSARY_STAFF"
@@ -198,6 +198,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
                   <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
                   <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
                   <SelectItem value="STAFF">Staff (POS, KDS, Orders & Customers)</SelectItem>
+                  <SelectItem value="WAITER">Waiter (table service POS)</SelectItem>
                   <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
                   <SelectItem value="AUDITOR">Auditor (Read-Only)</SelectItem>
                   <SelectItem value="DEVELOPER">Developer (API Access)</SelectItem>
@@ -347,7 +348,7 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
 
   if (!user) return null;
 
-  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF"].includes(formData.role);
+  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF", "WAITER"].includes(formData.role);
   const requiresWarehouse = ["WAREHOUSE_STAFF", "COMMISSARY_STAFF"].includes(formData.role);
   const filteredWarehouses = warehouses.filter((w) =>
     formData.role === "COMMISSARY_STAFF"
@@ -406,6 +407,7 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
                   <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
                   <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
                   <SelectItem value="STAFF">Staff</SelectItem>
+                  <SelectItem value="WAITER">Waiter</SelectItem>
                   <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
                   <SelectItem value="AUDITOR">Auditor</SelectItem>
                   <SelectItem value="DEVELOPER">Developer</SelectItem>

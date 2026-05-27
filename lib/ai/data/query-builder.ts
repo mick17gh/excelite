@@ -12,6 +12,7 @@ const ROLE_HIERARCHY: Record<Role, number> = {
   BRANCH_MANAGER: 6,
   SUPERVISOR: 5,
   STAFF: 4,
+  WAITER: 4,
   KITCHEN_STAFF: 3,
   AUDITOR: 3,
   DEVELOPER: 2,

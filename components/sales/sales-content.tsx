@@ -7,9 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import {
   DollarSign,
   TrendingUp,
+  Users,
   ShoppingCart,
   Receipt,
   Clock,
+  LayoutGrid,
   ArrowUpRight,
   ArrowDownRight,
   Loader2,
@@ -31,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
 import { getSalesAnalyticsData } from "@/lib/actions/transactions";
 import {
+  BarChart,
   Bar,
   ComposedChart,
   CartesianGrid,
@@ -50,6 +53,8 @@ interface SalesContentProps {
   worstItems: Array<{ name: string; quantity: number; revenue: number }>;
   branches: Array<{ id: string; name: string; code: string; currency?: string | null }>;
   hourlyData: Array<{ hour: string; transactions: number; revenue: number }>;
+  revenuePerCover?: number;
+  dineInBySection?: Array<{ section: string; revenue: number }>;
 }
 
 export function SalesContent({
@@ -60,6 +65,8 @@ export function SalesContent({
   worstItems: initialWorstItems,
   branches,
   hourlyData: initialHourlyData,
+  revenuePerCover: initialRevenuePerCover = 0,
+  dineInBySection: initialDineInBySection = [],
 }: SalesContentProps) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
@@ -77,6 +84,8 @@ export function SalesContent({
   const [topItems, setTopItems] = useState(initialTopItems);
   const [worstItems, setWorstItems] = useState(initialWorstItems);
   const [hourlyData, setHourlyData] = useState(initialHourlyData);
+  const [revenuePerCover, setRevenuePerCover] = useState(initialRevenuePerCover);
+  const [dineInBySection, setDineInBySection] = useState(initialDineInBySection);
   
   // State for comparison metrics
   const [revenueChange, setRevenueChange] = useState(0);
@@ -121,6 +130,8 @@ export function SalesContent({
         setTopItems(result.data.topItems);
         setWorstItems(result.data.worstItems);
         setHourlyData(result.data.hourlyData);
+        setRevenuePerCover(result.data.revenuePerCover || 0);
+        setDineInBySection(result.data.dineInBySection || []);
         // Update comparison metrics
         setRevenueChange(result.data.revenueChange || 0);
         setTransactionChange(result.data.transactionChange || 0);
@@ -183,7 +194,7 @@ export function SalesContent({
       </div>
 
       {/* Summary Cards - Compact */}
-      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-6">
         <Card className="kpi-card rounded-xl">
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
@@ -263,6 +274,34 @@ export function SalesContent({
             </div>
           </CardContent>
         </Card>
+
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Revenue / Cover</p>
+                <p className="text-base font-bold mt-0.5 truncate">{formatCurrency(revenuePerCover)}</p>
+              </div>
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <Users className="h-4 w-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="kpi-card rounded-xl">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-muted-foreground truncate">Dine-in Sections</p>
+                <p className="text-base font-bold mt-0.5">{dineInBySection.length}</p>
+              </div>
+              <div className="icon-blue rounded-lg p-1.5 shrink-0">
+                <LayoutGrid className="h-4 w-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Charts */}
@@ -280,6 +319,29 @@ export function SalesContent({
             <SalesByDaypartChart data={salesByDaypart} />
             <SalesByChannelChart data={salesByChannel} />
           </div>
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle>Dine-in revenue by section</CardTitle>
+              <CardDescription>
+                Paid dine-in checks grouped by dining section
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[320px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dineInBySection}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                    <XAxis dataKey="section" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(Number(value))}
+                    />
+                    <Bar dataKey="revenue" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="hourly" className="mt-6">

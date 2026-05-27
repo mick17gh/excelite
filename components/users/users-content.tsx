@@ -127,6 +127,7 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
       BRANCH_MANAGER: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
       SUPERVISOR: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
       STAFF: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
+      WAITER: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
       KITCHEN_STAFF: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
       AUDITOR: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
       DEVELOPER: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
@@ -142,6 +143,7 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
       BRANCH_MANAGER: "Branch Manager",
       SUPERVISOR: "Supervisor",
       STAFF: "Staff",
+      WAITER: "Waiter",
       KITCHEN_STAFF: "Kitchen Staff",
       AUDITOR: "Auditor",
       DEVELOPER: "Developer",
@@ -247,6 +249,7 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
               <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
               <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
               <SelectItem value="STAFF">Staff</SelectItem>
+              <SelectItem value="WAITER">Waiter</SelectItem>
               <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
               <SelectItem value="AUDITOR">Auditor</SelectItem>
               <SelectItem value="DEVELOPER">Developer</SelectItem>

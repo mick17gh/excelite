@@ -36,6 +36,7 @@ export interface TierFeatures {
   bulkImport: boolean;
   smsNotifications: boolean;
   emailNotifications: boolean;
+  tableManagement: boolean;
 }
 
 export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
@@ -68,6 +69,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
       bulkImport: false,
       smsNotifications: false,
       emailNotifications: false,
+      tableManagement: false,
     },
   },
   PRO: {
@@ -99,6 +101,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
       bulkImport: true,
       smsNotifications: true,
       emailNotifications: true,
+      tableManagement: true,
     },
   },
   ENTERPRISE: {
@@ -130,6 +133,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
       bulkImport: true,
       smsNotifications: true,
       emailNotifications: true,
+      tableManagement: true,
     },
   },
 };

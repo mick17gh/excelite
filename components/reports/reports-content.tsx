@@ -43,6 +43,7 @@ import {
   CreditCard,
   ChefHat,
   UtensilsCrossed,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -58,6 +59,7 @@ interface Branch {
 
 interface ReportsContentProps {
   branches: Branch[];
+  tableManagementEnabled?: boolean;
 }
 
 interface ReportType {
@@ -67,6 +69,7 @@ interface ReportType {
   icon: React.ElementType;
   category: string;
   frequency: string;
+  tableManagementOnly?: boolean;
 }
 
 const reportTypes: ReportType[] = [
@@ -168,6 +171,33 @@ const reportTypes: ReportType[] = [
     frequency: "Daily",
   },
   {
+    id: "dine-in-service",
+    name: "Dine-In & Table Service",
+    description: "Closed table sessions: covers, revenue per cover, and turn times",
+    icon: UtensilsCrossed,
+    category: "Operations",
+    frequency: "Daily",
+    tableManagementOnly: true,
+  },
+  {
+    id: "waiter-performance",
+    name: "Waiter Performance",
+    description: "Tables served, covers, sales, and average turn time by waiter",
+    icon: Users,
+    category: "Operations",
+    frequency: "Weekly",
+    tableManagementOnly: true,
+  },
+  {
+    id: "table-section-performance",
+    name: "Table Section Performance",
+    description: "Dine-in metrics grouped by dining section",
+    icon: LayoutGrid,
+    category: "Operations",
+    frequency: "Weekly",
+    tableManagementOnly: true,
+  },
+  {
     id: "customer-insights",
     name: "Customer Insights",
     description: "Repeat buyers, revenue by customer, and ranking for loyalty follow-ups",
@@ -193,7 +223,13 @@ const reportTypes: ReportType[] = [
   },
 ];
 
-export function ReportsContent({ branches }: ReportsContentProps) {
+export function ReportsContent({
+  branches,
+  tableManagementEnabled = false,
+}: ReportsContentProps) {
+  const visibleReports = reportTypes.filter(
+    (r) => !r.tableManagementOnly || tableManagementEnabled,
+  );
   const { formatCurrency } = useCurrency();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 7),
@@ -232,7 +268,7 @@ export function ReportsContent({ branches }: ReportsContentProps) {
             toast.success("Report exported to Excel");
           } else {
             // Show preview
-            const reportType = reportTypes.find((r) => r.id === reportId)!;
+            const reportType = visibleReports.find((r) => r.id === reportId)!;
             setViewingReport({ data: result.data, reportType });
           }
         } else {
@@ -512,7 +548,7 @@ export function ReportsContent({ branches }: ReportsContentProps) {
       <div>
         <h2 className="text-sm font-semibold mb-3">Available Reports</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {reportTypes.map((report) => {
+          {visibleReports.map((report) => {
             const Icon = report.icon;
             const isGenerating = generatingReport === report.id;
             return (

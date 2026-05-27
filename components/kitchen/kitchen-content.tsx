@@ -69,7 +69,15 @@ interface Ticket {
   status: OrderStatus;
   createdAt: Date;
   station: { id: string; name: string; branchId: string };
-  order: { orderNumber: string; branch: { name: string } };
+  order: {
+    orderNumber: string;
+    branch: { name: string };
+    tableSession?: {
+      guestCount: number;
+      table: { label: string };
+      opener?: { name: string } | null;
+    } | null;
+  };
   items: KitchenItem[];
 }
 
@@ -466,13 +474,26 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                             {ticket.station.name}
                           </Badge>
                         </CardTitle>
-                        <CardDescription className="mt-1.5 flex items-center gap-2 text-xs">
-                          <span>{ticket.order.branch.name}</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Timer className="h-3 w-3" />
-                            {timeElapsed}m ago
+                        <CardDescription className="mt-1.5 flex flex-col gap-0.5 text-xs">
+                          <span className="flex items-center gap-2">
+                            <span>{ticket.order.branch.name}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <Timer className="h-3 w-3" />
+                              {timeElapsed}m ago
+                            </span>
                           </span>
+                          {ticket.order.tableSession?.table?.label && (
+                            <span className="font-medium text-foreground">
+                              Table {ticket.order.tableSession.table.label}
+                              {ticket.order.tableSession.opener?.name
+                                ? ` · ${ticket.order.tableSession.opener.name}`
+                                : ""}
+                              {ticket.order.tableSession.guestCount
+                                ? ` · ${ticket.order.tableSession.guestCount} covers`
+                                : ""}
+                            </span>
+                          )}
                         </CardDescription>
                       </div>
                       <Badge className={cn("border shrink-0", statusColor(ticket.status))}>

@@ -7,6 +7,7 @@ import {
   getSalesByDaypart,
   getTopMenuItems,
   getHourlySalesData,
+  getSalesAnalyticsData,
 } from "@/lib/actions/transactions";
 
 export const metadata = {
@@ -22,6 +23,7 @@ export default async function SalesPage() {
     daypartResult,
     topItemsResult,
     hourlyResult,
+    analyticsResult,
   ] = await Promise.all([
     getBranches(),
     getRevenueData(),
@@ -29,6 +31,7 @@ export default async function SalesPage() {
     getSalesByDaypart(),
     getTopMenuItems(),
     getHourlySalesData(),
+    getSalesAnalyticsData(),
   ]);
 
   const branches = (branchesResult.data || []).map((branch: any) => {
@@ -45,6 +48,8 @@ export default async function SalesPage() {
   const topMenuItems = menuItemsData.top || [];
   const worstMenuItems = menuItemsData.worst || [];
   const hourlyData = hourlyResult.data || [];
+  const revenuePerCover = analyticsResult.data?.revenuePerCover || 0;
+  const dineInBySection = analyticsResult.data?.dineInBySection || [];
 
   return (
     <div className="space-y-6">
@@ -66,6 +71,8 @@ export default async function SalesPage() {
           worstItems={worstMenuItems}
           branches={branches}
           hourlyData={hourlyData}
+          revenuePerCover={revenuePerCover}
+          dineInBySection={dineInBySection}
         />
       </Suspense>
     </div>

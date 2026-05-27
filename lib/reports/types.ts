@@ -13,4 +13,7 @@ export type ReportId =
   | "pos-sales-report"
   | "cash-transactions"
   | "kitchen-efficiency"
-  | "menu-performance";
+  | "menu-performance"
+  | "dine-in-service"
+  | "waiter-performance"
+  | "table-section-performance";

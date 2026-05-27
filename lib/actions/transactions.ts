@@ -828,7 +828,7 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
     const prevStartDate = new Date(prevEndDate.getTime() - periodLength);
 
     // Fetch current and previous period sales in parallel
-    const [sales, prevSales] = await Promise.all([
+    const [sales, prevSales, paidTableOrders] = await Promise.all([
       db.sale.findMany({
         where: {
           deletedAt: null,
@@ -848,6 +848,26 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
           deletedAt: null,
           saleDate: { gte: prevStartDate, lte: prevEndDate },
           ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
+        },
+      }),
+      db.order.findMany({
+        where: {
+          paymentStatus: "PAID",
+          tableSessionId: { not: null },
+          createdAt: { gte: effectiveStartDate, lte: effectiveEndDate },
+          ...(branchIds && branchIds.length > 0 && { branchId: { in: branchIds } }),
+        },
+        include: {
+          tableSession: {
+            select: {
+              guestCount: true,
+              table: {
+                select: {
+                  section: { select: { name: true } },
+                },
+              },
+            },
+          },
         },
       }),
     ]);
@@ -961,6 +981,31 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
       ? ((avgDailyRevenue - prevAvgDailyRevenue) / prevAvgDailyRevenue) * 100 
       : 0;
 
+    // Table-service sales KPIs
+    const dineInTableRevenue = paidTableOrders.reduce((sum, order) => {
+      return sum + Number(order.total);
+    }, 0);
+    const dineInCovers = paidTableOrders.reduce((sum, order) => {
+      return sum + (order.tableSession?.guestCount ?? 0);
+    }, 0);
+    const revenuePerCover = dineInCovers > 0 ? dineInTableRevenue / dineInCovers : 0;
+
+    const sectionRevenueMap = new Map<string, number>();
+    for (const order of paidTableOrders) {
+      const sectionName =
+        order.tableSession?.table?.section?.name?.trim() || "Unassigned";
+      sectionRevenueMap.set(
+        sectionName,
+        (sectionRevenueMap.get(sectionName) || 0) + Number(order.total),
+      );
+    }
+    const dineInBySection = Array.from(sectionRevenueMap.entries())
+      .map(([section, revenue]) => ({
+        section,
+        revenue: Math.round(revenue * 100) / 100,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
     return {
       success: true,
       data: {
@@ -979,6 +1024,8 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
         avgTicketChange,
         avgDailyRevenue,
         avgDailyChange,
+        revenuePerCover: Math.round(revenuePerCover * 100) / 100,
+        dineInBySection,
       },
     };
   } catch (error) {

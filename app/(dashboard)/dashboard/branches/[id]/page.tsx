@@ -7,6 +7,7 @@ import { getUsersByBranch } from "@/lib/actions/users";
 import { getTargets } from "@/lib/actions/targets";
 import { BranchDetailsContent } from "@/components/branches/branch-details-content";
 import { notFound } from "next/navigation";
+import { isTableManagementEnabledForBranch } from "@/lib/features/table-management";
 
 export const metadata = {
   title: "Branch Details | ServStack",
@@ -94,6 +95,7 @@ export default async function BranchDetailsPage({
   
   // Targets already converted in getTargets action
   const targets = targetsData;
+  const tableManagementEnabled = await isTableManagementEnabledForBranch(id);
 
   return (
     <div className="space-y-6">
@@ -106,6 +108,7 @@ export default async function BranchDetailsPage({
           staff={staff}
           users={users}
           targets={targets}
+          tableManagementEnabled={tableManagementEnabled}
         />
       </Suspense>
     </div>

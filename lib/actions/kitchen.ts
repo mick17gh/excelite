@@ -102,6 +102,12 @@ export async function listKitchenTickets(branchId?: string, stationId?: string) 
           include: {
             branch: true,
             items: { include: { menuItem: true } },
+            tableSession: {
+              include: {
+                table: { select: { label: true } },
+                opener: { select: { name: true } },
+              },
+            },
           },
         },
         items: {

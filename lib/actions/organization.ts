@@ -59,6 +59,7 @@ export interface UpdateOrganizationInput {
   facebookUrl?: string | null;
   instagramUrl?: string | null;
   paystackEnabled?: boolean;
+  tableManagementEnabled?: boolean;
 }
 
 /** Resolves org from user.organizationId, else branch/warehouse; may backfill user.organizationId. */
@@ -205,6 +206,7 @@ export async function getOrganization(id?: string) {
           "SUPER_ADMIN",
         ],
         enforceCommissaryRouting: org.enforceCommissaryRouting,
+        tableManagementEnabled: org.tableManagementEnabled,
         createdAt: org.createdAt.toISOString(),
       },
     };
@@ -213,6 +215,48 @@ export async function getOrganization(id?: string) {
       console.error("[getOrganization] Error:", error);
     }
     return { data: null };
+  }
+}
+
+export async function updateOrganizationTableManagement(input: {
+  organizationId: string;
+  tableManagementEnabled: boolean;
+}) {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user || !hasPermission(session.user.role as Role, "organization:edit")) {
+      return { error: "Forbidden" };
+    }
+
+    const sessionOrgId = await getSessionOrganizationId();
+    if (sessionOrgId && sessionOrgId !== input.organizationId) {
+      return { error: "Forbidden" };
+    }
+
+    const org = await db.organization.findUnique({
+      where: { id: input.organizationId },
+      select: { tier: true },
+    });
+    if (!org) return { error: "Organization not found" };
+
+    if (input.tableManagementEnabled && !hasFeature(org.tier, "tableManagement")) {
+      return {
+        error: "Upgrade to Pro or Enterprise to enable table management",
+      };
+    }
+
+    await db.organization.update({
+      where: { id: input.organizationId },
+      data: { tableManagementEnabled: input.tableManagementEnabled },
+    });
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/pos");
+    revalidatePath("/dashboard/tables");
+    return { success: true };
+  } catch (error) {
+    console.error("[updateOrganizationTableManagement]", error);
+    return { error: "Failed to update table management settings" };
   }
 }
 
@@ -288,6 +332,12 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
       return { error: "Current subscription tier does not support online ordering" };
     }
     if (input.onlineOrderingEnabled !== undefined) data.onlineOrderingEnabled = input.onlineOrderingEnabled;
+    if (input.tableManagementEnabled && !hasFeature(existingOrg.tier, "tableManagement")) {
+      return { error: "Current subscription tier does not support table management" };
+    }
+    if (input.tableManagementEnabled !== undefined) {
+      data.tableManagementEnabled = input.tableManagementEnabled;
+    }
     if (input.storefrontUrl !== undefined) {
       if (input.storefrontUrl === null || input.storefrontUrl.trim() === "") {
         data.storefrontUrl = null;

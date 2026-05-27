@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { ReportsContent } from "@/components/reports/reports-content";
 import { getBranches } from "@/lib/actions/branches";
+import { isTableManagementEnabled } from "@/lib/features/table-management";
+import { db } from "@/lib/db";
 
 export const metadata = {
   title: "Reports | ServStack",
@@ -8,7 +10,13 @@ export const metadata = {
 };
 
 export default async function ReportsPage() {
-  const branchesResult = await getBranches();
+  const [branchesResult, org] = await Promise.all([
+    getBranches(),
+    db.organization.findFirst({ select: { id: true } }),
+  ]);
+  const tableManagementEnabled = org?.id
+    ? await isTableManagementEnabled(org.id)
+    : false;
   const branchList = (branchesResult.data || []).map((branch: any) => {
     const { taxRate, ...rest } = branch;
     return {
@@ -29,7 +37,10 @@ export default async function ReportsPage() {
       </div>
 
       <Suspense fallback={<ReportsLoadingSkeleton />}>
-        <ReportsContent branches={branchList} />
+        <ReportsContent
+          branches={branchList}
+          tableManagementEnabled={tableManagementEnabled}
+        />
       </Suspense>
     </div>
   );

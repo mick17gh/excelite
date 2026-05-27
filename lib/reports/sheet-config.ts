@@ -22,6 +22,12 @@ export const REPORT_EXPORT_CONFIG: Partial<Record<ReportId, ReportExportConfig>>
   "staff-report": { primarySheetName: "Staff Hours", primaryDataKey: "staffRows" },
   "manual-entries": { primarySheetName: "Manual Entries", primaryDataKey: "manualEntryRows" },
   "pos-sales-report": { primarySheetName: "POS Tickets", primaryDataKey: "posTicketRows" },
+  "dine-in-service": { primarySheetName: "Table Sessions", primaryDataKey: "sessionRows" },
+  "waiter-performance": { primarySheetName: "Waiters", primaryDataKey: "waiterRows" },
+  "table-section-performance": {
+    primarySheetName: "Sections",
+    primaryDataKey: "sectionRows",
+  },
 };
 
 export function getReportExportConfig(reportId: string): ReportExportConfig | undefined {

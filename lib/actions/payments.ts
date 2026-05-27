@@ -6,6 +6,7 @@ import { PaymentStatus, SalesChannel } from "@/lib/generated/prisma/client";
 import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
 import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
 import { getEnvPaystackSecretKey, isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
+import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
 
 export interface RecordPaymentInput {
   orderId: string;
@@ -191,6 +192,10 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
     await sendPaymentReceiptSMS(order.id);
   } catch (err) {
     console.warn("[settleOrderIfFullyPaid] Failed to send payment receipt SMS:", err);
+  }
+
+  if (order.tableSessionId) {
+    await closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId);
   }
 }
 

@@ -70,7 +70,10 @@ export type Permission =
   | "subscriptions:view"
   | "subscriptions:manage"
   | "organization:view"
-  | "organization:edit";
+  | "organization:edit"
+  | "tables:view"
+  | "tables:manage"
+  | "tables:assign";
 
 // All permissions - used by SUPER_ADMIN
 const ALL_PERMISSIONS: Permission[] = [
@@ -144,6 +147,9 @@ const ALL_PERMISSIONS: Permission[] = [
   "subscriptions:manage",
   "organization:view",
   "organization:edit",
+  "tables:view",
+  "tables:manage",
+  "tables:assign",
 ];
 
 const rolePermissions: Record<Role, Permission[]> = {
@@ -326,6 +332,9 @@ const rolePermissions: Record<Role, Permission[]> = {
     "delivery:view",
     "delivery:manage",
     "organization:view",
+    "tables:view",
+    "tables:manage",
+    "tables:assign",
   ],
 
   BRANCH_MANAGER: [
@@ -364,6 +373,9 @@ const rolePermissions: Record<Role, Permission[]> = {
     "customers:create",
     "customers:edit",
     "delivery:view",
+    "tables:view",
+    "tables:manage",
+    "tables:assign",
   ],
 
   SUPERVISOR: [
@@ -388,6 +400,19 @@ const rolePermissions: Record<Role, Permission[]> = {
     "orders:edit",
     "customers:view",
     "delivery:view",
+    "tables:view",
+    "tables:assign",
+  ],
+
+  WAITER: [
+    "dashboard:view",
+    "pos:access",
+    "orders:view",
+    "orders:create",
+    "orders:edit",
+    "tables:view",
+    "tables:assign",
+    "customers:view",
   ],
 
   STAFF: [
@@ -550,6 +575,7 @@ export function canAccessRoute(
     "/dashboard/subscriptions": ["subscriptions:view"],
     "/pos": ["pos:access"],
     "/kitchen": ["kitchen:access"],
+    "/dashboard/tables": ["tables:view"],
   };
 
   const requiredPermissions = routePermissions[route];
@@ -572,6 +598,7 @@ export const roleDisplayNames: Record<Role, string> = {
   CALL_CENTER: "Call Center",
   WAREHOUSE_STAFF: "Warehouse Staff",
   COMMISSARY_STAFF: "Commissary Staff",
+  WAITER: "Waiter",
 };
 
 export const roleDescriptions: Record<Role, string> = {
@@ -595,4 +622,5 @@ export const roleDescriptions: Record<Role, string> = {
     "Raw warehouse inventory, approvals for commissary dispatch, and branch transfers",
   COMMISSARY_STAFF:
     "Back kitchen production, material handling, and branch dispatch requests",
+  WAITER: "Table service: seat guests, take orders, and manage assigned tables in POS",
 };

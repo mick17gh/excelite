@@ -27,6 +27,22 @@ enum Role {
   CALL_CENTER
   WAREHOUSE_STAFF
   COMMISSARY_STAFF
+  WAITER
+}
+
+enum DiningTableStatus {
+  AVAILABLE
+  SEATED
+  ORDERING
+  BILL_REQUESTED
+  DIRTY
+  BLOCKED
+}
+
+enum TableSessionStatus {
+  OPEN
+  CLOSED
+  VOID
 }
 
 enum StaffRole {
@@ -334,6 +350,7 @@ model User {
   chatSessions       ChatSession[]
   assignedOrders     Order[]            @relation("AssignedOrders")
   cashierOrders      Order[]            @relation("CashierOrders")
+  tableSessionsOpened TableSession[]    @relation("TableSessionsOpened")
 
   @@index([email])
   @@index([role])
@@ -449,6 +466,9 @@ model Branch {
   orders             Order[]
   warehouseTransfers     WarehouseBranchTransfer[] @relation("WarehouseTransfers")
   branchWarehouseReturns BranchWarehouseTransfer[] @relation("BranchWarehouseReturns")
+  diningSections         DiningSection[]
+  diningTables           DiningTable[]
+  tableSessions          TableSession[]
 
   @@index([code])
   @@index([isActive])
@@ -1373,6 +1393,7 @@ model Organization {
   paystackEnabled             Boolean            @default(false)
   complimentaryApproverRoles  Json?
   enforceCommissaryRouting    Boolean            @default(false)
+  tableManagementEnabled      Boolean            @default(false)
   trialEndsAt                 DateTime?
   subscriptionEndsAt DateTime?
   createdAt          DateTime           @default(now())
@@ -1781,12 +1802,14 @@ model Order {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   offlineClientMutationId String? @unique
+  tableSessionId          String?
 
   // Relations
   customer       Customer?           @relation(fields: [customerId], references: [id])
   branch         Branch              @relation(fields: [branchId], references: [id])
   assignedByUser User?               @relation("AssignedOrders", fields: [assignedBy], references: [id])
   cashier        User?               @relation("CashierOrders", fields: [cashierId], references: [id])
+  tableSession   TableSession?       @relation(fields: [tableSessionId], references: [id])
   items          OrderItem[]
   tickets        KitchenTicket[]
   delivery       DeliveryRequest?
@@ -1800,7 +1823,73 @@ model Order {
   @@index([status])
   @@index([source])
   @@index([orderNumber])
+  @@index([tableSessionId])
   @@map("order")
+}
+
+model DiningSection {
+  id        String   @id @default(cuid())
+  branchId  String
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branch Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  tables DiningTable[]
+
+  @@index([branchId])
+  @@map("dining_section")
+}
+
+model DiningTable {
+  id        String            @id @default(cuid())
+  branchId  String
+  sectionId String?
+  label     String
+  capacity  Int               @default(4)
+  sortOrder Int               @default(0)
+  status    DiningTableStatus @default(AVAILABLE)
+  posX      Int?
+  posY      Int?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  branch   Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  section  DiningSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  sessions TableSession[]
+
+  @@unique([branchId, label])
+  @@index([branchId])
+  @@index([sectionId])
+  @@index([status])
+  @@map("dining_table")
+}
+
+model TableSession {
+  id              String             @id @default(cuid())
+  branchId        String
+  tableId         String
+  openedByUserId  String
+  guestCount      Int                @default(1)
+  status          TableSessionStatus @default(OPEN)
+  openedAt        DateTime           @default(now())
+  closedAt        DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  branch   Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  table    DiningTable  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  opener   User         @relation("TableSessionsOpened", fields: [openedByUserId], references: [id])
+  orders   Order[]
+
+  @@index([branchId])
+  @@index([tableId])
+  @@index([status])
+  @@index([openedByUserId])
+  @@map("table_session")
 }
 
 model PosOfflineMutation {

@@ -80,6 +80,10 @@ interface Order {
   branchName: string;
   branchCode: string;
   assignedBy: string | null;
+  tableLabel?: string | null;
+  tableSection?: string | null;
+  tableCovers?: number | null;
+  tableWaiter?: string | null;
   source: string;
   type: string;
   status: string;
@@ -144,6 +148,7 @@ interface OrdersContentProps {
   initialTotal?: number;
   initialPage?: number;
   initialPageSize?: number;
+  tableManagementEnabled?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -177,7 +182,17 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Cancelled",
 };
 
-export function OrdersContent({ orders: initialOrders, branches, menuItems, customers, stats, initialTotal = 0, initialPage = 1, initialPageSize = 50 }: OrdersContentProps) {
+export function OrdersContent({
+  orders: initialOrders,
+  branches,
+  menuItems,
+  customers,
+  stats,
+  initialTotal = 0,
+  initialPage = 1,
+  initialPageSize = 50,
+  tableManagementEnabled = false,
+}: OrdersContentProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(initialPage);
@@ -439,6 +454,8 @@ export function OrdersContent({ orders: initialOrders, branches, menuItems, cust
                 <TableHead>Branch</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Type</TableHead>
+                {tableManagementEnabled && <TableHead>Table</TableHead>}
+                {tableManagementEnabled && <TableHead>Waiter</TableHead>}
                 <TableHead>Status</TableHead>
                 <TableHead>Payment</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -449,7 +466,10 @@ export function OrdersContent({ orders: initialOrders, branches, menuItems, cust
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell
+                    colSpan={tableManagementEnabled ? 12 : 10}
+                    className="text-center py-8 text-muted-foreground"
+                  >
                     No orders found
                   </TableCell>
                 </TableRow>
@@ -472,6 +492,20 @@ export function OrdersContent({ orders: initialOrders, branches, menuItems, cust
                         <Badge variant="outline" className="text-xs">{SOURCE_LABELS[order.source] || order.source}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">{TYPE_LABELS[order.type] || order.type}</TableCell>
+                      {tableManagementEnabled && (
+                        <TableCell className="text-sm">
+                          {order.tableLabel
+                            ? `${order.tableLabel}${order.tableCovers ? ` (${order.tableCovers})` : ""}`
+                            : order.type === "DINE_IN"
+                              ? "Counter"
+                              : "—"}
+                        </TableCell>
+                      )}
+                      {tableManagementEnabled && (
+                        <TableCell className="text-sm text-muted-foreground">
+                          {order.tableWaiter || order.assignedBy || "—"}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Badge className={STATUS_COLORS[order.status] || "bg-slate-100 text-slate-700"}>
                           {STATUS_LABELS[order.status] || order.status}

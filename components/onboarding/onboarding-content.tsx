@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, MapPin, Phone, Mail, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, ArrowRight, Loader2, CheckCircle2, UtensilsCrossed } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { completeOnboarding } from "@/lib/actions/onboarding";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,7 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
   const [branchCity, setBranchCity] = useState("");
   const [branchPhone, setBranchPhone] = useState("");
   const [branchEmail, setBranchEmail] = useState("");
+  const [tableService, setTableService] = useState(false);
 
   const handleSubmit = () => {
     if (!orgName.trim()) {
@@ -51,6 +53,7 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
       const result = await completeOnboarding({
         organization: {
           name: orgName.trim(),
+          tableManagementEnabled: tableService,
         },
         branch: {
           name: branchName.trim(),
@@ -197,6 +200,19 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
                   value={branchCity}
                   onChange={(e) => setBranchCity(e.target.value)}
                 />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="flex items-center gap-2">
+                    <UtensilsCrossed className="h-4 w-4" />
+                    Table service
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Seat guests at tables, waiter POS, and floor board (can change later in Settings)
+                  </p>
+                </div>
+                <Switch checked={tableService} onCheckedChange={setTableService} />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">

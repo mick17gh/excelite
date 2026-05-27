@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { db } from "@/lib/db";
 import { hasFeature } from "@/lib/tier-config";
+import { isTableManagementEnabled } from "@/lib/features/table-management";
 import { getNotifications, getUnreadCount } from "@/lib/services/notifications";
 
 /** Auth and org resolution use request headers — do not statically prerender at build. */
@@ -28,12 +29,15 @@ export default async function DashboardLayout({
   }
 
   // Check if organization exists, redirect to onboarding if not
-  const org = await db.organization.findFirst({ select: { tier: true } });
+  const org = await db.organization.findFirst({
+    select: { id: true, tier: true, tableManagementEnabled: true },
+  });
   if (!org) {
     redirect("/onboarding");
   }
 
   const orgTier: SubscriptionTier = org.tier;
+  const tablesNavEnabled = await isTableManagementEnabled(org.id);
   const canUseAiAssistant = hasFeature(orgTier, "aiAssistant", userRole);
 
   const [notificationsResult, unreadResult] = await Promise.all([
@@ -48,7 +52,12 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar className="hidden md:flex" userRole={userRole} orgTier={orgTier} />
+      <Sidebar
+        className="hidden md:flex"
+        userRole={userRole}
+        orgTier={orgTier}
+        tableManagementEnabled={tablesNavEnabled}
+      />
       <div className="flex flex-1 flex-col overflow-hidden relative">
         {/* Gradient mesh background */}
         <div className="absolute inset-0 gradient-mesh pointer-events-none" />

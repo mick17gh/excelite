@@ -7,6 +7,7 @@ import { SubscriptionTier } from "@/lib/generated/prisma/client";
 interface OnboardingInput {
   organization: {
     name: string;
+    tableManagementEnabled?: boolean;
   };
   branch: {
     name: string;
@@ -45,6 +46,7 @@ export async function completeOnboarding(input: OnboardingInput) {
           maxBranches: 1,
           maxUsers: 2,
           maxMenuItems: 50,
+          tableManagementEnabled: input.organization.tableManagementEnabled ?? false,
         },
       });
 

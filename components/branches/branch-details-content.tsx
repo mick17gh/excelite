@@ -115,6 +115,7 @@ interface BranchDetailsContentProps {
   staff: StaffMember[];
   users: User[];
   targets: Target[];
+  tableManagementEnabled?: boolean;
 }
 
 export function BranchDetailsContent({
@@ -125,6 +126,7 @@ export function BranchDetailsContent({
   staff,
   users,
   targets,
+  tableManagementEnabled = false,
 }: BranchDetailsContentProps) {
   const { formatCurrency } = useCurrency();
   const router = useRouter();
@@ -170,6 +172,11 @@ export function BranchDetailsContent({
               </>
             )}
           </Badge>
+          {tableManagementEnabled && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/branches/${branch.id}/tables`}>Manage tables</Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
             Edit Branch
           </Button>

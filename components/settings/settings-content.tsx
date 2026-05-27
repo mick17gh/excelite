@@ -55,6 +55,7 @@ import { getOrganization } from "@/lib/actions/organization";
 import { OnlineStoreTab } from "./online-store-tab";
 import { DataManagementTab } from "./data-management-tab";
 import { PosPoliciesTab } from "./pos-policies-tab";
+import { DineInTablesTab } from "./dine-in-tables-tab";
 
 interface UserData {
   id: string;
@@ -366,6 +367,10 @@ export function SettingsContent() {
         <TabsTrigger value="online-store" className="text-xs">
           <Building2 className="mr-1.5 h-3.5 w-3.5" />
           Online Store
+        </TabsTrigger>
+        <TabsTrigger value="dine-in-tables" className="text-xs">
+          <ChefHat className="mr-1.5 h-3.5 w-3.5" />
+          Dine-in
         </TabsTrigger>
         {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
           <TabsTrigger value="data-management" className="text-xs">
@@ -833,6 +838,18 @@ export function SettingsContent() {
             <PosPoliciesTab organizationId={user.organizationId} />
           ) : null}
         </div>
+      </TabsContent>
+
+      <TabsContent value="dine-in-tables">
+        {user?.organizationId ? (
+          <DineInTablesTab organizationId={user.organizationId} tier={organizationTier} />
+        ) : (
+          <Card className="chart-card rounded-xl">
+            <CardContent className="px-4 py-6 text-sm text-muted-foreground">
+              Organization context is required.
+            </CardContent>
+          </Card>
+        )}
       </TabsContent>
 
       <TabsContent value="kitchen">

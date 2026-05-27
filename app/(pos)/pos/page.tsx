@@ -9,6 +9,8 @@ import { canAuthorizeComplimentary } from "@/lib/actions/pos";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
+import { isTableManagementEnabled } from "@/lib/features/table-management";
+import { Role } from "@/lib/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +43,9 @@ export default async function PosPage() {
       : null;
 
   let allowComplimentary = false;
+  let tableManagementEnabled = false;
   const session = await auth.api.getSession({ headers: await headers() });
+  const userRole = (session?.user?.role as Role) || "STAFF";
   if (session?.user?.id && session.user.role) {
     const dbUser = await db.user.findUnique({
       where: { id: session.user.id },
@@ -52,6 +56,7 @@ export default async function PosPage() {
         session.user.role,
         dbUser.organizationId,
       );
+      tableManagementEnabled = await isTableManagementEnabled(dbUser.organizationId);
     }
   }
 
@@ -72,6 +77,8 @@ export default async function PosPage() {
           customers={customers}
           storefrontQr={storefrontQr}
           allowComplimentary={allowComplimentary}
+          tableManagementEnabled={tableManagementEnabled}
+          userRole={userRole}
         />
       </Suspense>
     </div>

@@ -91,6 +91,7 @@ const ROLE_CONTEXT: Record<Role, string> = {
   BRANCH_MANAGER: 'User is a Branch Manager. Show only their assigned branch data.',
   SUPERVISOR: 'User is a Supervisor with limited branch management capabilities.',
   STAFF: 'User is Staff with access to POS and basic order management only.',
+  WAITER: 'User is a Waiter with table-service POS: seat guests, place dine-in orders on open tabs, no historical reports.',
   KITCHEN_STAFF: 'User is Kitchen Staff with access to kitchen display and order viewing only.',
   AUDITOR: 'User is an Auditor with read-only access to all data for compliance.',
   DEVELOPER: 'User is a Developer with API key management and technical settings access.',

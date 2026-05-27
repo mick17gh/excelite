@@ -52,7 +52,8 @@ import { savePosSnapshot, loadPosSnapshot, enqueuePosOutbox } from "@/lib/offlin
 import { drainPosOutbox } from "@/lib/offline/pos-sync";
 import { getBranchTaxRate } from "@/lib/actions/tax";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
-import { OrderType } from "@/lib/generated/prisma/client";
+import { OrderType, Role } from "@/lib/generated/prisma/client";
+import { TableServicePanel } from "@/components/pos/table-service-panel";
 import { useEffect, useCallback } from "react";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
@@ -118,6 +119,8 @@ interface PosContentProps {
   customers: Customer[];
   storefrontQr?: StorefrontQrProp;
   allowComplimentary?: boolean;
+  tableManagementEnabled?: boolean;
+  userRole?: Role;
 }
 
 interface CartLine {
@@ -143,9 +146,15 @@ export function PosContent({
   customers,
   storefrontQr = null,
   allowComplimentary = false,
+  tableManagementEnabled = false,
+  userRole: userRoleProp = "STAFF",
 }: PosContentProps) {
   const { formatCurrency } = useCurrency();
-  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+  const { canViewAllBranches, userBranchId, userRole: sessionRole, isLoading: authLoading } =
+    useBranchRestrictions();
+  const userRole = userRoleProp || (sessionRole as Role);
+  const [tableSessionId, setTableSessionId] = useState<string | null>(null);
+  const [tableLabel, setTableLabel] = useState<string | null>(null);
 
   /** Start true on server + first client paint to avoid hydration mismatch; sync from navigator in useEffect. */
   const [isOnline, setIsOnline] = useState(true);
@@ -230,6 +239,17 @@ export function PosContent({
   const [optionPickerItem, setOptionPickerItem] = useState<MenuItem | null>(null);
   const [pickerSelections, setPickerSelections] = useState<Record<string, string[]>>({});
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
+
+  const showTablePanel =
+    tableManagementEnabled && orderType === "DINE_IN" && Boolean(branchId);
+  const waiterTableMode = showTablePanel && userRole === "WAITER";
+
+  useEffect(() => {
+    if (!showTablePanel) {
+      setTableSessionId(null);
+      setTableLabel(null);
+    }
+  }, [showTablePanel, branchId]);
 
   useEffect(() => {
     if (!isOnline && orderType === "DELIVERY") {
@@ -475,7 +495,47 @@ export function PosContent({
   const submitOrder = () => {
     if (!branchId) return toast.error("Select a branch");
     if (cart.length === 0) return toast.error("Cart is empty");
+    if (showTablePanel && !tableSessionId) {
+      return toast.error("Select or seat a table first");
+    }
+    if (waiterTableMode) {
+      placeTableOrderOnly();
+      return;
+    }
     setIsPaymentOpen(true);
+  };
+
+  const placeTableOrderOnly = () => {
+    if (!branchId || !tableSessionId) return;
+    startTransition(async () => {
+      try {
+        const result = await createPosOrder({
+          branchId,
+          type: "DINE_IN",
+          tableSessionId,
+          items: cart.map((l) => ({
+            menuItemId: l.menuItemId,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            menuItemOptionIds: l.menuItemOptionIds,
+          })),
+          sendToKitchen: autoSendToKitchen,
+          stationId: selectedStation || undefined,
+        });
+        if (!result.success || !result.data) {
+          toast.error(result.error || "Failed to place order");
+          return;
+        }
+        if (autoSendToKitchen) {
+          toast.success(`Order #${result.data.orderNumber} sent to kitchen`);
+        } else {
+          toast.success(`Order #${result.data.orderNumber} placed on table ${tableLabel ?? ""}`);
+        }
+        setCart([]);
+      } catch {
+        toast.error("Failed to place order");
+      }
+    });
   };
 
   const handlePaymentComplete = async (paymentData: PaymentData) => {
@@ -495,6 +555,8 @@ export function PosContent({
       const createPayload = {
         branchId,
         type: paymentData.orderType as OrderType,
+        tableSessionId:
+          paymentData.orderType === "DINE_IN" ? tableSessionId ?? undefined : undefined,
         customerId: paymentData.customerId,
         customerName: paymentData.customerName,
         items: cart.map((l) => ({
@@ -574,6 +636,8 @@ export function PosContent({
         const result = await createPosOrder({
           branchId,
           type: paymentData.orderType as OrderType,
+          tableSessionId:
+            paymentData.orderType === "DINE_IN" ? tableSessionId ?? undefined : undefined,
           customerId: paymentData.customerId,
           customerName: paymentData.customerName,
           items: cart.map((l) => ({
@@ -673,6 +737,16 @@ export function PosContent({
       <div className="flex min-h-0 flex-1 gap-4">
       {/* Left Panel - Menu */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {showTablePanel && (
+          <TableServicePanel
+            branchId={branchId}
+            activeSessionId={tableSessionId}
+            onSessionChange={(id, label) => {
+              setTableSessionId(id);
+              setTableLabel(label);
+            }}
+          />
+        )}
         {/* Header Controls */}
         <div className="flex flex-wrap items-center gap-3 pb-3 shrink-0">
           {/* Branch Selector */}
@@ -1003,6 +1077,11 @@ export function PosContent({
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Processing...
+                  </>
+                ) : waiterTableMode ? (
+                  <>
+                    <Send className="mr-2 h-5 w-5" />
+                    Send to table{tableLabel ? ` ${tableLabel}` : ""}
                   </>
                 ) : (
                   <>

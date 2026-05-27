@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
+  LayoutGrid,
   Building2,
   Package,
   TrendingUp,
@@ -46,6 +47,7 @@ interface NavItem {
   icon: React.ElementType;
   permission?: Permission;
   featureKey?: keyof TierFeatures;
+  requiresTableManagement?: boolean;
   openInNewTab?: boolean;
 }
 
@@ -95,6 +97,14 @@ const navigation: NavItem[] = [
     href: "/dashboard/branches",
     icon: Building2,
     permission: "branches:view",
+  },
+  {
+    name: "Floor board",
+    href: "/dashboard/tables",
+    icon: LayoutGrid,
+    permission: "tables:view",
+    featureKey: "tableManagement",
+    requiresTableManagement: true,
   },
   {
     name: "Sales Analytics",
@@ -206,9 +216,15 @@ interface SidebarProps {
   className?: string;
   userRole?: Role;
   orgTier?: SubscriptionTier;
+  tableManagementEnabled?: boolean;
 }
 
-export function Sidebar({ className, userRole = "STAFF", orgTier = "FREE" }: SidebarProps) {
+export function Sidebar({
+  className,
+  userRole = "STAFF",
+  orgTier = "FREE",
+  tableManagementEnabled = false,
+}: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -219,6 +235,7 @@ export function Sidebar({ className, userRole = "STAFF", orgTier = "FREE" }: Sid
     (item) => {
       const hasRole = !item.permission || hasPermission(userRole, item.permission);
       const hasTier = !item.featureKey || hasFeature(orgTier, item.featureKey);
+      if (item.requiresTableManagement && !tableManagementEnabled) return false;
       return hasRole && hasTier;
     }
   );

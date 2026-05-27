@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/services/api-keys";
 import { createOrder } from "@/lib/actions/orders";
+import { createPosOrder } from "@/lib/actions/pos";
 
 // GET /api/v1/orders - Get POS orders
 export async function GET(request: NextRequest) {
@@ -46,6 +47,14 @@ export async function GET(request: NextRequest) {
         branch: {
           select: { id: true, name: true, code: true },
         },
+        tableSession: {
+          select: {
+            id: true,
+            guestCount: true,
+            table: { select: { label: true, section: { select: { name: true } } } },
+            opener: { select: { id: true, name: true } },
+          },
+        },
         items: {
           include: {
             menuItem: {
@@ -77,6 +86,11 @@ export async function GET(request: NextRequest) {
       deliveryFee: Number(order.deliveryFee),
       total: Number(order.total),
       paymentStatus: order.paymentStatus,
+      tableSessionId: order.tableSessionId,
+      tableLabel: order.tableSession?.table?.label ?? null,
+      tableSection: order.tableSession?.table?.section?.name ?? null,
+      tableGuestCount: order.tableSession?.guestCount ?? null,
+      tableWaiter: order.tableSession?.opener?.name ?? null,
       createdAt: order.createdAt.toISOString(),
       completedAt: order.closedAt?.toISOString() || null,
       items: order.items.map((item) => ({
@@ -111,7 +125,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { branchId, orderType, items, notes } = body;
+    const { branchId, orderType, items, notes, tableSessionId } = body;
 
     if (!branchId || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -128,25 +142,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const orderResult = await createOrder({
-      branchId,
-      source: "POS",
-      type: orderType || "DINE_IN",
-      items: items.map(
-        (i: {
-          menuItemId: string;
-          quantity?: number;
-          notes?: string;
-          menuItemOptionIds?: string[];
-        }) => ({
-          menuItemId: i.menuItemId,
-          quantity: i.quantity || 1,
-          notes: i.notes,
-          menuItemOptionIds: i.menuItemOptionIds,
-        })
-      ),
-      notes,
-    });
+    const normalizedType = (orderType || "DINE_IN") as
+      | "DINE_IN"
+      | "TAKEOUT"
+      | "DELIVERY"
+      | "APP";
+    const normalizedItems = items.map(
+      (i: {
+        menuItemId: string;
+        quantity?: number;
+        notes?: string;
+        menuItemOptionIds?: string[];
+      }) => ({
+        menuItemId: i.menuItemId,
+        quantity: i.quantity || 1,
+        notes: i.notes,
+        menuItemOptionIds: i.menuItemOptionIds,
+      })
+    );
+
+    const orderResult =
+      normalizedType === "DINE_IN" || tableSessionId
+        ? await createPosOrder({
+            branchId,
+            type: normalizedType,
+            items: normalizedItems,
+            notes,
+            tableSessionId: typeof tableSessionId === "string" ? tableSessionId : undefined,
+          })
+        : await createOrder({
+            branchId,
+            source: "POS",
+            type: normalizedType,
+            items: normalizedItems,
+            notes,
+          });
 
     if (orderResult.error || !orderResult.data) {
       return NextResponse.json(
@@ -163,6 +193,7 @@ export async function POST(request: NextRequest) {
           orderNumber: o.orderNumber,
           branchId: o.branchId,
           orderType: o.type,
+          tableSessionId: o.tableSessionId ?? null,
           status: o.status,
           subtotal: o.subtotal,
           tax: o.tax,

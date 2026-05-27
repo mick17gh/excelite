@@ -14,6 +14,10 @@ import {
 import { filterOrderItemsForKitchenStation } from "@/lib/kitchen/category-routing";
 import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
+import { requireTableForDineIn } from "@/lib/features/table-management";
+import { markTableOrdering } from "@/lib/actions/tables";
+import { validateTableSessionForOrder } from "@/lib/features/table-session-validation";
+import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,10 +96,50 @@ export interface CreatePosOrderInput {
   stationId?: string; // Specific kitchen station (optional)
   /** When replaying offline POS sync, prevents duplicate Order rows */
   offlineClientMutationId?: string;
+  tableSessionId?: string;
+  assignedBy?: string;
 }
 
 export async function createPosOrder(input: CreatePosOrderInput) {
   try {
+    const branch = await db.branch.findUnique({
+      where: { id: input.branchId },
+      select: { organizationId: true },
+    });
+    if (!branch?.organizationId) {
+      return { success: false, error: "Branch not found" };
+    }
+
+    const tableModuleOn = await requireTableForDineIn(branch.organizationId);
+    if (tableModuleOn && input.type === "DINE_IN" && !input.tableSessionId) {
+      return {
+        success: false,
+        error: "Select and seat a table before placing a dine-in order",
+      };
+    }
+
+    let tableSessionId: string | null = input.tableSessionId ?? null;
+    let assignedBy: string | null = input.assignedBy ?? null;
+
+    if (tableSessionId) {
+      const check = await validateTableSessionForOrder(
+        tableSessionId,
+        input.branchId,
+      );
+      if ("error" in check) {
+        return { success: false, error: check.error };
+      }
+      tableSessionId = check.sessionId;
+      const session = await db.tableSession.findUnique({
+        where: { id: tableSessionId },
+        select: { openedByUserId: true, tableId: true },
+      });
+      if (session) {
+        assignedBy = assignedBy ?? session.openedByUserId;
+        await markTableOrdering(session.tableId);
+      }
+    }
+
     if (input.offlineClientMutationId) {
       const existingOrder = await db.order.findFirst({
         where: { offlineClientMutationId: input.offlineClientMutationId },
@@ -115,7 +159,7 @@ export async function createPosOrder(input: CreatePosOrderInput) {
     const orderNumber = generateOrderNumber();
     
     // Fetch branch tax settings
-    const branch = await db.branch.findUnique({
+    const branchTax = await db.branch.findUnique({
       where: { id: input.branchId },
       select: {
         taxRate: true,
@@ -168,9 +212,9 @@ export async function createPosOrder(input: CreatePosOrderInput) {
       lineTotal,
       discount,
       deliveryFee,
-      ratePercent: Number(branch?.taxRate ?? 12.5),
-      enabled: branch?.taxEnabled ?? true,
-      inclusive: branch?.taxInclusive ?? false,
+      ratePercent: Number(branchTax?.taxRate ?? 12.5),
+      enabled: branchTax?.taxEnabled ?? true,
+      inclusive: branchTax?.taxInclusive ?? false,
     });
 
     // Create unified Order record with source: POS
@@ -179,6 +223,8 @@ export async function createPosOrder(input: CreatePosOrderInput) {
         orderNumber,
         branchId: input.branchId,
         cashierId: input.cashierId || null,
+        assignedBy,
+        tableSessionId,
         customerId: input.customerId || null,
         customerName: input.customerName || null,
         source: "POS",
@@ -412,6 +458,10 @@ export async function completeOrder(input: CompleteOrderInput) {
         ...(orderStatus === "COMPLETED" ? { closedAt: new Date() } : {}),
       },
     });
+
+    if (order.tableSessionId) {
+      await closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId);
+    }
 
     // Create Payment record
     const paymentRef = `PAY-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
