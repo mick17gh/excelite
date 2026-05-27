@@ -489,6 +489,17 @@ export function PaymentModal({
                       <CommandInput placeholder="Search customers..." />
                       <CommandList>
                         <CommandEmpty>No customer found.</CommandEmpty>
+                        {!offlineRestricted ? (
+                          <>
+                            <CommandGroup>
+                              <CommandItem onSelect={() => setShowNewCustomer(true)}>
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                Add New Customer
+                              </CommandItem>
+                            </CommandGroup>
+                            <CommandSeparator />
+                          </>
+                        ) : null}
                         <CommandGroup>
                           <CommandItem value="walk-in" onSelect={() => { setCustomerId("walk-in"); setCustomerOpen(false); }}>
                             <Check className={cn("mr-2 h-4 w-4", customerId === "walk-in" ? "opacity-100" : "opacity-0")} />
@@ -504,17 +515,6 @@ export function PaymentModal({
                             </CommandItem>
                           ))}
                         </CommandGroup>
-                        {!offlineRestricted ? (
-                          <>
-                            <CommandSeparator />
-                            <CommandGroup>
-                              <CommandItem onSelect={() => setShowNewCustomer(true)}>
-                                <UserPlus className="mr-2 h-4 w-4" />
-                                Add New Customer
-                              </CommandItem>
-                            </CommandGroup>
-                          </>
-                        ) : null}
                       </CommandList>
                     </Command>
                   ) : (

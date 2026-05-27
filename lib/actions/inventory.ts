@@ -551,24 +551,57 @@ export interface UpdateSupplierInput {
   isActive?: boolean;
 }
 
-export async function getSuppliersForManagement(search?: string) {
+export interface SupplierManagementFilters {
+  search?: string;
+  isActive?: boolean;
+  leadTime?: "SAME_DAY" | "NEXT_DAY" | "THREE_TO_SEVEN_DAYS" | "THIRTY_DAYS";
+  paymentMethod?: "MOMO_PREFERRED" | "BANK_TRANSFER" | "CASH_ONLY";
+  from?: string;
+  to?: string;
+}
+
+export async function getSuppliersForManagement(
+  filters?: string | SupplierManagementFilters,
+) {
   try {
+    const normalized: SupplierManagementFilters =
+      typeof filters === "string" ? { search: filters } : (filters ?? {});
+    const fromDate = normalized.from ? new Date(normalized.from) : undefined;
+    const toDate = normalized.to ? new Date(normalized.to) : undefined;
+    const inboundDateWhere =
+      fromDate || toDate
+        ? {
+            ...(fromDate ? { gte: fromDate } : {}),
+            ...(toDate ? { lte: toDate } : {}),
+          }
+        : undefined;
+
     const suppliers = await db.supplier.findMany({
       where: {
         deletedAt: null,
-        ...(search
+        ...(typeof normalized.isActive === "boolean"
+          ? { isActive: normalized.isActive }
+          : {}),
+        ...(normalized.leadTime ? { leadTime: normalized.leadTime } : {}),
+        ...(normalized.paymentMethod
+          ? { paymentMethod: normalized.paymentMethod }
+          : {}),
+        ...(normalized.search
           ? {
               OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { code: { contains: search, mode: "insensitive" } },
-                { contactName: { contains: search, mode: "insensitive" } },
+                { name: { contains: normalized.search, mode: "insensitive" } },
+                { code: { contains: normalized.search, mode: "insensitive" } },
+                { contactName: { contains: normalized.search, mode: "insensitive" } },
               ],
             }
+          : {}),
+        ...(inboundDateWhere
+          ? { warehouseInbound: { some: { deliveryDate: inboundDateWhere } } }
           : {}),
       },
       include: {
         warehouseInbound: {
-          select: { totalCost: true },
+          select: { totalCost: true, deliveryDate: true },
         },
       },
       orderBy: { name: "asc" },
@@ -593,6 +626,13 @@ export async function getSuppliersForManagement(search?: string) {
         specialNotes: supplier.specialNotes,
         tags: supplier.tags,
         isActive: supplier.isActive,
+        deliveriesCount: supplier.warehouseInbound.length,
+        lastSuppliedAt:
+          supplier.warehouseInbound.length > 0
+            ? supplier.warehouseInbound.reduce((latest, row) =>
+                row.deliveryDate > latest ? row.deliveryDate : latest,
+              supplier.warehouseInbound[0].deliveryDate).toISOString()
+            : null,
         lifetimePayments: supplier.warehouseInbound.reduce(
           (sum, row) => sum + Number(row.totalCost),
           0,
@@ -602,6 +642,175 @@ export async function getSuppliersForManagement(search?: string) {
   } catch (error) {
     console.error("[getSuppliersForManagement] Error:", error);
     return { success: false, error: "Failed to fetch suppliers", data: [] };
+  }
+}
+
+export interface SupplierSupplyDetailsFilters {
+  search?: string;
+  warehouseId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function getSupplierSupplyDetails(
+  supplierId: string,
+  filters?: SupplierSupplyDetailsFilters,
+) {
+  try {
+    const page = filters?.page && filters.page > 0 ? filters.page : 1;
+    const pageSize =
+      filters?.pageSize && filters.pageSize > 0
+        ? Math.min(filters.pageSize, 100)
+        : 20;
+    const skip = (page - 1) * pageSize;
+    const fromDate = filters?.from ? new Date(filters.from) : undefined;
+    const toDate = filters?.to ? new Date(filters.to) : undefined;
+
+    const [supplier, rows, totalItems] = await Promise.all([
+      db.supplier.findUnique({
+        where: { id: supplierId },
+        include: {
+          warehouseInbound: {
+            select: { totalCost: true, deliveryDate: true },
+          },
+        },
+      }),
+      db.warehouseInbound.findMany({
+        where: {
+          supplierId,
+          ...(filters?.warehouseId ? { warehouseId: filters.warehouseId } : {}),
+          ...(fromDate || toDate
+            ? {
+                deliveryDate: {
+                  ...(fromDate ? { gte: fromDate } : {}),
+                  ...(toDate ? { lte: toDate } : {}),
+                },
+              }
+            : {}),
+          ...(filters?.search
+            ? {
+                OR: [
+                  {
+                    warehouseItem: {
+                      name: { contains: filters.search, mode: "insensitive" },
+                    },
+                  },
+                  {
+                    warehouseItem: {
+                      sku: { contains: filters.search, mode: "insensitive" },
+                    },
+                  },
+                  { invoiceNumber: { contains: filters.search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+        include: {
+          warehouse: { select: { id: true, name: true } },
+          warehouseItem: {
+            select: { id: true, name: true, sku: true, unit: true },
+          },
+        },
+        orderBy: { deliveryDate: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      db.warehouseInbound.count({
+        where: {
+          supplierId,
+          ...(filters?.warehouseId ? { warehouseId: filters.warehouseId } : {}),
+          ...(fromDate || toDate
+            ? {
+                deliveryDate: {
+                  ...(fromDate ? { gte: fromDate } : {}),
+                  ...(toDate ? { lte: toDate } : {}),
+                },
+              }
+            : {}),
+          ...(filters?.search
+            ? {
+                OR: [
+                  {
+                    warehouseItem: {
+                      name: { contains: filters.search, mode: "insensitive" },
+                    },
+                  },
+                  {
+                    warehouseItem: {
+                      sku: { contains: filters.search, mode: "insensitive" },
+                    },
+                  },
+                  { invoiceNumber: { contains: filters.search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+      }),
+    ]);
+
+    if (!supplier || supplier.deletedAt) {
+      return { success: false, error: "Supplier not found" };
+    }
+
+    const lifetimePayments = supplier.warehouseInbound.reduce(
+      (sum, row) => sum + Number(row.totalCost),
+      0,
+    );
+    const lastSuppliedAt =
+      supplier.warehouseInbound.length > 0
+        ? supplier.warehouseInbound.reduce((latest, row) =>
+            row.deliveryDate > latest ? row.deliveryDate : latest,
+          supplier.warehouseInbound[0].deliveryDate)
+        : null;
+
+    return {
+      success: true,
+      data: {
+        supplier: {
+          id: supplier.id,
+          name: supplier.name,
+          code: supplier.code,
+          contactName: supplier.contactName,
+          email: supplier.email,
+          phone: supplier.phone,
+          address: supplier.address,
+          leadTime: supplier.leadTime,
+          paymentMethod: supplier.paymentMethod,
+          tags: supplier.tags,
+          isActive: supplier.isActive,
+          lifetimePayments,
+          deliveriesCount: supplier.warehouseInbound.length,
+          lastSuppliedAt: lastSuppliedAt ? lastSuppliedAt.toISOString() : null,
+        },
+        records: rows.map((row) => ({
+          id: row.id,
+          warehouseId: row.warehouseId,
+          warehouseName: row.warehouse.name,
+          itemId: row.warehouseItemId,
+          itemName: row.warehouseItem.name,
+          itemSku: row.warehouseItem.sku,
+          unit: row.warehouseItem.unit,
+          quantity: Number(row.quantity),
+          unitCost: Number(row.unitCost),
+          totalCost: Number(row.totalCost),
+          invoiceNumber: row.invoiceNumber,
+          notes: row.notes,
+          deliveryDate: row.deliveryDate.toISOString(),
+          createdAt: row.createdAt.toISOString(),
+        })),
+        pagination: {
+          page,
+          pageSize,
+          totalItems,
+          totalPages: Math.max(1, Math.ceil(totalItems / pageSize)),
+        },
+      },
+    };
+  } catch (error) {
+    console.error("[getSupplierSupplyDetails] Error:", error);
+    return { success: false, error: "Failed to fetch supplier details" };
   }
 }
 

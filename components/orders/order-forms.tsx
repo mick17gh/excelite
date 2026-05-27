@@ -451,6 +451,15 @@ export function CreateOrderDialog({
                         <CommandEmpty>No customer found.</CommandEmpty>
                         <CommandGroup>
                           <CommandItem
+                            onSelect={() => setShowNewCustomer(true)}
+                          >
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Add New Customer
+                          </CommandItem>
+                        </CommandGroup>
+                        <CommandSeparator />
+                        <CommandGroup>
+                          <CommandItem
                             value="walk-in"
                             onSelect={() => {
                               setCustomerId("walk-in");
@@ -492,15 +501,6 @@ export function CreateOrderDialog({
                               </div>
                             </CommandItem>
                           ))}
-                        </CommandGroup>
-                        <CommandSeparator />
-                        <CommandGroup>
-                          <CommandItem
-                            onSelect={() => setShowNewCustomer(true)}
-                          >
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Add New Customer
-                          </CommandItem>
                         </CommandGroup>
                       </CommandList>
                     </Command>
