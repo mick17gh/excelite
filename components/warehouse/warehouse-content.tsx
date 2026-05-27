@@ -213,9 +213,9 @@ interface WarehouseContentProps {
 const WAREHOUSE_TABS = [
   { value: "warehouses", label: "Warehouses" },
   { value: "inventory", label: "Inventory" },
-  { value: "transfers", label: "Branch transfers" },
-  { value: "branch-returns", label: "Branch returns" },
-  { value: "material", label: "Material issues" },
+  { value: "transfers", label: "Branch Transfers" },
+  { value: "branch-returns", label: "Branch Returns" },
+  { value: "material", label: "Material Issues" },
   { value: "approvals", label: "Approvals" },
   { value: "production", label: "Production" },
   { value: "receiving", label: "Supplier Receiving" },
@@ -559,7 +559,7 @@ export function WarehouseContent({
           {tabsReady ? (
             <TabsList>
               {tabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
+                <TabsTrigger key={tab.value} value={tab.value} className="capitalize">
                   {tab.label}
                 </TabsTrigger>
               ))}
@@ -572,7 +572,7 @@ export function WarehouseContent({
               {tabs.map((tab) => (
                 <span
                   key={tab.value}
-                  className="inline-flex h-[calc(100%-1px)] items-center justify-center rounded-md px-2 py-1 text-sm font-medium whitespace-nowrap"
+                  className="inline-flex h-[calc(100%-1px)] items-center justify-center rounded-md px-2 py-1 text-sm font-medium whitespace-nowrap capitalize"
                 >
                   {tab.label}
                 </span>

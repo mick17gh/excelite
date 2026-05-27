@@ -168,7 +168,7 @@ export function TableServicePanel({
         )}
       </div>
       <ScrollArea className="w-full">
-        <div className="flex gap-2 pb-1">
+        <div className="flex gap-2 px-1 py-1">
           {tables.length === 0 && isPending && (
             <Loader2 className="h-4 w-4 animate-spin" />
           )}
@@ -181,7 +181,7 @@ export function TableServicePanel({
                 onClick={() => selectTable(t)}
                 className={cn(
                   "shrink-0 rounded-md border px-3 py-2 text-left text-sm transition-colors min-w-[72px]",
-                  active && "ring-2 ring-primary border-primary",
+                  active && "ring-2 ring-primary ring-offset-1 border-primary",
                   t.status === "BLOCKED" && "opacity-50 cursor-not-allowed",
                 )}
               >

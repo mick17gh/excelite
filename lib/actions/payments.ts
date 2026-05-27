@@ -95,7 +95,12 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
     },
   });
 
-  if (alreadyPaid) return;
+  if (alreadyPaid) {
+    if (order.tableSessionId) {
+      await closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId);
+    }
+    return;
+  }
 
   const transactionRef = `TXN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
   const transaction = await db.transaction.create({

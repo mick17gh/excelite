@@ -322,11 +322,11 @@ export function BranchTablesAdmin({ branchId, branchName }: BranchTablesAdminPro
           </Select>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <div>
-            <Label>Prefix</Label>
+            <Label className="block px-1 pb-1">Prefix</Label>
             <Input value={bulkPrefix} onChange={(e) => setBulkPrefix(e.target.value)} />
           </div>
           <div>
-            <Label>From</Label>
+            <Label className="block px-1 pb-1">From</Label>
             <Input
               type="number"
               min={1}
@@ -335,7 +335,7 @@ export function BranchTablesAdmin({ branchId, branchName }: BranchTablesAdminPro
             />
           </div>
           <div>
-            <Label>To</Label>
+            <Label className="block px-1 pb-1">To</Label>
             <Input
               type="number"
               min={1}
@@ -344,7 +344,7 @@ export function BranchTablesAdmin({ branchId, branchName }: BranchTablesAdminPro
             />
           </div>
           <div>
-            <Label>Capacity (each table)</Label>
+            <Label className="block px-1 pb-1">Capacity (each table)</Label>
             <Input
               type="number"
               min={1}

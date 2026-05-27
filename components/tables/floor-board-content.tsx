@@ -24,7 +24,9 @@ import {
 } from "@/lib/actions/tables";
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/generated/prisma/client";
-import { Loader2, Users, Clock, LayoutGrid, Sparkles } from "lucide-react";
+import { Loader2, Users, Clock, LayoutGrid, Sparkles, CreditCard } from "lucide-react";
+import { SessionCheckoutDialog } from "@/components/tables/session-checkout-dialog";
+import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -51,7 +53,11 @@ export function FloorBoardContent({
   const canClearTables =
     hasPermission(userRole, "tables:manage") ||
     hasPermission(userRole, "tables:assign");
+  const canManageTables = hasPermission(userRole, "tables:manage");
+  const canPayTab = hasPermission(userRole, "transactions:create");
+  const { formatCurrency } = useCurrency();
   const [branchId, setBranchId] = useState(defaultBranchId ?? branches[0]?.id ?? "");
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [openSessions, setOpenSessions] = useState<
     Array<{
@@ -96,6 +102,7 @@ export function FloorBoardContent({
     }>;
   } | null>(null);
   const selectedSession = openSessions.find((s) => s.id === targetSessionId) ?? null;
+  const sessionByTableId = new Map(openSessions.map((s) => [s.tableId, s]));
   const parsedSplitCovers = Number(splitCovers);
   const splitCoverInvalid =
     !Number.isFinite(parsedSplitCovers) ||
@@ -108,18 +115,20 @@ export function FloorBoardContent({
       const res = await getFloorBoardData(branchId);
       if ("error" in res && res.error) return;
       if ("data" in res) setData(res.data ?? null);
-      const [sessionsRes, waitersRes] = await Promise.all([
-        listOpenSessions(branchId),
-        listBranchWaiters(branchId),
-      ]);
+      const sessionsRes = await listOpenSessions(branchId);
       if ("data" in sessionsRes && sessionsRes.data) {
         setOpenSessions(sessionsRes.data);
       }
-      if ("data" in waitersRes && waitersRes.data) {
-        setWaiters(waitersRes.data);
+      if (canManageTables) {
+        const waitersRes = await listBranchWaiters(branchId);
+        if ("data" in waitersRes && waitersRes.data) {
+          setWaiters(waitersRes.data);
+        }
+      } else {
+        setWaiters([]);
       }
     });
-  }, [branchId]);
+  }, [branchId, canManageTables]);
 
   useEffect(() => {
     load();
@@ -228,9 +237,23 @@ export function FloorBoardContent({
                   <p className="text-[10px] text-muted-foreground truncate">{t.sectionName}</p>
                 )}
                 {t.session ? (
-                  <p className="text-xs mt-1">
-                    {t.session.guestCount} covers · {t.session.openedByName}
-                  </p>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-xs">
+                      {t.session.guestCount} covers · {t.session.openedByName}
+                    </p>
+                    {(() => {
+                      const sess = sessionByTableId.get(t.id);
+                      if (sess && sess.unpaidOrders > 0) {
+                        return (
+                          <p className="text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                            {sess.unpaidOrders} check{sess.unpaidOrders !== 1 ? "s" : ""} ·{" "}
+                            {formatCurrency(sess.unpaidTotal)}
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                 ) : (
                   <p className="text-xs text-muted-foreground mt-1">Cap {t.capacity}</p>
                 )}
@@ -267,10 +290,25 @@ export function FloorBoardContent({
             </CardHeader>
             <CardContent className="space-y-4">
               {selectedSession && (
-                <p className="text-xs text-muted-foreground">
-                  Selected: Table {selectedSession.tableLabel} · {selectedSession.guestCount} covers ·{" "}
-                  {selectedSession.openedByName} · Unpaid {selectedSession.unpaidOrders} checks
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Selected: Table {selectedSession.tableLabel} · {selectedSession.guestCount}{" "}
+                    covers · {selectedSession.openedByName} · Unpaid{" "}
+                    {selectedSession.unpaidOrders} check
+                    {selectedSession.unpaidOrders !== 1 ? "s" : ""} (
+                    {formatCurrency(selectedSession.unpaidTotal)})
+                  </p>
+                  {canPayTab && selectedSession.unpaidOrders > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={() => setPayDialogOpen(true)}
+                      disabled={isPending}
+                    >
+                      <CreditCard className="h-3 w-3 mr-1" />
+                      Pay tab
+                    </Button>
+                  )}
+                </div>
               )}
               <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                 <Select value={targetSessionId} onValueChange={setTargetSessionId}>
@@ -286,6 +324,8 @@ export function FloorBoardContent({
                   </SelectContent>
                 </Select>
 
+                {canManageTables && (
+                  <>
                 <Select value={targetWaiterId} onValueChange={setTargetWaiterId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Reassign waiter" />
@@ -459,16 +499,30 @@ export function FloorBoardContent({
                 >
                   Split covers
                 </Button>
+                  </>
+                )}
               </div>
-              {selectedSession && (
+              {canManageTables && selectedSession && (
                 <p className="text-xs text-muted-foreground">
                   Split covers must be between 1 and {Math.max(1, selectedSession.guestCount - 1)}.
+                </p>
+              )}
+              {!canManageTables && canPayTab && (
+                <p className="text-xs text-muted-foreground">
+                  Select an open table session above, then use Pay tab to settle all unpaid checks.
                 </p>
               )}
             </CardContent>
           </Card>
         </>
       )}
+
+      <SessionCheckoutDialog
+        open={payDialogOpen}
+        onOpenChange={setPayDialogOpen}
+        sessionId={targetSessionId || null}
+        onSuccess={load}
+      />
     </div>
   );
 }

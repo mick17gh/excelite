@@ -428,6 +428,12 @@ export async function completeOrder(input: CompleteOrderInput) {
 
     // Idempotent replay (e.g. offline sync retry): order already finalized
     if (order.status === "COMPLETED" || order.paymentStatus === "PAID") {
+      if (order.tableSessionId) {
+        await closeTableSessionIfAllOrdersPaid(
+          order.tableSessionId,
+          order.branchId,
+        );
+      }
       const totalWithTip = Number(order.total) + (input.tip || 0);
       const change = input.amountReceived - totalWithTip;
       return {

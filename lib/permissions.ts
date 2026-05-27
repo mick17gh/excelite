@@ -219,6 +219,9 @@ const rolePermissions: Record<Role, Permission[]> = {
     "subscriptions:view",
     "organization:view",
     "organization:edit",
+    "tables:view",
+    "tables:manage",
+    "tables:assign",
   ],
 
   EXECUTIVE: [
@@ -280,6 +283,9 @@ const rolePermissions: Record<Role, Permission[]> = {
     "subscriptions:view",
     "organization:view",
     "organization:edit",
+    "tables:view",
+    "tables:manage",
+    "tables:assign",
   ],
 
   OPERATIONS_MANAGER: [
@@ -424,9 +430,12 @@ const rolePermissions: Record<Role, Permission[]> = {
     "orders:edit",
     "orders:assign",
     "orders:cancel",
+    "transactions:view",
+    "transactions:create",
     "customers:view",
     "customers:create",
     "customers:edit",
+    "tables:view",
   ],
 
   KITCHEN_STAFF: ["kitchen:access", "orders:view"],
@@ -613,7 +622,7 @@ export const roleDescriptions: Record<Role, string> = {
   BRANCH_MANAGER:
     "Manage a specific branch including staff, inventory, orders, and sales",
   SUPERVISOR: "Oversee branch operations with limited management capabilities",
-  STAFF: "Dashboard, POS, kitchen (KDS), orders, and customers",
+  STAFF: "Dashboard, POS, kitchen (KDS), orders, floor board pay, and customers",
   KITCHEN_STAFF: "Kitchen display access for order preparation",
   AUDITOR: "Read-only access to all data for compliance and auditing",
   DEVELOPER: "API key management and technical settings access",

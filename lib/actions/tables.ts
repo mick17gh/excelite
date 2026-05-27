@@ -11,6 +11,7 @@ import {
 } from "@/lib/generated/prisma/client";
 import { hasPermission } from "@/lib/permissions";
 import { isTableManagementEnabledForBranch } from "@/lib/features/table-management";
+import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
 
 async function getActor() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -477,7 +478,24 @@ export async function clearTable(tableId: string) {
   });
   if (!table) return { error: "Table not found" };
   if (table.sessions.length > 0) {
-    return { error: "Close the open check before clearing the table" };
+    const openSession = table.sessions[0];
+    const unpaid = await db.order.count({
+      where: {
+        tableSessionId: openSession.id,
+        paymentStatus: { not: "PAID" },
+      },
+    });
+    if (unpaid > 0) {
+      return { error: "Close the open check before clearing the table" };
+    }
+    await closeTableSessionIfAllOrdersPaid(openSession.id, table.branchId);
+    const refreshed = await db.diningTable.findUnique({
+      where: { id: tableId },
+      include: { sessions: { where: { status: "OPEN" } } },
+    });
+    if (refreshed && refreshed.sessions.length > 0) {
+      return { error: "Could not close the table session" };
+    }
   }
 
   await db.diningTable.update({
