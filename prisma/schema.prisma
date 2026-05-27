@@ -329,6 +329,7 @@ model User {
   emailVerified  Boolean   @default(false)
   image          String?
   phoneNumber    String?
+  pinHash        String?
   role           Role      @default(BRANCH_MANAGER)
   branchId            String?
   assignedWarehouseId String?

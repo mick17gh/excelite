@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { isTableManagementEnabled } from "@/lib/features/table-management";
 import { Role } from "@/lib/generated/prisma/client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,9 @@ export default async function PosPage() {
   let allowComplimentary = false;
   let tableManagementEnabled = false;
   const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
   const userRole = (session?.user?.role as Role) || "STAFF";
   if (session?.user?.id && session.user.role) {
     const dbUser = await db.user.findUnique({

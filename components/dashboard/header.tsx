@@ -38,10 +38,19 @@ export function Header({
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const formatRole = (role?: string | null) => {
+    if (!role) return "Member";
+    return role
+      .toLowerCase()
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  };
+
   const user = {
     name: session?.user?.name,
     email: session?.user?.email,
-    role: "",
+    role: formatRole((session?.user as { role?: string } | undefined)?.role),
     image: session?.user?.image,
   };
 

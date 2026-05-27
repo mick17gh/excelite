@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { Role } from "@/lib/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import { resolveOrganizationIdForUser } from "@/lib/users/organization-link";
+import {
+  decodeCredentialPassword,
+  encodeCredentialPassword,
+  isValidFourDigitPin,
+} from "@/lib/auth/credential-password";
 
 export interface PaginationParams {
   page?: number;
@@ -31,6 +36,7 @@ export interface CreateUserInput {
   branchId?: string;
   assignedWarehouseId?: string;
   phoneNumber?: string;
+  pin?: string;
   isActive: boolean;
 }
 
@@ -42,6 +48,8 @@ export interface UpdateUserInput {
   branchId?: string;
   assignedWarehouseId?: string | null;
   phoneNumber?: string;
+  pin?: string;
+  clearPin?: boolean;
   isActive?: boolean;
 }
 
@@ -56,8 +64,14 @@ export async function createUser(input: CreateUserInput) {
       return { success: false, error: "Email already in use" };
     }
 
+    const pin = input.pin?.trim();
+    if (pin && !isValidFourDigitPin(pin)) {
+      return { success: false, error: "PIN must be exactly 4 digits" };
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(input.password, 10);
+    const pinHash = pin ? await bcrypt.hash(pin, 10) : null;
 
     const organizationId = await resolveOrganizationIdForUser({
       branchId: input.branchId,
@@ -74,6 +88,7 @@ export async function createUser(input: CreateUserInput) {
         assignedWarehouseId: input.assignedWarehouseId,
         organizationId,
         phoneNumber: input.phoneNumber,
+        pinHash,
         isActive: input.isActive,
         emailVerified: false,
       },
@@ -85,7 +100,7 @@ export async function createUser(input: CreateUserInput) {
         accountId: user.id,
         providerId: "credential",
         userId: user.id,
-        password: hashedPassword,
+        password: encodeCredentialPassword({ passwordHash: hashedPassword, pinHash }),
       },
     });
 
@@ -99,7 +114,7 @@ export async function createUser(input: CreateUserInput) {
 
 export async function updateUser(input: UpdateUserInput) {
   try {
-    const { id, branchId, assignedWarehouseId, ...rest } = input;
+    const { id, branchId, assignedWarehouseId, pin, clearPin, ...rest } = input;
     const data: Record<string, unknown> = { ...rest };
 
     if (branchId !== undefined) data.branchId = branchId;
@@ -117,6 +132,38 @@ export async function updateUser(input: UpdateUserInput) {
             ? assignedWarehouseId
             : existing?.assignedWarehouseId) ?? null,
       });
+    }
+
+    if (pin !== undefined && clearPin) {
+      return { success: false, error: "Provide a PIN or clear PIN, not both" };
+    }
+
+    const trimmedPin = pin?.trim();
+    if (trimmedPin && !isValidFourDigitPin(trimmedPin)) {
+      return { success: false, error: "PIN must be exactly 4 digits" };
+    }
+
+    if (trimmedPin !== undefined || clearPin) {
+      const nextPinHash = trimmedPin ? await bcrypt.hash(trimmedPin, 10) : null;
+      data.pinHash = clearPin ? null : nextPinHash;
+
+      const account = await db.account.findFirst({
+        where: { userId: id, providerId: "credential" },
+        select: { id: true, password: true },
+      });
+      if (account?.password) {
+        const parsed = decodeCredentialPassword(account.password);
+        const passwordHash = parsed?.passwordHash ?? account.password;
+        await db.account.update({
+          where: { id: account.id },
+          data: {
+            password: encodeCredentialPassword({
+              passwordHash,
+              pinHash: clearPin ? null : nextPinHash,
+            }),
+          },
+        });
+      }
     }
 
     const user = await db.user.update({
@@ -274,10 +321,19 @@ export async function toggleUserActive(id: string) {
 export async function resetUserPassword(id: string, newPassword: string) {
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const user = await db.user.findUnique({
+      where: { id },
+      select: { pinHash: true },
+    });
 
     await db.account.updateMany({
       where: { userId: id, providerId: "credential" },
-      data: { password: hashedPassword },
+      data: {
+        password: encodeCredentialPassword({
+          passwordHash: hashedPassword,
+          pinHash: user?.pinHash ?? null,
+        }),
+      },
     });
 
     return { success: true };

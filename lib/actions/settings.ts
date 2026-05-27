@@ -3,6 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import {
+  decodeCredentialPassword,
+  encodeCredentialPassword,
+  verifyCredentialPassword,
+} from "@/lib/auth/credential-password";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { getSessionOrganizationId } from "@/lib/actions/organization";
@@ -136,7 +141,7 @@ export async function changePassword(input: ChangePasswordInput) {
     }
 
     // Verify current password
-    const isValid = await bcrypt.compare(input.currentPassword, account.password);
+    const isValid = await verifyCredentialPassword(input.currentPassword, account.password);
     if (!isValid) {
       return { success: false, error: "Current password is incorrect" };
     }
@@ -148,9 +153,19 @@ export async function changePassword(input: ChangePasswordInput) {
 
     // Hash and update the new password
     const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { pinHash: true },
+    });
+    const parsed = decodeCredentialPassword(account.password);
     await db.account.update({
       where: { id: account.id },
-      data: { password: hashedPassword },
+      data: {
+        password: encodeCredentialPassword({
+          passwordHash: hashedPassword,
+          pinHash: user?.pinHash ?? parsed?.pinHash ?? null,
+        }),
+      },
     });
 
     return { success: true };

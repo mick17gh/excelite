@@ -4,6 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { sendPasswordResetEmail } from "./services/email";
+import { verifyCredentialPassword } from "./auth/credential-password";
 
 export const ROLES = {
     SUPER_ADMIN: "SUPER_ADMIN",
@@ -141,7 +142,7 @@ export const auth = betterAuth({
                 return bcrypt.hash(password, 10);
             },
             verify: async ({ password, hash }: { password: string; hash: string }) => {
-                return bcrypt.compare(password, hash);
+                return verifyCredentialPassword(password, hash);
             },
         },
         sendResetPassword: async ({ user, url }) => {

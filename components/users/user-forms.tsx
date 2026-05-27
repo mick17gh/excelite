@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,8 +66,37 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
     branchId: "",
     assignedWarehouseId: "",
     phone: "",
+    pin: "",
     isActive: true,
   });
+  const addPinRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const addPinDigits = Array.from({ length: 4 }, (_, idx) => formData.pin[idx] || "");
+
+  const setAddPinAt = (index: number, digit: string) => {
+    const next = addPinDigits.slice();
+    next[index] = digit;
+    setFormData({ ...formData, pin: next.join("") });
+  };
+
+  const handleAddPinChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    setAddPinAt(index, digit);
+    if (digit && index < 3) addPinRefs.current[index + 1]?.focus();
+  };
+
+  const handleAddPinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !addPinDigits[index] && index > 0) {
+      addPinRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleAddPinPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    if (!pasted) return;
+    setFormData({ ...formData, pin: pasted });
+    addPinRefs.current[Math.min(pasted.length, 4) - 1]?.focus();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +111,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
         branchId: formData.branchId || undefined,
         assignedWarehouseId: formData.assignedWarehouseId || undefined,
         phoneNumber: formData.phone || undefined,
+        pin: formData.pin || undefined,
         isActive: formData.isActive,
       });
 
@@ -96,6 +126,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
           branchId: "",
           assignedWarehouseId: "",
           phone: "",
+          pin: "",
           isActive: true,
         });
       } else {
@@ -178,6 +209,31 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="pin">4-digit PIN (Optional)</Label>
+                <div className="flex items-center gap-2">
+                  {addPinDigits.map((digit, index) => (
+                    <Input
+                      key={`add-pin-${index}`}
+                      id={index === 0 ? "pin" : undefined}
+                      ref={(el) => {
+                        addPinRefs.current[index] = el;
+                      }}
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      className="h-10 w-10 text-center text-base tracking-widest"
+                      value={digit}
+                      onChange={(e) => handleAddPinChange(index, e.target.value)}
+                      onKeyDown={(e) => handleAddPinKeyDown(index, e)}
+                      onPaste={handleAddPinPaste}
+                      maxLength={1}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Used for PIN-only login</p>
               </div>
             </div>
 
@@ -299,8 +355,38 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
     branchId: "",
     assignedWarehouseId: "",
     phone: "",
+    pin: "",
+    clearPin: false,
     isActive: true,
   });
+  const editPinRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const editPinDigits = Array.from({ length: 4 }, (_, idx) => formData.pin[idx] || "");
+
+  const setEditPinAt = (index: number, digit: string) => {
+    const next = editPinDigits.slice();
+    next[index] = digit;
+    setFormData({ ...formData, pin: next.join(""), clearPin: false });
+  };
+
+  const handleEditPinChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    setEditPinAt(index, digit);
+    if (digit && index < 3) editPinRefs.current[index + 1]?.focus();
+  };
+
+  const handleEditPinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !editPinDigits[index] && index > 0) {
+      editPinRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleEditPinPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    if (!pasted) return;
+    setFormData({ ...formData, pin: pasted, clearPin: false });
+    editPinRefs.current[Math.min(pasted.length, 4) - 1]?.focus();
+  };
 
   useEffect(() => {
     if (user) {
@@ -311,6 +397,8 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
         branchId: "",
         assignedWarehouseId: user.assignedWarehouseId || "",
         phone: "",
+        pin: "",
+        clearPin: false,
         isActive: user.isActive,
       });
     }
@@ -329,6 +417,8 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
         branchId: formData.branchId || undefined,
         assignedWarehouseId: formData.assignedWarehouseId || null,
         phoneNumber: formData.phone || undefined,
+        pin: formData.pin || undefined,
+        clearPin: formData.clearPin,
         isActive: formData.isActive,
       });
 
@@ -388,6 +478,40 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
               />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="pin-edit">4-digit PIN (Optional)</Label>
+              <div className="flex items-center gap-2">
+                {editPinDigits.map((digit, index) => (
+                  <Input
+                    key={`edit-pin-${index}`}
+                    id={index === 0 ? "pin-edit" : undefined}
+                    ref={(el) => {
+                      editPinRefs.current[index] = el;
+                    }}
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    className="h-10 w-10 text-center text-base tracking-widest"
+                    value={digit}
+                    onChange={(e) => handleEditPinChange(index, e.target.value)}
+                    onKeyDown={(e) => handleEditPinKeyDown(index, e)}
+                    onPaste={handleEditPinPaste}
+                    maxLength={1}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Leave all boxes empty to keep current PIN</p>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={formData.clearPin}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, clearPin: checked, pin: checked ? "" : formData.pin })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">Clear existing PIN</p>
+              </div>
             </div>
 
             <div className="grid gap-2">
