@@ -59,6 +59,7 @@ interface KitchenItem {
   createdAt: Date;
   orderItem: {
     quantity: number;
+    notes?: string | null;
     configurationLabel?: string | null;
     menuItem: { name: string };
   };
@@ -71,6 +72,7 @@ interface Ticket {
   station: { id: string; name: string; branchId: string };
   order: {
     orderNumber: string;
+    notes?: string | null;
     branch: { name: string };
     tableSession?: {
       guestCount: number;
@@ -509,6 +511,14 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                         </p>
                       </div>
                     )}
+                    {ticket.order.notes && (
+                      <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                          Order note
+                        </p>
+                        <p className="text-xs text-foreground">{ticket.order.notes}</p>
+                      </div>
+                    )}
                     {/* Ticket-level actions */}
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t">
                       {ticket.status === "READY" && (
@@ -589,6 +599,11 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
                                 {itemTimeElapsed}m
                               </span>
                             </div>
+                            {item.orderItem.notes && (
+                              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                                Note: {item.orderItem.notes}
+                              </p>
+                            )}
                           </div>
                           <div className="flex gap-1.5 shrink-0">
                             {item.status === "NEW" && (
