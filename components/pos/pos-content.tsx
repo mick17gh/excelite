@@ -155,6 +155,7 @@ export function PosContent({
   const userRole = userRoleProp || (sessionRole as Role);
   const [tableSessionId, setTableSessionId] = useState<string | null>(null);
   const [tableLabel, setTableLabel] = useState<string | null>(null);
+  const [waiterOrderNote, setWaiterOrderNote] = useState("");
 
   /** Start true on server + first client paint to avoid hydration mismatch; sync from navigator in useEffect. */
   const [isOnline, setIsOnline] = useState(true);
@@ -248,6 +249,7 @@ export function PosContent({
     if (!showTablePanel) {
       setTableSessionId(null);
       setTableLabel(null);
+      setWaiterOrderNote("");
     }
   }, [showTablePanel, branchId]);
 
@@ -513,6 +515,7 @@ export function PosContent({
           branchId,
           type: "DINE_IN",
           tableSessionId,
+          notes: waiterOrderNote.trim() || undefined,
           items: cart.map((l) => ({
             menuItemId: l.menuItemId,
             quantity: l.quantity,
@@ -532,6 +535,7 @@ export function PosContent({
           toast.success(`Order #${result.data.orderNumber} placed on table ${tableLabel ?? ""}`);
         }
         setCart([]);
+        setWaiterOrderNote("");
       } catch {
         toast.error("Failed to place order");
       }
@@ -1031,6 +1035,17 @@ export function PosContent({
           {cart.length > 0 && (
             <>
               <div className="space-y-2">
+                {waiterTableMode && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Order note (optional)</label>
+                    <Input
+                      value={waiterOrderNote}
+                      onChange={(e) => setWaiterOrderNote(e.target.value)}
+                      placeholder="e.g. No onions, allergic to nuts"
+                      maxLength={200}
+                    />
+                  </div>
+                )}
                 {taxSettings.inclusive && taxSettings.enabled ? (
                   <>
                     <div className="flex justify-between text-sm">
