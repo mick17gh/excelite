@@ -23,12 +23,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Edit, Plus, Trash2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Edit, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createInventoryCategory,
   updateInventoryCategory,
   deleteOrArchiveInventoryCategory,
+  restoreInventoryCategory,
 } from "@/lib/actions/inventory-categories";
 
 interface InventoryCategoryRow {
@@ -51,13 +60,24 @@ export function InventoryCategoriesContent({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryCategoryRow | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "archived">("all");
   const [formData, setFormData] = useState({
     name: "",
     code: "",
     sortOrder: "0",
+    isActive: true,
   });
 
-  const resetForm = () => setFormData({ name: "", code: "", sortOrder: "0" });
+  const resetForm = () =>
+    setFormData({ name: "", code: "", sortOrder: "0", isActive: true });
+
+  const filteredCategories = categories.filter((row) => {
+    if (statusFilter === "active") return row.isActive;
+    if (statusFilter === "archived") return !row.isActive;
+    return true;
+  });
+
+  const archivedCount = categories.filter((c) => !c.isActive).length;
 
   const handleCreate = async () => {
     if (!formData.name.trim() || !formData.code.trim()) {
@@ -89,6 +109,7 @@ export function InventoryCategoriesContent({
       name: formData.name,
       code: formData.code,
       sortOrder: Number(formData.sortOrder || "0"),
+      isActive: formData.isActive,
     });
     setIsSubmitting(false);
     if (!res.success) {
@@ -108,6 +129,16 @@ export function InventoryCategoriesContent({
       return;
     }
     toast.success(row.totalItemCount > 0 ? "Category archived" : "Category deleted");
+    router.refresh();
+  };
+
+  const handleRestore = async (row: InventoryCategoryRow) => {
+    const res = await restoreInventoryCategory(row.id);
+    if (!res.success) {
+      toast.error(res.error || "Failed to restore category");
+      return;
+    }
+    toast.success("Category restored");
     router.refresh();
   };
 
@@ -138,7 +169,25 @@ export function InventoryCategoriesContent({
         </Card>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">Show</Label>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as "all" | "active" | "archived")}
+          >
+            <SelectTrigger className="h-9 w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ({categories.length})</SelectItem>
+              <SelectItem value="active">
+                Active ({categories.length - archivedCount})
+              </SelectItem>
+              <SelectItem value="archived">Archived ({archivedCount})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           onClick={() => {
             resetForm();
@@ -167,7 +216,14 @@ export function InventoryCategoriesContent({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categories.map((row) => (
+              {filteredCategories.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    No categories match this filter.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {filteredCategories.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>{row.code}</TableCell>
@@ -189,14 +245,31 @@ export function InventoryCategoriesContent({
                             name: row.name,
                             code: row.code,
                             sortOrder: String(row.sortOrder),
+                            isActive: row.isActive,
                           });
                         }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleArchive(row)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {row.isActive ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleArchive(row)}
+                          title="Archive category"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRestore(row)}
+                          title="Restore category"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -262,6 +335,20 @@ export function InventoryCategoriesContent({
             <div className="grid gap-2">
               <Label>Code</Label>
               <Input value={formData.code} onChange={(e) => setFormData((v) => ({ ...v, code: e.target.value.toUpperCase() }))} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label>Active</Label>
+                <p className="text-xs text-muted-foreground">
+                  Turn off to archive; archived categories are hidden from inventory and warehouse forms.
+                </p>
+              </div>
+              <Switch
+                checked={formData.isActive}
+                onCheckedChange={(checked) =>
+                  setFormData((v) => ({ ...v, isActive: checked }))
+                }
+              />
             </div>
           </div>
           <DialogFooter>

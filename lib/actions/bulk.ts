@@ -379,7 +379,7 @@ export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) 
       ),
     ];
     const categories = await db.inventoryCategoryMaster.findMany({
-      where: { organizationId: { in: orgIds }, deletedAt: null },
+      where: { organizationId: { in: orgIds }, deletedAt: null, isActive: true },
       select: { id: true, organizationId: true, name: true, code: true },
     });
     const categoryByOrg = new Map<string, Map<string, string>>();

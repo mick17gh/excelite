@@ -94,7 +94,7 @@ export default async function InventoryPage() {
     getWarehouseTransfers(),
     getWarehouses(),
     getBranchWarehouseTransfers({ limit: 200 }),
-    listInventoryCategories(),
+    listInventoryCategories({ activeOnly: true }),
   ]);
   const warehouseList = (warehousesResult.data || []).map((w) => ({
     id: w.id,

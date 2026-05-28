@@ -43,7 +43,7 @@ export default async function WarehousePage() {
     getWarehouseInboundRecords(),
     getWarehouseWasteLogs(),
     getBranchWarehouseTransfers({ limit: 200 }),
-    listInventoryCategories(),
+    listInventoryCategories({ activeOnly: true }),
   ]);
 
   const warehouses = warehousesResult.data || [];

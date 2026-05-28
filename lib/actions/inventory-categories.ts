@@ -26,16 +26,23 @@ async function resolveOrganizationId(): Promise<string | null> {
   return user?.organizationId ?? null;
 }
 
-export async function listInventoryCategories(organizationId?: string) {
+export async function listInventoryCategories(options?: {
+  organizationId?: string;
+  activeOnly?: boolean;
+}) {
   const actor = await getActor();
   if (!actor || !hasPermission(actor.role, "inventory:view")) {
     return { success: false, error: "Forbidden", data: [] };
   }
-  const orgId = organizationId ?? (await resolveOrganizationId());
+  const orgId = options?.organizationId ?? (await resolveOrganizationId());
   if (!orgId) return { success: false, error: "Organization not found", data: [] };
 
   const rows = await db.inventoryCategoryMaster.findMany({
-    where: { organizationId: orgId, deletedAt: null },
+    where: {
+      organizationId: orgId,
+      deletedAt: null,
+      ...(options?.activeOnly ? { isActive: true } : {}),
+    },
     include: {
       _count: {
         select: { inventoryItems: true, warehouseInventoryItems: true },
@@ -161,6 +168,32 @@ export async function deleteOrArchiveInventoryCategory(id: string) {
       data: { deletedAt: new Date(), isActive: false },
     });
   }
+
+  revalidatePath("/dashboard/inventory-categories");
+  revalidatePath("/dashboard/inventory");
+  revalidatePath("/dashboard/warehouse");
+  return { success: true };
+}
+
+export async function restoreInventoryCategory(id: string) {
+  const actor = await getActor();
+  if (!actor || !hasPermission(actor.role, "categories:manage")) {
+    return { success: false, error: "Forbidden" };
+  }
+  const orgId = await resolveOrganizationId();
+  if (!orgId) return { success: false, error: "Organization not found" };
+
+  const existing = await db.inventoryCategoryMaster.findFirst({
+    where: { id, organizationId: orgId, deletedAt: null },
+    select: { id: true, isActive: true },
+  });
+  if (!existing) return { success: false, error: "Category not found" };
+  if (existing.isActive) return { success: true };
+
+  await db.inventoryCategoryMaster.update({
+    where: { id },
+    data: { isActive: true },
+  });
 
   revalidatePath("/dashboard/inventory-categories");
   revalidatePath("/dashboard/inventory");

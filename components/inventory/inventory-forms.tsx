@@ -115,15 +115,15 @@ export function OutboundStockForm({ open, onOpenChange, branches, items }: Outbo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Record Outbound Stock</DialogTitle>
           <DialogDescription>
             Record stock usage or removal from inventory
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 px-6 py-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
             <div className="grid gap-2">
               <Label htmlFor="branch">Branch</Label>
               <Select
@@ -203,7 +203,7 @@ export function OutboundStockForm({ open, onOpenChange, branches, items }: Outbo
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -274,15 +274,15 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Record Waste</DialogTitle>
           <DialogDescription>
             Log wasted or spoiled inventory items
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 px-6 py-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
             <div className="grid gap-2">
               <Label htmlFor="branch">Branch</Label>
               <Select
@@ -375,7 +375,7 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -463,15 +463,15 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Transfer Stock Between Branches</DialogTitle>
           <DialogDescription>
             Create a transfer request. It will need to be approved and marked as received before stock moves.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 px-6 py-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="fromBranch">From Branch</Label>
@@ -560,7 +560,7 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -644,15 +644,15 @@ export function AddInventoryItemForm({ open, onOpenChange, branches, categories 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Add Inventory Item</DialogTitle>
           <DialogDescription>
             Create a new inventory item to track
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 px-6 py-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Item Name</Label>
@@ -796,7 +796,7 @@ export function AddInventoryItemForm({ open, onOpenChange, branches, categories 
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -877,14 +877,14 @@ export function BranchReturnToWarehouseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Return stock to warehouse</DialogTitle>
           <DialogDescription>
             Send branch inventory back to a raw or commissary warehouse.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3">
+        <div className="grid flex-1 gap-3 overflow-y-auto px-6 py-4">
           <div className="grid gap-2">
             <Label>From branch</Label>
             <Select value={fromBranchId} onValueChange={setFromBranchId}>
@@ -943,7 +943,7 @@ export function BranchReturnToWarehouseDialog({
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

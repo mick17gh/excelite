@@ -461,14 +461,14 @@ export function CreateWarehouseItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Add Warehouse Item</DialogTitle>
           <DialogDescription>
             Add inventory item to a warehouse
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4">
+        <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
           <div className="grid gap-2">
             <Label>Warehouse *</Label>
             <Select value={warehouseId} onValueChange={setWarehouseId}>
@@ -611,7 +611,7 @@ export function CreateWarehouseItemDialog({
             <Switch checked={allowDirectToBranch} onCheckedChange={setAllowDirectToBranch} />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -713,15 +713,15 @@ export function EditWarehouseItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Edit warehouse item</DialogTitle>
           <DialogDescription>
             {warehouseName ? `${warehouseName} · ` : ""}
             SKU <span className="font-mono">{item?.sku}</span> cannot be changed.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4">
+        <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
           <div className="grid gap-2">
             <Label>Name *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -842,7 +842,7 @@ export function EditWarehouseItemDialog({
             <Switch checked={isActive} onCheckedChange={setIsActive} />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

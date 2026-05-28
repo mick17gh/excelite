@@ -717,7 +717,11 @@ export async function bulkCreateWarehouseItems(
     if (!warehouse) return { error: "Warehouse not found" };
 
     const categoryRows = await db.inventoryCategoryMaster.findMany({
-      where: { organizationId: warehouse.organizationId, deletedAt: null },
+      where: {
+        organizationId: warehouse.organizationId,
+        deletedAt: null,
+        isActive: true,
+      },
       select: { id: true, name: true, code: true },
     });
     const categoryLookup = new Map<string, string>();
