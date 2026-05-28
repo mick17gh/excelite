@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { logCreate, logUpdate, logDelete } from "@/lib/services/audit";
-import { InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
+import { UnitType } from "@/lib/generated/prisma/client";
 import type {
   BulkMenuItemInput,
   BulkInventoryItemInput,
@@ -325,21 +325,6 @@ export async function bulkUpdateMenuPrices(
 // INVENTORY BULK OPERATIONS
 // =====================================
 
-// Map human-readable category names to InventoryCategory enum values
-function mapToInventoryCategory(category: string): InventoryCategory {
-  const categoryMap: Record<string, InventoryCategory> = {
-    food: InventoryCategory.FOOD,
-    beverage: InventoryCategory.BEVERAGE,
-    beverages: InventoryCategory.BEVERAGE,
-    packaging: InventoryCategory.PACKAGING,
-    cleaning: InventoryCategory.CLEANING,
-    equipment: InventoryCategory.EQUIPMENT,
-    other: InventoryCategory.OTHER,
-  };
-  const normalized = category.toLowerCase().trim();
-  return categoryMap[normalized] || InventoryCategory.OTHER;
-}
-
 // Map human-readable unit names to UnitType enum values
 function mapToUnitType(unit: string): UnitType {
   const unitMap: Record<string, UnitType> = {
@@ -379,6 +364,50 @@ export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) 
       return { success: false, error: "No items provided" };
     }
 
+    // Resolve organization-scoped inventory categories by name/code
+    const branchIds = [...new Set(items.map((i) => i.branchId))];
+    const branches = await db.branch.findMany({
+      where: { id: { in: branchIds } },
+      select: { id: true, organizationId: true },
+    });
+    const branchOrg = new Map(branches.map((b) => [b.id, b.organizationId]));
+    const orgIds = [
+      ...new Set(
+        branches
+          .map((b) => b.organizationId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const categories = await db.inventoryCategoryMaster.findMany({
+      where: { organizationId: { in: orgIds }, deletedAt: null },
+      select: { id: true, organizationId: true, name: true, code: true },
+    });
+    const categoryByOrg = new Map<string, Map<string, string>>();
+    for (const c of categories) {
+      const keyName = c.name.trim().toLowerCase();
+      const keyCode = c.code.trim().toLowerCase();
+      if (!categoryByOrg.has(c.organizationId)) {
+        categoryByOrg.set(c.organizationId, new Map());
+      }
+      categoryByOrg.get(c.organizationId)!.set(keyName, c.id);
+      categoryByOrg.get(c.organizationId)!.set(keyCode, c.id);
+    }
+
+    const invalidCategories = items
+      .map((item, index) => {
+        const orgId = branchOrg.get(item.branchId);
+        const key = item.category.trim().toLowerCase();
+        const categoryId = orgId ? categoryByOrg.get(orgId)?.get(key) : undefined;
+        return categoryId ? null : `row ${index + 1}: "${item.category}"`;
+      })
+      .filter(Boolean) as string[];
+    if (invalidCategories.length > 0) {
+      return {
+        success: false,
+        error: `Unknown inventory category for ${invalidCategories.join(", ")}`,
+      };
+    }
+
     // Check for existing items with same SKU and branch combination
     const skuBranchPairs = items.map(item => ({
       sku: item.sku || `INV-${Date.now().toString(36).toUpperCase()}`,
@@ -413,7 +442,9 @@ export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) 
         return {
           ...item,
           sku,
-          category: mapToInventoryCategory(item.category),
+          categoryId: categoryByOrg
+            .get(branchOrg.get(item.branchId) || "")
+            ?.get(item.category.trim().toLowerCase()) as string,
           unit: mapToUnitType(item.unit),
           currentStock: item.currentStock ?? 0,
           minStock: item.minStock ?? 10,

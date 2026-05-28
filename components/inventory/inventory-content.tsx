@@ -175,6 +175,7 @@ interface WarehouseOption {
 interface InventoryContentProps {
   items: InventoryItem[];
   branches: Branch[];
+  categories: Array<{ id: string; name: string; code: string }>;
   warehouses?: WarehouseOption[];
   outboundRecords?: OutboundRecord[];
   transferRecords?: TransferRecord[];
@@ -185,6 +186,7 @@ interface InventoryContentProps {
 export function InventoryContent({ 
   items, 
   branches,
+  categories,
   warehouses = [],
   outboundRecords = [], 
   transferRecords = [],
@@ -451,7 +453,10 @@ export function InventoryContent({
     totalPagesTransfers,
   ]);
 
-  const categories = [...new Set(items.map((i) => i.category))];
+  const categoryNames =
+    categories.length > 0
+      ? categories.map((c) => c.name)
+      : [...new Set(items.map((i) => i.category))];
 
   const criticalItems = items.filter((i) => i.status === "critical").length;
   const lowStockItems = items.filter((i) => i.status === "low").length;
@@ -692,7 +697,7 @@ export function InventoryContent({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All categories</SelectItem>
-                    {categories.map((cat) => (
+                    {categoryNames.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>

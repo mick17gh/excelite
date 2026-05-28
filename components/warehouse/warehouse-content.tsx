@@ -93,6 +93,7 @@ interface WarehouseItem {
   warehouseId: string;
   name: string;
   sku: string;
+  categoryId: string;
   category: string;
   unit: string;
   unitCost: number;
@@ -207,6 +208,7 @@ interface WarehouseContentProps {
   wastageRecords: WastageRecord[];
   userRole: Role;
   assignedWarehouseId: string | null;
+  categories: Array<{ id: string; name: string; code: string }>;
 }
 
 /** Stable tab labels — single source of truth to avoid SSR/client text drift. */
@@ -257,6 +259,7 @@ export function WarehouseContent({
   wastageRecords,
   userRole,
   assignedWarehouseId,
+  categories,
 }: WarehouseContentProps) {
   const router = useRouter();
   const canMutate = canMutateWarehouseOps(userRole);
@@ -826,6 +829,7 @@ export function WarehouseContent({
                                 warehouseId: item.warehouseId,
                                 name: item.name,
                                 sku: item.sku,
+                                categoryId: item.categoryId,
                                 category: item.category,
                                 unit: item.unit,
                                 unitCost: item.unitCost,
@@ -1267,7 +1271,7 @@ export function WarehouseContent({
         }}
         warehouse={editingWarehouse}
       />
-      <CreateWarehouseItemDialog open={showCreateItem} onOpenChange={setShowCreateItem} warehouses={warehouses} />
+      <CreateWarehouseItemDialog open={showCreateItem} onOpenChange={setShowCreateItem} warehouses={warehouses} categories={categories} />
       <EditWarehouseItemDialog
         open={editingItem != null}
         onOpenChange={(open) => {
@@ -1275,6 +1279,7 @@ export function WarehouseContent({
         }}
         item={editingItem}
         warehouseName={warehouses.find((w) => w.id === editingItem?.warehouseId)?.name}
+        categories={categories}
       />
       <CreateTransferDialog open={showCreateTransfer} onOpenChange={setShowCreateTransfer} warehouses={warehouses} items={items} branches={branches} />
       <BulkTransferToBranchDialog open={showBulkTransfer} onOpenChange={setShowBulkTransfer} warehouses={warehouses} items={items} branches={branches} />
@@ -1286,6 +1291,7 @@ export function WarehouseContent({
         open={showBulkImport}
         onOpenChange={setShowBulkImport}
         warehouses={warehouses}
+        categories={categories}
         defaultWarehouseId={selectedWarehouse !== "all" ? selectedWarehouse : undefined}
       />
     </div>

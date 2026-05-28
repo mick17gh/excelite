@@ -5,6 +5,7 @@ import { getWarehouseTransfers } from "@/lib/actions/warehouse";
 import { getBranches } from "@/lib/actions/branches";
 import { getWarehouses } from "@/lib/actions/warehouse";
 import { getBranchWarehouseTransfers } from "@/lib/actions/stock-transfers";
+import { listInventoryCategories } from "@/lib/actions/inventory-categories";
 
 export const metadata = {
   title: "Inventory Management | ServStack",
@@ -83,6 +84,7 @@ export default async function InventoryPage() {
     warehouseTransfersResult,
     warehousesResult,
     branchReturnsResult,
+    categoriesResult,
   ] = await Promise.all([
     getBranches(),
     getInventoryItems(undefined, { page: 1, pageSize: 1000 }),
@@ -92,6 +94,7 @@ export default async function InventoryPage() {
     getWarehouseTransfers(),
     getWarehouses(),
     getBranchWarehouseTransfers({ limit: 200 }),
+    listInventoryCategories(),
   ]);
   const warehouseList = (warehousesResult.data || []).map((w) => ({
     id: w.id,
@@ -138,6 +141,7 @@ export default async function InventoryPage() {
     };
   });
   const suppliers = suppliersResult.data || [];
+  const categories = categoriesResult.success ? categoriesResult.data : [];
 
   return (
     <div className="space-y-6">
@@ -154,6 +158,7 @@ export default async function InventoryPage() {
         <InventoryContent 
           items={items} 
           branches={branchList}
+          categories={categories}
           warehouses={warehouseList}
           outboundRecords={outboundRecords}
           transferRecords={transferRecords}

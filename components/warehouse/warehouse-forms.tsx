@@ -34,10 +34,12 @@ import {
 import { createWarehouseToWarehouseTransfer } from "@/lib/actions/stock-transfers";
 import { Combobox } from "@/components/ui/combobox";
 import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
-import {
-  INVENTORY_CATEGORIES,
-  CATEGORY_LABELS,
-} from "@/lib/constants/categories";
+
+interface InventoryCategoryOption {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface WarehouseData {
   id: string;
@@ -81,6 +83,7 @@ export interface WarehouseItemFormData {
   warehouseId: string;
   name: string;
   sku: string;
+  categoryId: string;
   category: string;
   unit: string;
   unitCost: number;
@@ -389,18 +392,20 @@ interface CreateWarehouseItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   warehouses: WarehouseData[];
+  categories: InventoryCategoryOption[];
 }
 
 export function CreateWarehouseItemDialog({
   open,
   onOpenChange,
   warehouses,
+  categories,
 }: CreateWarehouseItemDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
-  const [category, setCategory] = useState("FOOD");
+  const [categoryId, setCategoryId] = useState("");
   const [unit, setUnit] = useState("KG");
   const [unitCost, setUnitCost] = useState(0);
   const [currentStock, setCurrentStock] = useState(0);
@@ -422,7 +427,7 @@ export function CreateWarehouseItemDialog({
         warehouseId,
         name: name.trim(),
         sku: sku.trim(),
-        category: category as any,
+        categoryId,
         unit: unit as any,
         unitCost,
         currentStock,
@@ -499,15 +504,15 @@ export function CreateWarehouseItemDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
-              <Label>Category</Label>
-              <Select value={category} onValueChange={setCategory}>
+            <Label>Category</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {INVENTORY_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -627,6 +632,7 @@ interface EditWarehouseItemDialogProps {
   onOpenChange: (open: boolean) => void;
   item: WarehouseItemFormData | null;
   warehouseName?: string;
+  categories: InventoryCategoryOption[];
 }
 
 export function EditWarehouseItemDialog({
@@ -634,11 +640,12 @@ export function EditWarehouseItemDialog({
   onOpenChange,
   item,
   warehouseName,
+  categories,
 }: EditWarehouseItemDialogProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("FOOD");
+  const [categoryId, setCategoryId] = useState("");
   const [unit, setUnit] = useState("KG");
   const [unitCost, setUnitCost] = useState(0);
   const [currentStock, setCurrentStock] = useState(0);
@@ -653,7 +660,7 @@ export function EditWarehouseItemDialog({
   useEffect(() => {
     if (!item || !open) return;
     setName(item.name);
-    setCategory(item.category);
+    setCategoryId(item.categoryId || "");
     setUnit(item.unit);
     setUnitCost(item.unitCost);
     setCurrentStock(item.currentStock);
@@ -679,7 +686,7 @@ export function EditWarehouseItemDialog({
       const result = await updateWarehouseItem({
         id: item.id,
         name: name.trim(),
-        category: category as any,
+        categoryId,
         unit: unit as any,
         unitCost,
         currentStock,
@@ -722,14 +729,14 @@ export function EditWarehouseItemDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label>Category</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {INVENTORY_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

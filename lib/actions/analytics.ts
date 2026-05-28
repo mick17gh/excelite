@@ -384,7 +384,7 @@ export async function getInventoryAnalytics(branchId?: string) {
           isActive: true,
           ...branchFilter,
         },
-        include: { branch: true },
+        include: { branch: true, category: { select: { name: true } } },
       }),
       db.outboundStock.findMany({
         where: {
@@ -416,18 +416,19 @@ export async function getInventoryAnalytics(branchId?: string) {
     // Group by category
     const byCategory: Record<string, { count: number; value: number; waste: number }> = {};
     items.forEach((item) => {
-      if (!byCategory[item.category]) {
-        byCategory[item.category] = { count: 0, value: 0, waste: 0 };
+      const categoryName = item.category.name;
+      if (!byCategory[categoryName]) {
+        byCategory[categoryName] = { count: 0, value: 0, waste: 0 };
       }
-      byCategory[item.category].count += 1;
-      byCategory[item.category].value += Number(item.currentStock) * Number(item.unitCost);
+      byCategory[categoryName].count += 1;
+      byCategory[categoryName].value += Number(item.currentStock) * Number(item.unitCost);
     });
 
     // Add waste by category
     wasteLogs.forEach((log) => {
       const item = items.find((i) => i.id === log.itemId);
-      if (item && byCategory[item.category]) {
-        byCategory[item.category].waste += Number(log.totalCost);
+      if (item && byCategory[item.category.name]) {
+        byCategory[item.category.name].waste += Number(log.totalCost);
       }
     });
 

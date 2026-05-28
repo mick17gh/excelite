@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { ChangeEvent, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,15 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { Building2, Users, GitBranch, Warehouse, Save, Loader2 } from "lucide-react";
+import { Building2, Users, GitBranch, Warehouse, Save, Loader2, Upload, Image as ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { getOrganization, updateOrganization } from "@/lib/actions/organization";
 import { getTierLimits, TIER_DISPLAY_NAMES } from "@/lib/tier-config";
 import { SubscriptionTier } from "@/lib/generated/prisma/client";
+import Image from "next/image";
 
 interface OrgData {
   id: string;
   name: string;
+  storeLogoUrl?: string | null;
   tier: string;
   status: string;
   maxBranches: number;
@@ -46,6 +48,9 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState("");
+  const [storeLogoUrl, setStoreLogoUrl] = useState("");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
     loadOrg();
@@ -58,6 +63,9 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
       if (result.data) {
         setOrg(result.data as OrgData);
         setName(result.data.name);
+        setStoreLogoUrl(result.data.storeLogoUrl || "");
+        setLogoPreview(result.data.storeLogoUrl || null);
+        setSelectedLogoFile(null);
       }
     } catch {
       toast.error("Failed to load organization");
@@ -66,13 +74,71 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
     }
   };
 
+  const handleLogoChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 5 * 1024 * 1024;
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast.error("File size exceeds 5MB limit.");
+      return;
+    }
+
+    setSelectedLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+    setStoreLogoUrl("");
+  };
+
+  const clearLogo = () => {
+    setSelectedLogoFile(null);
+    setLogoPreview(null);
+    setStoreLogoUrl("");
+  };
+
   const handleSave = async () => {
     if (!org || !name.trim()) return;
     setIsSaving(true);
     try {
-      const result = await updateOrganization({ id: org.id, name: name.trim() });
+      let uploadedLogoUrl = storeLogoUrl.trim();
+      if (selectedLogoFile) {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", selectedLogoFile);
+        uploadFormData.append("folder", "organization");
+
+        const uploadResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: uploadFormData,
+        });
+
+        if (!uploadResponse.ok) {
+          const uploadError = await uploadResponse.json();
+          throw new Error(uploadError.error || "Failed to upload organization logo");
+        }
+
+        const uploadData = await uploadResponse.json();
+        uploadedLogoUrl = uploadData.url;
+      }
+
+      const result = await updateOrganization({
+        id: org.id,
+        name: name.trim(),
+        storeLogoUrl: uploadedLogoUrl || null,
+      });
       if (result.error) toast.error(result.error);
-      else toast.success("Organization updated");
+      else {
+        setStoreLogoUrl(uploadedLogoUrl || "");
+        setLogoPreview(uploadedLogoUrl || null);
+        setSelectedLogoFile(null);
+        setOrg((prev) => (prev ? { ...prev, name: name.trim(), storeLogoUrl: uploadedLogoUrl || null } : prev));
+        toast.success("Organization updated");
+      }
     } catch {
       toast.error("Failed to update");
     } finally {
@@ -130,6 +196,53 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
                 <Badge variant="outline" className="text-xs">
                   {org.status}
                 </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Organization Logo (optional)</Label>
+            <div className="flex items-center gap-4 rounded-lg border p-3">
+              <div className="relative h-20 w-20 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 overflow-hidden flex items-center justify-center">
+                {logoPreview || storeLogoUrl ? (
+                  <>
+                    <Image
+                      src={logoPreview || storeLogoUrl}
+                      alt="Organization logo preview"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-5 w-5"
+                      onClick={clearLogo}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
+                )}
+              </div>
+              <div className="space-y-2 flex-1">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                  id="org-settings-logo-upload"
+                />
+                <Label
+                  htmlFor="org-settings-logo-upload"
+                  className="cursor-pointer inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload Logo
+                </Label>
+                <p className="text-xs text-muted-foreground">Max 5MB. JPG, PNG, or WebP.</p>
               </div>
             </div>
           </div>

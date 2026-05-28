@@ -10,6 +10,7 @@ import { getBranches } from "@/lib/actions/branches";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Role } from "@/lib/generated/prisma/client";
+import { listInventoryCategories } from "@/lib/actions/inventory-categories";
 
 export const metadata = {
   title: "Warehouse | ServStack",
@@ -33,7 +34,7 @@ export default async function WarehousePage() {
   const userRole = (dbUser?.role as Role) ?? "STAFF";
   const assignedWarehouseId = dbUser?.assignedWarehouseId ?? null;
 
-  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult, branchReturnsResult] = await Promise.all([
+  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult, branchReturnsResult, categoriesResult] = await Promise.all([
     getWarehouses(),
     getWarehouseTransfers(),
     getWarehouseMaterialTransfers(),
@@ -42,6 +43,7 @@ export default async function WarehousePage() {
     getWarehouseInboundRecords(),
     getWarehouseWasteLogs(),
     getBranchWarehouseTransfers({ limit: 200 }),
+    listInventoryCategories(),
   ]);
 
   const warehouses = warehousesResult.data || [];
@@ -64,6 +66,7 @@ export default async function WarehousePage() {
   const inboundRecords = inboundResult.data || [];
   const wastageRecords = wastageResult.data || [];
   const branchReturns = branchReturnsResult.data || [];
+  const categories = categoriesResult.success ? categoriesResult.data : [];
   const branches = (branchesResult.data || []).map((b: { id: string; name: string; code: string }) => ({
     id: b.id,
     name: b.name,
@@ -98,6 +101,7 @@ export default async function WarehousePage() {
           wastageRecords={wastageRecords}
           userRole={userRole}
           assignedWarehouseId={assignedWarehouseId}
+          categories={categories}
         />
       </Suspense>
     </div>

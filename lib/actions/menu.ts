@@ -243,7 +243,7 @@ async function resolveIngredientIds(ingredients: IngredientInput[]): Promise<Ing
 
   const warehouseItems = await db.warehouseInventoryItem.findMany({
     where: { id: { in: warehouseIds } },
-    select: { id: true, name: true, sku: true, category: true, unit: true, unitCost: true, minStock: true, reorderPoint: true },
+    select: { id: true, name: true, sku: true, categoryId: true, unit: true, unitCost: true, minStock: true, reorderPoint: true },
   });
 
   // For each warehouse item, find or create a "template" branch InventoryItem
@@ -266,7 +266,7 @@ async function resolveIngredientIds(ingredients: IngredientInput[]): Promise<Ing
         data: {
           name: whItem.name,
           sku: whItem.sku,
-          category: whItem.category,
+          categoryId: whItem.categoryId,
           unit: whItem.unit,
           unitCost: whItem.unitCost,
           currentStock: 0,
@@ -828,9 +828,9 @@ export async function getInventoryItemsForIngredients() {
         sku: true,
         unit: true,
         unitCost: true,
-        category: true,
+        category: { select: { name: true } },
       },
-      orderBy: [{ category: "asc" }, { name: "asc" }],
+      orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
     });
 
     // Dedupe by SKU (in case multiple warehouses have same SKU)
@@ -843,7 +843,7 @@ export async function getInventoryItemsForIngredients() {
           sku: item.sku,
           unit: item.unit,
           unitCost: Number(item.unitCost),
-          category: item.category,
+          category: item.category.name,
         });
       }
     }
@@ -855,8 +855,15 @@ export async function getInventoryItemsForIngredients() {
         deletedAt: null,
         sku: { notIn: [...uniqueItems.keys()] },
       },
-      select: { id: true, name: true, sku: true, unit: true, unitCost: true, category: true },
-      orderBy: [{ category: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        unit: true,
+        unitCost: true,
+        category: { select: { name: true } },
+      },
+      orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
     });
 
     const branchUnique = new Map<string, typeof branchItems[0]>();
@@ -870,7 +877,7 @@ export async function getInventoryItemsForIngredients() {
         sku: item.sku,
         unit: item.unit,
         unitCost: Number(item.unitCost),
-        category: item.category,
+        category: item.category.name,
       });
     }
 

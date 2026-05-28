@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { InventoryCategory, UnitType, TransferStatus } from "@/lib/generated/prisma/client";
+import { UnitType, TransferStatus } from "@/lib/generated/prisma/client";
 import { assertWarehouseMutationAllowed } from "@/lib/actions/warehouse-auth";
 import {
   branchLimitsFromWarehouseItem,
@@ -48,7 +48,7 @@ export interface CreateWarehouseItemInput {
   warehouseId: string;
   name: string;
   sku: string;
-  category: InventoryCategory;
+  categoryId: string;
   unit: UnitType;
   unitCost: number;
   currentStock?: number;
@@ -111,6 +111,7 @@ export async function getWarehouseInventory(warehouseId: string) {
   try {
     const items = await db.warehouseInventoryItem.findMany({
       where: { warehouseId },
+      include: { category: true },
       orderBy: { name: "asc" },
     });
 
@@ -120,7 +121,8 @@ export async function getWarehouseInventory(warehouseId: string) {
         warehouseId: item.warehouseId,
         name: item.name,
         sku: item.sku,
-        category: item.category,
+        categoryId: item.categoryId,
+        category: item.category.name,
         unit: item.unit,
         unitCost: decimalToNumber(item.unitCost),
         currentStock: decimalToNumber(item.currentStock),
@@ -250,7 +252,7 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
         warehouseId: input.warehouseId,
         name: input.name,
         sku: input.sku,
-        category: input.category,
+        categoryId: input.categoryId,
         unit: input.unit,
         unitCost: input.unitCost,
         currentStock: input.currentStock || 0,
@@ -261,6 +263,7 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
         requiresCommissaryProcessing: input.requiresCommissaryProcessing ?? false,
         allowDirectToBranch: input.allowDirectToBranch ?? true,
       },
+      include: { category: true },
     });
 
     revalidatePath("/dashboard/warehouse");
@@ -270,7 +273,8 @@ export async function createWarehouseItem(input: CreateWarehouseItemInput) {
         warehouseId: item.warehouseId,
         name: item.name,
         sku: item.sku,
-        category: item.category,
+        categoryId: item.categoryId,
+        category: item.category.name,
         unit: item.unit,
         unitCost: decimalToNumber(item.unitCost),
         currentStock: decimalToNumber(item.currentStock),
@@ -406,7 +410,7 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
             data: {
               name: whItem.name,
               sku: whItem.sku,
-              category: whItem.category,
+              categoryId: whItem.categoryId,
               unit: whItem.unit,
               unitCost: whItem.unitCost,
               currentStock: qty,
@@ -686,7 +690,7 @@ export async function getWarehouseInboundRecords(warehouseId?: string) {
 export interface BulkWarehouseItemInput {
   name: string;
   sku: string;
-  category: InventoryCategory;
+  categoryId: string;
   unit: UnitType;
   unitCost: number;
   currentStock?: number;
@@ -705,6 +709,23 @@ export async function bulkCreateWarehouseItems(
 ) {
   try {
     if (!items.length) return { error: "No items to import" };
+
+    const warehouse = await db.warehouse.findUnique({
+      where: { id: warehouseId },
+      select: { organizationId: true },
+    });
+    if (!warehouse) return { error: "Warehouse not found" };
+
+    const categoryRows = await db.inventoryCategoryMaster.findMany({
+      where: { organizationId: warehouse.organizationId, deletedAt: null },
+      select: { id: true, name: true, code: true },
+    });
+    const categoryLookup = new Map<string, string>();
+    for (const c of categoryRows) {
+      categoryLookup.set(c.id, c.id);
+      categoryLookup.set(c.name.trim().toLowerCase(), c.id);
+      categoryLookup.set(c.code.trim().toLowerCase(), c.id);
+    }
 
     // Validate no duplicate SKUs in the batch
     const skus = items.map((i) => i.sku);
@@ -727,12 +748,26 @@ export async function bulkCreateWarehouseItems(
       return { error: "All SKUs already exist in this warehouse", skipped: skippedCount };
     }
 
+    const normalizedItems = newItems.map((item) => ({
+      ...item,
+      categoryId: categoryLookup.get(item.categoryId.trim().toLowerCase()) || "",
+    }));
+
+    const invalid = normalizedItems.filter((i) => !i.categoryId);
+    if (invalid.length > 0) {
+      return {
+        error: `Unknown categories: ${invalid.map((i) => i.name).join(", ")}`,
+      };
+    }
+
     const created = await db.warehouseInventoryItem.createMany({
       data: newItems.map((item) => ({
         warehouseId,
         name: item.name,
         sku: item.sku,
-        category: item.category,
+        categoryId:
+          categoryLookup.get(item.categoryId.trim().toLowerCase()) ||
+          item.categoryId,
         unit: item.unit,
         unitCost: item.unitCost,
         currentStock: item.currentStock || 0,
@@ -761,7 +796,7 @@ export async function bulkCreateWarehouseItems(
 export interface UpdateWarehouseItemInput {
   id: string;
   name?: string;
-  category?: InventoryCategory;
+  categoryId?: string;
   unit?: UnitType;
   unitCost?: number;
   currentStock?: number;
@@ -779,7 +814,7 @@ export async function updateWarehouseItem(input: UpdateWarehouseItemInput) {
     const { id, ...fields } = input;
     const data: Record<string, unknown> = {};
     if (fields.name !== undefined) data.name = fields.name;
-    if (fields.category !== undefined) data.category = fields.category;
+    if (fields.categoryId !== undefined) data.categoryId = fields.categoryId;
     if (fields.unit !== undefined) data.unit = fields.unit;
     if (fields.unitCost !== undefined) data.unitCost = fields.unitCost;
     if (fields.currentStock !== undefined) data.currentStock = fields.currentStock;
@@ -797,7 +832,11 @@ export async function updateWarehouseItem(input: UpdateWarehouseItemInput) {
     }
     if (fields.isActive !== undefined) data.isActive = fields.isActive;
 
-    const item = await db.warehouseInventoryItem.update({ where: { id }, data });
+    const item = await db.warehouseInventoryItem.update({
+      where: { id },
+      data,
+      include: { category: true },
+    });
 
     revalidatePath("/dashboard/warehouse");
     return {
@@ -806,7 +845,8 @@ export async function updateWarehouseItem(input: UpdateWarehouseItemInput) {
         warehouseId: item.warehouseId,
         name: item.name,
         sku: item.sku,
-        category: item.category,
+        categoryId: item.categoryId,
+        category: item.category.name,
         unit: item.unit,
         unitCost: decimalToNumber(item.unitCost),
         currentStock: decimalToNumber(item.currentStock),

@@ -932,13 +932,14 @@ async function buildInventoryReport(
 ): Promise<ReportDataPayload> {
   const items = await db.inventoryItem.findMany({
     where: { deletedAt: null, isActive: true, ...branchFilter },
-    include: { branch: true },
+    include: { branch: true, category: { select: { name: true } } },
   });
 
   const branchInventoryRows = items.map((item) => ({
     "Item Name": item.name,
     Branch: item.branch?.name || "",
     SKU: item.sku,
+    Category: item.category.name,
     "Current Stock": Number(item.currentStock),
     "Unit Cost": roundMoney(Number(item.unitCost)),
     "Line Value (GHS)": roundMoney(Number(item.currentStock) * Number(item.unitCost)),
@@ -974,7 +975,10 @@ async function buildWarehouseStock(
   const items = whIds.length
     ? await db.warehouseInventoryItem.findMany({
         where: { warehouseId: { in: whIds }, isActive: true },
-        include: { warehouse: { select: { name: true, code: true } } },
+        include: {
+          warehouse: { select: { name: true, code: true } },
+          category: { select: { name: true } },
+        },
         orderBy: [{ warehouseId: "asc" }, { name: "asc" }],
       })
     : [];
@@ -983,7 +987,7 @@ async function buildWarehouseStock(
     Warehouse: i.warehouse?.name || "",
     "Item Name": i.name,
     SKU: i.sku,
-    Category: i.category,
+    Category: i.category.name,
     "Current Stock": Number(i.currentStock),
     "Unit Cost": roundMoney(Number(i.unitCost)),
     "Line Value (GHS)": roundMoney(Number(i.currentStock) * Number(i.unitCost)),

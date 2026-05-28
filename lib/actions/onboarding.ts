@@ -8,6 +8,7 @@ interface OnboardingInput {
   organization: {
     name: string;
     tableManagementEnabled?: boolean;
+    storeLogoUrl?: string;
   };
   branch: {
     name: string;
@@ -47,6 +48,7 @@ export async function completeOnboarding(input: OnboardingInput) {
           maxUsers: 2,
           maxMenuItems: 50,
           tableManagementEnabled: input.organization.tableManagementEnabled ?? false,
+          storeLogoUrl: input.organization.storeLogoUrl || null,
         },
       });
 

@@ -29,9 +29,14 @@ import {
   createInventoryItem,
 } from "@/lib/actions/inventory";
 import { createBranchToWarehouseTransfer } from "@/lib/actions/stock-transfers";
-import { StockMovementType, InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
+import { StockMovementType, UnitType } from "@/lib/generated/prisma/client";
 import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
-import { INVENTORY_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants/categories";
+
+interface InventoryCategoryOption {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface Branch {
   id: string;
@@ -575,14 +580,15 @@ interface AddItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   branches: Branch[];
+  categories: InventoryCategoryOption[];
 }
 
-export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFormProps) {
+export function AddInventoryItemForm({ open, onOpenChange, branches, categories }: AddItemFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
-    category: "FOOD",
+    categoryId: "",
     unit: "KG",
     unitCost: "",
     currentStock: "",
@@ -600,7 +606,7 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
       const result = await createInventoryItem({
         name: formData.name,
         sku: formData.sku,
-        category: formData.category as InventoryCategory,
+        categoryId: formData.categoryId,
         unit: formData.unit as UnitType,
         unitCost: parseFloat(formData.unitCost),
         currentStock: formData.currentStock ? parseFloat(formData.currentStock) : 0,
@@ -616,7 +622,7 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
         setFormData({
           name: "",
           sku: "",
-          category: "FOOD",
+          categoryId: "",
           unit: "KG",
           unitCost: "",
           currentStock: "",
@@ -674,18 +680,18 @@ export function AddInventoryItemForm({ open, onOpenChange, branches }: AddItemFo
               <div className="grid gap-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  value={formData.categoryId}
+                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FOOD">Food</SelectItem>
-                    <SelectItem value="BEVERAGE">Beverage</SelectItem>
-                    <SelectItem value="PACKAGING">Packaging</SelectItem>
-                    <SelectItem value="CLEANING">Cleaning</SelectItem>
-                    <SelectItem value="OTHER">Other</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

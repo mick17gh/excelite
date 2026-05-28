@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const branchId = searchParams.get("branchId") || auth.branchId;
-  const category = searchParams.get("category");
+  const categoryId = searchParams.get("categoryId");
   const lowStock = searchParams.get("lowStock") === "true";
   const limit = parseInt(searchParams.get("limit") || "100");
   const offset = parseInt(searchParams.get("offset") || "0");
@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
     whereClause.branchId = branchId;
   }
 
-  if (category) {
-    whereClause.category = category;
+  if (categoryId) {
+    whereClause.categoryId = categoryId;
   }
 
   const [items, total] = await Promise.all([
@@ -37,8 +37,11 @@ export async function GET(request: NextRequest) {
         branch: {
           select: { id: true, name: true, code: true },
         },
+        category: {
+          select: { id: true, name: true, code: true },
+        },
       },
-      orderBy: [{ category: "asc" }, { name: "asc" }],
+      orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
       take: Math.min(limit, 500),
       skip: offset,
     }),
@@ -58,7 +61,8 @@ export async function GET(request: NextRequest) {
       id: item.id,
       name: item.name,
       sku: item.sku,
-      category: item.category,
+      categoryId: item.categoryId,
+      category: item.category?.name,
       unit: item.unit,
       unitCost: Number(item.unitCost),
       currentStock: Number(item.currentStock),

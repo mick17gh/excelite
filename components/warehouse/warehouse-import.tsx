@@ -48,12 +48,12 @@ import {
   type BulkWarehouseItemInput,
 } from "@/lib/utils/bulk-import";
 import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
-import { INVENTORY_CATEGORIES, CATEGORY_LABELS } from "@/lib/constants/categories";
 
 interface WarehouseImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   warehouses: Array<{ id: string; name: string }>;
+  categories: Array<{ id: string; name: string; code: string }>;
   defaultWarehouseId?: string;
 }
 
@@ -69,9 +69,13 @@ export function WarehouseImportDialog({
   open,
   onOpenChange,
   warehouses,
+  categories,
   defaultWarehouseId,
 }: WarehouseImportDialogProps) {
   const router = useRouter();
+  const categoryLookup = new Set(
+    categories.flatMap((c) => [c.id, c.code.toLowerCase(), c.name.toLowerCase()]),
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [file, setFile] = useState<File | null>(null);
@@ -129,10 +133,10 @@ export function WarehouseImportDialog({
         if (!item.sku || item.sku.trim() === "") {
           errors.push("SKU is required");
         }
-        if (!item.category || item.category.trim() === "") {
+        if (!item.categoryId || item.categoryId.trim() === "") {
           errors.push("Category is required");
-        } else if (!INVENTORY_CATEGORIES.includes(item.category as any)) {
-          errors.push(`Invalid category. Must be one of: ${INVENTORY_CATEGORIES.join(", ")}`);
+        } else if (!categoryLookup.has(item.categoryId.toLowerCase())) {
+          errors.push(`Invalid category (${item.categoryId}). Choose a known category`);
         }
         if (!item.unit || item.unit.trim() === "") {
           errors.push("Unit is required");
@@ -273,7 +277,7 @@ export function WarehouseImportDialog({
       
       if (!item.name || item.name.trim() === "") errors.push("Name is required");
       if (!item.sku || item.sku.trim() === "") errors.push("SKU is required");
-      if (!item.category || !INVENTORY_CATEGORIES.includes(item.category as any)) {
+      if (!item.categoryId || !categoryLookup.has(item.categoryId.toLowerCase())) {
         errors.push("Valid category is required");
       }
       if (!item.unit || !UNIT_TYPES.includes(item.unit as any)) {
@@ -475,16 +479,16 @@ export function WarehouseImportDialog({
                         <TableCell className="font-mono text-xs">{row.sku || "-"}</TableCell>
                         <TableCell>
                           <Select
-                            value={row.category || ""}
-                            onValueChange={(value) => updateRowField(index, "category", value)}
+                            value={row.categoryId || ""}
+                            onValueChange={(value) => updateRowField(index, "categoryId", value)}
                           >
                             <SelectTrigger className="h-8 text-xs">
                               <SelectValue placeholder="Select..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {INVENTORY_CATEGORIES.map((cat) => (
-                                <SelectItem key={cat} value={cat} className="text-xs">
-                                  {CATEGORY_LABELS[cat]}
+                              {categories.map((category) => (
+                                <SelectItem key={category.id} value={category.id} className="text-xs">
+                                  {category.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>

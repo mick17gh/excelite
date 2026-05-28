@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   if (type === "inventory" && warehouseId) {
     const items = await db.warehouseInventoryItem.findMany({
       where: { warehouseId },
+      include: { category: { select: { id: true, name: true, code: true } } },
       orderBy: { name: "asc" },
     });
 
@@ -26,7 +27,8 @@ export async function GET(request: NextRequest) {
         warehouseId: item.warehouseId,
         name: item.name,
         sku: item.sku,
-        category: item.category,
+        categoryId: item.categoryId,
+        category: item.category?.name,
         unit: item.unit,
         unitCost: Number(item.unitCost),
         currentStock: Number(item.currentStock),

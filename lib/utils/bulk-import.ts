@@ -276,12 +276,12 @@ export function getStaffCSVTemplate(): string {
 // WAREHOUSE UTILITIES
 // =====================================
 
-import type { InventoryCategory, UnitType } from "@/lib/generated/prisma/client";
+import type { UnitType } from "@/lib/generated/prisma/client";
 
 export interface BulkWarehouseItemInput {
   name: string;
   sku: string;
-  category: InventoryCategory;
+  categoryId: string;
   unit: UnitType;
   unitCost: number;
   currentStock?: number;
@@ -324,7 +324,8 @@ export function parseWarehouseCSV(rows: ParsedCSVRow[]): BulkWarehouseItemInput[
     .map((row) => ({
       name: row.name || row.Name || "",
       sku: row.sku || row.SKU || "",
-      category: (row.category || row.Category || "FOOD") as InventoryCategory,
+      categoryId:
+        row.categoryId || row.CategoryId || row.category || row.Category || "",
       unit: (row.unit || row.Unit || "UNIT") as UnitType,
       unitCost: parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0"),
       currentStock: parseNum(row.currentStock || row["Current Stock"]),
@@ -460,7 +461,7 @@ export function getWarehouseCSVTemplate(): string {
     "# --- Reference (rows below are ignored on import) ---",
     "# Columns: name, sku, category, unit, unitCost, currentStock, minStock, reorderPoint, maxStock, itemStage, requiresCommissaryProcessing, allowDirectToBranch, isActive",
     "# maxStock: branch par level when sending to branches (optional; blank uses 5x reorder point on transfer)",
-    "# Valid categories: FOOD, BEVERAGE, PACKAGING, CLEANING, EQUIPMENT, OTHER",
+    "# Category can be categoryId, code, or name from Inventory Categories setup",
     "# Valid units: KG, GRAM, MG, TON, LITER, ML, CL, GALLON, PIECE, UNIT, ITEM, BOX, CARTON, CASE, PACK, BAG, SACK, CRATE, TRAY, BOTTLE, CAN, JAR, CUP, TABLESPOON, TEASPOON, SLICE, PORTION, SERVING, PLATE",
     "# Valid itemStage: RAW, PROCESSED, BRANCH_READY",
     "# Booleans (requiresCommissaryProcessing, allowDirectToBranch, isActive): true/false (also yes/no, 1/0)",

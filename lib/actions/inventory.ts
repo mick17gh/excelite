@@ -2,13 +2,13 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { InventoryCategory, UnitType, StockMovementType, TransferStatus } from "@/lib/generated/prisma/client";
+import { UnitType, StockMovementType, TransferStatus } from "@/lib/generated/prisma/client";
 import { logTransfer } from "@/lib/services/audit";
 
 export interface CreateInventoryItemInput {
   name: string;
   sku: string;
-  category: InventoryCategory;
+  categoryId: string;
   unit: UnitType;
   unitCost: number;
   currentStock?: number;
@@ -21,7 +21,7 @@ export interface CreateInventoryItemInput {
 export interface UpdateInventoryItemInput {
   id: string;
   name?: string;
-  category?: InventoryCategory;
+  categoryId?: string;
   unit?: UnitType;
   unitCost?: number;
   minStock?: number;
@@ -36,7 +36,7 @@ export async function createInventoryItem(input: CreateInventoryItemInput) {
       data: {
         name: input.name,
         sku: input.sku,
-        category: input.category,
+        categoryId: input.categoryId,
         unit: input.unit,
         unitCost: input.unitCost,
         minStock: input.minStock,
@@ -143,6 +143,7 @@ export async function getInventoryItems(
         where,
         include: {
           branch: true,
+          category: true,
         },
         orderBy: { name: "asc" },
         skip,
@@ -156,7 +157,8 @@ export async function getInventoryItems(
       id: item.id,
       name: item.name,
       sku: item.sku,
-      category: item.category,
+      categoryId: item.categoryId,
+      category: item.category.name,
       unit: item.unit,
       unitCost: Number(item.unitCost),
       currentStock: Number(item.currentStock),
@@ -421,7 +423,7 @@ export async function updateBranchTransferStatus(
           data: {
             name: item.name,
             sku: item.sku,
-            category: item.category,
+            categoryId: item.categoryId,
             unit: item.unit,
             unitCost: item.unitCost,
             currentStock: qty,
@@ -966,6 +968,7 @@ export async function getLowStockItems() {
       },
       include: {
         branch: true,
+        category: true,
       },
     });
 
@@ -978,7 +981,8 @@ export async function getLowStockItems() {
       id: item.id,
       name: item.name,
       sku: item.sku,
-      category: item.category,
+      categoryId: item.categoryId,
+      category: item.category.name,
       unit: item.unit,
       unitCost: Number(item.unitCost),
       currentStock: Number(item.currentStock),

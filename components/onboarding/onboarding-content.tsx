@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { ChangeEvent, useState, useTransition } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, MapPin, Phone, Mail, ArrowRight, Loader2, CheckCircle2, UtensilsCrossed } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, ArrowRight, Loader2, CheckCircle2, UtensilsCrossed, Upload, Image as ImageIcon, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { completeOnboarding } from "@/lib/actions/onboarding";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface OnboardingContentProps {
   user: {
@@ -28,6 +29,8 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
   // Organization details
   const [orgName, setOrgName] = useState("");
   const [industry, setIndustry] = useState("RESTAURANT");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
 
   // First branch details
   const [branchName, setBranchName] = useState("");
@@ -37,6 +40,32 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
   const [branchPhone, setBranchPhone] = useState("");
   const [branchEmail, setBranchEmail] = useState("");
   const [tableService, setTableService] = useState(false);
+
+  const handleLogoChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 5 * 1024 * 1024;
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast.error("File size exceeds 5MB limit.");
+      return;
+    }
+
+    setSelectedLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const clearLogo = () => {
+    setSelectedLogoFile(null);
+    setLogoPreview(null);
+  };
 
   const handleSubmit = () => {
     if (!orgName.trim()) {
@@ -50,10 +79,37 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
     }
 
     startTransition(async () => {
+      let uploadedLogoUrl = "";
+
+      try {
+        if (selectedLogoFile) {
+          const uploadFormData = new FormData();
+          uploadFormData.append("file", selectedLogoFile);
+          uploadFormData.append("folder", "organization");
+
+          const uploadResponse = await fetch("/api/upload", {
+            method: "POST",
+            body: uploadFormData,
+          });
+
+          if (!uploadResponse.ok) {
+            const uploadError = await uploadResponse.json();
+            throw new Error(uploadError.error || "Failed to upload organization logo");
+          }
+
+          const uploadData = await uploadResponse.json();
+          uploadedLogoUrl = uploadData.url;
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to upload logo");
+        return;
+      }
+
       const result = await completeOnboarding({
         organization: {
           name: orgName.trim(),
           tableManagementEnabled: tableService,
+          storeLogoUrl: uploadedLogoUrl || undefined,
         },
         branch: {
           name: branchName.trim(),
@@ -137,6 +193,53 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
                     <SelectItem value="CATERING">Catering</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Organization Logo (optional)</Label>
+                <div className="flex items-center gap-4">
+                  <div className="relative h-20 w-20 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 overflow-hidden flex items-center justify-center">
+                    {logoPreview ? (
+                      <>
+                        <Image
+                          src={logoPreview}
+                          alt="Organization logo preview"
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-5 w-5"
+                          onClick={clearLogo}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </>
+                    ) : (
+                      <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
+                    )}
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="hidden"
+                      id="org-logo-upload"
+                    />
+                    <Label
+                      htmlFor="org-logo-upload"
+                      className="cursor-pointer inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload Logo
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Max 5MB. JPG, PNG, or WebP.</p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end pt-4">

@@ -119,15 +119,6 @@ enum StockMovementType {
   ADJUSTMENT_CORRECTION
 }
 
-enum InventoryCategory {
-  FOOD
-  BEVERAGE
-  PACKAGING
-  CLEANING
-  EQUIPMENT
-  OTHER
-}
-
 enum UnitType {
   KG
   GRAM
@@ -847,7 +838,7 @@ model InventoryItem {
   id              String            @id @default(cuid())
   name            String
   sku             String
-  category        InventoryCategory
+  categoryId      String
   unit            UnitType
   unitCost        Decimal           @db.Decimal(10, 2)
   currentStock    Decimal           @default(0) @db.Decimal(12, 3)
@@ -863,6 +854,7 @@ model InventoryItem {
 
   // Relations
   branch        Branch               @relation(fields: [branchId], references: [id])
+  category      InventoryCategoryMaster @relation(fields: [categoryId], references: [id])
   inboundStock  InboundStock[]
   outboundStock OutboundStock[]
   wasteLogs          WasteLog[]
@@ -874,7 +866,7 @@ model InventoryItem {
 
   @@unique([sku, branchId])
   @@index([branchId])
-  @@index([category])
+  @@index([categoryId])
   @@index([currentStock])
   @@index([sku])
   @@map("inventory_item")
@@ -1401,14 +1393,37 @@ model Organization {
   updatedAt          DateTime           @updatedAt
 
   // Relations
-  users        User[]
-  branches     Branch[]
-  subscription Subscription?
-  warehouses   Warehouse[]
+  users               User[]
+  branches            Branch[]
+  subscription        Subscription?
+  warehouses          Warehouse[]
+  inventoryCategories InventoryCategoryMaster[]
 
   @@index([tier])
   @@index([status])
   @@map("organization")
+}
+
+model InventoryCategoryMaster {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  code           String
+  isActive       Boolean   @default(true)
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization          Organization             @relation(fields: [organizationId], references: [id])
+  inventoryItems        InventoryItem[]
+  warehouseInventoryItems WarehouseInventoryItem[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@index([organizationId, sortOrder])
+  @@map("inventory_category_master")
 }
 
 model Subscription {
@@ -1499,7 +1514,7 @@ model WarehouseInventoryItem {
   warehouseId  String
   name         String
   sku          String
-  category     InventoryCategory
+  categoryId   String
   unit         UnitType
   unitCost     Decimal           @db.Decimal(10, 2)
   currentStock Decimal           @default(0) @db.Decimal(12, 3)
@@ -1515,6 +1530,7 @@ model WarehouseInventoryItem {
 
   // Relations
   warehouse              Warehouse                   @relation(fields: [warehouseId], references: [id])
+  category               InventoryCategoryMaster     @relation(fields: [categoryId], references: [id])
   transfers              WarehouseBranchTransfer[]
   warehouseTransfers     WarehouseTransfer[]
   wasteLogs              WarehouseWasteLog[]
@@ -1525,7 +1541,7 @@ model WarehouseInventoryItem {
 
   @@unique([sku, warehouseId])
   @@index([warehouseId])
-  @@index([category])
+  @@index([categoryId])
   @@map("warehouse_inventory_item")
 }
 
