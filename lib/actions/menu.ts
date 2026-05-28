@@ -4,6 +4,12 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { UnitType } from "@/lib/generated/prisma/client";
 import { MAX_OPTION_GROUPS_PER_MENU_ITEM } from "@/lib/menu-selections";
+import {
+  menuItemVisibilityWhere,
+  resolveOrgBranchIds,
+  serializeMenuItemBranchVisibility,
+  validateMenuItemBranchScope,
+} from "@/lib/menu/branch-availability";
 
 export interface PaginationParams {
   page?: number;
@@ -31,6 +37,8 @@ export interface CreateMenuItemInput {
   description?: string;
   imageUrl?: string;
   isActive?: boolean;
+  availableAtAllBranches?: boolean;
+  branchIds?: string[];
   ingredients?: IngredientInput[];
   optionGroups?: MenuItemOptionGroupInput[];
 }
@@ -45,6 +53,8 @@ export interface UpdateMenuItemInput {
   description?: string;
   imageUrl?: string;
   isActive?: boolean;
+  availableAtAllBranches?: boolean;
+  branchIds?: string[];
   ingredients?: IngredientInput[];
   optionGroups?: MenuItemOptionGroupInput[] | null;
 }
@@ -287,6 +297,43 @@ async function resolveIngredientIds(ingredients: IngredientInput[]): Promise<Ing
   }));
 }
 
+async function syncMenuItemBranchAvailability(
+  menuItemId: string,
+  availableAtAllBranches: boolean,
+  branchIds: string[]
+) {
+  await db.$transaction([
+    db.menuItemBranch.deleteMany({ where: { menuItemId } }),
+    ...(availableAtAllBranches
+      ? []
+      : [
+          db.menuItemBranch.createMany({
+            data: branchIds.map((branchId) => ({ menuItemId, branchId })),
+          }),
+        ]),
+    db.menuItem.update({
+      where: { id: menuItemId },
+      data: { availableAtAllBranches },
+    }),
+  ]);
+}
+
+function mapMenuItemBranchFields(
+  item: {
+    availableAtAllBranches: boolean;
+    branchAvailability: { branchId: string }[];
+  }
+) {
+  const vis = serializeMenuItemBranchVisibility(
+    item.availableAtAllBranches,
+    item.branchAvailability
+  );
+  return {
+    availableAtAllBranches: vis.availableAtAllBranches,
+    branchIds: vis.branchIds,
+  };
+}
+
 export async function createMenuItem(input: CreateMenuItemInput) {
   try {
     // Input validation
@@ -313,6 +360,23 @@ export async function createMenuItem(input: CreateMenuItemInput) {
     const skuErr = await assertMenuItemOptionSkusAvailable(input.optionGroups);
     if (skuErr) {
       return { success: false, error: skuErr };
+    }
+
+    const availableAtAllBranches = input.availableAtAllBranches ?? true;
+    const scopeErr = validateMenuItemBranchScope(
+      availableAtAllBranches,
+      input.branchIds
+    );
+    if (scopeErr) {
+      return { success: false, error: scopeErr };
+    }
+    let resolvedBranchIds: string[] = [];
+    if (!availableAtAllBranches) {
+      const resolved = await resolveOrgBranchIds(input.branchIds!);
+      if (!resolved.ok) {
+        return { success: false, error: resolved.error };
+      }
+      resolvedBranchIds = resolved.ids;
     }
 
     // Check if SKU already exists
@@ -345,6 +409,7 @@ export async function createMenuItem(input: CreateMenuItemInput) {
         description: input.description?.trim(),
         imageUrl: input.imageUrl,
         isActive: input.isActive ?? true,
+        availableAtAllBranches,
         ...(resolvedIngredients.length > 0 && {
           ingredients: {
             create: resolvedIngredients.map((ing) => ({
@@ -357,9 +422,15 @@ export async function createMenuItem(input: CreateMenuItemInput) {
         ...(input.optionGroups?.length && {
           optionGroups: await buildNestedOptionGroupsCreate(input.optionGroups),
         }),
+        ...(!availableAtAllBranches && {
+          branchAvailability: {
+            create: resolvedBranchIds.map((branchId) => ({ branchId })),
+          },
+        }),
       },
       include: {
         category: true,
+        branchAvailability: { select: { branchId: true } },
         optionGroups: {
           orderBy: { sortOrder: "asc" },
           include: {
@@ -379,6 +450,7 @@ export async function createMenuItem(input: CreateMenuItemInput) {
         price: Number(item.price),
         cost: item.cost ? Number(item.cost) : null,
         optionGroups: mapOptionGroupsForClient(item.optionGroups),
+        ...mapMenuItemBranchFields(item),
       },
     };
   } catch (error) {
@@ -389,7 +461,14 @@ export async function createMenuItem(input: CreateMenuItemInput) {
 
 export async function updateMenuItem(input: UpdateMenuItemInput) {
   try {
-    const { id, ingredients, optionGroups, ...updateData } = input;
+    const {
+      id,
+      ingredients,
+      optionGroups,
+      availableAtAllBranches,
+      branchIds,
+      ...updateData
+    } = input;
 
     // If SKU is being updated, check for conflicts
     if (updateData.sku) {
@@ -409,6 +488,26 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
       const ogErr = validateOptionGroupsStructure(optionGroups ?? undefined);
       if (ogErr) {
         return { success: false, error: ogErr };
+      }
+    }
+
+    let resolvedBranchIds: string[] | undefined;
+    if (availableAtAllBranches !== undefined) {
+      const scopeErr = validateMenuItemBranchScope(
+        availableAtAllBranches,
+        branchIds
+      );
+      if (scopeErr) {
+        return { success: false, error: scopeErr };
+      }
+      if (!availableAtAllBranches) {
+        const resolved = await resolveOrgBranchIds(branchIds!);
+        if (!resolved.ok) {
+          return { success: false, error: resolved.error };
+        }
+        resolvedBranchIds = resolved.ids;
+      } else {
+        resolvedBranchIds = [];
       }
     }
 
@@ -497,9 +596,18 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
       });
     }
 
+    if (availableAtAllBranches !== undefined) {
+      await syncMenuItemBranchAvailability(
+        id,
+        availableAtAllBranches,
+        resolvedBranchIds ?? []
+      );
+    }
+
     const item = await db.menuItem.findUniqueOrThrow({
       where: { id },
       include: {
+        branchAvailability: { select: { branchId: true } },
         optionGroups: {
           orderBy: { sortOrder: "asc" },
           include: { options: { orderBy: { sortOrder: "asc" } } },
@@ -516,6 +624,7 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
         price: Number(item.price),
         cost: item.cost ? Number(item.cost) : null,
         optionGroups: mapOptionGroupsForClient(item.optionGroups),
+        ...mapMenuItemBranchFields(item),
       },
     };
   } catch (error) {
@@ -546,7 +655,8 @@ export async function deleteMenuItem(id: string) {
 export async function getMenuItems(
   categoryId?: string,
   includeInactive = false,
-  pagination?: PaginationParams
+  pagination?: PaginationParams,
+  branchId?: string
 ): Promise<PaginatedResult<any>> {
   try {
     const page = pagination?.page || 1;
@@ -557,6 +667,7 @@ export async function getMenuItems(
       deletedAt: null,
       ...(categoryId && { categoryId }),
       ...(!includeInactive && { isActive: true }),
+      ...(branchId ? menuItemVisibilityWhere(branchId) : {}),
     };
 
     const [items, totalItems] = await Promise.all([
@@ -564,6 +675,7 @@ export async function getMenuItems(
         where,
         include: {
           category: true,
+          branchAvailability: { select: { branchId: true } },
           optionGroups: {
             where: { isActive: true },
             orderBy: { sortOrder: "asc" },
@@ -600,6 +712,7 @@ export async function getMenuItems(
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       optionGroups: mapOptionGroupsForClient(item.optionGroups),
+      ...mapMenuItemBranchFields(item),
     }));
 
     return {
@@ -672,6 +785,7 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
             inventoryItem: true,
           },
         },
+        branchAvailability: { select: { branchId: true } },
         optionGroups: {
           orderBy: { sortOrder: "asc" },
           include: {
@@ -746,6 +860,7 @@ export async function getMenuItemWithIngredients(menuItemId: string) {
         description: item.description,
         imageUrl: item.imageUrl,
         isActive: item.isActive,
+        ...mapMenuItemBranchFields(item),
         ingredients: item.ingredients.map(mapIngRow),
         optionGroups: item.optionGroups.map((g) => ({
           id: g.id,

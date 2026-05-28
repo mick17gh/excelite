@@ -57,6 +57,101 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { UnitType } from "@/lib/generated/prisma/client";
 import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { validateMenuItemBranchScope } from "@/lib/menu/branch-availability";
+
+export interface BranchOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+function BranchVisibilitySection({
+  branches,
+  availableAtAllBranches,
+  branchIds,
+  onChange,
+}: {
+  branches: BranchOption[];
+  availableAtAllBranches: boolean;
+  branchIds: string[];
+  onChange: (next: {
+    availableAtAllBranches: boolean;
+    branchIds: string[];
+  }) => void;
+}) {
+  const toggleBranch = (branchId: string, checked: boolean) => {
+    const next = checked
+      ? [...branchIds, branchId]
+      : branchIds.filter((id) => id !== branchId);
+    onChange({ availableAtAllBranches: false, branchIds: next });
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <div>
+        <Label>Visible at branches</Label>
+        <p className="text-xs text-muted-foreground mt-1">
+          Choose which locations can sell this product in POS and orders
+        </p>
+      </div>
+      <RadioGroup
+        value={availableAtAllBranches ? "all" : "selected"}
+        onValueChange={(value) => {
+          if (value === "all") {
+            onChange({ availableAtAllBranches: true, branchIds: [] });
+          } else {
+            onChange({ availableAtAllBranches: false, branchIds });
+          }
+        }}
+        className="gap-3"
+      >
+        <div className="flex items-center gap-2">
+          <RadioGroupItem value="all" id="branch-vis-all" />
+          <Label htmlFor="branch-vis-all" className="font-normal cursor-pointer">
+            All branches
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <RadioGroupItem value="selected" id="branch-vis-selected" />
+          <Label
+            htmlFor="branch-vis-selected"
+            className="font-normal cursor-pointer"
+          >
+            Only selected branches
+          </Label>
+        </div>
+      </RadioGroup>
+      {!availableAtAllBranches && (
+        <div className="space-y-2 pl-1 max-h-40 overflow-y-auto">
+          {branches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No active branches</p>
+          ) : (
+            branches.map((branch) => (
+              <div key={branch.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={`branch-${branch.id}`}
+                  checked={branchIds.includes(branch.id)}
+                  onCheckedChange={(checked) =>
+                    toggleBranch(branch.id, checked === true)
+                  }
+                />
+                <Label
+                  htmlFor={`branch-${branch.id}`}
+                  className="font-normal cursor-pointer text-sm"
+                >
+                  {branch.name}{" "}
+                  <span className="text-muted-foreground">({branch.code})</span>
+                </Label>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface MenuItem {
   id: string;
@@ -69,6 +164,8 @@ interface MenuItem {
   description?: string | null;
   imageUrl?: string | null;
   isActive: boolean;
+  availableAtAllBranches?: boolean;
+  branchIds?: string[];
 }
 
 interface CategoryOption {
@@ -81,6 +178,7 @@ interface MenuFormProps {
   onOpenChange: (open: boolean) => void;
   item?: MenuItem | null;
   categories?: CategoryOption[];
+  branches?: BranchOption[];
 }
 
 interface InventoryItemOption {
@@ -112,6 +210,7 @@ export function AddMenuItemForm({
   open,
   onOpenChange,
   categories = [],
+  branches = [],
 }: Omit<MenuFormProps, "item">) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -134,6 +233,10 @@ export function AddMenuItemForm({
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
   const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
   const [optionGroups, setOptionGroups] = useState<LocalMenuOptionGroupRow[]>([]);
+  const [branchVisibility, setBranchVisibility] = useState({
+    availableAtAllBranches: true,
+    branchIds: [] as string[],
+  });
 
   // Load inventory items when ingredients section is opened
   useEffect(() => {
@@ -249,6 +352,16 @@ export function AddMenuItemForm({
         (ing) => ing.inventoryItemId && ing.quantity > 0,
       );
 
+      const scopeErr = validateMenuItemBranchScope(
+        branchVisibility.availableAtAllBranches,
+        branchVisibility.branchIds
+      );
+      if (scopeErr) {
+        toast.error(scopeErr);
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await createMenuItem({
         name: formData.name,
         sku: formData.sku,
@@ -260,6 +373,10 @@ export function AddMenuItemForm({
         description: formData.description || undefined,
         imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
+        availableAtAllBranches: branchVisibility.availableAtAllBranches,
+        branchIds: branchVisibility.availableAtAllBranches
+          ? undefined
+          : branchVisibility.branchIds,
         ingredients: validIngredients.length > 0 ? validIngredients : undefined,
         ...(optionGroups.length
           ? { optionGroups: serializeLocalOptionGroups(optionGroups)! }
@@ -279,6 +396,7 @@ export function AddMenuItemForm({
           imageUrl: "",
           isActive: true,
         });
+        setBranchVisibility({ availableAtAllBranches: true, branchIds: [] });
         setImagePreview(null);
         setSelectedFile(null);
         setIngredients([]);
@@ -446,6 +564,13 @@ export function AddMenuItemForm({
                 </div>
               </div>
             </div>
+
+            <BranchVisibilitySection
+              branches={branches}
+              availableAtAllBranches={branchVisibility.availableAtAllBranches}
+              branchIds={branchVisibility.branchIds}
+              onChange={setBranchVisibility}
+            />
 
             {/* Pricing */}
             <div className="grid grid-cols-2 gap-4">
@@ -688,6 +813,7 @@ export function EditMenuItemForm({
   onOpenChange,
   item,
   categories = [],
+  branches = [],
 }: MenuFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -714,6 +840,10 @@ export function EditMenuItemForm({
   const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
   const [optionGroups, setOptionGroups] = useState<LocalMenuOptionGroupRow[]>([]);
+  const [branchVisibility, setBranchVisibility] = useState({
+    availableAtAllBranches: item?.availableAtAllBranches ?? true,
+    branchIds: item?.branchIds ?? ([] as string[]),
+  });
 
   useEffect(() => {
     if (item) {
@@ -728,6 +858,10 @@ export function EditMenuItemForm({
         imageUrl: item.imageUrl || "",
         isActive: item.isActive,
       });
+      setBranchVisibility({
+        availableAtAllBranches: item.availableAtAllBranches ?? true,
+        branchIds: item.branchIds ?? [],
+      });
       setImagePreview(item.imageUrl || null);
     }
   }, [item, categories]);
@@ -741,6 +875,10 @@ export function EditMenuItemForm({
     void getMenuItemWithIngredients(item.id).then((res) => {
       if (cancelled || !res.success || !res.data) return;
       setOptionGroups(localFromServerOptionGroups(res.data.optionGroups || []));
+      setBranchVisibility({
+        availableAtAllBranches: res.data.availableAtAllBranches ?? true,
+        branchIds: res.data.branchIds ?? [],
+      });
     });
     return () => {
       cancelled = true;
@@ -890,6 +1028,16 @@ export function EditMenuItemForm({
         (ing) => ing.inventoryItemId && ing.quantity > 0,
       );
 
+      const scopeErr = validateMenuItemBranchScope(
+        branchVisibility.availableAtAllBranches,
+        branchVisibility.branchIds
+      );
+      if (scopeErr) {
+        toast.error(scopeErr);
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await updateMenuItem({
         id: item.id,
         name: formData.name,
@@ -902,6 +1050,10 @@ export function EditMenuItemForm({
         description: formData.description || undefined,
         imageUrl: imageUrl || undefined,
         isActive: formData.isActive,
+        availableAtAllBranches: branchVisibility.availableAtAllBranches,
+        branchIds: branchVisibility.availableAtAllBranches
+          ? []
+          : branchVisibility.branchIds,
         ingredients: validIngredients,
         optionGroups: optionGroups.length ? serializeLocalOptionGroups(optionGroups)! : [],
       });
@@ -1071,6 +1223,13 @@ export function EditMenuItemForm({
                 </div>
               </div>
             </div>
+
+            <BranchVisibilitySection
+              branches={branches}
+              availableAtAllBranches={branchVisibility.availableAtAllBranches}
+              branchIds={branchVisibility.branchIds}
+              onChange={setBranchVisibility}
+            />
 
             {/* Pricing */}
             <div className="grid grid-cols-2 gap-4">

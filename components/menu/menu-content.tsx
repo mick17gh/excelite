@@ -42,6 +42,7 @@ import { useCurrency } from "@/contexts/currency-context";
 import {
   AddMenuItemForm,
   EditMenuItemForm,
+  type BranchOption,
 } from "@/components/menu/menu-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { deleteMenuItem } from "@/lib/actions/menu";
@@ -61,6 +62,8 @@ interface MenuItem {
   description?: string | null;
   imageUrl?: string | null;
   isActive: boolean;
+  availableAtAllBranches?: boolean;
+  branchIds?: string[];
 }
 
 interface CategoryOption {
@@ -71,9 +74,31 @@ interface CategoryOption {
 interface MenuContentProps {
   items: MenuItem[];
   categories: CategoryOption[];
+  branches?: BranchOption[];
 }
 
-export function MenuContent({ items, categories }: MenuContentProps) {
+function visibilityBadge(
+  item: MenuItem,
+  branches: BranchOption[]
+): { label: string; title?: string } {
+  if (item.availableAtAllBranches !== false) {
+    return { label: "Visible: all branches" };
+  }
+  const ids = item.branchIds ?? [];
+  const names = branches
+    .filter((b) => ids.includes(b.id))
+    .map((b) => b.name);
+  return {
+    label: `Visible: ${ids.length} branch${ids.length === 1 ? "" : "es"}`,
+    title: names.length > 0 ? names.join(", ") : undefined,
+  };
+}
+
+export function MenuContent({
+  items,
+  categories,
+  branches = [],
+}: MenuContentProps) {
   const { formatCurrency } = useCurrency();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -322,6 +347,18 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                   <CardDescription className="text-xs">
                     {item.sku} • {item.category}
                   </CardDescription>
+                  {(() => {
+                    const vis = visibilityBadge(item, branches);
+                    return (
+                      <Badge
+                        variant="outline"
+                        className="mt-2 text-[10px] font-normal"
+                        title={vis.title}
+                      >
+                        {vis.label}
+                      </Badge>
+                    );
+                  })()}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -412,6 +449,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                     <TableHead>Cost</TableHead>
                     <TableHead>Margin</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Visibility</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -467,6 +505,20 @@ export function MenuContent({ items, categories }: MenuContentProps) {
                         ) : (
                           <Badge variant="secondary">Inactive</Badge>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const vis = visibilityBadge(item, branches);
+                          return (
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-normal"
+                              title={vis.title}
+                            >
+                              {vis.label}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -560,6 +612,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
         open={isAddOpen}
         onOpenChange={setIsAddOpen}
         categories={categories}
+        branches={branches}
       />
       {editingItem && (
         <EditMenuItemForm
@@ -567,6 +620,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
           onOpenChange={(open) => !open && setEditingItem(null)}
           item={editingItem}
           categories={categories}
+          branches={branches}
         />
       )}
 
@@ -575,6 +629,7 @@ export function MenuContent({ items, categories }: MenuContentProps) {
         open={isBulkImportOpen}
         onOpenChange={setIsBulkImportOpen}
         type="menu"
+        branches={branches}
         onSuccess={() => router.refresh()}
       />
       <BulkImportDialog

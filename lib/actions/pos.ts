@@ -121,6 +121,18 @@ export async function createPosOrder(input: CreatePosOrderInput) {
     let tableSessionId: string | null = input.tableSessionId ?? null;
     let assignedBy: string | null = input.assignedBy ?? null;
 
+    const menuItemIds = [...new Set(input.items.map((i) => i.menuItemId))];
+    const { assertMenuItemsVisibleAtBranch } = await import(
+      "@/lib/menu/branch-availability"
+    );
+    const visibilityCheck = await assertMenuItemsVisibleAtBranch(
+      menuItemIds,
+      input.branchId
+    );
+    if (!visibilityCheck.ok) {
+      return { success: false, error: visibilityCheck.error };
+    }
+
     if (tableSessionId) {
       const check = await validateTableSessionForOrder(
         tableSessionId,

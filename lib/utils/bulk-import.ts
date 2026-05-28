@@ -17,24 +17,108 @@ export interface BulkMenuItemInput {
   cost?: number;
   description?: string;
   isActive?: boolean;
+  availableAtAllBranches?: boolean;
+  /** Branch codes or names from CSV (resolved server-side). */
+  branchRefs?: string[];
+}
+
+function parseCsvBoolish(value: string | undefined, defaultValue: boolean): boolean {
+  if (value === undefined || value.trim() === "") return defaultValue;
+  const v = value.trim().toLowerCase();
+  if (["true", "yes", "1", "y"].includes(v)) return true;
+  if (["false", "no", "0", "n"].includes(v)) return false;
+  return defaultValue;
+}
+
+function parseMenuBranchRefs(row: ParsedCSVRow): string[] | undefined {
+  const raw =
+    row.branches ||
+    row.Branches ||
+    row.branchCodes ||
+    row.branch_codes ||
+    row.visibleBranches ||
+    row.VisibleBranches ||
+    "";
+  if (!raw.trim()) return undefined;
+  return raw
+    .split(",")
+    .map((s) => s.trim().replace(/^"|"$/g, ""))
+    .filter(Boolean);
 }
 
 export function parseMenuCSV(rows: ParsedCSVRow[]): BulkMenuItemInput[] {
-  return rows.map((row) => ({
-    name: row.name || row.Name || "",
-    sku: row.sku || row.SKU || undefined,
-    categoryId: row.categoryId || row.CategoryId || row.category || row.Category || "",
-    price: parseFloat(row.price || row.Price || "0"),
-    cost: row.cost || row.Cost ? parseFloat(row.cost || row.Cost) : undefined,
-    description: row.description || row.Description || undefined,
-    isActive: row.isActive === "false" ? false : true,
-  })).filter((item) => item.name && item.price > 0 && item.categoryId);
+  return rows
+    .map((row) => {
+      const visibleRaw =
+        row.visibleAtAllBranches ??
+        row.VisibleAtAllBranches ??
+        row.allBranches ??
+        row.AllBranches ??
+        row.visible_all_branches;
+      const availableAtAllBranches = parseCsvBoolish(visibleRaw, true);
+      const branchRefs = parseMenuBranchRefs(row);
+
+      return {
+        name: row.name || row.Name || "",
+        sku: row.sku || row.SKU || undefined,
+        categoryId:
+          row.categoryId || row.CategoryId || row.category || row.Category || "",
+        price: parseFloat(row.price || row.Price || "0"),
+        cost: row.cost || row.Cost ? parseFloat(row.cost || row.Cost) : undefined,
+        description: row.description || row.Description || undefined,
+        isActive: row.isActive === "false" ? false : true,
+        availableAtAllBranches,
+        branchRefs,
+      };
+    })
+    .filter((item) => item.name && item.price > 0 && item.categoryId);
 }
 
 export function getMenuCSVTemplate(): string {
-  const headers = ["name", "sku", "category", "price", "cost", "description", "isActive"];
-  const example = ["Grilled Chicken", "GC-001", "Main Course", "25.99", "12.50", "Delicious grilled chicken breast", "true"];
-  return [headers.join(","), example.join(",")].join("\n");
+  const headers = [
+    "name",
+    "sku",
+    "category",
+    "price",
+    "cost",
+    "description",
+    "isActive",
+    "visibleAtAllBranches",
+    "branches",
+  ];
+  const exampleAll = [
+    "House Salad",
+    "HS-001",
+    "Salads",
+    "12.00",
+    "4.00",
+    "Fresh greens",
+    "true",
+    "true",
+    "",
+  ];
+  const exampleScoped = [
+    "Grilled Chicken",
+    "GC-001",
+    "Main Course",
+    "25.99",
+    "12.50",
+    "Grilled chicken breast",
+    "true",
+    "false",
+    "MAIN,DOWNTOWN",
+  ];
+  return [
+    headers.join(","),
+    exampleAll.join(","),
+    exampleScoped.join(","),
+  ].join("\n");
+}
+
+export function menuVisibilityPreviewLabel(item: BulkMenuItemInput): string {
+  if (item.availableAtAllBranches !== false) return "All branches";
+  const refs = item.branchRefs ?? [];
+  return refs.length > 0 ? refs.join(", ") : "(no branches)";
 }
 
 /** One row = one option under a group for an existing menu item (matched by product SKU). */

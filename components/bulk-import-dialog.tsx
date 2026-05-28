@@ -60,7 +60,9 @@ import {
   getCategoryCSVTemplate,
   getSupplierCSVTemplate,
   getStaffCSVTemplate,
+  menuVisibilityPreviewLabel,
 } from "@/lib/utils/bulk-import";
+import { resolveBranchRefsFromList } from "@/lib/menu/branch-availability";
 
 type ImportType = "menu" | "menu-options" | "inventory" | "category" | "supplier" | "staff";
 
@@ -68,7 +70,7 @@ interface BulkImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   type: ImportType;
-  branches?: Array<{ id: string; name: string }>;
+  branches?: Array<{ id: string; name: string; code?: string }>;
   onSuccess?: () => void;
 }
 
@@ -174,12 +176,45 @@ export function BulkImportDialog({
     const errors: string[] = [];
 
     switch (type) {
-      case "menu":
+      case "menu": {
         if (!row.name && !row.Name) errors.push("Name is required");
         const price = parseFloat(row.price || row.Price || "0");
         if (isNaN(price) || price <= 0) errors.push("Valid price is required");
         if (!row.category && !row.Category) errors.push("Category is required");
+        const visibleRaw =
+          row.visibleAtAllBranches ??
+          row.allBranches ??
+          row.visible_all_branches ??
+          "";
+        const allBranches =
+          visibleRaw === "" ||
+          ["true", "yes", "1", "y"].includes(visibleRaw.toLowerCase());
+        if (!allBranches) {
+          const branchList = (
+            row.branches ||
+            row.branchCodes ||
+            row.visibleBranches ||
+            ""
+          )
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          if (branchList.length === 0) {
+            errors.push("branches required when visibleAtAllBranches is false");
+          } else if (branches.length > 0) {
+            const resolved = resolveBranchRefsFromList(
+              branchList,
+              branches.map((b) => ({
+                id: b.id,
+                name: b.name,
+                code: b.code ?? b.name,
+              }))
+            );
+            if (!resolved.ok) errors.push(resolved.error);
+          }
+        }
         break;
+      }
       case "menu-options": {
         const sku =
           row.menuItemSku ||
@@ -416,7 +451,9 @@ export function BulkImportDialog({
                     Required: <code>name</code>, <code>category</code>,{" "}
                     <code>price</code>. Optional: <code>sku</code>,{" "}
                     <code>cost</code>, <code>description</code>,{" "}
-                    <code>isActive</code>
+                    <code>isActive</code>, <code>visibleAtAllBranches</code>,{" "}
+                    <code>branches</code> (branch codes/names when not all
+                    branches)
                   </>
                 )}
                 {type === "menu-options" && (
@@ -519,6 +556,7 @@ export function BulkImportDialog({
                       <>
                         <TableHead>Category</TableHead>
                         <TableHead>Price</TableHead>
+                        <TableHead>Visibility</TableHead>
                       </>
                     )}
                     {type === "menu-options" && (
@@ -581,6 +619,15 @@ export function BulkImportDialog({
                           </TableCell>
                           <TableCell>
                             {String(row.data.price || row.data.Price || "-")}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const parsed = parseMenuCSV([row.data as Record<string, string>]);
+                              const item = parsed[0];
+                              return item
+                                ? menuVisibilityPreviewLabel(item)
+                                : "-";
+                            })()}
                           </TableCell>
                         </>
                       )}

@@ -470,7 +470,7 @@ export async function generateStorefrontConfig(organizationId: string) {
         apiBaseUrl,
         publicEndpoints,
         notes: {
-          menu: "Fetch live menu via GET .../menu (includes optionGroups for variants).",
+          menu: "Fetch live menu via GET .../menu?branchId={id} after the customer picks a branch (includes optionGroups). Omit branchId to return all active items.",
           orders: "POST items[].menuItemOptionIds with selected option ids from menu.optionGroups[].options[].id",
         },
       },

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { isMenuItemVisibleAtBranch } from "@/lib/menu/branch-availability";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +78,8 @@ interface MenuItem {
   price: number;
   categoryId: string | null;
   optionGroups?: ClientMenuOptionGroup[];
+  availableAtAllBranches?: boolean;
+  branchIds?: string[];
 }
 
 interface Customer {
@@ -184,12 +187,64 @@ export function CreateOrderDialog({
     }
   };
 
-  const filteredMenuItems = menuItems.filter(
-    (item) =>
-      !searchItem ||
-      item.name.toLowerCase().includes(searchItem.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchItem.toLowerCase()),
-  );
+  const prevBranchIdRef = useRef<string | null>(null);
+
+  const handleBranchChange = (nextBranchId: string) => {
+    if (
+      prevBranchIdRef.current &&
+      nextBranchId &&
+      prevBranchIdRef.current !== nextBranchId
+    ) {
+      setCart((prev) => {
+        const next = prev.filter((line) => {
+          const item = menuItems.find((m) => m.id === line.menuItemId);
+          if (!item) return false;
+          return isMenuItemVisibleAtBranch(
+            {
+              availableAtAllBranches: item.availableAtAllBranches ?? true,
+              branchIds: item.branchIds ?? [],
+            },
+            nextBranchId
+          );
+        });
+        if (next.length < prev.length) {
+          toast.info("Removed items not sold at this branch");
+        }
+        return next;
+      });
+    }
+    prevBranchIdRef.current = nextBranchId;
+    setBranchId(nextBranchId);
+  };
+
+  useEffect(() => {
+    if (branchId) {
+      prevBranchIdRef.current = branchId;
+    }
+  }, [branchId]);
+
+  const filteredMenuItems = useMemo(() => {
+    if (!branchId) return [];
+    const q = searchItem.trim().toLowerCase();
+    return menuItems.filter((item) => {
+      if (
+        !isMenuItemVisibleAtBranch(
+          {
+            availableAtAllBranches: item.availableAtAllBranches ?? true,
+            branchIds: item.branchIds ?? [],
+          },
+          branchId
+        )
+      ) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.sku.toLowerCase().includes(q)
+      );
+    });
+  }, [menuItems, branchId, searchItem]);
 
   const lineTotal =
     Math.round(
@@ -416,7 +471,7 @@ export function CreateOrderDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label>Branch *</Label>
-              <Select value={branchId} onValueChange={setBranchId}>
+              <Select value={branchId} onValueChange={handleBranchChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
@@ -589,11 +644,21 @@ export function CreateOrderDialog({
           <div className="grid gap-2">
             <Label>Items *</Label>
             <Input
-              placeholder="Search menu items..."
+              placeholder={
+                branchId
+                  ? "Search menu items..."
+                  : "Select a branch first"
+              }
               value={searchItem}
               onChange={(e) => setSearchItem(e.target.value)}
+              disabled={!branchId}
             />
-            {searchItem && (
+            {!branchId && (
+              <p className="text-sm text-muted-foreground">
+                Select a branch to add menu items
+              </p>
+            )}
+            {branchId && searchItem && (
               <div className="max-h-40 overflow-y-auto border rounded-md">
                 {filteredMenuItems.slice(0, 10).map((item) => (
                   <button
@@ -618,7 +683,7 @@ export function CreateOrderDialog({
                 ))}
                 {filteredMenuItems.length === 0 && (
                   <p className="px-3 py-2 text-sm text-muted-foreground">
-                    No items found
+                    No items found for this branch
                   </p>
                 )}
               </div>

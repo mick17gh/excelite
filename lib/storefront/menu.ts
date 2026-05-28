@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { menuItemVisibilityWhere } from "@/lib/menu/branch-availability";
 
 export type PublicMenuOption = {
   id: string;
@@ -32,12 +33,16 @@ export type PublicMenuItem = {
 
 type MenuItemRow = Awaited<ReturnType<typeof fetchPublicMenuRows>>[number];
 
-async function fetchPublicMenuRows(categoryId?: string | null) {
+async function fetchPublicMenuRows(
+  categoryId?: string | null,
+  branchId?: string | null
+) {
   return db.menuItem.findMany({
     where: {
       deletedAt: null,
       isActive: true,
       ...(categoryId ? { categoryId } : {}),
+      ...(branchId ? menuItemVisibilityWhere(branchId) : {}),
     },
     include: {
       category: {
@@ -99,7 +104,13 @@ export function mapMenuItemToPublic(item: MenuItemRow): PublicMenuItem {
   };
 }
 
-export async function getPublicStoreMenu(options?: { categoryId?: string | null }): Promise<PublicMenuItem[]> {
-  const items = await fetchPublicMenuRows(options?.categoryId);
+export async function getPublicStoreMenu(options?: {
+  categoryId?: string | null;
+  branchId?: string | null;
+}): Promise<PublicMenuItem[]> {
+  const items = await fetchPublicMenuRows(
+    options?.categoryId,
+    options?.branchId
+  );
   return items.map(mapMenuItemToPublic);
 }

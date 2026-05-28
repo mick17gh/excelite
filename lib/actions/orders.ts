@@ -449,7 +449,18 @@ export async function createOrder(input: CreateOrderInput) {
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 4).toUpperCase()}`;
 
     // Get menu items for pricing
-    const menuItemIds = input.items.map((i) => i.menuItemId);
+    const menuItemIds = [...new Set(input.items.map((i) => i.menuItemId))];
+    const { assertMenuItemsVisibleAtBranch } = await import(
+      "@/lib/menu/branch-availability"
+    );
+    const visibilityCheck = await assertMenuItemsVisibleAtBranch(
+      menuItemIds,
+      input.branchId
+    );
+    if (!visibilityCheck.ok) {
+      return { error: visibilityCheck.error };
+    }
+
     const menuItems = await db.menuItem.findMany({
       where: { id: { in: menuItemIds } },
     });

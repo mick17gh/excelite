@@ -458,9 +458,10 @@ model Branch {
   orders             Order[]
   warehouseTransfers     WarehouseBranchTransfer[] @relation("WarehouseTransfers")
   branchWarehouseReturns BranchWarehouseTransfer[] @relation("BranchWarehouseReturns")
-  diningSections         DiningSection[]
-  diningTables           DiningTable[]
-  tableSessions          TableSession[]
+  diningSections           DiningSection[]
+  diningTables             DiningTable[]
+  tableSessions            TableSession[]
+  menuItemBranchVisibility MenuItemBranch[]
 
   @@index([code])
   @@index([isActive])
@@ -551,25 +552,42 @@ model MenuItem {
   categoryId  String?
   price       Decimal   @db.Decimal(10, 2)
   cost        Decimal?  @db.Decimal(10, 2)
-  isActive    Boolean   @default(true)
-  description String?
-  imageUrl    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  isActive               Boolean   @default(true)
+  availableAtAllBranches Boolean   @default(true)
+  description            String?
+  imageUrl               String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  deletedAt              DateTime?
 
   // Relations
-  category     Category?              @relation(fields: [categoryId], references: [id])
-  saleItems    SaleItem[]
-  posItems     PosOrderItem[]
-  ingredients  MenuItemIngredient[]
-  manualLines  ManualEntryLine[]
-  orderItems   OrderItem[]
-  optionGroups MenuItemOptionGroup[]
+  category           Category?              @relation(fields: [categoryId], references: [id])
+  saleItems          SaleItem[]
+  posItems           PosOrderItem[]
+  ingredients        MenuItemIngredient[]
+  manualLines        ManualEntryLine[]
+  orderItems         OrderItem[]
+  optionGroups       MenuItemOptionGroup[]
+  branchAvailability MenuItemBranch[]
 
   @@index([categoryId])
   @@index([isActive])
+  @@index([availableAtAllBranches])
   @@map("menu_item")
+}
+
+model MenuItemBranch {
+  id         String   @id @default(cuid())
+  menuItemId String
+  branchId   String
+  createdAt  DateTime @default(now())
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  branch   Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, branchId])
+  @@index([branchId])
+  @@map("menu_item_branch")
 }
 
 model MenuItemOptionGroup {

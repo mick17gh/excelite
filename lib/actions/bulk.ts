@@ -14,6 +14,11 @@ import type {
 } from "@/lib/utils/bulk-import";
 import { updateMenuItem } from "@/lib/actions/menu";
 import type { MenuItemOptionGroupInput } from "@/lib/actions/menu";
+import { getSessionOrganizationId } from "@/lib/actions/organization";
+import {
+  resolveBranchRefsFromList,
+  validateMenuItemBranchScope,
+} from "@/lib/menu/branch-availability";
 
 // =====================================
 // MENU BULK OPERATIONS
@@ -86,19 +91,103 @@ export async function bulkCreateMenuItems(items: BulkMenuItemInput[]) {
       };
     }
 
-    const result = await db.menuItem.createMany({
-      data: itemsWithValidCategories,
+    const orgId = await getSessionOrganizationId();
+    const orgBranches = await db.branch.findMany({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        ...(orgId ? { organizationId: orgId } : {}),
+      },
+      select: { id: true, name: true, code: true },
+    });
+
+    const prepared: {
+      name: string;
+      sku: string;
+      categoryId: string;
+      price: number;
+      cost: number;
+      description?: string;
+      isActive: boolean;
+      availableAtAllBranches: boolean;
+      branchIds: string[];
+    }[] = [];
+
+    for (const item of itemsWithValidCategories) {
+      const availableAtAllBranches = item.availableAtAllBranches ?? true;
+      const scopeErr = validateMenuItemBranchScope(
+        availableAtAllBranches,
+        item.branchRefs
+      );
+      if (scopeErr) {
+        return {
+          success: false,
+          error: `${item.name} (${item.sku}): ${scopeErr}`,
+        };
+      }
+
+      let branchIds: string[] = [];
+      if (!availableAtAllBranches) {
+        const resolved = resolveBranchRefsFromList(
+          item.branchRefs ?? [],
+          orgBranches
+        );
+        if (!resolved.ok) {
+          return {
+            success: false,
+            error: `${item.name} (${item.sku}): ${resolved.error}`,
+          };
+        }
+        branchIds = resolved.ids;
+      }
+
+      prepared.push({
+        name: item.name.trim(),
+        sku: item.sku!,
+        categoryId: item.categoryId,
+        price: item.price,
+        cost: item.cost ?? 0,
+        description: item.description?.trim(),
+        isActive: item.isActive ?? true,
+        availableAtAllBranches,
+        branchIds,
+      });
+    }
+
+    let created = 0;
+    await db.$transaction(async (tx) => {
+      for (const item of prepared) {
+        await tx.menuItem.create({
+          data: {
+            name: item.name,
+            sku: item.sku,
+            categoryId: item.categoryId,
+            price: item.price,
+            cost: item.cost,
+            description: item.description,
+            isActive: item.isActive,
+            availableAtAllBranches: item.availableAtAllBranches,
+            ...(!item.availableAtAllBranches && {
+              branchAvailability: {
+                create: item.branchIds.map((branchId) => ({ branchId })),
+              },
+            }),
+          },
+        });
+        created += 1;
+      }
     });
 
     // Log bulk creation
     await logCreate("MenuItem", "BULK", {
       action: "BULK_CREATE",
-      count: result.count,
+      count: created,
       categoryIds: [...new Set(items.map((i) => i.categoryId))],
     });
 
     revalidatePath("/dashboard/menu");
-    return { success: true, created: result.count };
+    revalidatePath("/pos");
+    return { success: true, created };
   } catch (error) {
     console.error("[bulkCreateMenuItems] Error:", error);
     return { success: false, error: "Failed to create menu items" };

@@ -38,8 +38,11 @@ import {
 import {
   parseMenuCSV,
   getMenuCSVTemplate,
+  menuVisibilityPreviewLabel,
   type BulkMenuItemInput,
 } from "@/lib/utils/bulk-import";
+import { getBranches } from "@/lib/actions/branches";
+import { resolveBranchRefsFromList } from "@/lib/menu/branch-availability";
 
 interface MenuImportDialogProps {
   open: boolean;
@@ -81,7 +84,11 @@ export function MenuImportDialog({ open, onOpenChange }: MenuImportDialogProps) 
       }
 
       const parsed = parseMenuCSV(rows);
-      
+      const branchesResult = await getBranches();
+      const orgBranches = (branchesResult.data || [])
+        .filter((b) => b.isActive)
+        .map((b) => ({ id: b.id, name: b.name, code: b.code }));
+
       // Validate each row
       const validatedData: ParsedRow[] = parsed.map((item) => {
         const errors: string[] = [];
@@ -97,6 +104,22 @@ export function MenuImportDialog({ open, onOpenChange }: MenuImportDialogProps) 
         }
         if (item.cost !== undefined && (isNaN(item.cost) || item.cost < 0)) {
           errors.push("Cost must be a non-negative number");
+        }
+        const allBranches = item.availableAtAllBranches !== false;
+        if (!allBranches) {
+          if (!item.branchRefs?.length) {
+            errors.push(
+              "branches required when visibleAtAllBranches is false"
+            );
+          } else {
+            const resolved = resolveBranchRefsFromList(
+              item.branchRefs,
+              orgBranches
+            );
+            if (!resolved.ok) {
+              errors.push(resolved.error);
+            }
+          }
         }
 
         return {
@@ -286,6 +309,7 @@ export function MenuImportDialog({ open, onOpenChange }: MenuImportDialogProps) 
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Price</TableHead>
                       <TableHead className="text-right">Cost</TableHead>
+                      <TableHead>Visibility</TableHead>
                       <TableHead>Errors</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -307,6 +331,11 @@ export function MenuImportDialog({ open, onOpenChange }: MenuImportDialogProps) 
                         </TableCell>
                         <TableCell className="text-right">
                           {row.cost === undefined || isNaN(row.cost) ? "-" : `GH₵ ${row.cost.toFixed(2)}`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs font-normal">
+                            {menuVisibilityPreviewLabel(row)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           {row._errors.length > 0 && (

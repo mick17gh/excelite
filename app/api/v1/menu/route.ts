@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/services/api-keys";
 import { getOrganizationForStorefront, isStorefrontEnabledForOrg } from "@/lib/storefront/config";
+import { menuItemVisibilityWhere } from "@/lib/menu/branch-availability";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const publicMode = url.searchParams.get("public") === "true";
   const organizationId = url.searchParams.get("organizationId");
   const categoryId = url.searchParams.get("categoryId");
+  const branchId = url.searchParams.get("branchId");
 
   if (publicMode && organizationId) {
     const org = await getOrganizationForStorefront(organizationId);
@@ -18,11 +20,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, data: null, error: "Store temporarily closed" }, { status: 503 });
     }
 
+    if (branchId) {
+      const branchAllowed = org.branches.some((b) => b.id === branchId);
+      if (!branchAllowed) {
+        return NextResponse.json(
+          { success: false, data: null, error: "Invalid branch for this store" },
+          { status: 400 }
+        );
+      }
+    }
+
     const publicItems = await db.menuItem.findMany({
       where: {
         deletedAt: null,
         isActive: true,
         ...(categoryId ? { categoryId } : {}),
+        ...(branchId ? menuItemVisibilityWhere(branchId) : {}),
       },
       include: {
         category: {

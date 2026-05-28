@@ -54,7 +54,8 @@ import { getBranchTaxRate } from "@/lib/actions/tax";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 import { OrderType, Role } from "@/lib/generated/prisma/client";
 import { TableServicePanel } from "@/components/pos/table-service-panel";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
+import { isMenuItemVisibleAtBranch } from "@/lib/menu/branch-availability";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
@@ -93,6 +94,8 @@ interface MenuItem {
   price: number;
   imageUrl?: string | null;
   optionGroups?: ClientMenuOptionGroup[];
+  availableAtAllBranches?: boolean;
+  branchIds?: string[];
 }
 
 interface RecentOrder {
@@ -304,17 +307,30 @@ export function PosContent({
     },
   ]);
 
+  const branchVisibleMenu = useMemo(() => {
+    if (!branchId) return [];
+    return liveMenuItems.filter((m) =>
+      isMenuItemVisibleAtBranch(
+        {
+          availableAtAllBranches: m.availableAtAllBranches ?? true,
+          branchIds: m.branchIds ?? [],
+        },
+        branchId
+      )
+    );
+  }, [liveMenuItems, branchId]);
+
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(liveMenuItems.map((m) => m.category))).sort();
+    const cats = Array.from(new Set(branchVisibleMenu.map((m) => m.category))).sort();
     const categoryCounts = cats.map((cat) => ({
       name: cat,
-      count: liveMenuItems.filter((m) => m.category === cat).length,
+      count: branchVisibleMenu.filter((m) => m.category === cat).length,
     }));
     return categoryCounts;
-  }, [liveMenuItems]);
+  }, [branchVisibleMenu]);
 
   const filteredMenu = useMemo(() => {
-    let filtered = liveMenuItems;
+    let filtered = branchVisibleMenu;
     const q = search.trim().toLowerCase();
     if (q) {
       filtered = filtered.filter(
@@ -325,7 +341,42 @@ export function PosContent({
       filtered = filtered.filter((m) => m.category === selectedCategory);
     }
     return filtered;
-  }, [liveMenuItems, search, selectedCategory]);
+  }, [branchVisibleMenu, search, selectedCategory]);
+
+  const prevBranchIdRef = useRef<string | null>(null);
+  const handleBranchChange = (nextBranchId: string) => {
+    if (
+      prevBranchIdRef.current &&
+      nextBranchId &&
+      prevBranchIdRef.current !== nextBranchId
+    ) {
+      setCart((prev) => {
+        const next = prev.filter((line) => {
+          const item = liveMenuItems.find((m) => m.id === line.menuItemId);
+          if (!item) return false;
+          return isMenuItemVisibleAtBranch(
+            {
+              availableAtAllBranches: item.availableAtAllBranches ?? true,
+              branchIds: item.branchIds ?? [],
+            },
+            nextBranchId
+          );
+        });
+        if (next.length < prev.length) {
+          toast.info("Removed items not sold at this branch");
+        }
+        return next;
+      });
+    }
+    prevBranchIdRef.current = nextBranchId;
+    setBranchId(nextBranchId);
+  };
+
+  useEffect(() => {
+    if (branchId) {
+      prevBranchIdRef.current = branchId;
+    }
+  }, [branchId]);
 
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = Math.round(cart.reduce((s, l) => s + l.unitPrice * l.quantity, 0) * 100) / 100;
@@ -754,7 +805,7 @@ export function PosContent({
         {/* Header Controls */}
         <div className="flex flex-wrap items-center gap-3 pb-3 shrink-0">
           {/* Branch Selector */}
-          <Select value={branchId} onValueChange={setBranchId}>
+          <Select value={branchId} onValueChange={handleBranchChange}>
             <SelectTrigger className="w-[180px] h-10 bg-background">
               <Store className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Select Branch" />
@@ -853,7 +904,7 @@ export function PosContent({
             className="shrink-0 h-8"
             onClick={() => setSelectedCategory("all")}
           >
-            All ({liveMenuItems.length})
+            All ({branchVisibleMenu.length})
           </Button>
           {categories.map((cat) => (
             <Button

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { MenuContent } from "@/components/menu/menu-content";
 import { getMenuItems, getMenuCategories } from "@/lib/actions/menu";
+import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
   title: "Products | ServStack",
@@ -8,13 +9,17 @@ export const metadata = {
 };
 
 export default async function MenuPage() {
-  const [itemsResult, categoriesResult] = await Promise.all([
+  const [itemsResult, categoriesResult, branchesResult] = await Promise.all([
     getMenuItems(undefined, true), // Include inactive items to debug
     getMenuCategories(),
+    getBranches(),
   ]);
 
   const items = itemsResult.data || [];
   const categories = categoriesResult.data || [];
+  const branches = (branchesResult.data || [])
+    .filter((b) => b.isActive)
+    .map((b) => ({ id: b.id, name: b.name, code: b.code }));
 
   return (
     <div className="space-y-6">
@@ -28,7 +33,7 @@ export default async function MenuPage() {
       </div>
 
       <Suspense fallback={<MenuLoadingSkeleton />}>
-        <MenuContent items={items} categories={categories} />
+        <MenuContent items={items} categories={categories} branches={branches} />
       </Suspense>
     </div>
   );

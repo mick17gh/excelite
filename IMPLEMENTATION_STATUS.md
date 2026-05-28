@@ -8,6 +8,7 @@
 - ✅ Currency integration across all pages
 - ✅ Branch currency auto-switching
 - ✅ Menu/Product Management (CRUD)
+- ✅ Branch-specific menu visibility (Products, POS, Orders, CSV import, online store)
 - ✅ Export functionality (CSV)
 - ✅ Date presets
 - ✅ Keyboard shortcuts (POS)
@@ -115,21 +116,6 @@
 - `components/menu/menu-ingredients.tsx` (new)
 - `lib/actions/menu-ingredients.ts` (new)
 - `components/menu/menu-forms.tsx` (modify)
-
----
-
-### 6. **Branch-Specific Menu Availability** (MEDIUM PRIORITY)
-**Status:** No way to scope menu items to branches
-**What's needed:**
-- Add branch availability selection in menu forms
-- Filter menu items by branch in POS
-- Show branch availability in menu management
-- Create junction table or add branchIds array
-
-**Files to create/modify:**
-- Update Prisma schema (add MenuItemBranch or branchIds field)
-- `components/menu/menu-forms.tsx`
-- `components/pos/pos-content.tsx`
 
 ---
 
@@ -259,8 +245,7 @@
 4. Supplier Selection
 5. Report Generation (remaining types)
 6. Menu Item Ingredients/BOM
-7. Branch-Specific Menu Availability
-8. Full KDS Features (real-time, notifications)
+7. Full KDS Features (real-time, notifications)
 
 ### 🟢 LOW PRIORITY (Nice to Have)
 9. Settings Backend Integration

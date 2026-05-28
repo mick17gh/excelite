@@ -49,7 +49,28 @@ export async function GET(req: NextRequest, context: { params: Promise<{ organiz
 
   const { searchParams } = new URL(req.url);
   const categoryId = searchParams.get("categoryId");
-  const menu = await getPublicStoreMenu({ categoryId });
+  const branchId = searchParams.get("branchId");
+
+  if (branchId) {
+    const branchAllowed = org.branches.some((b) => b.id === branchId);
+    if (!branchAllowed) {
+      recordStorefrontMetric("storefront.menu.requests", {
+        organizationId,
+        status: 400,
+        reason: "invalid_branch",
+      });
+      return applyCors(
+        req,
+        NextResponse.json(
+          { error: "Invalid branch for this store" },
+          { status: 400 }
+        ),
+        allowedOrigins
+      );
+    }
+  }
+
+  const menu = await getPublicStoreMenu({ categoryId, branchId });
 
   recordStorefrontMetric("storefront.menu.requests", { organizationId, status: 200, count: menu.length });
   return applyCors(req, NextResponse.json({ data: menu }), allowedOrigins);
