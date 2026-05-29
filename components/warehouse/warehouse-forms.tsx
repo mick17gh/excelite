@@ -28,12 +28,14 @@ import {
   createWarehouse,
   createWarehouseItem,
   createWarehouseTransfer,
+  recordWarehouseOutboundBatch,
   updateWarehouse,
   updateWarehouseItem,
 } from "@/lib/actions/warehouse";
 import { createWarehouseToWarehouseTransfer } from "@/lib/actions/stock-transfers";
 import { Combobox } from "@/components/ui/combobox";
 import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
+import type { WarehouseOutboundReason } from "@/lib/inventory/warehouse-outbound";
 
 interface InventoryCategoryOption {
   id: string;
@@ -1419,6 +1421,314 @@ export function BulkTransferToBranchDialog({
           >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create transfers
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Record warehouse outbound (multi-line) ──
+
+interface WarehouseOutboundDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  warehouses: WarehouseData[];
+  items: WarehouseItem[];
+}
+
+export function WarehouseOutboundDialog({
+  open,
+  onOpenChange,
+  warehouses,
+  items,
+}: WarehouseOutboundDialogProps) {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [warehouseId, setWarehouseId] = useState("");
+  const [reason, setReason] = useState<WarehouseOutboundReason>("USAGE");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<BulkTransferLine[]>([newLine()]);
+
+  const filteredItems = useMemo(
+    () => items.filter((i) => !warehouseId || i.warehouseId === warehouseId),
+    [items, warehouseId],
+  );
+
+  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+
+  const hasInvalidQuantities = useMemo(
+    () =>
+      lines.some((l) => {
+        if (!l.warehouseItemId || l.quantity <= 0) return false;
+        const item = itemById.get(l.warehouseItemId);
+        return item != null && l.quantity > item.currentStock;
+      }),
+    [lines, itemById],
+  );
+
+  const reset = () => {
+    setWarehouseId("");
+    setReason("USAGE");
+    setNotes("");
+    setLines([newLine()]);
+  };
+
+  const addLine = () => setLines((prev) => [newLine(), ...prev]);
+
+  const removeLine = (key: string) => {
+    setLines((prev) =>
+      prev.length <= 1 ? prev : prev.filter((l) => l.key !== key),
+    );
+  };
+
+  const updateLine = (
+    key: string,
+    patch: Partial<Pick<BulkTransferLine, "warehouseItemId" | "quantity">>,
+  ) => {
+    setLines((prev) =>
+      prev.map((l) => (l.key === key ? { ...l, ...patch } : l)),
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!warehouseId) {
+      toast.error("Select a warehouse");
+      return;
+    }
+
+    const filled = lines.filter((l) => l.warehouseItemId && l.quantity > 0);
+    if (filled.length === 0) {
+      toast.error("Add at least one item with quantity greater than 0");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await recordWarehouseOutboundBatch({
+        warehouseId,
+        reason,
+        notes: notes.trim() || undefined,
+        lines: filled.map((l) => ({
+          warehouseItemId: l.warehouseItemId,
+          quantity: l.quantity,
+        })),
+      });
+
+      if (result.data) {
+        toast.success(
+          `Recorded outbound for ${result.data.count} item${result.data.count === 1 ? "" : "s"}`,
+        );
+        reset();
+        onOpenChange(false);
+        router.refresh();
+      } else {
+        toast.error(result.error || "Failed to record outbound");
+      }
+    } catch {
+      toast.error("Failed to record outbound");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset();
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="max-w-2xl max-h-[min(90vh,880px)] !flex !flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <div className="shrink-0 space-y-1.5 px-6 pt-6 pr-14 mb-2">
+          <DialogHeader className="text-left">
+            <DialogTitle>Record Outbound Stock</DialogTitle>
+            <DialogDescription>
+              Record stock usage or adjustment removal from warehouse inventory
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-6 pb-2">
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Warehouse *</Label>
+              <Combobox
+                options={warehouses.map((w) => ({
+                  value: w.id,
+                  label: w.name,
+                  description: w.code,
+                }))}
+                value={warehouseId}
+                onValueChange={(v) => {
+                  setWarehouseId(v);
+                  setLines([newLine()]);
+                }}
+                placeholder="Select warehouse"
+                searchPlaceholder="Search warehouses..."
+                emptyText="No warehouses found"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Reason *</Label>
+              <Select
+                value={reason}
+                onValueChange={(v) => setReason(v as WarehouseOutboundReason)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USAGE">Normal Usage</SelectItem>
+                  <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid shrink-0 gap-2">
+            <Label>Notes (optional)</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Additional notes..."
+              className="resize-none"
+            />
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="flex shrink-0 items-center justify-between gap-2">
+              <Label>Items *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addLine}
+                disabled={!warehouseId}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Add item
+              </Button>
+            </div>
+            <div
+              className="min-h-0 max-h-[min(50vh,420px)] flex-1 overflow-y-auto overscroll-contain rounded-lg border border-border bg-muted/20 p-3 [scrollbar-gutter:stable]"
+              role="list"
+              aria-label="Outbound line items"
+            >
+              <div className="space-y-3">
+                {lines.map((line) => {
+                  const selected = line.warehouseItemId
+                    ? itemById.get(line.warehouseItemId)
+                    : undefined;
+                  const overStock =
+                    selected != null &&
+                    line.quantity > 0 &&
+                    line.quantity > selected.currentStock;
+                  return (
+                    <div key={line.key} className="space-y-1">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="min-w-0 flex-1 grid gap-2">
+                          <Label className="text-xs text-muted-foreground sm:sr-only">
+                            Item
+                          </Label>
+                          <Combobox
+                            options={filteredItems.map((i) => {
+                              const unitLabel =
+                                UNIT_LABELS[i.unit as keyof typeof UNIT_LABELS] ||
+                                i.unit;
+                              return {
+                                value: i.id,
+                                label: i.name,
+                                description: `${i.sku} · ${unitLabel} · ${i.currentStock} available`,
+                              };
+                            })}
+                            value={line.warehouseItemId}
+                            onValueChange={(v) =>
+                              updateLine(line.key, { warehouseItemId: v })
+                            }
+                            placeholder="Select item"
+                            searchPlaceholder="Search items..."
+                            emptyText="No items"
+                            disabled={!warehouseId}
+                          />
+                        </div>
+                        <div className="grid w-full gap-1 sm:w-36">
+                          <Label className="text-xs text-muted-foreground sm:sr-only">
+                            Qty {selected ? `(${selected.unit})` : ""}
+                          </Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={selected ? selected.currentStock : undefined}
+                            step="any"
+                            value={line.quantity || ""}
+                            onChange={(e) =>
+                              updateLine(line.key, {
+                                quantity: Number(e.target.value),
+                              })
+                            }
+                            onBlur={() => {
+                              if (!selected || !line.quantity) return;
+                              if (line.quantity > selected.currentStock) {
+                                updateLine(line.key, {
+                                  quantity: selected.currentStock,
+                                });
+                              }
+                            }}
+                            placeholder="0"
+                            className={
+                              overStock ? "border-destructive" : undefined
+                            }
+                            aria-invalid={overStock}
+                            aria-label={
+                              selected
+                                ? `Quantity in ${selected.unit}`
+                                : "Quantity"
+                            }
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={() => removeLine(line.key)}
+                          disabled={lines.length <= 1}
+                          aria-label="Remove line"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {overStock && selected && (
+                        <p className="text-xs text-destructive">
+                          Cannot remove more than {selected.currentStock}{" "}
+                          {selected.unit} on hand.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="shrink-0 gap-2 border-t bg-background px-6 py-4 sm:gap-2">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !warehouseId || hasInvalidQuantities}
+          >
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Record Outbound
           </Button>
         </DialogFooter>
       </DialogContent>

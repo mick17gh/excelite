@@ -42,6 +42,7 @@ import {
   Trash2,
   Upload,
   Layers,
+  PackageMinus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateTransferStatus } from "@/lib/actions/warehouse";
@@ -61,6 +62,7 @@ import {
   BulkTransferToBranchDialog,
   BulkTransferToWarehouseDialog,
   BulkCommissaryDispatchDialog,
+  WarehouseOutboundDialog,
 } from "./warehouse-forms";
 import { DispatchApprovalPanel } from "./dispatch-approval-panel";
 import { MaterialIssuesPanel, type MaterialTransferRow } from "./material-issues-panel";
@@ -177,6 +179,25 @@ interface WastageRecord {
   createdAt: string;
 }
 
+interface OutboundRecord {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseItemId: string;
+  itemName: string;
+  itemSku: string;
+  itemUnit: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  reason: string;
+  reasonLabel: string;
+  notes: string | null;
+  recordedBy: string | null;
+  outboundDate: string;
+  createdAt: string;
+}
+
 interface BranchReturnRow {
   id: string;
   fromBranchId: string;
@@ -206,6 +227,7 @@ interface WarehouseContentProps {
   stats: WarehouseStats;
   inboundRecords: InboundRecord[];
   wastageRecords: WastageRecord[];
+  outboundRecords: OutboundRecord[];
   userRole: Role;
   assignedWarehouseId: string | null;
   categories: Array<{ id: string; name: string; code: string }>;
@@ -222,6 +244,7 @@ const WAREHOUSE_TABS = [
   { value: "production", label: "Production" },
   { value: "receiving", label: "Supplier Receiving" },
   { value: "wastage", label: "Wastage" },
+  { value: "outbound", label: "Outbound" },
 ] as const;
 
 function visibleWarehouseTabs(role: Role) {
@@ -257,6 +280,7 @@ export function WarehouseContent({
   stats,
   inboundRecords,
   wastageRecords,
+  outboundRecords,
   userRole,
   assignedWarehouseId,
   categories,
@@ -282,6 +306,7 @@ export function WarehouseContent({
   const [showBulkCommissaryDispatch, setShowBulkCommissaryDispatch] = useState(false);
   const [showSupplierReceiving, setShowSupplierReceiving] = useState(false);
   const [showWastage, setShowWastage] = useState(false);
+  const [showOutbound, setShowOutbound] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const { formatCurrency } = useCurrency();
 
@@ -295,6 +320,7 @@ export function WarehouseContent({
   const [pageApprovals, setPageApprovals] = useState(1);
   const [pageReceiving, setPageReceiving] = useState(1);
   const [pageWastage, setPageWastage] = useState(1);
+  const [pageOutbound, setPageOutbound] = useState(1);
   const [tabsReady, setTabsReady] = useState(false);
 
   useEffect(() => {
@@ -369,6 +395,10 @@ export function WarehouseContent({
   }, [selectedWarehouse, materialTransfers]);
 
   useEffect(() => {
+    setPageOutbound(1);
+  }, [selectedWarehouse, outboundRecords]);
+
+  useEffect(() => {
     setPageApprovals(1);
   }, [selectedWarehouse]);
 
@@ -381,6 +411,7 @@ export function WarehouseContent({
     setPageApprovals(1);
     setPageReceiving(1);
     setPageWastage(1);
+    setPageOutbound(1);
   }, [pageSize]);
 
   const branchMap = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches]);
@@ -420,6 +451,16 @@ export function WarehouseContent({
     return wastageRecords.slice(start, start + pageSize);
   }, [wastageRecords, pageWastage, pageSize]);
 
+  const filteredOutboundRecords = useMemo(() => {
+    if (selectedWarehouse === "all") return outboundRecords;
+    return outboundRecords.filter((r) => r.warehouseId === selectedWarehouse);
+  }, [outboundRecords, selectedWarehouse]);
+
+  const paginatedOutbound = useMemo(() => {
+    const start = (pageOutbound - 1) * pageSize;
+    return filteredOutboundRecords.slice(start, start + pageSize);
+  }, [filteredOutboundRecords, pageOutbound, pageSize]);
+
   const totalPagesWh = Math.max(1, Math.ceil(warehouses.length / pageSize) || 1);
   const totalPagesInv = Math.max(1, Math.ceil(filteredItems.length / pageSize) || 1);
   const totalPagesXfer = Math.max(1, Math.ceil(filteredTransfers.length / pageSize) || 1);
@@ -429,6 +470,10 @@ export function WarehouseContent({
   );
   const totalPagesRecv = Math.max(1, Math.ceil(inboundRecords.length / pageSize) || 1);
   const totalPagesWaste = Math.max(1, Math.ceil(wastageRecords.length / pageSize) || 1);
+  const totalPagesOutbound = Math.max(
+    1,
+    Math.ceil(filteredOutboundRecords.length / pageSize) || 1,
+  );
 
   useEffect(() => {
     if (pageWarehouses > totalPagesWh) setPageWarehouses(totalPagesWh);
@@ -453,6 +498,9 @@ export function WarehouseContent({
   useEffect(() => {
     if (pageWastage > totalPagesWaste) setPageWastage(totalPagesWaste);
   }, [pageWastage, totalPagesWaste]);
+  useEffect(() => {
+    if (pageOutbound > totalPagesOutbound) setPageOutbound(totalPagesOutbound);
+  }, [pageOutbound, totalPagesOutbound]);
 
   const handleApproveTransfer = async (id: string) => {
     const result = await updateTransferStatus(id, "IN_TRANSIT" as TransferStatus);
@@ -629,6 +677,11 @@ export function WarehouseContent({
                   {canLogWastage ? (
                     <DropdownMenuItem onClick={() => setShowWastage(true)}>
                       <Trash2 className="mr-2 h-4 w-4" />Log Wastage
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canLogWastage ? (
+                    <DropdownMenuItem onClick={() => setShowOutbound(true)}>
+                      <PackageMinus className="mr-2 h-4 w-4" />Record Outbound
                     </DropdownMenuItem>
                   ) : null}
                   {canCreateWarehouse ? (
@@ -1261,6 +1314,83 @@ export function WarehouseContent({
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Outbound Tab */}
+        <TabsContent value="outbound">
+          <Card className="rounded-xl">
+            <CardContent className="p-0">
+              <div className="flex flex-col gap-3 px-4 pt-4 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-medium">Outbound Records</p>
+                {warehouses.length > 1 && (
+                  <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
+                    <SelectTrigger className="w-full sm:w-48 h-9">
+                      <SelectValue placeholder="Warehouse" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All warehouses</SelectItem>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Warehouse</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Unit Cost</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOutboundRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                        No outbound records yet. Use &quot;Record Outbound&quot; in the actions menu.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedOutbound.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{formatDisplayDate(record.outboundDate)}</TableCell>
+                        <TableCell>{record.warehouseName}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{record.itemName}</p>
+                            <p className="text-xs text-muted-foreground">{record.itemSku}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{record.reasonLabel}</TableCell>
+                        <TableCell className="text-right">
+                          {record.quantity} {record.itemUnit}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(record.unitCost)}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(record.totalCost)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={pageOutbound}
+                totalPages={totalPagesOutbound}
+                totalItems={filteredOutboundRecords.length}
+                pageSize={pageSize}
+                onPageChange={setPageOutbound}
+                onPageSizeChange={setPageSize}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <CreateWarehouseDialog open={showCreateWarehouse} onOpenChange={setShowCreateWarehouse} />
@@ -1287,6 +1417,12 @@ export function WarehouseContent({
       <BulkCommissaryDispatchDialog open={showBulkCommissaryDispatch} onOpenChange={setShowBulkCommissaryDispatch} warehouses={warehouses} items={items} branches={branches} />
       <SupplierReceivingDialog open={showSupplierReceiving} onOpenChange={setShowSupplierReceiving} warehouses={warehouses} items={items} />
       <WastageDialog open={showWastage} onOpenChange={setShowWastage} warehouses={warehouses} items={items} />
+      <WarehouseOutboundDialog
+        open={showOutbound}
+        onOpenChange={setShowOutbound}
+        warehouses={warehouses}
+        items={items}
+      />
       <WarehouseImportDialog
         open={showBulkImport}
         onOpenChange={setShowBulkImport}

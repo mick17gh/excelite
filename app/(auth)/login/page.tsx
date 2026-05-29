@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Login | ServStack",
   description: "Sign in to your ServStack account",

@@ -652,6 +652,55 @@ export const QUERY_TEMPLATES: QueryTemplate[] = [
     cacheTTL: 180,
   },
   {
+    id: 'warehouse_outbound_period',
+    intent: 'informational',
+    entity: 'warehouseHub',
+    patterns: [
+      'warehouse outbound',
+      'hub stock usage',
+      'warehouse adjustment',
+      'warehouse stock removal',
+      'outbound from warehouse',
+    ],
+    description: 'Warehouse outbound usage and adjustments in a period',
+    buildQuery: (params: QueryParams): PrismaQueryConfig => {
+      const { startDate, endDate } =
+        params.startDate && params.endDate
+          ? { startDate: params.startDate, endDate: params.endDate }
+          : getDateRange((params as { period?: string }).period || 'last_30_days');
+      return {
+        model: 'warehouseOutboundLog',
+        operation: 'findMany',
+        where: {
+          outboundDate: { gte: startDate, lte: endDate },
+        },
+        select: {
+          outboundDate: true,
+          quantity: true,
+          unitCost: true,
+          totalCost: true,
+          reason: true,
+          notes: true,
+          warehouse: { select: { name: true, code: true } },
+          warehouseItem: { select: { name: true, sku: true, unit: true } },
+        },
+        orderBy: { outboundDate: 'desc' },
+        take: params.limit || 25,
+      };
+    },
+    maxResults: 50,
+    requiredRoles: [
+      Role.SUPER_ADMIN,
+      Role.ADMIN,
+      Role.EXECUTIVE,
+      Role.OPERATIONS_MANAGER,
+      Role.BRANCH_MANAGER,
+      Role.WAREHOUSE_STAFF,
+      Role.AUDITOR,
+    ],
+    cacheTTL: 180,
+  },
+  {
     id: 'unified_orders_by_status',
     intent: 'comparative',
     entity: 'unifiedOrders',

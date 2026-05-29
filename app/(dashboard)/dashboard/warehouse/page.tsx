@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import { WarehouseContent } from "@/components/warehouse/warehouse-content";
-import { getWarehouses, getWarehouseInventory, getWarehouseTransfers, getWarehouseStats, getWarehouseInboundRecords, getWarehouseWasteLogs } from "@/lib/actions/warehouse";
+import { getWarehouses, getWarehouseInventory, getWarehouseTransfers, getWarehouseStats, getWarehouseInboundRecords, getWarehouseWasteLogs, getWarehouseOutboundLogs } from "@/lib/actions/warehouse";
 import {
   getBranchWarehouseTransfers,
   getWarehouseTransfers as getWarehouseMaterialTransfers,
@@ -34,7 +34,7 @@ export default async function WarehousePage() {
   const userRole = (dbUser?.role as Role) ?? "STAFF";
   const assignedWarehouseId = dbUser?.assignedWarehouseId ?? null;
 
-  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult, branchReturnsResult, categoriesResult] = await Promise.all([
+  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult, outboundResult, branchReturnsResult, categoriesResult] = await Promise.all([
     getWarehouses(),
     getWarehouseTransfers(),
     getWarehouseMaterialTransfers(),
@@ -42,6 +42,7 @@ export default async function WarehousePage() {
     getBranches(),
     getWarehouseInboundRecords(),
     getWarehouseWasteLogs(),
+    getWarehouseOutboundLogs(),
     getBranchWarehouseTransfers({ limit: 200 }),
     listInventoryCategories({ activeOnly: true }),
   ]);
@@ -65,6 +66,7 @@ export default async function WarehousePage() {
   const stats = statsResult.data ?? EMPTY_STATS;
   const inboundRecords = inboundResult.data || [];
   const wastageRecords = wastageResult.data || [];
+  const outboundRecords = outboundResult.data || [];
   const branchReturns = branchReturnsResult.data || [];
   const categories = categoriesResult.success ? categoriesResult.data : [];
   const branches = (branchesResult.data || []).map((b: { id: string; name: string; code: string }) => ({
@@ -99,6 +101,7 @@ export default async function WarehousePage() {
           stats={stats}
           inboundRecords={inboundRecords}
           wastageRecords={wastageRecords}
+          outboundRecords={outboundRecords}
           userRole={userRole}
           assignedWarehouseId={assignedWarehouseId}
           categories={categories}

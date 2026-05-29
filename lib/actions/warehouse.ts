@@ -8,6 +8,13 @@ import {
   branchLimitsFromWarehouseItem,
   normalizeWarehouseMaxStock,
 } from "@/lib/inventory/branch-stock-limits";
+import {
+  type WarehouseOutboundReason,
+  warehouseOutboundReasonLabel,
+} from "@/lib/inventory/warehouse-outbound";
+
+export type { WarehouseOutboundReason };
+export { warehouseOutboundReasonLabel };
 
 /** Prisma Decimal → plain number (RSC props and server-action responses must be JSON-serializable) */
 function decimalToNumber(value: unknown): number {
@@ -573,6 +580,137 @@ export async function getWarehouseWasteLogs(warehouseId?: string) {
     };
   } catch (error) {
     console.error("[getWarehouseWasteLogs] Error:", error);
+    return { data: [] };
+  }
+}
+
+// ============================================
+// WAREHOUSE OUTBOUND
+// ============================================
+
+export interface RecordWarehouseOutboundLine {
+  warehouseItemId: string;
+  quantity: number;
+}
+
+export interface RecordWarehouseOutboundBatchInput {
+  warehouseId: string;
+  reason: WarehouseOutboundReason;
+  notes?: string;
+  lines: RecordWarehouseOutboundLine[];
+  recordedBy?: string;
+}
+
+export async function recordWarehouseOutboundBatch(input: RecordWarehouseOutboundBatchInput) {
+  try {
+    if (!input.warehouseId) {
+      return { error: "Select a warehouse" };
+    }
+    if (input.reason !== "USAGE" && input.reason !== "ADJUSTMENT") {
+      return { error: "Invalid outbound reason" };
+    }
+
+    const filled = input.lines.filter((l) => l.warehouseItemId && l.quantity > 0);
+    if (filled.length === 0) {
+      return { error: "Add at least one item with quantity greater than 0" };
+    }
+
+    const itemIds = filled.map((l) => l.warehouseItemId);
+    if (new Set(itemIds).size !== itemIds.length) {
+      return { error: "Each item can only appear once in the list" };
+    }
+
+    const items = await db.warehouseInventoryItem.findMany({
+      where: { id: { in: itemIds } },
+    });
+    const itemById = new Map(items.map((i) => [i.id, i]));
+
+    for (const line of filled) {
+      const item = itemById.get(line.warehouseItemId);
+      if (!item || item.warehouseId !== input.warehouseId) {
+        return { error: "Invalid item selection for this warehouse" };
+      }
+      if (Number(item.currentStock) < line.quantity) {
+        return {
+          error: `Insufficient stock for ${item.name} (max ${Number(item.currentStock)} ${item.unit})`,
+        };
+      }
+    }
+
+    const outboundDate = new Date();
+    const notes = input.notes?.trim() || null;
+
+    await db.$transaction(async (tx) => {
+      for (const line of filled) {
+        const item = itemById.get(line.warehouseItemId)!;
+        const totalCost = line.quantity * Number(item.unitCost);
+
+        await tx.warehouseOutboundLog.create({
+          data: {
+            warehouseId: input.warehouseId,
+            warehouseItemId: line.warehouseItemId,
+            quantity: line.quantity,
+            unitCost: item.unitCost,
+            totalCost,
+            reason: input.reason,
+            notes,
+            recordedBy: input.recordedBy || null,
+            outboundDate,
+          },
+        });
+
+        await tx.warehouseInventoryItem.update({
+          where: { id: line.warehouseItemId },
+          data: { currentStock: { decrement: line.quantity } },
+        });
+      }
+    });
+
+    revalidatePath("/dashboard/warehouse");
+    return { data: { count: filled.length } };
+  } catch (error) {
+    console.error("[recordWarehouseOutboundBatch] Error:", error);
+    return { error: "Failed to record warehouse outbound" };
+  }
+}
+
+export async function getWarehouseOutboundLogs(warehouseId?: string) {
+  try {
+    const where: Record<string, unknown> = {};
+    if (warehouseId) where.warehouseId = warehouseId;
+
+    const logs = await db.warehouseOutboundLog.findMany({
+      where,
+      include: {
+        warehouseItem: { select: { name: true, sku: true, unit: true } },
+        warehouse: { select: { name: true } },
+      },
+      orderBy: { outboundDate: "desc" },
+      take: 200,
+    });
+
+    return {
+      data: logs.map((l) => ({
+        id: l.id,
+        warehouseId: l.warehouseId,
+        warehouseName: l.warehouse?.name || "",
+        warehouseItemId: l.warehouseItemId,
+        itemName: l.warehouseItem?.name || "",
+        itemSku: l.warehouseItem?.sku || "",
+        itemUnit: l.warehouseItem?.unit || "",
+        quantity: decimalToNumber(l.quantity),
+        unitCost: decimalToNumber(l.unitCost),
+        totalCost: decimalToNumber(l.totalCost),
+        reason: l.reason,
+        reasonLabel: warehouseOutboundReasonLabel(l.reason),
+        notes: l.notes,
+        recordedBy: l.recordedBy,
+        outboundDate: l.outboundDate.toISOString(),
+        createdAt: l.createdAt.toISOString(),
+      })),
+    };
+  } catch (error) {
+    console.error("[getWarehouseOutboundLogs] Error:", error);
     return { data: [] };
   }
 }

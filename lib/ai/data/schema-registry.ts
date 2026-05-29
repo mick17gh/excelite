@@ -174,7 +174,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
   {
     entity: 'warehouseHub',
     description:
-      'Central warehouse hub SKUs, stock, reorder levels, inbound receipts, transfers to branches, and warehouse waste (separate from branch on-hand inventory)',
+      'Central warehouse hub SKUs, stock, reorder levels, inbound receipts, transfers to branches, warehouse waste, and outbound usage/adjustments (separate from branch on-hand inventory)',
     fields: [
       { name: 'warehouse', type: 'reference', description: 'Warehouse location', referenceTo: 'warehouse' },
       { name: 'sku', type: 'string', description: 'Hub item SKU' },
@@ -183,6 +183,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
       { name: 'transferStatus', type: 'enum', description: 'Transfer workflow status', enumValues: ['PENDING', 'IN_TRANSIT', 'COMPLETED', 'CANCELLED'] },
       { name: 'inboundCost', type: 'currency', description: 'Supplier receipt value' },
       { name: 'wasteCost', type: 'currency', description: 'Warehouse waste cost' },
+      { name: 'outboundCost', type: 'currency', description: 'Warehouse outbound (normal usage or adjustment) cost' },
     ],
     allowedAggregations: ['sum', 'count'],
     allowedGroupings: ['warehouse', 'category', 'transferStatus'],

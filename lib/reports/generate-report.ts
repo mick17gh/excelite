@@ -31,6 +31,7 @@ import {
   fetchSectionPerformance,
 } from "@/lib/reports/table-aggregations";
 import { isTableManagementEnabled } from "@/lib/features/table-management";
+import { warehouseOutboundReasonLabel } from "@/lib/inventory/warehouse-outbound";
 
 export interface GenerateReportInput {
   reportId: ReportId;
@@ -1040,10 +1041,47 @@ async function buildWarehouseActivity(
     Status: t.status,
   }));
 
+  const outboundWhere: Record<string, unknown> = {
+    outboundDate: { gte: input.startDate, lte: input.endDate },
+  };
+  if (whIds.length) outboundWhere.warehouseId = { in: whIds };
+
+  const outboundLogs = await db.warehouseOutboundLog.findMany({
+    where: outboundWhere,
+    include: {
+      warehouse: { select: { name: true } },
+      warehouseItem: { select: { name: true, sku: true, unit: true } },
+    },
+    orderBy: { outboundDate: "desc" },
+  });
+
+  const outboundRows = outboundLogs.map((o) => ({
+    Date: formatReportDate(o.outboundDate),
+    Warehouse: o.warehouse?.name || "",
+    Item: o.warehouseItem?.name || "",
+    SKU: o.warehouseItem?.sku || "",
+    Unit: o.warehouseItem?.unit || "",
+    Quantity: Number(o.quantity),
+    Reason: warehouseOutboundReasonLabel(o.reason),
+    Notes: o.notes || "—",
+    "Unit Cost (GHS)": roundMoney(Number(o.unitCost)),
+    "Total Cost (GHS)": roundMoney(Number(o.totalCost)),
+  }));
+
+  const totalOutboundCost = outboundRows.reduce(
+    (sum, row) => sum + Number(row["Total Cost (GHS)"]),
+    0,
+  );
+
   return mergeReport(base, {
     reportName: "Warehouse Activity Report",
-    summary: { transferCount: transferRows.length },
+    summary: {
+      transferCount: transferRows.length,
+      outboundCount: outboundRows.length,
+      totalOutboundCost: roundMoney(totalOutboundCost),
+    },
     transfers: transferRows,
+    outbound: outboundRows,
   });
 }
 

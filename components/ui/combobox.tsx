@@ -68,11 +68,25 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("h-10 w-full min-w-0 justify-between font-normal", className)}
+          className={cn(
+            "h-auto min-h-10 w-full min-w-0 justify-between py-2 font-normal",
+            className,
+          )}
           disabled={disabled}
         >
-          <span className="truncate text-left">
-            {selectedOption ? selectedOption.label : placeholder}
+          <span className="min-w-0 flex-1 truncate text-left">
+            {selectedOption ? (
+              <span className="flex w-full flex-col items-start gap-0.5">
+                <span className="w-full truncate">{selectedOption.label}</span>
+                {selectedOption.description ? (
+                  <span className="w-full truncate text-xs font-normal text-muted-foreground">
+                    {selectedOption.description}
+                  </span>
+                ) : null}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">{placeholder}</span>
+            )}
           </span>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

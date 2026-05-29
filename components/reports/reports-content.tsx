@@ -141,7 +141,8 @@ const reportTypes: ReportType[] = [
   {
     id: "warehouse-activity",
     name: "Warehouse Activity",
-    description: "Transfers to branches, inbound receipts, and warehouse waste in the period",
+    description:
+      "Transfers to branches, inbound receipts, warehouse waste, and outbound usage/adjustments in the period",
     icon: Truck,
     category: "Warehouse",
     frequency: "Weekly",
