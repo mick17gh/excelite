@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useIsMounted } from "@/hooks/use-is-mounted";
 import {
   Card,
@@ -61,6 +61,8 @@ import { getBranchTaxRate } from "@/lib/actions/tax";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 import { SalesChannel } from "@/lib/generated/prisma/client";
 import { cn } from "@/lib/utils";
+import { useMenuStockAvailability } from "@/hooks/use-menu-stock-availability";
+import { validateMenuItemStockForSale } from "@/lib/actions/menu-stock-availability";
 
 interface Branch {
   id: string;
@@ -213,7 +215,46 @@ export function TransactionsContent({
   // Use actual menu items from props
   const displayMenuItems = menuItems.length > 0 ? menuItems : [];
 
-  const addToCart = (item: MenuItem) => {
+  const menuItemIds = useMemo(
+    () => displayMenuItems.map((m) => m.id),
+    [displayMenuItems]
+  );
+
+  const {
+    blocking: stockBlocking,
+    unsellableIds,
+    isSellable,
+    loading: stockLoading,
+    refresh: refreshStockAvailability,
+  } = useMenuStockAvailability(selectedBranch, menuItemIds, Boolean(selectedBranch));
+
+  useEffect(() => {
+    if (!selectedBranch || !stockBlocking || stockLoading) return;
+    setCart((prev) => {
+      const next = prev.filter((line) => !unsellableIds.has(line.menuItemId));
+      if (next.length < prev.length) {
+        toast.info("Removed out-of-stock items from cart");
+      }
+      return next;
+    });
+  }, [selectedBranch, stockBlocking, stockLoading, unsellableIds]);
+
+  const addToCart = async (item: MenuItem) => {
+    if (stockBlocking && !isSellable(item.id)) {
+      toast.error(`${item.name} is out of stock at this branch`);
+      return;
+    }
+    if (selectedBranch && stockBlocking) {
+      const stockResult = await validateMenuItemStockForSale(
+        selectedBranch,
+        item.id,
+        1
+      );
+      if (!stockResult.success) {
+        toast.error(stockResult.error || "Item is out of stock");
+        return;
+      }
+    }
     const existingItem = cart.find((c) => c.menuItemId === item.id);
     if (existingItem) {
       setCart(
@@ -301,6 +342,7 @@ export function TransactionsContent({
       if (result.success) {
         toast.success("Transaction recorded successfully!");
         setCart([]);
+        void refreshStockAvailability();
         setIsNewSaleOpen(false);
         // Refresh today's transactions
         const refreshResult = await getTransactions(selectedBranch, new Date());
@@ -402,21 +444,30 @@ export function TransactionsContent({
                             {category}
                           </h4>
                           <div className="grid grid-cols-2 gap-2">
-                            {items.map((item) => (
-                              <Button
-                                key={item.id}
-                                variant="outline"
-                                className="h-auto py-2 px-2 flex flex-col items-start justify-start text-left"
-                                onClick={() => addToCart(item)}
-                              >
-                                <span className="font-medium text-xs truncate w-full">
-                                  {item.name}
-                                </span>
-                                <span className="text-xs font-semibold text-primary mt-0.5">
-                                  {formatCurrency(item.price)}
-                                </span>
-                              </Button>
-                            ))}
+                            {items.map((item) => {
+                              const outOfStock =
+                                stockBlocking && !isSellable(item.id);
+                              return (
+                                <Button
+                                  key={item.id}
+                                  variant="outline"
+                                  disabled={outOfStock}
+                                  className={cn(
+                                    "h-auto py-2 px-2 flex flex-col items-start justify-start text-left",
+                                    outOfStock && "opacity-50"
+                                  )}
+                                  onClick={() => void addToCart(item)}
+                                >
+                                  <span className="font-medium text-xs truncate w-full">
+                                    {item.name}
+                                    {outOfStock ? " (Out of stock)" : ""}
+                                  </span>
+                                  <span className="text-xs font-semibold text-primary mt-0.5">
+                                    {formatCurrency(item.price)}
+                                  </span>
+                                </Button>
+                              );
+                            })}
                           </div>
                         </div>
                       );

@@ -72,7 +72,7 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
     include: {
       items: {
         include: {
-          menuItem: { select: { cost: true } },
+          menuItem: { select: { cost: true, name: true } },
           selections: { select: { menuItemOptionId: true } },
         },
       },
@@ -128,6 +128,23 @@ async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
     APP: "APP",
   };
   const channel = channelMap[order.type] || "DINE_IN";
+
+  const { assertCartStockAvailable } = await import(
+    "@/lib/services/menu-stock-availability"
+  );
+  const stockCheck = await assertCartStockAvailable(
+    order.branchId,
+    order.items.map((item) => ({
+      menuItemId: item.menuItemId,
+      quantity: item.quantity,
+      menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
+      menuItemName: item.menuItem?.name,
+    }))
+  );
+  if (!stockCheck.ok) {
+    console.warn("[settleOrderIfFullyPaid] Stock check failed:", stockCheck.error);
+    return;
+  }
 
   const allOptionIds = order.items.flatMap((i) =>
     i.selections?.map((s) => s.menuItemOptionId) || []

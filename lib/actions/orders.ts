@@ -507,6 +507,22 @@ export async function createOrder(input: CreateOrderInput) {
       });
     }
 
+    const { assertCartStockAvailable } = await import(
+      "@/lib/services/menu-stock-availability"
+    );
+    const stockCheck = await assertCartStockAvailable(
+      input.branchId,
+      orderItemsPayload.map((p) => ({
+        menuItemId: p.menuItemId,
+        quantity: p.quantity,
+        menuItemOptionIds: p.optionIds,
+        menuItemName: menuItemMap.get(p.menuItemId)?.name,
+      }))
+    );
+    if (!stockCheck.ok) {
+      return { error: stockCheck.error };
+    }
+
     const branch = await db.branch.findUnique({
       where: { id: input.branchId },
       select: { taxRate: true, taxEnabled: true, taxInclusive: true },

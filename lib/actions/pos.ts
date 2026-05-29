@@ -217,6 +217,28 @@ export async function createPosOrder(input: CreatePosOrderInput) {
       });
     }
 
+    const menuItemsForStock = await db.menuItem.findMany({
+      where: { id: { in: menuItemIds } },
+      select: { id: true, name: true },
+    });
+    const menuNameMap = new Map(menuItemsForStock.map((m) => [m.id, m.name]));
+
+    const { assertCartStockAvailable } = await import(
+      "@/lib/services/menu-stock-availability"
+    );
+    const stockCheck = await assertCartStockAvailable(
+      input.branchId,
+      resolvedLines.map((l) => ({
+        menuItemId: l.menuItemId,
+        quantity: l.quantity,
+        menuItemOptionIds: l.optionIds,
+        menuItemName: menuNameMap.get(l.menuItemId),
+      }))
+    );
+    if (!stockCheck.ok) {
+      return { success: false, error: stockCheck.error };
+    }
+
     const lineTotal = resolvedLines.reduce((s, l) => s + l.lineTotal, 0);
     const discount = input.discount || 0;
     const deliveryFee = input.deliveryFee || 0;
@@ -436,6 +458,24 @@ export async function completeOrder(input: CompleteOrderInput) {
 
     if (!order) {
       return { success: false, error: "Order not found" };
+    }
+
+    if (order.status !== "COMPLETED" && order.paymentStatus !== "PAID") {
+      const { assertCartStockAvailable } = await import(
+        "@/lib/services/menu-stock-availability"
+      );
+      const stockCheck = await assertCartStockAvailable(
+        order.branchId,
+        order.items.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
+          menuItemName: item.menuItem?.name,
+        }))
+      );
+      if (!stockCheck.ok) {
+        return { success: false, error: stockCheck.error };
+      }
     }
 
     // Idempotent replay (e.g. offline sync retry): order already finalized

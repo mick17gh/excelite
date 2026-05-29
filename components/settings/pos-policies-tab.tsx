@@ -30,6 +30,7 @@ export function PosPoliciesTab({ organizationId }: PosPoliciesTabProps) {
   const [saving, setSaving] = useState(false);
   const [roles, setRoles] = useState<Role[]>(["EXECUTIVE", "ADMIN", "SUPER_ADMIN"]);
   const [enforceRouting, setEnforceRouting] = useState(false);
+  const [blockSalesWhenOutOfStock, setBlockSalesWhenOutOfStock] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -37,6 +38,7 @@ export function PosPoliciesTab({ organizationId }: PosPoliciesTabProps) {
       if (res.data) {
         setRoles((res.data.complimentaryApproverRoles as Role[]) || []);
         setEnforceRouting(res.data.enforceCommissaryRouting ?? false);
+        setBlockSalesWhenOutOfStock(res.data.blockSalesWhenOutOfStock ?? false);
       }
       setLoading(false);
     })();
@@ -58,6 +60,7 @@ export function PosPoliciesTab({ organizationId }: PosPoliciesTabProps) {
       organizationId,
       complimentaryApproverRoles: roles,
       enforceCommissaryRouting: enforceRouting,
+      blockSalesWhenOutOfStock,
     });
     setSaving(false);
     if (res.error) toast.error(res.error);
@@ -95,6 +98,24 @@ export function PosPoliciesTab({ organizationId }: PosPoliciesTabProps) {
               </Label>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">Out-of-stock sales</CardTitle>
+          <CardDescription className="text-xs">
+            When enabled, menu items cannot be sold at a branch if any recipe ingredient is
+            below required stock. POS, Orders, Transactions, and the online store hide or
+            block those items. Branches can override this default.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 flex items-center justify-between">
+          <Label className="text-sm">Block sales when out of stock</Label>
+          <Switch
+            checked={blockSalesWhenOutOfStock}
+            onCheckedChange={setBlockSalesWhenOutOfStock}
+          />
         </CardContent>
       </Card>
 

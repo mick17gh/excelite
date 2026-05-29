@@ -10,6 +10,8 @@ import {
   serializeMenuItemBranchVisibility,
   validateMenuItemBranchScope,
 } from "@/lib/menu/branch-availability";
+import { isBlockingSalesWhenOutOfStock } from "@/lib/inventory/sales-stock-policy";
+import { filterSellableMenuItemIds } from "@/lib/services/menu-stock-availability";
 
 export interface PaginationParams {
   page?: number;
@@ -66,6 +68,8 @@ export interface IngredientInput {
 }
 
 export interface MenuItemOptionInput {
+  /** Existing DB id (omit for new options). */
+  id?: string;
   name: string;
   sortOrder?: number;
   priceDelta?: number;
@@ -77,6 +81,8 @@ export interface MenuItemOptionInput {
 }
 
 export interface MenuItemOptionGroupInput {
+  /** Existing DB id (omit for new groups). */
+  id?: string;
   name: string;
   sortOrder?: number;
   isRequired?: boolean;
@@ -84,6 +90,11 @@ export interface MenuItemOptionGroupInput {
   maxSelections?: number;
   isActive?: boolean;
   options: MenuItemOptionInput[];
+}
+
+/** Client form keys use UUIDs (with hyphens); persisted ids are cuids without hyphens. */
+function isPersistedMenuKey(key: string | undefined): boolean {
+  return Boolean(key && !key.includes("-"));
 }
 
 function validateOptionGroupsStructure(
@@ -183,6 +194,166 @@ async function buildNestedOptionGroupsCreate(optionGroups: MenuItemOptionGroupIn
     });
   }
   return { create };
+}
+
+type MenuTx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+async function syncOptionIngredients(
+  tx: MenuTx,
+  menuItemOptionId: string,
+  ingredients: IngredientInput[] | undefined
+) {
+  if (ingredients === undefined) return;
+  await tx.menuItemOptionIngredient.deleteMany({ where: { menuItemOptionId } });
+  if (ingredients.length > 0) {
+    const resolved = await resolveIngredientIds(ingredients);
+    await tx.menuItemOptionIngredient.createMany({
+      data: resolved.map((ing) => ({
+        menuItemOptionId,
+        inventoryItemId: ing.inventoryItemId,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      })),
+    });
+  }
+}
+
+async function removeOrDeactivateOption(
+  tx: MenuTx,
+  option: { id: string; _count: { orderSelections: number; saleSelections: number } }
+) {
+  const refs = option._count.orderSelections + option._count.saleSelections;
+  if (refs > 0) {
+    await tx.menuItemOption.update({
+      where: { id: option.id },
+      data: { isActive: false },
+    });
+    return;
+  }
+  await tx.menuItemOptionIngredient.deleteMany({ where: { menuItemOptionId: option.id } });
+  await tx.menuItemOption.delete({ where: { id: option.id } });
+}
+
+/** Upsert option groups in place so historical order/sale selections keep valid FKs. */
+async function syncMenuItemOptionGroups(
+  tx: MenuTx,
+  menuItemId: string,
+  optionGroups: MenuItemOptionGroupInput[]
+) {
+  const existing = await tx.menuItemOptionGroup.findMany({
+    where: { menuItemId },
+    include: {
+      options: {
+        include: {
+          _count: {
+            select: { orderSelections: true, saleSelections: true },
+          },
+        },
+      },
+    },
+  });
+
+  const keptGroupIds = new Set<string>();
+  const keptOptionIds = new Set<string>();
+
+  for (const [gi, g] of optionGroups.entries()) {
+    const groupData = {
+      name: g.name.trim(),
+      sortOrder: g.sortOrder ?? gi,
+      isRequired: g.isRequired ?? true,
+      minSelections: (g.isRequired ?? true) ? (g.minSelections ?? 1) : 0,
+      maxSelections: g.maxSelections ?? 1,
+      isActive: g.isActive ?? true,
+    };
+
+    let groupId: string;
+    const existingGroup =
+      g.id && isPersistedMenuKey(g.id)
+        ? existing.find((eg) => eg.id === g.id)
+        : undefined;
+
+    if (existingGroup) {
+      groupId = existingGroup.id;
+      await tx.menuItemOptionGroup.update({
+        where: { id: groupId },
+        data: groupData,
+      });
+    } else {
+      const created = await tx.menuItemOptionGroup.create({
+        data: { menuItemId, ...groupData },
+      });
+      groupId = created.id;
+    }
+    keptGroupIds.add(groupId);
+
+    const groupOptions = existingGroup?.options ?? [];
+
+    for (const [oi, o] of g.options.entries()) {
+      const optionData = {
+        name: o.name.trim(),
+        sortOrder: o.sortOrder ?? oi,
+        priceDelta: o.priceDelta ?? 0,
+        costDelta: o.costDelta ?? null,
+        sku: o.sku?.trim() ? o.sku.trim().toUpperCase() : null,
+        isDefault: o.isDefault ?? false,
+        isActive: o.isActive ?? true,
+      };
+
+      const existingOption =
+        o.id && isPersistedMenuKey(o.id)
+          ? groupOptions.find((eo) => eo.id === o.id) ??
+            existing
+              .flatMap((eg) => eg.options)
+              .find((eo) => eo.id === o.id)
+          : undefined;
+
+      if (existingOption) {
+        await tx.menuItemOption.update({
+          where: { id: existingOption.id },
+          data: { ...optionData, groupId },
+        });
+        await syncOptionIngredients(tx, existingOption.id, o.ingredients);
+        keptOptionIds.add(existingOption.id);
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const row: any = {
+          groupId,
+          ...optionData,
+        };
+        if (o.ingredients?.length) {
+          const resolved = await resolveIngredientIds(o.ingredients);
+          row.ingredients = {
+            create: resolved.map((ing) => ({
+              inventoryItemId: ing.inventoryItemId,
+              quantity: ing.quantity,
+              unit: ing.unit,
+            })),
+          };
+        }
+        const created = await tx.menuItemOption.create({ data: row });
+        keptOptionIds.add(created.id);
+      }
+    }
+  }
+
+  for (const eg of existing) {
+    for (const eo of eg.options) {
+      if (!keptOptionIds.has(eo.id)) {
+        await removeOrDeactivateOption(tx, eo);
+      }
+    }
+    if (!keptGroupIds.has(eg.id)) {
+      const remaining = await tx.menuItemOption.count({ where: { groupId: eg.id } });
+      if (remaining === 0) {
+        await tx.menuItemOptionGroup.delete({ where: { id: eg.id } });
+      } else {
+        await tx.menuItemOptionGroup.update({
+          where: { id: eg.id },
+          data: { isActive: false },
+        });
+      }
+    }
+  }
 }
 
 function mapOptionGroupsForClient(
@@ -541,59 +712,69 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
       }
     }
 
+    const menuItemScalarUpdate = {
+      ...(updateData.name && { name: updateData.name }),
+      ...(updateData.sku && { sku: updateData.sku }),
+      ...(updateData.categoryId && { categoryId: updateData.categoryId }),
+      ...(updateData.price !== undefined && { price: updateData.price }),
+      ...(calculatedCost !== undefined && { cost: calculatedCost }),
+      ...(updateData.description !== undefined && { description: updateData.description }),
+      ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
+      ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
+    };
+
     if (optionGroups !== undefined) {
+      const skuErr = await assertMenuItemOptionSkusAvailable(optionGroups ?? undefined, id);
+      if (skuErr) {
+        return { success: false, error: skuErr };
+      }
+
       await db.$transaction(async (tx) => {
-        await tx.menuItemOptionGroup.deleteMany({ where: { menuItemId: id } });
         if (optionGroups && optionGroups.length > 0) {
-          const skuErr = await assertMenuItemOptionSkusAvailable(optionGroups, id);
-          if (skuErr) {
-            throw new Error(skuErr);
-          }
-          const nested = await buildNestedOptionGroupsCreate(optionGroups);
-          await tx.menuItem.update({
-            where: { id },
-            data: {
-              ...(updateData.name && { name: updateData.name }),
-              ...(updateData.sku && { sku: updateData.sku }),
-              ...(updateData.categoryId && { categoryId: updateData.categoryId }),
-              ...(updateData.price !== undefined && { price: updateData.price }),
-              ...(calculatedCost !== undefined && { cost: calculatedCost }),
-              ...(updateData.description !== undefined && { description: updateData.description }),
-              ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
-              ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
-              optionGroups: nested,
+          await syncMenuItemOptionGroups(tx, id, optionGroups);
+        } else {
+          const existing = await tx.menuItemOptionGroup.findMany({
+            where: { menuItemId: id },
+            include: {
+              options: {
+                include: {
+                  _count: {
+                    select: { orderSelections: true, saleSelections: true },
+                  },
+                },
+              },
             },
           });
-        } else {
+          for (const eg of existing) {
+            for (const eo of eg.options) {
+              await removeOrDeactivateOption(tx, eo);
+            }
+            const remaining = await tx.menuItemOption.count({ where: { groupId: eg.id } });
+            if (remaining === 0) {
+              await tx.menuItemOptionGroup.delete({ where: { id: eg.id } });
+            } else {
+              await tx.menuItemOptionGroup.update({
+                where: { id: eg.id },
+                data: { isActive: false },
+              });
+            }
+          }
+        }
+
+        if (Object.keys(menuItemScalarUpdate).length > 0) {
           await tx.menuItem.update({
             where: { id },
-            data: {
-              ...(updateData.name && { name: updateData.name }),
-              ...(updateData.sku && { sku: updateData.sku }),
-              ...(updateData.categoryId && { categoryId: updateData.categoryId }),
-              ...(updateData.price !== undefined && { price: updateData.price }),
-              ...(calculatedCost !== undefined && { cost: calculatedCost }),
-              ...(updateData.description !== undefined && { description: updateData.description }),
-              ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
-              ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
-            },
+            data: menuItemScalarUpdate,
           });
         }
       });
     } else {
-      await db.menuItem.update({
-        where: { id },
-        data: {
-          ...(updateData.name && { name: updateData.name }),
-          ...(updateData.sku && { sku: updateData.sku }),
-          ...(updateData.categoryId && { categoryId: updateData.categoryId }),
-          ...(updateData.price !== undefined && { price: updateData.price }),
-          ...(calculatedCost !== undefined && { cost: calculatedCost }),
-          ...(updateData.description !== undefined && { description: updateData.description }),
-          ...(updateData.imageUrl !== undefined && { imageUrl: updateData.imageUrl }),
-          ...(updateData.isActive !== undefined && { isActive: updateData.isActive }),
-        },
-      });
+      if (Object.keys(menuItemScalarUpdate).length > 0) {
+        await db.menuItem.update({
+          where: { id },
+          data: menuItemScalarUpdate,
+        });
+      }
     }
 
     if (availableAtAllBranches !== undefined) {
@@ -631,6 +812,18 @@ export async function updateMenuItem(input: UpdateMenuItemInput) {
     console.error("[updateMenuItem] Error:", error);
     if (error instanceof Error && error.message.includes("SKU")) {
       return { success: false, error: error.message };
+    }
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2003"
+    ) {
+      return {
+        success: false,
+        error:
+          "Cannot remove options that appear on past orders. Removed options were deactivated instead — try saving again.",
+      };
     }
     return { success: false, error: "Failed to update menu item" };
   }
@@ -697,8 +890,20 @@ export async function getMenuItems(
       db.menuItem.count({ where }),
     ]);
 
+    let visibleItems = items;
+    if (branchId && items.length > 0) {
+      const blocking = await isBlockingSalesWhenOutOfStock(branchId);
+      if (blocking) {
+        const sellable = await filterSellableMenuItemIds(
+          branchId,
+          items.map((i) => i.id)
+        );
+        visibleItems = items.filter((i) => sellable.has(i.id));
+      }
+    }
+
     // Convert Decimal fields to plain numbers for client components
-    const convertedItems = items.map((item) => ({
+    const convertedItems = visibleItems.map((item) => ({
       id: item.id,
       name: item.name,
       sku: item.sku,

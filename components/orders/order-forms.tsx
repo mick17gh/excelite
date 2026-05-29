@@ -59,6 +59,9 @@ import {
 } from "@/lib/menu-option-client";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 import { shouldShowTaxBreakdown } from "@/lib/services/receipt-display";
+import { useMenuStockAvailability } from "@/hooks/use-menu-stock-availability";
+import { validateMenuItemStockForSale } from "@/lib/actions/menu-stock-availability";
+import { Badge } from "@/components/ui/badge";
 
 interface Branch {
   id: string;
@@ -246,6 +249,40 @@ export function CreateOrderDialog({
     });
   }, [menuItems, branchId, searchItem]);
 
+  const branchMenuIds = useMemo(() => {
+    if (!branchId) return [];
+    return menuItems
+      .filter((item) =>
+        isMenuItemVisibleAtBranch(
+          {
+            availableAtAllBranches: item.availableAtAllBranches ?? true,
+            branchIds: item.branchIds ?? [],
+          },
+          branchId
+        )
+      )
+      .map((m) => m.id);
+  }, [menuItems, branchId]);
+
+  const {
+    blocking: stockBlocking,
+    unsellableIds,
+    isSellable,
+    loading: stockLoading,
+    refresh: refreshStockAvailability,
+  } = useMenuStockAvailability(branchId, branchMenuIds, Boolean(branchId));
+
+  useEffect(() => {
+    if (!branchId || !stockBlocking || stockLoading) return;
+    setCart((prev) => {
+      const next = prev.filter((line) => !unsellableIds.has(line.menuItemId));
+      if (next.length < prev.length) {
+        toast.info("Removed out-of-stock items from cart");
+      }
+      return next;
+    });
+  }, [branchId, stockBlocking, stockLoading, unsellableIds]);
+
   const lineTotal =
     Math.round(
       cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0) * 100,
@@ -283,13 +320,25 @@ export function CreateOrderDialog({
   const flattenPickerSelections = (groups: ClientMenuOptionGroup[], rec: Record<string, string[]>) =>
     groups.flatMap((g) => rec[g.id] || []);
 
-  const commitCartLine = (item: MenuItem, draftOptionIds: string[]) => {
+  const commitCartLine = async (item: MenuItem, draftOptionIds: string[]) => {
     const groups = item.optionGroups;
     const withDefs = applyDefaultSelections(groups, draftOptionIds);
     const err = validateOptionSelections(groups, withDefs);
     if (err) {
       toast.error(err);
       return false;
+    }
+    if (branchId && stockBlocking) {
+      const stockResult = await validateMenuItemStockForSale(
+        branchId,
+        item.id,
+        1,
+        withDefs
+      );
+      if (!stockResult.success) {
+        toast.error(stockResult.error || "Item is out of stock");
+        return false;
+      }
     }
     const preview = buildLinePreview(item.price, groups, withDefs);
     const lineKey = posCartLineKey(item.id, preview.configurationKey);
@@ -317,6 +366,10 @@ export function CreateOrderDialog({
   };
 
   const requestAddToCart = (item: MenuItem) => {
+    if (stockBlocking && !isSellable(item.id)) {
+      toast.error(`${item.name} is out of stock at this branch`);
+      return;
+    }
     const groups = item.optionGroups;
     if (groups?.length) {
       const initialIds = applyDefaultSelections(groups, []);
@@ -325,7 +378,7 @@ export function CreateOrderDialog({
       setOptionPickerOpen(true);
       return;
     }
-    commitCartLine(item, []);
+    void commitCartLine(item, []);
   };
 
   const togglePickerOption = (g: ClientMenuOptionGroup, optionId: string) => {
@@ -349,10 +402,12 @@ export function CreateOrderDialog({
     }
     const groups = optionPickerItem.optionGroups;
     const flat = flattenPickerSelections(groups, pickerSelections);
-    if (commitCartLine(optionPickerItem, flat)) {
-      setOptionPickerOpen(false);
-      setOptionPickerItem(null);
-    }
+    void commitCartLine(optionPickerItem, flat).then((ok) => {
+      if (ok) {
+        setOptionPickerOpen(false);
+        setOptionPickerItem(null);
+      }
+    });
   };
 
   const updateQuantity = (lineKey: string, delta: number) => {
@@ -408,6 +463,7 @@ export function CreateOrderDialog({
         toast.error(result.error);
       } else {
         toast.success("Order created successfully");
+        void refreshStockAvailability();
         const orderId = result.data?.id;
         if (orderId && onOrderCreated) {
           setSubmitPhase("opening");
@@ -660,27 +716,41 @@ export function CreateOrderDialog({
             )}
             {branchId && searchItem && (
               <div className="max-h-40 overflow-y-auto border rounded-md">
-                {filteredMenuItems.slice(0, 10).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted transition-colors"
-                    onClick={() => {
-                      requestAddToCart(item);
-                      setSearchItem("");
-                    }}
-                  >
-                    <span>
-                      {item.name}{" "}
-                      <span className="text-muted-foreground">
-                        ({item.sku})
+                {filteredMenuItems.slice(0, 10).map((item) => {
+                  const outOfStock = stockBlocking && !isSellable(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={outOfStock}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted transition-colors",
+                        outOfStock && "opacity-50 cursor-not-allowed hover:bg-transparent"
+                      )}
+                      onClick={() => {
+                        requestAddToCart(item);
+                        setSearchItem("");
+                      }}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="truncate">
+                          {item.name}{" "}
+                          <span className="text-muted-foreground">
+                            ({item.sku})
+                          </span>
+                        </span>
+                        {outOfStock && (
+                          <Badge variant="secondary" className="text-[10px] shrink-0">
+                            Out of stock
+                          </Badge>
+                        )}
                       </span>
-                    </span>
-                    <span className="font-medium">
-                      {formatCurrency(item.price)}
-                    </span>
-                  </button>
-                ))}
+                      <span className="font-medium shrink-0">
+                        {formatCurrency(item.price)}
+                      </span>
+                    </button>
+                  );
+                })}
                 {filteredMenuItems.length === 0 && (
                   <p className="px-3 py-2 text-sm text-muted-foreground">
                     No items found for this branch

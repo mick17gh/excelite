@@ -107,6 +107,7 @@ export interface CreateBranchInput {
   requiredStaff?: number;
   isActive: boolean;
   onlineStoreVisible?: boolean;
+  blockSalesWhenOutOfStock?: boolean | null;
 }
 
 export interface UpdateBranchInput {
@@ -124,6 +125,8 @@ export interface UpdateBranchInput {
   requiredStaff?: number;
   isActive?: boolean;
   onlineStoreVisible?: boolean;
+  /** null = inherit org setting */
+  blockSalesWhenOutOfStock?: boolean | null;
 }
 
 export async function createBranch(input: CreateBranchInput) {

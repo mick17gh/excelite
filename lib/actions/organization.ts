@@ -207,6 +207,7 @@ export async function getOrganization(id?: string) {
         ],
         enforceCommissaryRouting: org.enforceCommissaryRouting,
         tableManagementEnabled: org.tableManagementEnabled,
+        blockSalesWhenOutOfStock: org.blockSalesWhenOutOfStock,
         createdAt: org.createdAt.toISOString(),
       },
     };
@@ -264,6 +265,7 @@ export async function updateOrganizationPosPolicies(input: {
   organizationId: string;
   complimentaryApproverRoles: Role[];
   enforceCommissaryRouting?: boolean;
+  blockSalesWhenOutOfStock?: boolean;
 }) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -283,10 +285,14 @@ export async function updateOrganizationPosPolicies(input: {
         ...(input.enforceCommissaryRouting !== undefined && {
           enforceCommissaryRouting: input.enforceCommissaryRouting,
         }),
+        ...(input.blockSalesWhenOutOfStock !== undefined && {
+          blockSalesWhenOutOfStock: input.blockSalesWhenOutOfStock,
+        }),
       },
     });
 
     revalidatePath("/dashboard/settings");
+    revalidatePath("/pos");
     return { success: true };
   } catch (error) {
     console.error("[updateOrganizationPosPolicies]", error);

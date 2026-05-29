@@ -427,6 +427,7 @@ model Branch {
   taxEnabled     Boolean   @default(true)
   taxInclusive      Boolean   @default(false)
   showTaxOnReceipt  Boolean   @default(true)
+  blockSalesWhenOutOfStock Boolean?
   organizationId String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -1434,6 +1435,7 @@ model Organization {
   complimentaryApproverRoles  Json?
   enforceCommissaryRouting    Boolean            @default(false)
   tableManagementEnabled      Boolean            @default(false)
+  blockSalesWhenOutOfStock    Boolean            @default(false)
   trialEndsAt                 DateTime?
   subscriptionEndsAt DateTime?
   createdAt          DateTime           @default(now())

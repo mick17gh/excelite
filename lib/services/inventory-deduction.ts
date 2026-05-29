@@ -20,6 +20,26 @@ export async function deductInventoryForSale(
   try {
     if (!items.length || !branchId) return;
 
+    const { assertCartStockAvailable } = await import(
+      "@/lib/services/menu-stock-availability"
+    );
+    const stockGuard = await assertCartStockAvailable(
+      branchId,
+      items.map((item) => ({
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        menuItemOptionIds: item.menuItemOptionIds,
+      }))
+    );
+    if (!stockGuard.ok) {
+      console.warn(
+        "[deductInventoryForSale] Blocked — insufficient stock:",
+        stockGuard.error,
+        reference
+      );
+      return;
+    }
+
     const menuItemIds = [...new Set(items.map((i) => i.menuItemId))];
     const allOptionIds = [...new Set(items.flatMap((i) => i.menuItemOptionIds || []))];
 

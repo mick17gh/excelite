@@ -99,6 +99,27 @@ export async function createTransaction(input: CreateTransactionInput) {
     });
     const amount = total + (input.tip || 0);
 
+    const { assertCartStockAvailable } = await import(
+      "@/lib/services/menu-stock-availability"
+    );
+    const menuNames = await db.menuItem.findMany({
+      where: { id: { in: input.items.map((i) => i.menuItemId) } },
+      select: { id: true, name: true },
+    });
+    const nameMap = new Map(menuNames.map((m) => [m.id, m.name]));
+    const stockCheck = await assertCartStockAvailable(
+      input.branchId,
+      input.items.map((item) => ({
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        menuItemOptionIds: item.menuItemOptionIds,
+        menuItemName: nameMap.get(item.menuItemId),
+      }))
+    );
+    if (!stockCheck.ok) {
+      return { success: false, error: stockCheck.error };
+    }
+
     // Create transaction
     const transaction = await db.transaction.create({
       data: {

@@ -346,7 +346,22 @@ interface EditBranchFormProps {
     requiredStaff?: number;
     isActive: boolean;
     onlineStoreVisible?: boolean;
+    blockSalesWhenOutOfStock?: boolean | null;
   } | null;
+}
+
+type StockPolicyOverride = "inherit" | "block" | "allow";
+
+function stockPolicyFromBranch(value: boolean | null | undefined): StockPolicyOverride {
+  if (value === true) return "block";
+  if (value === false) return "allow";
+  return "inherit";
+}
+
+function stockPolicyToBranch(value: StockPolicyOverride): boolean | null {
+  if (value === "block") return true;
+  if (value === "allow") return false;
+  return null;
 }
 
 export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormProps) {
@@ -364,6 +379,7 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
     isActive: branch?.isActive ?? true,
     onlineStoreVisible: branch?.onlineStoreVisible ?? false,
   });
+  const [stockPolicyOverride, setStockPolicyOverride] = useState<StockPolicyOverride>("inherit");
 
   useEffect(() => {
     if (!open || !branch?.id) return;
@@ -380,6 +396,7 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
       isActive: branch.isActive ?? true,
       onlineStoreVisible: branch.onlineStoreVisible ?? false,
     });
+    setStockPolicyOverride(stockPolicyFromBranch(branch.blockSalesWhenOutOfStock));
 
     void (async () => {
       const ctx = await getBranchOnlineStoreEditContext(branch.id);
@@ -412,6 +429,7 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
         ...(showOnlineStoreToggle
           ? { onlineStoreVisible: formData.isActive ? formData.onlineStoreVisible : false }
           : {}),
+        blockSalesWhenOutOfStock: stockPolicyToBranch(stockPolicyOverride),
       });
 
       if (result.success) {
@@ -566,6 +584,26 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
                 />
               </div>
             )}
+
+            <div className="grid gap-2 rounded-lg border p-4">
+              <Label htmlFor="stockPolicy">Out-of-stock sales</Label>
+              <p className="text-sm text-muted-foreground">
+                Override organization default for blocking sales when ingredients are short
+              </p>
+              <Select
+                value={stockPolicyOverride}
+                onValueChange={(v) => setStockPolicyOverride(v as StockPolicyOverride)}
+              >
+                <SelectTrigger id="stockPolicy">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inherit">Inherit organization setting</SelectItem>
+                  <SelectItem value="block">Block sales when out of stock</SelectItem>
+                  <SelectItem value="allow">Allow sales (may go negative)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

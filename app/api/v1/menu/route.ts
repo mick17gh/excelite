@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { authenticateApiKey } from "@/lib/services/api-keys";
 import { getOrganizationForStorefront, isStorefrontEnabledForOrg } from "@/lib/storefront/config";
 import { menuItemVisibilityWhere } from "@/lib/menu/branch-availability";
+import { isBlockingSalesWhenOutOfStock } from "@/lib/inventory/sales-stock-policy";
+import { filterSellableMenuItemIds } from "@/lib/services/menu-stock-availability";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -63,9 +65,21 @@ export async function GET(request: Request) {
       orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
     });
 
+    let visibleItems = publicItems;
+    if (branchId) {
+      const blocking = await isBlockingSalesWhenOutOfStock(branchId);
+      if (blocking && visibleItems.length > 0) {
+        const sellable = await filterSellableMenuItemIds(
+          branchId,
+          visibleItems.map((i) => i.id)
+        );
+        visibleItems = visibleItems.filter((i) => sellable.has(i.id));
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: publicItems.map((i) => ({
+      data: visibleItems.map((i) => ({
         id: i.id,
         name: i.name,
         sku: i.sku,
@@ -98,8 +112,8 @@ export async function GET(request: Request) {
       error: null,
       pagination: {
         page: 1,
-        limit: publicItems.length,
-        total: publicItems.length,
+        limit: visibleItems.length,
+        total: visibleItems.length,
       },
     });
   }

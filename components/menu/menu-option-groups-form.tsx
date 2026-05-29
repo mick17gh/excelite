@@ -36,6 +36,11 @@ function newKey() {
     : `k-${Math.random().toString(36).slice(2)}`;
 }
 
+/** Persisted Prisma cuids have no hyphens; new form rows use UUID client keys. */
+function isPersistedMenuKey(key: string): boolean {
+  return key.length > 0 && !key.includes("-");
+}
+
 export type OptionIngredientRow = {
   inventoryItemId: string;
   inventoryItemName?: string;
@@ -162,6 +167,7 @@ export function serializeLocalOptionGroups(
 ): MenuItemOptionGroupInput[] | undefined {
   if (!groups.length) return undefined;
   return groups.map((g, gi) => ({
+    ...(isPersistedMenuKey(g._key) ? { id: g._key } : {}),
     name: g.name.trim(),
     sortOrder: Number.isFinite(g.sortOrder) ? g.sortOrder : gi,
     isRequired: g.isRequired,
@@ -177,6 +183,7 @@ export function serializeLocalOptionGroups(
           unit: ing.unit,
         }));
       return {
+        ...(isPersistedMenuKey(o._key) ? { id: o._key } : {}),
         name: o.name.trim(),
         sortOrder: Number.isFinite(o.sortOrder) ? o.sortOrder : oi,
         priceDelta: parseFloat(o.priceDelta) || 0,

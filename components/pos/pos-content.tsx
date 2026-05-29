@@ -56,6 +56,8 @@ import { OrderType, Role } from "@/lib/generated/prisma/client";
 import { TableServicePanel } from "@/components/pos/table-service-panel";
 import { useEffect, useCallback, useRef } from "react";
 import { isMenuItemVisibleAtBranch } from "@/lib/menu/branch-availability";
+import { useMenuStockAvailability } from "@/hooks/use-menu-stock-availability";
+import { validateMenuItemStockForSale } from "@/lib/actions/menu-stock-availability";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBranchCurrency } from "@/hooks/use-branch-currency";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
@@ -320,6 +322,29 @@ export function PosContent({
     );
   }, [liveMenuItems, branchId]);
 
+  const branchMenuIds = useMemo(
+    () => branchVisibleMenu.map((m) => m.id),
+    [branchVisibleMenu]
+  );
+  const {
+    blocking: stockBlocking,
+    unsellableIds,
+    isSellable,
+    loading: stockLoading,
+    refresh: refreshStockAvailability,
+  } = useMenuStockAvailability(branchId, branchMenuIds, true);
+
+  useEffect(() => {
+    if (!branchId || !stockBlocking || stockLoading) return;
+    setCart((prev) => {
+      const next = prev.filter((line) => !unsellableIds.has(line.menuItemId));
+      if (next.length < prev.length) {
+        toast.info("Removed out-of-stock items from cart");
+      }
+      return next;
+    });
+  }, [branchId, stockBlocking, stockLoading, unsellableIds]);
+
   const categories = useMemo(() => {
     const cats = Array.from(new Set(branchVisibleMenu.map((m) => m.category))).sort();
     const categoryCounts = cats.map((cat) => ({
@@ -397,13 +422,25 @@ export function PosContent({
   const flattenPickerSelections = (groups: ClientMenuOptionGroup[], rec: Record<string, string[]>) =>
     groups.flatMap((g) => rec[g.id] || []);
 
-  const commitCartLine = (item: MenuItem, draftOptionIds: string[]) => {
+  const commitCartLine = async (item: MenuItem, draftOptionIds: string[]) => {
     const groups = item.optionGroups;
     const withDefs = applyDefaultSelections(groups, draftOptionIds);
     const err = validateOptionSelections(groups, withDefs);
     if (err) {
       toast.error(err);
       return false;
+    }
+    if (branchId && stockBlocking) {
+      const stockResult = await validateMenuItemStockForSale(
+        branchId,
+        item.id,
+        1,
+        withDefs
+      );
+      if (!stockResult.success) {
+        toast.error(stockResult.error || "Item is out of stock");
+        return false;
+      }
     }
     const preview = buildLinePreview(item.price, groups, withDefs);
     const lineKey = posCartLineKey(item.id, preview.configurationKey);
@@ -432,6 +469,10 @@ export function PosContent({
   };
 
   const requestAddToCart = (item: MenuItem) => {
+    if (stockBlocking && !isSellable(item.id)) {
+      toast.error(`${item.name} is out of stock at this branch`);
+      return;
+    }
     const groups = item.optionGroups;
     if (groups?.length) {
       const initialIds = applyDefaultSelections(groups, []);
@@ -440,7 +481,7 @@ export function PosContent({
       setOptionPickerOpen(true);
       return;
     }
-    commitCartLine(item, []);
+    void commitCartLine(item, []);
   };
 
   const togglePickerOption = (g: ClientMenuOptionGroup, optionId: string) => {
@@ -464,10 +505,12 @@ export function PosContent({
     }
     const groups = optionPickerItem.optionGroups;
     const flat = flattenPickerSelections(groups, pickerSelections);
-    if (commitCartLine(optionPickerItem, flat)) {
-      setOptionPickerOpen(false);
-      setOptionPickerItem(null);
-    }
+    void commitCartLine(optionPickerItem, flat).then((ok) => {
+      if (ok) {
+        setOptionPickerOpen(false);
+        setOptionPickerItem(null);
+      }
+    });
   };
 
   const setQty = (lineKey: string, qty: number) => {
@@ -587,6 +630,7 @@ export function PosContent({
         }
         setCart([]);
         setWaiterOrderNote("");
+        void refreshStockAvailability();
       } catch {
         toast.error("Failed to place order");
       }
@@ -732,7 +776,9 @@ export function PosContent({
               });
 
         if (!completeResult.success) {
-          console.error("Failed to complete order:", completeResult.error);
+          toast.error(completeResult.error || "Failed to complete order");
+          setIsPaymentOpen(false);
+          return;
         }
 
         setCompletedOrder({
@@ -752,6 +798,7 @@ export function PosContent({
           });
         }
         setCart([]);
+        void refreshStockAvailability();
       } catch (e) {
         console.warn("[POS] Network error, queueing offline:", e);
         await queueOffline();
@@ -926,16 +973,28 @@ export function PosContent({
               const qtyOnProduct = cart
                 .filter((c) => c.menuItemId === m.id)
                 .reduce((s, c) => s + c.quantity, 0);
+              const outOfStock = stockBlocking && !isSellable(m.id);
               return (
                 <button
                   key={m.id}
+                  type="button"
+                  disabled={outOfStock}
                   className={cn(
                     "relative flex flex-col rounded-xl border bg-card p-3 text-left transition-all hover:shadow-md hover:border-primary/50 active:scale-[0.98]",
-                    qtyOnProduct > 0 && "ring-2 ring-primary border-primary"
+                    qtyOnProduct > 0 && "ring-2 ring-primary border-primary",
+                    outOfStock && "cursor-not-allowed opacity-50 hover:shadow-none hover:border-border"
                   )}
                   onClick={() => requestAddToCart(m)}
                 >
-                  {qtyOnProduct > 0 && (
+                  {outOfStock && (
+                    <Badge
+                      variant="secondary"
+                      className="absolute -top-2 -right-2 text-[10px] px-1.5"
+                    >
+                      Out of stock
+                    </Badge>
+                  )}
+                  {qtyOnProduct > 0 && !outOfStock && (
                     <Badge className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold">
                       {qtyOnProduct}
                     </Badge>

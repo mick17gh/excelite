@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
 import { menuItemVisibilityWhere } from "@/lib/menu/branch-availability";
+import { isBlockingSalesWhenOutOfStock } from "@/lib/inventory/sales-stock-policy";
+import { filterSellableMenuItemIds } from "@/lib/services/menu-stock-availability";
 
 export type PublicMenuOption = {
   id: string;
@@ -108,9 +110,21 @@ export async function getPublicStoreMenu(options?: {
   categoryId?: string | null;
   branchId?: string | null;
 }): Promise<PublicMenuItem[]> {
-  const items = await fetchPublicMenuRows(
+  let items = await fetchPublicMenuRows(
     options?.categoryId,
     options?.branchId
   );
+
+  if (options?.branchId) {
+    const blocking = await isBlockingSalesWhenOutOfStock(options.branchId);
+    if (blocking && items.length > 0) {
+      const sellable = await filterSellableMenuItemIds(
+        options.branchId,
+        items.map((i) => i.id)
+      );
+      items = items.filter((i) => sellable.has(i.id));
+    }
+  }
+
   return items.map(mapMenuItemToPublic);
 }
