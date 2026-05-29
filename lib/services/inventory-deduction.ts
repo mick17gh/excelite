@@ -181,3 +181,119 @@ async function createLowStockAlerts(
     console.error("[createLowStockAlerts] Error:", error);
   }
 }
+
+export async function createLowStockAlertsForItems(
+  branchId: string,
+  items: Array<{ itemId: string; itemName: string; currentStock: number; reorderPoint: number }>
+) {
+  return createLowStockAlerts(branchId, items);
+}
+
+export async function restoreInventoryForSale(
+  items: SaleDeductionLine[],
+  branchId: string,
+  reference: string
+) {
+  try {
+    if (!items.length || !branchId) return;
+
+    const menuItemIds = [...new Set(items.map((i) => i.menuItemId))];
+    const allOptionIds = [...new Set(items.flatMap((i) => i.menuItemOptionIds || []))];
+
+    const [baseRecipes, optionRecipes] = await Promise.all([
+      db.menuItemIngredient.findMany({
+        where: { menuItemId: { in: menuItemIds } },
+        include: {
+          inventoryItem: {
+            select: { id: true, sku: true, branchId: true },
+          },
+        },
+      }),
+      allOptionIds.length
+        ? db.menuItemOptionIngredient.findMany({
+            where: { menuItemOptionId: { in: allOptionIds } },
+            include: {
+              inventoryItem: {
+                select: { id: true, sku: true, branchId: true },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const baseMap = new Map<string, Array<{ sku: string; quantityPerUnit: number }>>();
+    for (const r of baseRecipes) {
+      const list = baseMap.get(r.menuItemId) || [];
+      list.push({
+        sku: r.inventoryItem?.sku || "",
+        quantityPerUnit: Number(r.quantity),
+      });
+      baseMap.set(r.menuItemId, list);
+    }
+
+    const optionMap = new Map<string, Array<{ sku: string; quantityPerUnit: number }>>();
+    for (const r of optionRecipes) {
+      const list = optionMap.get(r.menuItemOptionId) || [];
+      list.push({
+        sku: r.inventoryItem?.sku || "",
+        quantityPerUnit: Number(r.quantity),
+      });
+      optionMap.set(r.menuItemOptionId, list);
+    }
+
+    const restorations = new Map<string, number>();
+
+    for (const line of items) {
+      const q = line.quantity;
+      const base = baseMap.get(line.menuItemId) || [];
+      for (const ing of base) {
+        if (!ing.sku) continue;
+        const qty = ing.quantityPerUnit * q;
+        restorations.set(ing.sku, (restorations.get(ing.sku) || 0) + qty);
+      }
+      for (const oid of line.menuItemOptionIds || []) {
+        const extras = optionMap.get(oid) || [];
+        for (const ing of extras) {
+          if (!ing.sku) continue;
+          const qty = ing.quantityPerUnit * q;
+          restorations.set(ing.sku, (restorations.get(ing.sku) || 0) + qty);
+        }
+      }
+    }
+
+    if (restorations.size === 0) return;
+
+    const branchItems = await db.inventoryItem.findMany({
+      where: {
+        branchId,
+        sku: { in: [...restorations.keys()] },
+        deletedAt: null,
+      },
+    });
+
+    const branchItemMap = new Map(branchItems.map((bi) => [bi.sku, bi]));
+
+    for (const [sku, totalQty] of restorations) {
+      const branchItem = branchItemMap.get(sku);
+      if (!branchItem) continue;
+
+      await db.inventoryItem.update({
+        where: { id: branchItem.id },
+        data: { currentStock: { increment: totalQty } },
+      });
+
+      await db.outboundStock.create({
+        data: {
+          branchId,
+          itemId: branchItem.id,
+          quantity: totalQty,
+          movementType: "ADJUSTMENT_CORRECTION",
+          reason: "Restored from voided sale",
+          reference,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("[restoreInventoryForSale] Error:", error);
+  }
+}

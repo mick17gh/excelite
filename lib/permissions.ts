@@ -12,6 +12,7 @@ export type Permission =
   | "inventory:edit"
   | "inventory:delete"
   | "inventory:transfer"
+  | "inventory:reconcile"
   | "menu:view"
   | "menu:create"
   | "menu:edit"
@@ -88,6 +89,7 @@ const ALL_PERMISSIONS: Permission[] = [
   "inventory:edit",
   "inventory:delete",
   "inventory:transfer",
+  "inventory:reconcile",
   "menu:view",
   "menu:create",
   "menu:edit",
@@ -165,6 +167,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     "inventory:create",
     "inventory:edit",
     "inventory:transfer",
+  "inventory:reconcile",
     "menu:view",
     "menu:create",
     "menu:edit",
@@ -234,6 +237,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     "inventory:create",
     "inventory:edit",
     "inventory:transfer",
+  "inventory:reconcile",
     "menu:view",
     "menu:create",
     "menu:edit",
@@ -298,6 +302,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     "inventory:create",
     "inventory:edit",
     "inventory:transfer",
+  "inventory:reconcile",
     "menu:view",
     "menu:create",
     "menu:edit",
@@ -351,6 +356,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     "inventory:create",
     "inventory:edit",
     "inventory:transfer",
+    "inventory:reconcile",
     "menu:view",
     "categories:view",
     "staff:view",
@@ -390,6 +396,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     "inventory:view",
     "inventory:create",
     "inventory:edit",
+    "inventory:reconcile",
     "menu:view",
     "categories:view",
     "staff:view",

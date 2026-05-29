@@ -38,6 +38,7 @@ import {
   Upload,
   CheckCircle2,
   XCircle,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -65,6 +66,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { downloadCSV, formatDateForFilename } from "@/lib/utils/export";
 import { formatDisplayDate } from "@/lib/utils/date-display";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { StockReconciliationDialog } from "@/components/inventory/stock-reconciliation-dialog";
+import { ReconciliationHistoryPanel } from "@/components/inventory/reconciliation-history-panel";
+import { authClient } from "@/lib/auth-client";
+import { hasPermission } from "@/lib/permissions";
+import { Role } from "@/lib/generated/prisma/client";
+import { getReconciliationStatusForDate } from "@/lib/actions/stock-reconciliation";
 
 interface InventoryItem {
   id: string;
@@ -195,7 +202,10 @@ export function InventoryContent({
 }: InventoryContentProps) {
   const router = useRouter();
   const { formatCurrency } = useCurrency();
-  const { canViewAllBranches, userBranchId, isLoading: authLoading } = useBranchRestrictions();
+  const { canViewAllBranches, userBranchId, userRole, isLoading: authLoading } = useBranchRestrictions();
+  const { data: session } = authClient.useSession();
+  const role = (session?.user as { role?: Role } | undefined)?.role ?? (userRole as Role | undefined);
+  const canReconcile = hasPermission(role, "inventory:reconcile");
   
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -203,6 +213,12 @@ export function InventoryContent({
   const [branchFilter, setBranchFilter] = useState<string>(() =>
     !authLoading && !canViewAllBranches && userBranchId ? userBranchId : "all"
   );
+
+  const reconcileBranchId = useMemo(() => {
+    if (!canViewAllBranches) return userBranchId;
+    if (branchFilter !== "all") return branchFilter;
+    return userBranchId || branches[0]?.id || null;
+  }, [canViewAllBranches, branchFilter, userBranchId, branches]);
   
   // Pagination state (shared page size across tabs)
   const [currentPage, setCurrentPage] = useState(1);
@@ -230,6 +246,25 @@ export function InventoryContent({
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isBranchReturnOpen, setIsBranchReturnOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isReconcileOpen, setIsReconcileOpen] = useState(false);
+  const [reconcileSubmittedToday, setReconcileSubmittedToday] = useState(false);
+
+  useEffect(() => {
+    if (!canReconcile || !reconcileBranchId) {
+      setReconcileSubmittedToday(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const result = await getReconciliationStatusForDate(reconcileBranchId);
+      if (!cancelled && result.success && result.data) {
+        setReconcileSubmittedToday(result.data.submitted);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canReconcile, reconcileBranchId, isReconcileOpen]);
 
   const resetAllPages = () => {
     setCurrentPage(1);
@@ -587,9 +622,21 @@ export function InventoryContent({
             <TabsTrigger value="outbound" className="text-xs h-7">Outbound</TabsTrigger>
             <TabsTrigger value="transfers" className="text-xs h-7">Branch Transfers</TabsTrigger>
             <TabsTrigger value="to-warehouse" className="text-xs h-7">To Warehouse</TabsTrigger>
+            <TabsTrigger value="reconciliations" className="text-xs h-7">Reconciliations</TabsTrigger>
           </TabsList>
 
           <div className="flex gap-2">
+            {canReconcile && reconcileBranchId && (
+              <Button
+                size="sm"
+                className="h-8"
+                variant={reconcileSubmittedToday ? "outline" : "default"}
+                onClick={() => setIsReconcileOpen(true)}
+              >
+                <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
+                {reconcileSubmittedToday ? "View reconciliation" : "Reconcile stock"}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -1334,7 +1381,23 @@ export function InventoryContent({
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="reconciliations" className="mt-6">
+          <ReconciliationHistoryPanel
+            branches={branches}
+            branchId={reconcileBranchId}
+            canViewAllBranches={canViewAllBranches}
+          />
+        </TabsContent>
       </Tabs>
+
+      <StockReconciliationDialog
+        open={isReconcileOpen}
+        onOpenChange={setIsReconcileOpen}
+        branches={branches}
+        branchId={reconcileBranchId}
+        canViewAllBranches={canViewAllBranches}
+      />
 
       {/* Forms */}
       <OutboundStockForm

@@ -120,6 +120,8 @@ export async function buildReportData(
       return buildMenuPerformance(input, base, branchFilter);
     case "waste-variance":
       return buildWasteVariance(input, base, branchFilter);
+    case "reconciliation-summary":
+      return buildReconciliationSummary(input, base, branchFilter);
     case "customer-insights":
       return buildCustomerInsights(input, base, branchFilter, viewer.role);
     case "cash-transactions":
@@ -720,6 +722,79 @@ async function buildWasteVariance(
       note: estimateNote,
     },
     wasteVarianceRows,
+  });
+}
+
+async function buildReconciliationSummary(
+  input: GenerateReportInput,
+  base: ReportBase,
+  branchFilter: { branchId?: string }
+): Promise<ReportDataPayload> {
+  const sessions = await db.stockReconciliationSession.findMany({
+    where: {
+      ...branchFilter,
+      status: "SUBMITTED",
+      reconciliationDate: { gte: input.startDate, lte: input.endDate },
+    },
+    include: {
+      branch: { select: { name: true, code: true } },
+      stockCounts: {
+        include: { item: { select: { name: true, sku: true, unitCost: true } } },
+      },
+    },
+    orderBy: { reconciliationDate: "desc" },
+  });
+
+  const reconciliationSummaryRows = sessions.map((s) => ({
+    Date: formatReportDateOnly(s.reconciliationDate),
+    Branch: s.branch.name,
+    "Items Counted": s.itemCount,
+    "Shortage Qty": Number(s.totalShortageQty),
+    "Overage Qty": Number(s.totalOverageQty),
+    "Variance Cost (GHS)": roundMoney(Number(s.totalVarianceCost)),
+    "Sales Snapshot (GHS)": s.salesTotalSnapshot
+      ? roundMoney(Number(s.salesTotalSnapshot))
+      : "—",
+    "Shrinkage %": s.salesTotalSnapshot
+      ? formatPercentDecimal(Number(s.totalVarianceCost), Number(s.salesTotalSnapshot))
+      : "—",
+    "Submitted By": s.submittedBy || "—",
+    Notes: s.notes || "—",
+  }));
+
+  const detailRows = sessions.flatMap((s) =>
+    s.stockCounts.map((c) => {
+      const expected = Number(c.expectedQty);
+      const actual = Number(c.actualQty);
+      const variance = expected - actual;
+      return {
+        Date: formatReportDateOnly(s.reconciliationDate),
+        Branch: s.branch.name,
+        "Item Name": c.item.name,
+        SKU: c.item.sku,
+        "Expected Qty": expected,
+        "Actual Qty": actual,
+        Variance: variance,
+        "Loss Value (GHS)": roundMoney(Math.max(0, variance) * Number(c.item.unitCost)),
+        Reason: c.wasteReason || "—",
+      };
+    })
+  );
+
+  const totalVarianceCost = sessions.reduce(
+    (sum, s) => sum + Number(s.totalVarianceCost),
+    0
+  );
+
+  return mergeReport(base, {
+    reportName: "Stock Reconciliation Summary",
+    summary: {
+      sessionCount: sessions.length,
+      totalVarianceCost: roundMoney(totalVarianceCost),
+      lineCount: detailRows.length,
+    },
+    reconciliationSummaryRows,
+    reconciliationDetailRows: detailRows,
   });
 }
 

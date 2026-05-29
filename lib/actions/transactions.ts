@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { DayPart, SalesChannel } from "@/lib/generated/prisma/client";
 import { logCreate, logVoid } from "@/lib/services/audit";
-import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
+import { deductInventoryForSale, restoreInventoryForSale } from "@/lib/services/inventory-deduction";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 
 function generateTransactionRef(): string {
@@ -221,6 +221,15 @@ export async function voidTransaction(transactionId: string, reason: string) {
       return { success: false, error: "Transaction not found" };
     }
 
+    const sale = await db.sale.findFirst({
+      where: { transactionId, deletedAt: null },
+      include: {
+        items: {
+          include: { selections: { select: { menuItemOptionId: true } } },
+        },
+      },
+    });
+
     const transaction = await db.transaction.update({
       where: { id: transactionId },
       data: {
@@ -234,6 +243,22 @@ export async function voidTransaction(transactionId: string, reason: string) {
       where: { transactionId },
       data: { deletedAt: new Date() },
     });
+
+    if (sale?.items?.length) {
+      try {
+        await restoreInventoryForSale(
+          sale.items.map((item) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
+          })),
+          existingTransaction.branchId,
+          transactionId
+        );
+      } catch (err) {
+        console.warn("[voidTransaction] Inventory restore failed:", err);
+      }
+    }
 
     // Create audit log for the void action
     await logVoid(

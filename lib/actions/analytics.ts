@@ -377,7 +377,9 @@ export async function getInventoryAnalytics(branchId?: string) {
   try {
     const branchFilter = branchId ? { branchId } : {};
 
-    const [items, recentMovements, wasteLogs] = await Promise.all([
+    const thirtyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 30));
+
+    const [items, recentMovements, wasteLogs, reconciliationSessions] = await Promise.all([
       db.inventoryItem.findMany({
         where: {
           deletedAt: null,
@@ -396,8 +398,16 @@ export async function getInventoryAnalytics(branchId?: string) {
       db.wasteLog.findMany({
         where: {
           ...branchFilter,
-          wasteDate: { gte: new Date(new Date().setDate(new Date().getDate() - 30)) },
+          wasteDate: { gte: thirtyDaysAgo },
         },
+      }),
+      db.stockReconciliationSession.findMany({
+        where: {
+          ...branchFilter,
+          status: "SUBMITTED",
+          reconciliationDate: { gte: thirtyDaysAgo },
+        },
+        select: { totalVarianceCost: true, salesTotalSnapshot: true },
       }),
     ]);
 
@@ -406,6 +416,18 @@ export async function getInventoryAnalytics(branchId?: string) {
     const lowStockItems = items.filter((i) => Number(i.currentStock) <= Number(i.reorderPoint));
     const overstockItems = items.filter((i) => Number(i.currentStock) > Number(i.maxStock));
     const totalWasteCost = wasteLogs.reduce((s, w) => s + Number(w.totalCost), 0);
+    const reconciliationVarianceCost = reconciliationSessions.reduce(
+      (s, r) => s + Number(r.totalVarianceCost),
+      0
+    );
+    const reconciliationSalesBase = reconciliationSessions.reduce(
+      (s, r) => s + Number(r.salesTotalSnapshot || 0),
+      0
+    );
+    const shrinkagePercent =
+      reconciliationSalesBase > 0
+        ? Math.round((reconciliationVarianceCost / reconciliationSalesBase) * 1000) / 10
+        : 0;
 
     // Calculate turnover rate (simplified)
     const totalOutbound = recentMovements
@@ -441,6 +463,9 @@ export async function getInventoryAnalytics(branchId?: string) {
           lowStockCount: lowStockItems.length,
           overstockCount: overstockItems.length,
           totalWasteCost: Math.round(totalWasteCost * 100) / 100,
+          reconciliationVarianceCost: Math.round(reconciliationVarianceCost * 100) / 100,
+          shrinkagePercent,
+          reconciliationSessionCount: reconciliationSessions.length,
           wastePercentage: totalValue > 0 ? Math.round((totalWasteCost / totalValue) * 1000) / 10 : 0,
           turnoverRate: Math.round(turnoverRate * 10) / 10,
         },

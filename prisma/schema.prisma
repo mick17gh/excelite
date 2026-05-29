@@ -451,6 +451,7 @@ model Branch {
   posTerminals       PosTerminal[]
   operatingExpenses  OperatingExpense[]
   inventoryStockCounts InventoryStockCount[]
+  stockReconciliationSessions StockReconciliationSession[]
   kitchenStations    KitchenStation[]
   manualEntryBatches ManualEntryBatch[]
   apiKeys            ApiKey[]
@@ -780,6 +781,7 @@ model InventoryStockCount {
   id           String   @id @default(cuid())
   branchId     String
   itemId       String
+  sessionId    String?
   expectedQty  Decimal  @db.Decimal(12, 3)
   actualQty    Decimal  @db.Decimal(12, 3)
   wasteReason  String?
@@ -789,14 +791,41 @@ model InventoryStockCount {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  branch Branch        @relation(fields: [branchId], references: [id])
-  item   InventoryItem @relation(fields: [itemId], references: [id])
+  branch  Branch                      @relation(fields: [branchId], references: [id])
+  item    InventoryItem               @relation(fields: [itemId], references: [id])
+  session StockReconciliationSession? @relation(fields: [sessionId], references: [id])
 
   @@index([branchId])
   @@index([itemId])
+  @@index([sessionId])
   @@index([countedAt])
   @@index([branchId, countedAt])
   @@map("inventory_stock_count")
+}
+
+model StockReconciliationSession {
+  id                 String   @id @default(cuid())
+  branchId           String
+  reconciliationDate DateTime @db.Date
+  status             String   @default("SUBMITTED")
+  itemCount          Int
+  totalShortageQty   Decimal  @db.Decimal(12, 3)
+  totalOverageQty    Decimal  @db.Decimal(12, 3)
+  totalVarianceCost  Decimal  @db.Decimal(12, 2)
+  salesTotalSnapshot Decimal? @db.Decimal(12, 2)
+  submittedBy        String?
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  branch      Branch                @relation(fields: [branchId], references: [id])
+  stockCounts InventoryStockCount[]
+
+  @@unique([branchId, reconciliationDate, status])
+  @@index([branchId])
+  @@index([reconciliationDate])
+  @@index([branchId, reconciliationDate])
+  @@map("stock_reconciliation_session")
 }
 
 // ============================================

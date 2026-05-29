@@ -242,6 +242,66 @@ export async function recordOutbound(input: RecordOutboundInput) {
   }
 }
 
+export interface RecordStockCorrectionInput {
+  branchId: string;
+  itemId: string;
+  quantity: number;
+  direction: "shortage" | "overage";
+  movementType?: StockMovementType;
+  reason?: string;
+  reference?: string;
+  createdBy?: string;
+}
+
+/** Apply a reconciliation or manual stock correction with ledger entry. */
+export async function recordStockCorrection(input: RecordStockCorrectionInput) {
+  try {
+    const movementType =
+      input.movementType ??
+      (input.direction === "overage" ? "ADJUSTMENT_CORRECTION" : "ADJUSTMENT_LOSS");
+
+    if (input.direction === "shortage") {
+      await db.outboundStock.create({
+        data: {
+          branchId: input.branchId,
+          itemId: input.itemId,
+          quantity: input.quantity,
+          movementType,
+          reason: input.reason,
+          reference: input.reference,
+          createdBy: input.createdBy,
+        },
+      });
+      await db.inventoryItem.update({
+        where: { id: input.itemId },
+        data: { currentStock: { decrement: input.quantity } },
+      });
+    } else {
+      await db.outboundStock.create({
+        data: {
+          branchId: input.branchId,
+          itemId: input.itemId,
+          quantity: input.quantity,
+          movementType,
+          reason: input.reason,
+          reference: input.reference,
+          createdBy: input.createdBy,
+        },
+      });
+      await db.inventoryItem.update({
+        where: { id: input.itemId },
+        data: { currentStock: { increment: input.quantity } },
+      });
+    }
+
+    revalidatePath("/dashboard/inventory");
+    return { success: true };
+  } catch (error) {
+    console.error("[recordStockCorrection] Error:", error);
+    return { success: false, error: "Failed to record stock correction" };
+  }
+}
+
 export interface RecordWasteInput {
   branchId: string;
   itemId: string;

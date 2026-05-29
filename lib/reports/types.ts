@@ -6,6 +6,7 @@ export type ReportId =
   | "warehouse-stock"
   | "warehouse-activity"
   | "waste-variance"
+  | "reconciliation-summary"
   | "staff-report"
   | "manual-entries"
   | "orders-overview"

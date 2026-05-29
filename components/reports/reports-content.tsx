@@ -44,6 +44,7 @@ import {
   ChefHat,
   UtensilsCrossed,
   LayoutGrid,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -154,6 +155,14 @@ const reportTypes: ReportType[] = [
     icon: Trash2,
     category: "Operations",
     frequency: "Weekly",
+  },
+  {
+    id: "reconciliation-summary",
+    name: "Stock Reconciliation Summary",
+    description: "End-of-shift count sessions with shortage, overage, and variance cost by branch",
+    icon: ClipboardCheck,
+    category: "Inventory",
+    frequency: "Daily",
   },
   {
     id: "staff-report",

@@ -11,6 +11,10 @@ export const REPORT_EXPORT_CONFIG: Partial<Record<ReportId, ReportExportConfig>>
   "weekly-performance": { primarySheetName: "Weekly Digest", primaryDataKey: "weeklyDigestRows" },
   "kitchen-efficiency": { primarySheetName: "Kitchen Efficiency", primaryDataKey: "kitchenRows" },
   "waste-variance": { primarySheetName: "Waste Variance", primaryDataKey: "wasteVarianceRows" },
+  "reconciliation-summary": {
+    primarySheetName: "Reconciliation Summary",
+    primaryDataKey: "reconciliationSummaryRows",
+  },
   "customer-insights": { primarySheetName: "Customer Insights", primaryDataKey: "customerRows" },
   "menu-performance": { primarySheetName: "Menu Performance", primaryDataKey: "menuRows" },
   "cash-transactions": { primarySheetName: "POS Terminal", primaryDataKey: "posTerminalRows" },
