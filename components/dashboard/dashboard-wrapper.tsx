@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useMemo, useTransition, useCallback } from "react";
 import { DateRange } from "react-day-picker";
 import { subDays } from "date-fns";
@@ -90,6 +91,7 @@ interface KPIData {
 
 interface DashboardWrapperProps {
   organizationName: string;
+  organizationLogoUrl?: string | null;
   branches: Branch[];
   revenueData: RevenueDataPoint[];
   salesByChannel: SalesChannel[];
@@ -104,6 +106,7 @@ interface DashboardWrapperProps {
 
 export function DashboardWrapper({
   organizationName,
+  organizationLogoUrl,
   branches,
   revenueData: initialRevenueData,
   salesByChannel: initialSalesByChannel,
@@ -287,18 +290,31 @@ export function DashboardWrapper({
       {/* Header Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 px-6 py-6 text-white shadow-lg">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE4YzEuNjU3IDAgMy0xLjM0MyAzLTNzLTEuMzQzLTMtMy0zLTMgMS4zNDMtMyAzIDEuMzQzIDMgMyAzem0tMjQgMjRjMS42NTcgMCAzLTEuMzQzIDMtM3MtMS4zNDMtMy0zLTMtMyAxLjM0My0zIDMgMS4zNDMgMyAzIDN6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-50" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-              {organizationName}
-            </h1>
-            {isPending && (
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
-            )}
+        <div className="relative z-10 flex items-center gap-4">
+          {organizationLogoUrl ? (
+            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/30 bg-white/20 p-1.5 shadow-sm">
+              <Image
+                src={organizationLogoUrl}
+                alt={`${organizationName} logo`}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          ) : null}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+                {organizationName}
+              </h1>
+              {isPending && (
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+              )}
+            </div>
+            <p className="mt-1 text-sm text-white/80">
+              Real-time overview of your restaurant operations
+            </p>
           </div>
-          <p className="mt-1 text-sm text-white/80">
-            Real-time overview of your restaurant operations
-          </p>
         </div>
       </div>
 

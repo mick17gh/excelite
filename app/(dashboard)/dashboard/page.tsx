@@ -42,6 +42,7 @@ export default async function ExecutiveDashboard() {
   ]);
 
   const organizationName = orgResult.data?.name || "ServStack";
+  const organizationLogoUrl = orgResult.data?.storeLogoUrl?.trim() || null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const branches = (branchesResult.data || []).map((branch: Record<string, any>) => ({
@@ -88,6 +89,7 @@ export default async function ExecutiveDashboard() {
   return (
     <DashboardWrapper
       organizationName={organizationName}
+      organizationLogoUrl={organizationLogoUrl}
       branches={branches}
       revenueData={revenueData}
       salesByChannel={salesByChannel}
