@@ -988,8 +988,7 @@ export function PosContent({
                 >
                   {outOfStock && (
                     <Badge
-                      variant="secondary"
-                      className="absolute -top-2 -right-2 text-[10px] px-1.5"
+                      className="absolute -top-2 -right-2 text-[10px] px-1.5 border-transparent bg-orange-500 text-white dark:bg-orange-600"
                     >
                       Out of stock
                     </Badge>
