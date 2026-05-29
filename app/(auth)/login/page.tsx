@@ -1,13 +1,31 @@
 import { LoginForm } from "@/components/auth/login-form";
 import { TrendingUp, BarChart3, Package, Users, Bell } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { db } from "@/lib/db";
 
 export const metadata = {
   title: "Login | ServStack",
   description: "Sign in to your ServStack account",
 };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const orgBranding = await db.organization.findFirst({
+    select: {
+      name: true,
+      storeName: true,
+      storeDescription: true,
+      storeLogoUrl: true,
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const brandName = orgBranding?.storeName?.trim() || orgBranding?.name?.trim() || "ServStack";
+  const brandDescription =
+    orgBranding?.storeDescription?.trim() ||
+    "Run all your branches from one platform. Track sales, manage inventory, optimize operations, and boost profitability.";
+  const logoUrl = orgBranding?.storeLogoUrl || null;
+
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Gradient Branding */}
@@ -26,18 +44,26 @@ export default function LoginPage() {
         {/* Content */}
         <div className="relative z-10 flex items-center justify-center p-12 w-full">
           <div className="max-w-md text-center text-white">
-            <div className="flex items-center justify-center gap-3 mb-8">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg">
-                <TrendingUp className="h-8 w-8" />
-              </div>
-              <span className="text-3xl font-bold">ServStack</span>
+            <div className="flex flex-col items-center justify-center gap-4 mb-8">
+              {logoUrl ? (
+                <div className="relative h-24 w-24 overflow-hidden rounded-2xl border border-white/30 bg-white/20 shadow-lg backdrop-blur-sm p-2">
+                  <Image
+                    src={logoUrl}
+                    alt={`${brandName} logo`}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg">
+                  <TrendingUp className="h-10 w-10" />
+                </div>
+              )}
+              <span className="text-3xl font-bold">{brandName}</span>
             </div>
-            <h1 className="text-4xl font-bold mb-4 leading-tight">
-              The Command Center for Restaurant Growth
-            </h1>
             <p className="text-lg text-white/80 mb-12">
-              Run all your branches from one platform. Track sales, manage inventory,
-              optimize operations, and boost profitability.
+              {brandDescription}
             </p>
             
             {/* Feature highlights */}
@@ -67,11 +93,23 @@ export default function LoginPage() {
         <div className="absolute inset-0 gradient-mesh" />
         
         <div className="w-full max-w-md space-y-8 relative z-10">
-          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg gradient-primary shadow-lg">
-              <TrendingUp className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold gradient-text">ServStack</span>
+          <div className="lg:hidden flex flex-col items-center justify-center gap-3 mb-8">
+            {logoUrl ? (
+              <div className="relative h-16 w-16 overflow-hidden rounded-lg shadow-lg p-1">
+                <Image
+                  src={logoUrl}
+                  alt={`${brandName} logo`}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg gradient-primary shadow-lg">
+                <TrendingUp className="h-8 w-8 text-white" />
+              </div>
+            )}
+            <span className="text-2xl font-bold gradient-text">{brandName}</span>
           </div>
 
           <div className="text-center">

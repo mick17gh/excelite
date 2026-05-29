@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -136,9 +135,7 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="glass">
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-lg border p-1">
             <Button
               type="button"
@@ -266,7 +263,5 @@ export function LoginForm() {
             )}
           </Button>
         </form>
-      </CardContent>
-    </Card>
   );
 }
