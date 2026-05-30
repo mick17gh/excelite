@@ -11,6 +11,7 @@ export const metadata = {
   description: "Sign in to your ServStack account",
 };
 
+
 export default async function LoginPage() {
   const orgBranding = await db.organization.findFirst({
     select: {

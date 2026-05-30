@@ -828,7 +828,7 @@ export async function getPosTableContext(branchId: string) {
   if (!enabled) return { data: { enabled: false as const } };
 
   const setup = await getBranchTableSetup(branchId);
-  if (setup.error || !setup.data) {
+  if ("error" in setup) {
     return { data: { enabled: true as const, tables: [], sections: [] } };
   }
 

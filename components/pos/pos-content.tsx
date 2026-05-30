@@ -775,15 +775,24 @@ export function PosContent({
                 skipStatusComplete: autoSendToKitchen,
               });
 
-        if (!completeResult.success) {
-          toast.error(completeResult.error || "Failed to complete order");
+        const completedPayment =
+          completeResult.success &&
+          "data" in completeResult &&
+          completeResult.data != null
+            ? completeResult.data
+            : null;
+
+        if (!completedPayment) {
+          toast.error(
+            "error" in completeResult ? completeResult.error : "Failed to complete order"
+          );
           setIsPaymentOpen(false);
           return;
         }
 
         setCompletedOrder({
           ...result.data,
-          change: completeResult.data?.change || paymentData.change,
+          change: completedPayment.change ?? paymentData.change,
         });
         setIsPaymentOpen(false);
         setIsReceiptOpen(true);
