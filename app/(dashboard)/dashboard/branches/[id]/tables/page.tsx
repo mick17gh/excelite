@@ -23,7 +23,7 @@ export default async function BranchTablesPage({
 
   const enabled = await isTableManagementEnabledForBranch(id);
   if (!enabled) {
-    redirect("/dashboard/settings");
+    redirect(`/dashboard/branches/${id}`);
   }
 
   return (

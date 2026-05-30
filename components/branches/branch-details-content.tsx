@@ -116,6 +116,7 @@ interface BranchDetailsContentProps {
   users: User[];
   targets: Target[];
   tableManagementEnabled?: boolean;
+  orgTableManagementEnabled?: boolean;
 }
 
 export function BranchDetailsContent({
@@ -127,6 +128,7 @@ export function BranchDetailsContent({
   users,
   targets,
   tableManagementEnabled = false,
+  orgTableManagementEnabled = false,
 }: BranchDetailsContentProps) {
   const { formatCurrency } = useCurrency();
   const router = useRouter();
@@ -558,10 +560,11 @@ export function BranchDetailsContent({
       </Tabs>
 
       {/* Edit Branch Form */}
-      <EditBranchForm 
-        open={isEditOpen} 
-        onOpenChange={setIsEditOpen} 
-        branch={branch} 
+      <EditBranchForm
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        orgTableManagementEnabled={orgTableManagementEnabled}
+        branch={branch}
       />
     </div>
   );

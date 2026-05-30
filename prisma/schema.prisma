@@ -428,6 +428,7 @@ model Branch {
   taxInclusive      Boolean   @default(false)
   showTaxOnReceipt  Boolean   @default(true)
   blockSalesWhenOutOfStock Boolean?
+  tableServiceEnabled   Boolean   @default(false)
   organizationId String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

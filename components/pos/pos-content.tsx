@@ -48,6 +48,7 @@ import {
   completeOrder,
   completeComplimentaryOrder,
 } from "@/lib/actions/pos";
+import { getPosTableContext } from "@/lib/actions/tables";
 import { savePosSnapshot, loadPosSnapshot, enqueuePosOutbox } from "@/lib/offline/pos-idb";
 import { drainPosOutbox } from "@/lib/offline/pos-sync";
 import { getBranchTaxRate } from "@/lib/actions/tax";
@@ -124,7 +125,6 @@ interface PosContentProps {
   customers: Customer[];
   storefrontQr?: StorefrontQrProp;
   allowComplimentary?: boolean;
-  tableManagementEnabled?: boolean;
   userRole?: Role;
 }
 
@@ -151,7 +151,6 @@ export function PosContent({
   customers,
   storefrontQr = null,
   allowComplimentary = false,
-  tableManagementEnabled = false,
   userRole: userRoleProp = "STAFF",
 }: PosContentProps) {
   const { formatCurrency } = useCurrency();
@@ -245,10 +244,27 @@ export function PosContent({
   const [optionPickerItem, setOptionPickerItem] = useState<MenuItem | null>(null);
   const [pickerSelections, setPickerSelections] = useState<Record<string, string[]>>({});
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
+  const [branchTableServiceEnabled, setBranchTableServiceEnabled] = useState(false);
 
   const showTablePanel =
-    tableManagementEnabled && orderType === "DINE_IN" && Boolean(branchId);
+    branchTableServiceEnabled && orderType === "DINE_IN" && Boolean(branchId);
   const waiterTableMode = showTablePanel && userRole === "WAITER";
+
+  useEffect(() => {
+    if (!branchId) {
+      setBranchTableServiceEnabled(false);
+      return;
+    }
+    let cancelled = false;
+    void getPosTableContext(branchId).then((res) => {
+      if (!cancelled) {
+        setBranchTableServiceEnabled(res.data?.enabled ?? false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId]);
 
   useEffect(() => {
     if (!showTablePanel) {

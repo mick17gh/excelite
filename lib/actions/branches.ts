@@ -127,6 +127,7 @@ export interface UpdateBranchInput {
   onlineStoreVisible?: boolean;
   /** null = inherit org setting */
   blockSalesWhenOutOfStock?: boolean | null;
+  tableServiceEnabled?: boolean;
 }
 
 export async function createBranch(input: CreateBranchInput) {
@@ -222,6 +223,19 @@ export async function updateBranch(input: UpdateBranchInput) {
       return { success: false, error: "You do not have access to update this branch" };
     }
 
+    if (input.tableServiceEnabled === true && existing.organizationId) {
+      const { isTableManagementEnabled } = await import(
+        "@/lib/features/table-management"
+      );
+      const orgTableOn = await isTableManagementEnabled(existing.organizationId);
+      if (!orgTableOn) {
+        return {
+          success: false,
+          error: "Enable table management in organization settings first",
+        };
+      }
+    }
+
     const { id, ...rest } = input;
     const data: typeof rest & { organizationId?: string | null } = { ...rest };
 
@@ -263,6 +277,7 @@ export async function updateBranch(input: UpdateBranchInput) {
     revalidatePath("/dashboard/warehouse");
     revalidatePath("/pos");
     revalidatePath("/kitchen");
+    revalidatePath("/dashboard/settings");
     revalidatePath(`/dashboard/branches/${id}`);
     return {
       success: true,

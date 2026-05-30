@@ -334,6 +334,7 @@ export function AddBranchForm({ open, onOpenChange }: AddBranchFormProps) {
 interface EditBranchFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  orgTableManagementEnabled?: boolean;
   branch: {
     id: string;
     name: string;
@@ -347,6 +348,7 @@ interface EditBranchFormProps {
     isActive: boolean;
     onlineStoreVisible?: boolean;
     blockSalesWhenOutOfStock?: boolean | null;
+    tableServiceEnabled?: boolean;
   } | null;
 }
 
@@ -364,7 +366,12 @@ function stockPolicyToBranch(value: StockPolicyOverride): boolean | null {
   return null;
 }
 
-export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormProps) {
+export function EditBranchForm({
+  open,
+  onOpenChange,
+  orgTableManagementEnabled = false,
+  branch,
+}: EditBranchFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showOnlineStoreToggle, setShowOnlineStoreToggle] = useState(false);
   const [formData, setFormData] = useState({
@@ -378,6 +385,7 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
     requiredStaff: branch?.requiredStaff?.toString() || "5",
     isActive: branch?.isActive ?? true,
     onlineStoreVisible: branch?.onlineStoreVisible ?? false,
+    tableServiceEnabled: branch?.tableServiceEnabled ?? false,
   });
   const [stockPolicyOverride, setStockPolicyOverride] = useState<StockPolicyOverride>("inherit");
 
@@ -395,6 +403,7 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
       requiredStaff: branch.requiredStaff?.toString() || "5",
       isActive: branch.isActive ?? true,
       onlineStoreVisible: branch.onlineStoreVisible ?? false,
+      tableServiceEnabled: branch.tableServiceEnabled ?? false,
     });
     setStockPolicyOverride(stockPolicyFromBranch(branch.blockSalesWhenOutOfStock));
 
@@ -430,6 +439,9 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
           ? { onlineStoreVisible: formData.isActive ? formData.onlineStoreVisible : false }
           : {}),
         blockSalesWhenOutOfStock: stockPolicyToBranch(stockPolicyOverride),
+        ...(orgTableManagementEnabled
+          ? { tableServiceEnabled: formData.tableServiceEnabled }
+          : {}),
       });
 
       if (result.success) {
@@ -580,6 +592,23 @@ export function EditBranchForm({ open, onOpenChange, branch }: EditBranchFormPro
                   disabled={!formData.isActive}
                   onCheckedChange={(checked) =>
                     setFormData({ ...formData, onlineStoreVisible: checked })
+                  }
+                />
+              </div>
+            )}
+
+            {orgTableManagementEnabled && (
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label>Table service at this branch</Label>
+                  <p className="text-sm text-muted-foreground">
+                    When on, POS dine-in requires seating at a table for this branch
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.tableServiceEnabled}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, tableServiceEnabled: checked })
                   }
                 />
               </div>

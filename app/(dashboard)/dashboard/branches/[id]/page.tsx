@@ -7,7 +7,7 @@ import { getUsersByBranch } from "@/lib/actions/users";
 import { getTargets } from "@/lib/actions/targets";
 import { BranchDetailsContent } from "@/components/branches/branch-details-content";
 import { notFound } from "next/navigation";
-import { isTableManagementEnabledForBranch } from "@/lib/features/table-management";
+import { isTableManagementEnabled, isTableManagementEnabledForBranch } from "@/lib/features/table-management";
 
 export const metadata = {
   title: "Branch Details | ServStack",
@@ -95,6 +95,9 @@ export default async function BranchDetailsPage({
   
   // Targets already converted in getTargets action
   const targets = targetsData;
+  const orgTableManagementEnabled = branch.organizationId
+    ? await isTableManagementEnabled(branch.organizationId)
+    : false;
   const tableManagementEnabled = await isTableManagementEnabledForBranch(id);
 
   return (
@@ -109,6 +112,7 @@ export default async function BranchDetailsPage({
           users={users}
           targets={targets}
           tableManagementEnabled={tableManagementEnabled}
+          orgTableManagementEnabled={orgTableManagementEnabled}
         />
       </Suspense>
     </div>

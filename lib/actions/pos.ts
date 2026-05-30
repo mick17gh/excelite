@@ -14,7 +14,7 @@ import {
 import { filterOrderItemsForKitchenStation } from "@/lib/kitchen/category-routing";
 import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
-import { requireTableForDineIn } from "@/lib/features/table-management";
+import { requireTableForDineInAtBranch } from "@/lib/features/table-management";
 import { markTableOrdering } from "@/lib/actions/tables";
 import { validateTableSessionForOrder } from "@/lib/features/table-session-validation";
 import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
@@ -110,7 +110,7 @@ export async function createPosOrder(input: CreatePosOrderInput) {
       return { success: false, error: "Branch not found" };
     }
 
-    const tableModuleOn = await requireTableForDineIn(branch.organizationId);
+    const tableModuleOn = await requireTableForDineInAtBranch(input.branchId);
     if (tableModuleOn && input.type === "DINE_IN" && !input.tableSessionId) {
       return {
         success: false,

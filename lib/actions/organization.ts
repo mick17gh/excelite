@@ -15,6 +15,7 @@ import {
   validateStoreBannersForSave,
 } from "@/lib/storefront/banners";
 import { normalizeStorefrontUrl } from "@/lib/storefront/url";
+import { setTableServiceBranches } from "@/lib/features/table-management";
 import { headers } from "next/headers";
 
 function isDynamicServerUsageError(error: unknown): boolean {
@@ -219,9 +220,62 @@ export async function getOrganization(id?: string) {
   }
 }
 
+export async function getTableServiceSettings(organizationId: string) {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user || !hasPermission(session.user.role as Role, "organization:view")) {
+      return { error: "Forbidden" };
+    }
+
+    const sessionOrgId = await getSessionOrganizationId();
+    if (sessionOrgId && sessionOrgId !== organizationId) {
+      return { error: "Forbidden" };
+    }
+
+    const org = await db.organization.findUnique({
+      where: { id: organizationId },
+      select: { tableManagementEnabled: true, tier: true },
+    });
+    if (!org) return { error: "Organization not found" };
+
+    const tierAllowed = hasFeature(org.tier, "tableManagement");
+    const branches = await db.branch.findMany({
+      where: { organizationId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+        tableServiceEnabled: true,
+        _count: { select: { diningTables: true } },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return {
+      data: {
+        tableManagementEnabled: org.tableManagementEnabled,
+        tierAllowed,
+        branches: branches.map((b) => ({
+          id: b.id,
+          name: b.name,
+          code: b.code,
+          isActive: b.isActive,
+          tableServiceEnabled: b.tableServiceEnabled,
+          tableCount: b._count.diningTables,
+        })),
+      },
+    };
+  } catch (error) {
+    console.error("[getTableServiceSettings]", error);
+    return { error: "Failed to load table service settings" };
+  }
+}
+
 export async function updateOrganizationTableManagement(input: {
   organizationId: string;
   tableManagementEnabled: boolean;
+  tableServiceBranchIds?: string[];
 }) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -250,6 +304,15 @@ export async function updateOrganizationTableManagement(input: {
       where: { id: input.organizationId },
       data: { tableManagementEnabled: input.tableManagementEnabled },
     });
+
+    if (!input.tableManagementEnabled) {
+      await db.branch.updateMany({
+        where: { organizationId: input.organizationId },
+        data: { tableServiceEnabled: false },
+      });
+    } else if (input.tableServiceBranchIds !== undefined) {
+      await setTableServiceBranches(input.organizationId, input.tableServiceBranchIds);
+    }
 
     revalidatePath("/dashboard/settings");
     revalidatePath("/pos");
