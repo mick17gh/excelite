@@ -123,8 +123,8 @@ export function CreateOrderDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitPhase, setSubmitPhase] = useState<"creating" | "opening">("creating");
   const [branchId, setBranchId] = useState("");
-  const [source, setSource] = useState("WALK_IN");
-  const [type, setType] = useState("DINE_IN");
+  const [source, setSource] = useState("CALL_CENTER");
+  const [type, setType] = useState("TAKEOUT");
   const [customerId, setCustomerId] = useState("walk-in");
   const [notes, setNotes] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -481,8 +481,8 @@ export function CreateOrderDialog({
 
   const resetForm = () => {
     setBranchId("");
-    setSource("WALK_IN");
-    setType("DINE_IN");
+    setSource("CALL_CENTER");
+    setType("TAKEOUT");
     setCustomerId("walk-in");
     setNotes("");
     setCart([]);
