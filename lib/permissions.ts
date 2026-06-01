@@ -474,6 +474,7 @@ const rolePermissions: Record<Role, Permission[]> = {
 
   CALL_CENTER: [
     "dashboard:view",
+    "pos:access",
     "orders:view",
     "orders:create",
     "orders:edit",
@@ -634,7 +635,7 @@ export const roleDescriptions: Record<Role, string> = {
   KITCHEN_STAFF: "Kitchen display access for order preparation",
   AUDITOR: "Read-only access to all data for compliance and auditing",
   DEVELOPER: "API key management and technical settings access",
-  CALL_CENTER: "Dashboard, orders, and customers only",
+  CALL_CENTER: "Dashboard, POS, orders, customers, and delivery",
   WAREHOUSE_STAFF:
     "Raw warehouse inventory, approvals for commissary dispatch, and branch transfers",
   COMMISSARY_STAFF:

@@ -76,7 +76,7 @@ export function LoginForm() {
   };
 
   const getPostLoginRoute = (role?: string | null) => {
-    if (role === "WAITER" || role === "STAFF") {
+    if (role === "WAITER" || role === "STAFF" || role === "CALL_CENTER") {
       return "/pos";
     }
     return "/dashboard";
