@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Edit, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -57,6 +58,8 @@ export function InventoryCategoriesContent({
   categories: InventoryCategoryRow[];
 }) {
   const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryCategoryRow | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,6 +79,22 @@ export function InventoryCategoriesContent({
     if (statusFilter === "archived") return !row.isActive;
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredCategories.length / pageSize));
+  const paginatedCategories = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredCategories.slice(startIndex, startIndex + pageSize);
+  }, [filteredCategories, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const archivedCount = categories.filter((c) => !c.isActive).length;
 
@@ -223,7 +242,7 @@ export function InventoryCategoriesContent({
                   </TableCell>
                 </TableRow>
               ) : null}
-              {filteredCategories.map((row) => (
+              {paginatedCategories.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>{row.code}</TableCell>
@@ -276,6 +295,19 @@ export function InventoryCategoriesContent({
               ))}
             </TableBody>
           </Table>
+          {filteredCategories.length > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredCategories.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </CardContent>
       </Card>
 

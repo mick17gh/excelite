@@ -574,7 +574,6 @@ export function canAccessRoute(
     "/dashboard/inventory": ["inventory:view"],
     "/dashboard/menu": ["menu:view"],
     "/dashboard/categories": ["categories:view"],
-    "/dashboard/inventory-categories": ["categories:manage"],
     "/dashboard/staff": ["staff:view"],
     "/dashboard/transactions": ["transactions:view"],
     "/dashboard/transactions/manual": ["transactions:manual"],

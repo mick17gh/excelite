@@ -95,6 +95,7 @@ export async function createInventoryCategory(input: {
     },
   });
 
+  revalidatePath("/dashboard/categories");
   revalidatePath("/dashboard/inventory-categories");
   revalidatePath("/dashboard/inventory");
   revalidatePath("/dashboard/warehouse");
@@ -131,6 +132,7 @@ export async function updateInventoryCategory(input: {
     },
   });
 
+  revalidatePath("/dashboard/categories");
   revalidatePath("/dashboard/inventory-categories");
   revalidatePath("/dashboard/inventory");
   revalidatePath("/dashboard/warehouse");
@@ -169,6 +171,7 @@ export async function deleteOrArchiveInventoryCategory(id: string) {
     });
   }
 
+  revalidatePath("/dashboard/categories");
   revalidatePath("/dashboard/inventory-categories");
   revalidatePath("/dashboard/inventory");
   revalidatePath("/dashboard/warehouse");
@@ -195,6 +198,7 @@ export async function restoreInventoryCategory(id: string) {
     data: { isActive: true },
   });
 
+  revalidatePath("/dashboard/categories");
   revalidatePath("/dashboard/inventory-categories");
   revalidatePath("/dashboard/inventory");
   revalidatePath("/dashboard/warehouse");

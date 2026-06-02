@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ import { useRouter } from "next/navigation";
 import { createCategory, updateCategory, deleteCategory } from "@/lib/actions/categories";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Category {
   id: string;
@@ -48,6 +49,8 @@ interface CategoriesContentProps {
 
 export function CategoriesContent({ categories: initialCategories }: CategoriesContentProps) {
   const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -144,6 +147,18 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
   const totalCategories = initialCategories.length;
   const totalItems = initialCategories.reduce((sum, cat) => sum + cat.itemCount, 0);
 
+  const totalPages = Math.max(1, Math.ceil(initialCategories.length / pageSize));
+  const paginatedCategories = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return initialCategories.slice(startIndex, startIndex + pageSize);
+  }, [initialCategories, currentPage, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   return (
     <div className="space-y-4">
       {/* Summary Cards - Compact */}
@@ -239,7 +254,7 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {initialCategories.map((category) => (
+                {paginatedCategories.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>
@@ -269,6 +284,19 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                 ))}
               </TableBody>
             </Table>
+          )}
+          {initialCategories.length > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={initialCategories.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </CardContent>
       </Card>

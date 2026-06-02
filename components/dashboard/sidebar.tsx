@@ -140,12 +140,6 @@ const navigation: NavItem[] = [
     permission: "categories:view",
   },
   {
-    name: "Inventory Categories",
-    href: "/dashboard/inventory-categories",
-    icon: Tag,
-    permission: "categories:manage",
-  },
-  {
     name: "Customers",
     href: "/dashboard/customers",
     icon: Contact,

@@ -1,29 +1,57 @@
 import { Suspense } from "react";
-import { CategoriesContent } from "@/components/categories/categories-content";
+import { headers } from "next/headers";
+import { CategoriesHubContent } from "@/components/categories/categories-hub-content";
 import { getCategories } from "@/lib/actions/categories";
+import { listInventoryCategories } from "@/lib/actions/inventory-categories";
+import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import type { Role } from "@/lib/generated/prisma/client";
 
 export const metadata = {
   title: "Category Management | ServStack",
-  description: "Manage menu categories",
+  description: "Manage menu and inventory categories",
 };
 
-export default async function CategoriesPage() {
-  const categoriesResult = await getCategories();
-  const categories = categoriesResult.data || [];
-  
+export default async function CategoriesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
+  const session = await auth.api.getSession({ headers: await headers() });
+  const role = (session?.user?.role as Role) || null;
+  const showInventoryTab = hasPermission(role, "categories:manage");
+
+  const [categoriesResult, inventoryResult] = await Promise.all([
+    getCategories(),
+    showInventoryTab ? listInventoryCategories() : Promise.resolve(null),
+  ]);
+
+  const menuCategories = categoriesResult.data || [];
+  const inventoryCategories =
+    inventoryResult?.success && inventoryResult.data ? inventoryResult.data : [];
+
+  const defaultTab = tab === "inventory" ? "inventory" : "menu";
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Category Management
+          Categories
         </h1>
         <p className="text-muted-foreground">
-          Manage menu categories for organizing your menu items
+          Manage menu categories and organization-wide inventory category master
+          data
         </p>
       </div>
 
       <Suspense fallback={<CategoriesLoadingSkeleton />}>
-        <CategoriesContent categories={categories} />
+        <CategoriesHubContent
+          menuCategories={menuCategories}
+          inventoryCategories={inventoryCategories}
+          showInventoryTab={showInventoryTab}
+          defaultTab={defaultTab}
+        />
       </Suspense>
     </div>
   );
