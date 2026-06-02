@@ -23,6 +23,17 @@ const withSerwist = withSerwistInit({
     { url: "/offline", revision },
     { url: "/pos", revision },
   ],
+  manifestTransforms: [
+    async (manifestEntries) => ({
+      manifest: manifestEntries.filter(
+        (entry) =>
+          !entry.url.includes(
+            "/_next/static/chunks/next/dist/client/components/builtin/",
+          ),
+      ),
+      warnings: [],
+    }),
+  ],
 });
 
 const nextConfig: NextConfig = {

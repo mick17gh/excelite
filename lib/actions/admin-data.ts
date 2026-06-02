@@ -4,17 +4,12 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
-import type { Role } from "@/lib/generated/prisma/client";
+import { requirePermission } from "@/lib/permissions/require";
 
 async function requirePurgePermission() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) return { error: "Unauthorized" as const };
-  const role = (session.user.role as Role) || "STAFF";
-  if (!hasPermission(role, "transactions:purge")) {
-    return { error: "Forbidden" as const };
-  }
-  return { userId: session.user.id };
+  const auth = await requirePermission("transactions:purge");
+  if (!auth.ok) return { error: auth.error as "Unauthorized" | "Forbidden" };
+  return { userId: auth.ctx.user.id };
 }
 
 export interface DataPurgeInput {

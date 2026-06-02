@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { Role } from "@/lib/generated/prisma/client";
 import { redirect } from "next/navigation";
+import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export const metadata = {
 };
 
 export default async function PosPage() {
+  await enforcePageRouteAccess("/pos");
+
   const [branchesResult, menuItemsResult, ordersResult, customersResult, qrContextResult] =
     await Promise.all([
       getBranches(),

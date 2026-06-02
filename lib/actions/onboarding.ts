@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { SubscriptionTier } from "@/lib/generated/prisma/client";
+import { seedOrgRolePermissions } from "@/lib/permissions/seed";
 
 interface OnboardingInput {
   organization: {
@@ -72,6 +73,8 @@ export async function completeOnboarding(input: OnboardingInput) {
         where: { organizationId: null },
         data: { organizationId: organization.id },
       });
+
+      await seedOrgRolePermissions(tx, organization.id);
 
       return { organization, branch };
     });

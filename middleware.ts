@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { REQUEST_PATHNAME_COOKIE } from "@/lib/permissions/constants";
 
 const publicRoutes = ["/","/login", "/forgot-password", "/reset-password", "/auth/reset-password", "/api/auth", "/api/v1"];
 const authRoutes = ["/login", "/forgot-password", "/reset-password"];
+
+/** better-auth session cookies (incl. secure prefix on HTTPS). */
+function hasSessionCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some((cookie) => {
+    const name = cookie.name;
+    return (
+      name === "better-auth.session_token" ||
+      name === "__Secure-better-auth.session_token" ||
+      name === "better-auth.session_data" ||
+      name === "__Secure-better-auth.session_data"
+    );
+  });
+}
 
 function isTruthyEnv(value: string | undefined): boolean {
   if (!value) return false;
@@ -17,8 +31,7 @@ export async function middleware(request: NextRequest) {
   const hideLanding = isTruthyEnv(process.env.NEXT_PUBLIC_HIDE_LANDING_PAGE);
 
   if (hideLanding && pathname === "/") {
-    const sessionCookie = request.cookies.get("better-auth.session_token");
-    if (sessionCookie) {
+    if (hasSessionCookie(request)) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     const loginUrl = new URL("/login", request.url);
@@ -31,22 +44,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for session cookie
-  const sessionCookie = request.cookies.get("better-auth.session_token");
+  const hasSession = hasSessionCookie(request);
 
   // If no session and trying to access protected route, redirect to login
-  if (!sessionCookie && !authRoutes.some((route) => pathname.startsWith(route))) {
+  if (!hasSession && !authRoutes.some((route) => pathname.startsWith(route))) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   // If has session and trying to access auth routes, redirect to dashboard
-  if (sessionCookie && authRoutes.some((route) => pathname.startsWith(route))) {
+  if (hasSession && authRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
+  requestHeaders.set("x-url", request.url);
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+  response.cookies.set(REQUEST_PATHNAME_COOKIE, pathname, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: request.nextUrl.protocol === "https:",
+  });
+  return response;
 }
 
 export const config = {

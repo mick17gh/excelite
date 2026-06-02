@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { hasPermission } from "@/lib/permissions";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
 import { Role } from "@/lib/generated/prisma/client";
 
 export const metadata = {
@@ -16,13 +16,13 @@ export const metadata = {
 export default async function FloorBoardPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   const role = (session?.user?.role as Role) || "STAFF";
-  if (!hasPermission(role, "tables:view")) {
-    redirect("/dashboard");
-  }
-
   const org = await db.organization.findFirst({
     select: { id: true },
   });
+  const permissions = org ? await getEffectivePermissions(org.id, role) : [];
+  if (!hasPermissionInList(permissions, "tables:view")) {
+    redirect("/dashboard");
+  }
   if (!org || !(await isTableManagementEnabled(org.id))) {
     redirect("/dashboard/settings");
   }

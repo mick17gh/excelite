@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
+import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import { Role } from "@/lib/generated/prisma/client";
 
 export interface ReportViewerContext {
@@ -21,7 +22,12 @@ export async function resolveReportViewer(): Promise<
   }
 
   const role = session.user.role as Role;
-  if (!hasPermission(role, "reports:generate")) {
+  const organizationId = await resolveOrganizationIdForSession(session.user.id);
+  if (!organizationId) {
+    return { ok: false, error: "Organization not found" };
+  }
+  const permissions = await getEffectivePermissions(organizationId, role);
+  if (!hasPermissionInList(permissions, "reports:generate")) {
     return { ok: false, error: "You do not have permission to generate reports" };
   }
 

@@ -4,7 +4,8 @@ import { CategoriesHubContent } from "@/components/categories/categories-hub-con
 import { getCategories } from "@/lib/actions/categories";
 import { listInventoryCategories } from "@/lib/actions/inventory-categories";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { db } from "@/lib/db";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
 import type { Role } from "@/lib/generated/prisma/client";
 
 export const metadata = {
@@ -19,8 +20,12 @@ export default async function CategoriesPage({
 }) {
   const { tab } = await searchParams;
   const session = await auth.api.getSession({ headers: await headers() });
-  const role = (session?.user?.role as Role) || null;
-  const showInventoryTab = hasPermission(role, "categories:manage");
+  const role = (session?.user?.role as Role) || "STAFF";
+  const org = await db.organization.findFirst({ select: { id: true } });
+  const permissions = org
+    ? await getEffectivePermissions(org.id, role)
+    : [];
+  const showInventoryTab = hasPermissionInList(permissions, "categories:manage");
 
   const [categoriesResult, inventoryResult] = await Promise.all([
     getCategories(),

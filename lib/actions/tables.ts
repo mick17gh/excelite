@@ -9,17 +9,37 @@ import {
   TableSessionStatus,
   Role,
 } from "@/lib/generated/prisma/client";
-import { hasPermission } from "@/lib/permissions";
+import type { Permission } from "@/lib/permissions/types";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
+import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import { isTableManagementEnabledForBranch } from "@/lib/features/table-management";
 import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
 
-async function getActor() {
+type TableActor = {
+  userId: string;
+  role: Role;
+  branchId: string | null;
+  organizationId: string;
+  permissions: Permission[];
+};
+
+function actorCan(actor: TableActor, permission: Permission) {
+  return hasPermissionInList(actor.permissions, permission);
+}
+
+async function getActor(): Promise<TableActor | null> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) return null;
+  const organizationId = await resolveOrganizationIdForSession(session.user.id);
+  if (!organizationId) return null;
+  const role = session.user.role as Role;
+  const permissions = await getEffectivePermissions(organizationId, role);
   return {
     userId: session.user.id,
-    role: session.user.role as Role,
+    role,
     branchId: session.user.branchId as string | null,
+    organizationId,
+    permissions,
   };
 }
 
@@ -44,7 +64,7 @@ function normalizeCapacity(capacity?: number): number | { error: string } {
 export async function getBranchTableSetup(branchId: string) {
   try {
     const actor = await getActor();
-    if (!actor || !hasPermission(actor.role, "tables:view")) {
+    if (!actor || !actorCan(actor, "tables:view")) {
       return { error: "Forbidden" };
     }
     const gate = await assertTablesEnabled(branchId);
@@ -110,7 +130,7 @@ export async function createDiningSection(input: {
   sortOrder?: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
   const gate = await assertTablesEnabled(input.branchId);
@@ -133,7 +153,7 @@ export async function updateDiningSection(input: {
   sortOrder?: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -160,7 +180,7 @@ export async function updateDiningSection(input: {
 
 export async function deleteDiningSection(sectionId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -191,7 +211,7 @@ export async function createDiningTable(input: {
   capacity?: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
   const gate = await assertTablesEnabled(input.branchId);
@@ -226,7 +246,7 @@ export async function bulkCreateDiningTables(input: {
   capacity?: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
   const gate = await assertTablesEnabled(input.branchId);
@@ -263,7 +283,7 @@ export async function updateDiningTableLayout(input: {
   posY: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
   const table = await db.diningTable.update({
@@ -281,7 +301,7 @@ export async function updateDiningTable(input: {
   sectionId?: string | null;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -320,7 +340,7 @@ export async function updateDiningTable(input: {
 
 export async function deleteDiningTable(tableId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -355,7 +375,7 @@ export async function openTableSession(input: {
   openedByUserId?: string;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:assign")) {
+  if (!actor || !actorCan(actor, "tables:assign")) {
     return { error: "Forbidden" };
   }
 
@@ -413,7 +433,7 @@ export async function openTableSession(input: {
 
 export async function setTableBillRequested(tableId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:assign")) {
+  if (!actor || !actorCan(actor, "tables:assign")) {
     return { error: "Forbidden" };
   }
   const table = await db.diningTable.findUnique({ where: { id: tableId } });
@@ -432,7 +452,7 @@ export async function setTableBillRequested(tableId: string) {
 
 export async function closeTableSession(sessionId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:assign")) {
+  if (!actor || !actorCan(actor, "tables:assign")) {
     return { error: "Forbidden" };
   }
 
@@ -467,8 +487,8 @@ export async function clearTable(tableId: string) {
   const actor = await getActor();
   const canClear =
     actor &&
-    (hasPermission(actor.role, "tables:manage") ||
-      hasPermission(actor.role, "tables:assign"));
+    (actorCan(actor, "tables:manage") ||
+      actorCan(actor, "tables:assign"));
   if (!canClear) {
     return { error: "Forbidden" };
   }
@@ -513,7 +533,7 @@ export async function transferTableSession(input: {
   toTableId: string;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -560,7 +580,7 @@ export async function reassignTableSession(input: {
   waiterUserId: string;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -574,7 +594,7 @@ export async function reassignTableSession(input: {
 
 export async function setTableBlocked(tableId: string, blocked: boolean) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
   await db.diningTable.update({
@@ -587,7 +607,7 @@ export async function setTableBlocked(tableId: string, blocked: boolean) {
 
 export async function listOpenSessions(branchId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:view")) {
+  if (!actor || !actorCan(actor, "tables:view")) {
     return { error: "Forbidden" };
   }
   const gate = await assertTablesEnabled(branchId);
@@ -625,7 +645,7 @@ export async function listOpenSessions(branchId: string) {
 
 export async function listBranchWaiters(branchId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
   const users = await db.user.findMany({
@@ -644,7 +664,7 @@ export async function mergeTableSessions(input: {
   targetSessionId: string;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -689,7 +709,7 @@ export async function splitTableSession(input: {
   movedCovers: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:manage")) {
+  if (!actor || !actorCan(actor, "tables:manage")) {
     return { error: "Forbidden" };
   }
 
@@ -753,7 +773,7 @@ export async function markTableOrdering(tableId: string) {
 
 export async function getFloorBoardData(branchId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:view")) {
+  if (!actor || !actorCan(actor, "tables:view")) {
     return { error: "Forbidden" };
   }
   const gate = await assertTablesEnabled(branchId);

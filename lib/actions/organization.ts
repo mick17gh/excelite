@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { SubscriptionTier, SubscriptionStatus, Role } from "@/lib/generated/prisma/client";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { requirePermission } from "@/lib/permissions/require";
 import { hasFeature, TIER_CONFIG } from "@/lib/tier-config";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES } from "@/lib/storefront/templates";
 import { buildPublicStoreConfig, getOrganizationForStorefront, type PublicStoreConfig } from "@/lib/storefront/config";
@@ -222,10 +222,8 @@ export async function getOrganization(id?: string) {
 
 export async function getTableServiceSettings(organizationId: string) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user || !hasPermission(session.user.role as Role, "organization:view")) {
-      return { error: "Forbidden" };
-    }
+    const auth = await requirePermission("organization:view");
+    if (!auth.ok) return { error: auth.error };
 
     const sessionOrgId = await getSessionOrganizationId();
     if (sessionOrgId && sessionOrgId !== organizationId) {
@@ -278,10 +276,8 @@ export async function updateOrganizationTableManagement(input: {
   tableServiceBranchIds?: string[];
 }) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user || !hasPermission(session.user.role as Role, "organization:edit")) {
-      return { error: "Forbidden" };
-    }
+    const auth = await requirePermission("organization:edit");
+    if (!auth.ok) return { error: auth.error };
 
     const sessionOrgId = await getSessionOrganizationId();
     if (sessionOrgId && sessionOrgId !== input.organizationId) {
@@ -331,10 +327,8 @@ export async function updateOrganizationPosPolicies(input: {
   blockSalesWhenOutOfStock?: boolean;
 }) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user || !hasPermission(session.user.role as Role, "organization:edit")) {
-      return { error: "Forbidden" };
-    }
+    const auth = await requirePermission("organization:edit");
+    if (!auth.ok) return { error: auth.error };
 
     const sessionOrgId = await getSessionOrganizationId();
     if (sessionOrgId && sessionOrgId !== input.organizationId) {
@@ -375,10 +369,8 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
 
     // Check if user is trying to change tier
     if (input.tier !== undefined) {
-      const session = await auth.api.getSession({ headers: await import("next/headers").then(m => m.headers()) });
-      const user = session?.user;
-      
-      if (!user || !hasPermission(user.role as Role, "subscriptions:manage")) {
+      const tierAuth = await requirePermission("subscriptions:manage");
+      if (!tierAuth.ok) {
         return { error: "You don't have permission to change subscription tiers" };
       }
     }
@@ -610,11 +602,8 @@ export async function getSubscriptionPayments(organizationId: string) {
 
 export async function getAllOrganizations() {
   try {
-    // Check if user has permission
-    const session = await auth.api.getSession({ headers: await import("next/headers").then(m => m.headers()) });
-    const user = session?.user;
-    
-    if (!user || !hasPermission(user.role as Role, "subscriptions:manage")) {
+    const auth = await requirePermission("subscriptions:manage");
+    if (!auth.ok) {
       return { error: "You don't have permission to view all organizations" };
     }
 

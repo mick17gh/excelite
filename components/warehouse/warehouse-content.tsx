@@ -48,7 +48,9 @@ import { toast } from "sonner";
 import { updateTransferStatus } from "@/lib/actions/warehouse";
 import { updateBranchWarehouseTransferStatus } from "@/lib/actions/stock-transfers";
 import type { Role } from "@/lib/generated/prisma/client";
-import { canMutateWarehouseOps, hasPermission } from "@/lib/permissions";
+import { canMutateWarehouseFromPermissions } from "@/lib/permissions/sync";
+import { usePermissions } from "@/contexts/permissions-context";
+import type { Permission } from "@/lib/permissions/types";
 import {
   CreateWarehouseDialog,
   EditWarehouseDialog,
@@ -247,9 +249,12 @@ const WAREHOUSE_TABS = [
   { value: "outbound", label: "Outbound" },
 ] as const;
 
-function visibleWarehouseTabs(role: Role) {
+function visibleWarehouseTabs(
+  role: Role,
+  hasPermission: (p: Permission) => boolean,
+) {
   return WAREHOUSE_TABS.filter((tab) => {
-    if (tab.value === "production") return hasPermission(role, "commissary:production");
+    if (tab.value === "production") return hasPermission("commissary:production");
     if (tab.value === "receiving") return role !== "COMMISSARY_STAFF";
     return true;
   });
@@ -286,14 +291,18 @@ export function WarehouseContent({
   categories,
 }: WarehouseContentProps) {
   const router = useRouter();
-  const canMutate = canMutateWarehouseOps(userRole);
-  const showActionsMenu = canMutate && userRole !== "COMMISSARY_STAFF";
-  const canCreateWarehouse = canMutate && hasPermission(userRole, "warehouse:create");
-  const canTransfer = canMutate && hasPermission(userRole, "warehouse:transfer");
+  const { hasPermission, permissions } = usePermissions();
+  const canMutate = canMutateWarehouseFromPermissions(permissions);
+  const showActionsMenu = canMutate && hasPermission("warehouse:edit");
+  const canCreateWarehouse = canMutate && hasPermission("warehouse:create");
+  const canTransfer = canMutate && hasPermission("warehouse:transfer");
   const canApproveDispatch =
-    canMutate && hasPermission(userRole, "warehouse:approve_dispatch");
-  const canLogWastage = canMutate && hasPermission(userRole, "warehouse:edit");
-  const tabs = useMemo(() => visibleWarehouseTabs(userRole), [userRole]);
+    canMutate && hasPermission("warehouse:approve_dispatch");
+  const canLogWastage = canMutate && hasPermission("warehouse:edit");
+  const tabs = useMemo(
+    () => visibleWarehouseTabs(userRole, hasPermission),
+    [userRole, hasPermission],
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
   const [showCreateWarehouse, setShowCreateWarehouse] = useState(false);

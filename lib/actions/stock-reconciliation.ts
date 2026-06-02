@@ -11,6 +11,7 @@ import {
   canReconcileRole,
   canViewReconciliationHistory,
   resolveReconciliationBranch,
+  resolveReconciliationOrgId,
   resolveReconciliationViewer,
 } from "@/lib/inventory/reconciliation-auth";
 import { movementTypeForReason } from "@/lib/inventory/reconciliation-constants";
@@ -197,7 +198,8 @@ export async function getReconciliationCandidates(
     if (!authResult.ok) return { success: false, error: authResult.error };
 
     const viewer = authResult.viewer;
-    if (!canReconcileRole(viewer.role)) {
+    const organizationId = await resolveReconciliationOrgId(viewer.userId);
+    if (!organizationId || !(await canReconcileRole(viewer.role, organizationId))) {
       return { success: false, error: "You do not have permission to reconcile stock" };
     }
 
@@ -313,7 +315,8 @@ export async function submitStockReconciliation(input: SubmitReconciliationInput
     if (!authResult.ok) return { success: false, error: authResult.error };
 
     const viewer = authResult.viewer;
-    if (!canReconcileRole(viewer.role)) {
+    const organizationId = await resolveReconciliationOrgId(viewer.userId);
+    if (!organizationId || !(await canReconcileRole(viewer.role, organizationId))) {
       return { success: false, error: "You do not have permission to reconcile stock" };
     }
 
@@ -559,7 +562,8 @@ export async function getReconciliationHistory(
     if (!authResult.ok) return { success: false, error: authResult.error };
 
     const viewer = authResult.viewer;
-    if (!canViewReconciliationHistory(viewer.role)) {
+    const organizationId = await resolveReconciliationOrgId(viewer.userId);
+    if (!organizationId || !(await canViewReconciliationHistory(viewer.role, organizationId))) {
       return { success: false, error: "You do not have permission to view reconciliation history" };
     }
 
@@ -643,7 +647,8 @@ export async function getReconciliationStatusForDate(
     if (!authResult.ok) return { success: false, error: authResult.error };
 
     const viewer = authResult.viewer;
-    if (!canViewReconciliationHistory(viewer.role)) {
+    const organizationId = await resolveReconciliationOrgId(viewer.userId);
+    if (!organizationId || !(await canViewReconciliationHistory(viewer.role, organizationId))) {
       return { success: false, error: "Forbidden" };
     }
 

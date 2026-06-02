@@ -11,8 +11,19 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+/** Next may emit optional RSC boundary chunks in the manifest that 404 at runtime. */
+function filterPrecacheEntries(
+  entries: (PrecacheEntry | string)[] | undefined,
+): (PrecacheEntry | string)[] {
+  if (!entries?.length) return [];
+  return entries.filter((entry) => {
+    const url = typeof entry === "string" ? entry : entry.url;
+    return !url.includes("/_next/static/chunks/next/dist/client/components/builtin/");
+  });
+}
+
 const serwist = new Serwist({
-  precacheEntries: self.__SW_MANIFEST,
+  precacheEntries: filterPrecacheEntries(self.__SW_MANIFEST),
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,

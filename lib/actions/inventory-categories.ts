@@ -4,26 +4,35 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { hasPermission } from "@/lib/permissions";
+import type { Permission } from "@/lib/permissions/types";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
+import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import type { Role } from "@/lib/generated/prisma/client";
 
-async function getActor() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) return null;
-  return {
-    userId: session.user.id,
-    role: session.user.role as Role,
-  };
+type CategoryActor = {
+  userId: string;
+  role: Role;
+  organizationId: string;
+  permissions: Permission[];
+};
+
+function actorCan(actor: CategoryActor, permission: Permission) {
+  return hasPermissionInList(actor.permissions, permission);
 }
 
-async function resolveOrganizationId(): Promise<string | null> {
-  const actor = await getActor();
-  if (!actor) return null;
-  const user = await db.user.findUnique({
-    where: { id: actor.userId },
-    select: { organizationId: true },
-  });
-  return user?.organizationId ?? null;
+async function getActor(): Promise<CategoryActor | null> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user?.id) return null;
+  const organizationId = await resolveOrganizationIdForSession(session.user.id);
+  if (!organizationId) return null;
+  const role = session.user.role as Role;
+  const permissions = await getEffectivePermissions(organizationId, role);
+  return {
+    userId: session.user.id,
+    role,
+    organizationId,
+    permissions,
+  };
 }
 
 export async function listInventoryCategories(options?: {
@@ -31,10 +40,10 @@ export async function listInventoryCategories(options?: {
   activeOnly?: boolean;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "inventory:view")) {
+  if (!actor || !actorCan(actor, "inventory:view")) {
     return { success: false, error: "Forbidden", data: [] };
   }
-  const orgId = options?.organizationId ?? (await resolveOrganizationId());
+  const orgId = options?.organizationId ?? actor.organizationId;
   if (!orgId) return { success: false, error: "Organization not found", data: [] };
 
   const rows = await db.inventoryCategoryMaster.findMany({
@@ -73,11 +82,10 @@ export async function createInventoryCategory(input: {
   sortOrder?: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "categories:manage")) {
+  if (!actor || !actorCan(actor, "categories:manage")) {
     return { success: false, error: "Forbidden" };
   }
-  const orgId = await resolveOrganizationId();
-  if (!orgId) return { success: false, error: "Organization not found" };
+  const orgId = actor.organizationId;
 
   const name = input.name.trim();
   const code = input.code.trim().toUpperCase();
@@ -110,11 +118,10 @@ export async function updateInventoryCategory(input: {
   sortOrder?: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "categories:manage")) {
+  if (!actor || !actorCan(actor, "categories:manage")) {
     return { success: false, error: "Forbidden" };
   }
-  const orgId = await resolveOrganizationId();
-  if (!orgId) return { success: false, error: "Organization not found" };
+  const orgId = actor.organizationId;
 
   const existing = await db.inventoryCategoryMaster.findFirst({
     where: { id: input.id, organizationId: orgId, deletedAt: null },
@@ -141,11 +148,10 @@ export async function updateInventoryCategory(input: {
 
 export async function deleteOrArchiveInventoryCategory(id: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "categories:manage")) {
+  if (!actor || !actorCan(actor, "categories:manage")) {
     return { success: false, error: "Forbidden" };
   }
-  const orgId = await resolveOrganizationId();
-  if (!orgId) return { success: false, error: "Organization not found" };
+  const orgId = actor.organizationId;
 
   const existing = await db.inventoryCategoryMaster.findFirst({
     where: { id, organizationId: orgId, deletedAt: null },
@@ -180,11 +186,10 @@ export async function deleteOrArchiveInventoryCategory(id: string) {
 
 export async function restoreInventoryCategory(id: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "categories:manage")) {
+  if (!actor || !actorCan(actor, "categories:manage")) {
     return { success: false, error: "Forbidden" };
   }
-  const orgId = await resolveOrganizationId();
-  if (!orgId) return { success: false, error: "Organization not found" };
+  const orgId = actor.organizationId;
 
   const existing = await db.inventoryCategoryMaster.findFirst({
     where: { id, organizationId: orgId, deletedAt: null },

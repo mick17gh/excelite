@@ -1448,10 +1448,25 @@ model Organization {
   subscription        Subscription?
   warehouses          Warehouse[]
   inventoryCategories InventoryCategoryMaster[]
+  rolePermissions     OrgRolePermission[]
 
   @@index([tier])
   @@index([status])
   @@map("organization")
+}
+
+model OrgRolePermission {
+  id             String   @id @default(cuid())
+  organizationId String
+  role           Role
+  permission     String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, role, permission])
+  @@index([organizationId, role])
+  @@map("org_role_permission")
 }
 
 model InventoryCategoryMaster {

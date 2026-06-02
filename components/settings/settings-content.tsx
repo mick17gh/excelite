@@ -26,7 +26,6 @@ import {
   Key,
   Save,
   Loader2,
-  X,
   Calculator,
   CreditCard,
   ChefHat,
@@ -40,9 +39,6 @@ import { useTheme } from "next-themes";
 import {
   getCurrentUser,
   updateProfile,
-  changePassword,
-  getActiveSessions,
-  revokeSession,
   updateNotificationPreferences,
   type NotificationPreferences,
 } from "@/lib/actions/settings";
@@ -54,8 +50,14 @@ import { getBranches } from "@/lib/actions/branches";
 import { getOrganization } from "@/lib/actions/organization";
 import { OnlineStoreTab } from "./online-store-tab";
 import { DataManagementTab } from "./data-management-tab";
+import { RolePermissionsTab } from "./role-permissions-tab";
 import { PosPoliciesTab } from "./pos-policies-tab";
 import { DineInTablesTab } from "./dine-in-tables-tab";
+import { ChangePasswordCard } from "@/components/account/change-password-card";
+import { ChangePinCard } from "@/components/account/change-pin-card";
+import { ActiveSessionsCard } from "@/components/settings/active-sessions-card";
+import type { Role } from "@/lib/generated/prisma/client";
+import { usePermissions } from "@/contexts/permissions-context";
 
 interface UserData {
   id: string;
@@ -69,21 +71,18 @@ interface UserData {
   organizationId?: string | null;
 }
 
-interface Session {
-  id: string;
-  userAgent: string;
-  ipAddress: string;
-  createdAt: Date;
-  isCurrent: boolean;
-}
-
 export function SettingsContent() {
   const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
+  const { hasPermission } = usePermissions();
+  const canViewRoles = hasPermission("roles:view");
+  const canPurgeData = hasPermission("transactions:purge");
+  const canManagePlatform = hasPermission("subscriptions:manage");
+  const canViewOrganization = hasPermission("organization:view");
+  const canViewSubscription = hasPermission("subscriptions:view");
   
   // User data
   const [user, setUser] = useState<UserData | null>(null);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [organizationTier, setOrganizationTier] = useState<"FREE" | "PRO" | "ENTERPRISE">("FREE");
   
@@ -92,13 +91,6 @@ export function SettingsContent() {
     name: "",
     email: "",
     phoneNumber: "",
-  });
-  
-  // Password form
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
   });
   
   // Notification preferences
@@ -127,9 +119,8 @@ export function SettingsContent() {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [userResult, sessionsResult, branchesResult, orgResult] = await Promise.all([
+        const [userResult, branchesResult, orgResult] = await Promise.all([
           getCurrentUser(),
-          getActiveSessions(),
           getBranches(),
           getOrganization(),
         ]);
@@ -143,10 +134,6 @@ export function SettingsContent() {
           });
         }
         
-        if (sessionsResult.success && sessionsResult.data) {
-          setSessions(sessionsResult.data);
-        }
-
         if (branchesResult.success && branchesResult.data) {
           setBranches(branchesResult.data);
           if (branchesResult.data.length > 0) {
@@ -205,49 +192,6 @@ export function SettingsContent() {
         }
       } else {
         toast.error(result.error || "Failed to update profile");
-      }
-    });
-  };
-
-  const handleChangePassword = () => {
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error("New passwords do not match");
-      return;
-    }
-    
-    if (passwordForm.newPassword.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
-    
-    startTransition(async () => {
-      const result = await changePassword({
-        currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword,
-      });
-      
-      if (result.success) {
-        toast.success("Password changed successfully");
-        setPasswordForm({
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-        });
-      } else {
-        toast.error(result.error || "Failed to change password");
-      }
-    });
-  };
-
-  const handleRevokeSession = (sessionId: string) => {
-    startTransition(async () => {
-      const result = await revokeSession(sessionId);
-      
-      if (result.success) {
-        toast.success("Session revoked");
-        setSessions(sessions.filter((s) => s.id !== sessionId));
-      } else {
-        toast.error(result.error || "Failed to revoke session");
       }
     });
   };
@@ -313,14 +257,6 @@ export function SettingsContent() {
     return role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  const parseUserAgent = (ua: string) => {
-    if (ua.includes("Chrome")) return "Chrome";
-    if (ua.includes("Safari")) return "Safari";
-    if (ua.includes("Firefox")) return "Firefox";
-    if (ua.includes("Edge")) return "Edge";
-    return "Unknown Browser";
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -352,18 +288,22 @@ export function SettingsContent() {
           <Calculator className="mr-1.5 h-3.5 w-3.5" />
           Tax Config
         </TabsTrigger>
-        <TabsTrigger value="organization" className="text-xs">
-          <Building2 className="mr-1.5 h-3.5 w-3.5" />
-          Organization
-        </TabsTrigger>
+        {canViewOrganization && (
+          <TabsTrigger value="organization" className="text-xs">
+            <Building2 className="mr-1.5 h-3.5 w-3.5" />
+            Organization
+          </TabsTrigger>
+        )}
         <TabsTrigger value="kitchen" className="text-xs">
           <ChefHat className="mr-1.5 h-3.5 w-3.5" />
           Kitchen
         </TabsTrigger>
-        <TabsTrigger value="subscription" className="text-xs">
-          <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-          Subscription
-        </TabsTrigger>
+        {canViewSubscription && (
+          <TabsTrigger value="subscription" className="text-xs">
+            <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+            Subscription
+          </TabsTrigger>
+        )}
         <TabsTrigger value="online-store" className="text-xs">
           <Building2 className="mr-1.5 h-3.5 w-3.5" />
           Online Store
@@ -372,13 +312,19 @@ export function SettingsContent() {
           <ChefHat className="mr-1.5 h-3.5 w-3.5" />
           Dine-in
         </TabsTrigger>
-        {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+        {canViewRoles && (
+          <TabsTrigger value="role-permissions" className="text-xs">
+            <Key className="mr-1.5 h-3.5 w-3.5" />
+            Permissions
+          </TabsTrigger>
+        )}
+        {canPurgeData && (
           <TabsTrigger value="data-management" className="text-xs">
             <Shield className="mr-1.5 h-3.5 w-3.5" />
             Data
           </TabsTrigger>
         )}
-        {user?.role === "SUPER_ADMIN" && (
+        {canManagePlatform && (
           <TabsTrigger value="platform-admin" className="text-xs">
             <Shield className="mr-1.5 h-3.5 w-3.5" />
             Platform Admin
@@ -540,107 +486,9 @@ export function SettingsContent() {
 
       <TabsContent value="security">
         <div className="space-y-4">
-          <Card className="chart-card rounded-xl">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Key className="h-4 w-4" />
-                Change Password
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Update your password to keep your account secure
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0 space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="current-password" className="text-xs">Current Password</Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="new-password" className="text-xs">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="confirm-password" className="text-xs">Confirm New Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  className="h-9"
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={handleChangePassword}
-                  disabled={isPending || !passwordForm.currentPassword || !passwordForm.newPassword}
-                >
-                  {isPending ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : null}
-                  Update Password
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="chart-card rounded-xl">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-base">Active Sessions</CardTitle>
-              <CardDescription className="text-xs">
-                Manage your active login sessions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0">
-              <div className="space-y-2">
-                {sessions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No active sessions found</p>
-                ) : (
-                  sessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between p-2 rounded-lg border text-sm"
-                    >
-                      <div>
-                        <p className="font-medium text-xs">{parseUserAgent(session.userAgent)}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {session.ipAddress} • {session.isCurrent ? "Current session" : `Active`}
-                        </p>
-                      </div>
-                      {session.isCurrent ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 text-[10px] h-5">
-                          Current
-                        </Badge>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => handleRevokeSession(session.id)}
-                          disabled={isPending}
-                        >
-                          <X className="h-3 w-3 mr-1" />
-                          Revoke
-                        </Button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <ChangePasswordCard />
+          <ChangePinCard />
+          <ActiveSessionsCard />
         </div>
       </TabsContent>
 
@@ -831,14 +679,16 @@ export function SettingsContent() {
         </Card>
       </TabsContent>
 
-      <TabsContent value="organization">
-        <div className="space-y-4">
-          <OrganizationTab organizationId={user?.organizationId ?? undefined} />
-          {user?.organizationId ? (
-            <PosPoliciesTab organizationId={user.organizationId} />
-          ) : null}
-        </div>
-      </TabsContent>
+      {canViewOrganization && (
+        <TabsContent value="organization">
+          <div className="space-y-4">
+            <OrganizationTab organizationId={user?.organizationId ?? undefined} />
+            {user?.organizationId ? (
+              <PosPoliciesTab organizationId={user.organizationId} />
+            ) : null}
+          </div>
+        </TabsContent>
+      )}
 
       <TabsContent value="dine-in-tables">
         {user?.organizationId ? (
@@ -856,9 +706,11 @@ export function SettingsContent() {
         <KitchenStationsTab />
       </TabsContent>
 
-      <TabsContent value="subscription">
-        <SubscriptionTab />
-      </TabsContent>
+      {canViewSubscription && (
+        <TabsContent value="subscription">
+          <SubscriptionTab />
+        </TabsContent>
+      )}
 
       <TabsContent value="online-store">
         {user?.organizationId ? (
@@ -872,13 +724,19 @@ export function SettingsContent() {
         )}
       </TabsContent>
 
-      {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+      {canViewRoles && user && (
+        <TabsContent value="role-permissions">
+          <RolePermissionsTab actorRole={user.role as Role} />
+        </TabsContent>
+      )}
+
+      {canPurgeData && (
         <TabsContent value="data-management">
           <DataManagementTab />
         </TabsContent>
       )}
 
-      {user?.role === "SUPER_ADMIN" && (
+      {canManagePlatform && (
         <TabsContent value="platform-admin">
           <PlatformAdminTab />
         </TabsContent>

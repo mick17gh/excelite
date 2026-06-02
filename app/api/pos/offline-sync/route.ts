@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { Role } from "@/lib/generated/prisma/client";
 import { auth } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
+import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import { db } from "@/lib/db";
 import { createPosOrder, completeOrder } from "@/lib/actions/pos";
 import type { PosOfflineSyncPayload } from "@/lib/offline/pos-types";
@@ -19,7 +20,12 @@ export async function POST(request: NextRequest) {
   }
 
   const role = (session.user.role as Role) || "STAFF";
-  if (!hasPermission(role, "pos:access")) {
+  const organizationId = await resolveOrganizationIdForSession(session.user.id);
+  if (!organizationId) {
+    return NextResponse.json({ error: "Organization not found" }, { status: 403 });
+  }
+  const permissions = await getEffectivePermissions(organizationId, role);
+  if (!hasPermissionInList(permissions, "pos:access")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

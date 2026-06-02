@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +11,6 @@ import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 
 export function LoginForm() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginMode, setLoginMode] = useState<"password" | "pin">("password");
@@ -122,8 +120,8 @@ export function LoginForm() {
         const targetRoute = getPostLoginRoute(role);
 
         toast.success("Welcome back!");
-        router.push(targetRoute);
-        router.refresh();
+        // Full navigation so Set-Cookie is applied before the next server render
+        window.location.assign(targetRoute);
         return;
       }
     } catch (error) {

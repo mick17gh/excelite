@@ -69,8 +69,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { StockReconciliationDialog } from "@/components/inventory/stock-reconciliation-dialog";
 import { ReconciliationHistoryPanel } from "@/components/inventory/reconciliation-history-panel";
 import { authClient } from "@/lib/auth-client";
-import { hasPermission } from "@/lib/permissions";
-import { Role } from "@/lib/generated/prisma/client";
+import { usePermissions } from "@/contexts/permissions-context";
 import { getReconciliationStatusForDate } from "@/lib/actions/stock-reconciliation";
 
 interface InventoryItem {
@@ -203,9 +202,8 @@ export function InventoryContent({
   const router = useRouter();
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, userRole, isLoading: authLoading } = useBranchRestrictions();
-  const { data: session } = authClient.useSession();
-  const role = (session?.user as { role?: Role } | undefined)?.role ?? (userRole as Role | undefined);
-  const canReconcile = hasPermission(role, "inventory:reconcile");
+  const { hasPermission } = usePermissions();
+  const canReconcile = hasPermission("inventory:reconcile");
   
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");

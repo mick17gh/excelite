@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getOrganization, updateOrganizationPosPolicies } from "@/lib/actions/organization";
-import { roleDisplayNames } from "@/lib/permissions";
+import { roleDisplayNames } from "@/lib/permissions/labels";
 import type { Role } from "@/lib/generated/prisma/client";
 
 const APPROVER_OPTIONS: Role[] = [

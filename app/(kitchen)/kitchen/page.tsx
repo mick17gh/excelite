@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { KitchenContent } from "@/components/kitchen/kitchen-content";
 import { getBranches } from "@/lib/actions/branches";
 import { listKitchenStations, listKitchenTickets } from "@/lib/actions/kitchen";
+import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 
 export const metadata = {
   title: "Kitchen Display System | ServStack",
@@ -9,6 +10,8 @@ export const metadata = {
 };
 
 export default async function KitchenPage() {
+  await enforcePageRouteAccess("/kitchen");
+
   const [branchesResult, stationsResult, ticketsResult] = await Promise.all([
     getBranches(),
     listKitchenStations(),

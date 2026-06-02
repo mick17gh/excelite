@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import {
   decodeCredentialPassword,
   encodeCredentialPassword,
+  isValidFourDigitPin,
   verifyCredentialPassword,
 } from "@/lib/auth/credential-password";
 import { auth } from "@/lib/auth";
@@ -32,6 +33,38 @@ export interface ChangePasswordInput {
   newPassword: string;
 }
 
+export interface ChangePinInput {
+  currentPin?: string;
+  newPin: string;
+  confirmPin: string;
+}
+
+async function syncUserPinHash(userId: string, pinHash: string | null) {
+  await db.user.update({
+    where: { id: userId },
+    data: { pinHash },
+  });
+
+  const account = await db.account.findFirst({
+    where: { userId, providerId: "credential" },
+    select: { id: true, password: true },
+  });
+
+  if (account?.password) {
+    const parsed = decodeCredentialPassword(account.password);
+    const passwordHash = parsed?.passwordHash ?? account.password;
+    await db.account.update({
+      where: { id: account.id },
+      data: {
+        password: encodeCredentialPassword({
+          passwordHash,
+          pinHash,
+        }),
+      },
+    });
+  }
+}
+
 export async function getCurrentUser() {
   try {
     const session = await auth.api.getSession({
@@ -44,8 +77,18 @@ export async function getCurrentUser() {
 
     const user = await db.user.findUnique({
       where: { id: session.user.id },
-      include: {
-        branch: true,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        role: true,
+        image: true,
+        branchId: true,
+        organizationId: true,
+        isActive: true,
+        pinHash: true,
+        branch: { select: { name: true } },
       },
     });
 
@@ -69,11 +112,101 @@ export async function getCurrentUser() {
         branchName: user.branch?.name || null,
         organizationId,
         isActive: user.isActive,
+        hasPin: !!user.pinHash,
       },
     };
   } catch (error) {
     console.error("[getCurrentUser] Error:", error);
     return { success: false, error: "Failed to get current user" };
+  }
+}
+
+export async function changePin(input: ChangePinInput) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    if (!isValidFourDigitPin(input.newPin)) {
+      return { success: false, error: "PIN must be exactly 4 digits" };
+    }
+
+    if (input.newPin !== input.confirmPin) {
+      return { success: false, error: "PINs do not match" };
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { pinHash: true },
+    });
+
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    if (user.pinHash) {
+      const current = input.currentPin?.trim() ?? "";
+      if (!isValidFourDigitPin(current)) {
+        return { success: false, error: "Enter your current PIN" };
+      }
+      const valid = await bcrypt.compare(current, user.pinHash);
+      if (!valid) {
+        return { success: false, error: "Current PIN is incorrect" };
+      }
+    }
+
+    const nextPinHash = await bcrypt.hash(input.newPin, 10);
+    await syncUserPinHash(session.user.id, nextPinHash);
+
+    revalidatePath("/dashboard/account");
+    revalidatePath("/dashboard/settings");
+    return { success: true };
+  } catch (error) {
+    console.error("[changePin] Error:", error);
+    return { success: false, error: "Failed to change PIN" };
+  }
+}
+
+export async function clearMyPin(currentPin: string) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    if (!isValidFourDigitPin(currentPin)) {
+      return { success: false, error: "Enter your current PIN" };
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { pinHash: true },
+    });
+
+    if (!user?.pinHash) {
+      return { success: false, error: "No PIN is set on this account" };
+    }
+
+    const valid = await bcrypt.compare(currentPin, user.pinHash);
+    if (!valid) {
+      return { success: false, error: "Current PIN is incorrect" };
+    }
+
+    await syncUserPinHash(session.user.id, null);
+
+    revalidatePath("/dashboard/account");
+    revalidatePath("/dashboard/settings");
+    return { success: true };
+  } catch (error) {
+    console.error("[clearMyPin] Error:", error);
+    return { success: false, error: "Failed to remove PIN" };
   }
 }
 
@@ -111,6 +244,7 @@ export async function updateProfile(input: UpdateProfileInput) {
     });
 
     revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/account");
     return { success: true, data: user };
   } catch (error) {
     console.error("[updateProfile] Error:", error);
@@ -168,6 +302,7 @@ export async function changePassword(input: ChangePasswordInput) {
       },
     });
 
+    revalidatePath("/dashboard/account");
     return { success: true };
   } catch (error) {
     console.error("[changePassword] Error:", error);
@@ -225,25 +360,47 @@ export async function updateNotificationPreferences(preferences: NotificationPre
   }
 }
 
-export async function getActiveSessions() {
+export type ActiveSessionRow = {
+  id: string;
+  userAgent: string;
+  ipAddress: string;
+  createdAt: Date;
+  isCurrent: boolean;
+};
+
+export async function getActiveSessions(options?: {
+  page?: number;
+  pageSize?: number;
+}) {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
     });
 
     if (!session?.user?.id) {
-      return { success: false, error: "Not authenticated" };
+      return { success: false as const, error: "Not authenticated" };
     }
 
-    const sessions = await db.session.findMany({
-      where: {
-        userId: session.user.id,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const page = Math.max(1, options?.page ?? 1);
+    const pageSize = Math.min(50, Math.max(1, options?.pageSize ?? 10));
+    const skip = (page - 1) * pageSize;
 
-    const formattedSessions = sessions.map((s) => ({
+    const where = {
+      userId: session.user.id,
+      expiresAt: { gt: new Date() },
+    };
+
+    const [sessions, total] = await Promise.all([
+      db.session.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+      }),
+      db.session.count({ where }),
+    ]);
+
+    const formattedSessions: ActiveSessionRow[] = sessions.map((s) => ({
       id: s.id,
       userAgent: s.userAgent || "Unknown Device",
       ipAddress: s.ipAddress || "Unknown Location",
@@ -251,10 +408,27 @@ export async function getActiveSessions() {
       isCurrent: s.token === session.session?.token,
     }));
 
-    return { success: true, data: formattedSessions };
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    return {
+      success: true as const,
+      data: formattedSessions,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
   } catch (error) {
     console.error("[getActiveSessions] Error:", error);
-    return { success: false, error: "Failed to get sessions", data: [] };
+    return {
+      success: false as const,
+      error: "Failed to get sessions",
+      data: [] as ActiveSessionRow[],
+      total: 0,
+      page: 1,
+      pageSize: options?.pageSize ?? 10,
+      totalPages: 1,
+    };
   }
 }
 
@@ -285,6 +459,7 @@ export async function revokeSession(sessionId: string) {
     });
 
     revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/account");
     return { success: true };
   } catch (error) {
     console.error("[revokeSession] Error:", error);

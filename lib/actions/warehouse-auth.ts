@@ -5,9 +5,10 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Role } from "@/lib/generated/prisma/client";
 import {
-  canMutateWarehouseOps,
-  hasPermission,
-} from "@/lib/permissions";
+  canMutateWarehouseFromPermissions,
+} from "@/lib/permissions/sync";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
+import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 
 export type WarehouseSessionContext = {
   userId: string;
@@ -37,7 +38,16 @@ export async function assertWarehouseMutationAllowed(
 ): Promise<{ ok: true; ctx: WarehouseSessionContext } | { ok: false; error: string }> {
   const ctx = await getWarehouseSessionContext();
   if (!ctx) return { ok: false, error: "Unauthorized" };
-  if (!canMutateWarehouseOps(ctx.role)) {
+
+  const session = await auth.api.getSession({ headers: await headers() });
+  const organizationId = session?.user?.id
+    ? await resolveOrganizationIdForSession(session.user.id)
+    : null;
+  const permissions =
+    organizationId != null
+      ? await getEffectivePermissions(organizationId, ctx.role)
+      : [];
+  if (!canMutateWarehouseFromPermissions(permissions)) {
     return { ok: false, error: "You do not have permission to perform this action" };
   }
 
@@ -58,10 +68,15 @@ export async function assertWarehouseDispatchApprovalAllowed(): Promise<
 > {
   const ctx = await getWarehouseSessionContext();
   if (!ctx) return { ok: false, error: "Unauthorized" };
-  if (
-    !canMutateWarehouseOps(ctx.role) &&
-    !hasPermission(ctx.role, "warehouse:approve_dispatch")
-  ) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  const organizationId = session?.user?.id
+    ? await resolveOrganizationIdForSession(session.user.id)
+    : null;
+  const permissions =
+    organizationId != null
+      ? await getEffectivePermissions(organizationId, ctx.role)
+      : [];
+  if (!hasPermissionInList(permissions, "warehouse:approve_dispatch")) {
     return { ok: false, error: "You do not have permission to perform this action" };
   }
   return { ok: true, ctx };

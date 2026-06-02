@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { hasPermission, Permission } from "@/lib/permissions";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
+import type { Permission } from "@/lib/permissions/types";
+import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import { Role } from "@/lib/generated/prisma/client";
 
 export interface ReconciliationViewer {
@@ -42,15 +44,24 @@ export async function resolveReconciliationViewer(): Promise<
   };
 }
 
-export function canReconcileRole(role: Role): boolean {
-  return hasPermission(role, "inventory:reconcile" as Permission);
+export async function canReconcileRole(role: Role, organizationId: string): Promise<boolean> {
+  const permissions = await getEffectivePermissions(organizationId, role);
+  return hasPermissionInList(permissions, "inventory:reconcile");
 }
 
-export function canViewReconciliationHistory(role: Role): boolean {
+export async function canViewReconciliationHistory(
+  role: Role,
+  organizationId: string,
+): Promise<boolean> {
+  const permissions = await getEffectivePermissions(organizationId, role);
   return (
-    hasPermission(role, "inventory:view" as Permission) ||
-    canReconcileRole(role)
+    hasPermissionInList(permissions, "inventory:view") ||
+    hasPermissionInList(permissions, "inventory:reconcile")
   );
+}
+
+export async function resolveReconciliationOrgId(userId: string) {
+  return resolveOrganizationIdForSession(userId);
 }
 
 export function resolveReconciliationBranch(

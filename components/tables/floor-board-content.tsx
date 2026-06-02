@@ -22,7 +22,7 @@ import {
   splitTableSession,
   clearTable,
 } from "@/lib/actions/tables";
-import { hasPermission } from "@/lib/permissions";
+import { usePermissions } from "@/contexts/permissions-context";
 import type { Role } from "@/lib/generated/prisma/client";
 import { Loader2, Users, Clock, LayoutGrid, Sparkles, CreditCard } from "lucide-react";
 import { SessionCheckoutDialog } from "@/components/tables/session-checkout-dialog";
@@ -48,13 +48,13 @@ interface FloorBoardContentProps {
 export function FloorBoardContent({
   branches,
   defaultBranchId,
-  userRole = "STAFF",
+  userRole: _userRole = "STAFF",
 }: FloorBoardContentProps) {
+  const { hasPermission } = usePermissions();
   const canClearTables =
-    hasPermission(userRole, "tables:manage") ||
-    hasPermission(userRole, "tables:assign");
-  const canManageTables = hasPermission(userRole, "tables:manage");
-  const canPayTab = hasPermission(userRole, "transactions:create");
+    hasPermission("tables:manage") || hasPermission("tables:assign");
+  const canManageTables = hasPermission("tables:manage");
+  const canPayTab = hasPermission("transactions:create");
   const { formatCurrency } = useCurrency();
   const [branchId, setBranchId] = useState(defaultBranchId ?? branches[0]?.id ?? "");
   const [payDialogOpen, setPayDialogOpen] = useState(false);

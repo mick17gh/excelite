@@ -6,6 +6,7 @@ import { getMenuItems } from "@/lib/actions/menu";
 import { getCustomers } from "@/lib/actions/customers";
 import { isTableManagementEnabled } from "@/lib/features/table-management";
 import { db } from "@/lib/db";
+import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 
 export const metadata = {
   title: "Orders | ServStack",
@@ -13,6 +14,8 @@ export const metadata = {
 };
 
 export default async function OrdersPage() {
+  await enforcePageRouteAccess("/dashboard/orders");
+
   const [ordersResult, statsResult, branchesResult, menuResult, customersResult, org] =
     await Promise.all([
       getOrders({ pageSize: 50, page: 1 }),

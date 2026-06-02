@@ -5,26 +5,39 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { Role } from "@/lib/generated/prisma/client";
-import { hasPermission } from "@/lib/permissions";
+import type { Permission } from "@/lib/permissions/types";
+import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
+import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import { isTableManagementEnabledForBranch } from "@/lib/features/table-management";
 import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
 import { completeOrder } from "@/lib/actions/pos";
 
-async function getActor() {
+type CheckoutActor = {
+  userId: string;
+  role: Role;
+  permissions: Permission[];
+};
+
+function actorCan(actor: CheckoutActor, permission: Permission) {
+  return hasPermissionInList(actor.permissions, permission);
+}
+
+async function getActor(): Promise<CheckoutActor | null> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) return null;
-  return {
-    userId: session.user.id,
-    role: session.user.role as Role,
-  };
+  const organizationId = await resolveOrganizationIdForSession(session.user.id);
+  if (!organizationId) return null;
+  const role = session.user.role as Role;
+  const permissions = await getEffectivePermissions(organizationId, role);
+  return { userId: session.user.id, role, permissions };
 }
 
 export async function getTableSessionCheckout(sessionId: string) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "tables:view")) {
+  if (!actor || !actorCan(actor, "tables:view")) {
     return { error: "Forbidden" };
   }
-  if (!hasPermission(actor.role, "transactions:create")) {
+  if (!actorCan(actor, "transactions:create")) {
     return { error: "Forbidden" };
   }
 
@@ -93,7 +106,7 @@ export async function settleTableSession(input: {
   tip?: number;
 }) {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, "transactions:create")) {
+  if (!actor || !actorCan(actor, "transactions:create")) {
     return { error: "Forbidden" };
   }
 

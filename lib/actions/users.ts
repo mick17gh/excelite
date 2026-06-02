@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Role } from "@/lib/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import { resolveOrganizationIdForUser } from "@/lib/users/organization-link";
+import { requirePermission } from "@/lib/permissions/require";
 import {
   decodeCredentialPassword,
   encodeCredentialPassword,
@@ -55,6 +56,9 @@ export interface UpdateUserInput {
 
 export async function createUser(input: CreateUserInput) {
   try {
+    const auth = await requirePermission("users:create");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     // Check if email already exists
     const existing = await db.user.findUnique({
       where: { email: input.email },
@@ -114,6 +118,9 @@ export async function createUser(input: CreateUserInput) {
 
 export async function updateUser(input: UpdateUserInput) {
   try {
+    const auth = await requirePermission("users:edit");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     const { id, branchId, assignedWarehouseId, pin, clearPin, ...rest } = input;
     const data: Record<string, unknown> = { ...rest };
 
@@ -181,6 +188,9 @@ export async function updateUser(input: UpdateUserInput) {
 
 export async function deleteUser(id: string) {
   try {
+    const auth = await requirePermission("users:delete");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     await db.user.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
@@ -198,6 +208,16 @@ export async function getUsers(
   pagination?: PaginationParams
 ): Promise<PaginatedResult<any>> {
   try {
+    const auth = await requirePermission("users:view");
+    if (!auth.ok) {
+      return {
+        success: false,
+        error: auth.error,
+        data: [],
+        pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+      };
+    }
+
     const page = pagination?.page || 1;
     const pageSize = pagination?.pageSize || 20;
     const skip = (page - 1) * pageSize;

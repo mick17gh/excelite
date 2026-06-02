@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { usePermissionsOptional } from "@/contexts/permissions-context";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -37,6 +38,8 @@ export function Header({
   const { data: session } = authClient.useSession();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const permissionsCtx = usePermissionsOptional();
+  const canOpenSettings = permissionsCtx?.hasPermission("settings:view") ?? false;
 
   const formatRole = (role?: string | null) => {
     if (!role) return "Member";
@@ -132,8 +135,13 @@ export function Header({
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/dashboard/settings">Settings</Link>
+              <Link href="/dashboard/account" prefetch={false}>My account</Link>
             </DropdownMenuItem>
+            {canOpenSettings && (
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/settings">Settings</Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive"

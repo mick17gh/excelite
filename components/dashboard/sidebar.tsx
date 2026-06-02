@@ -4,243 +4,61 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  LayoutGrid,
-  Building2,
-  Package,
   TrendingUp,
-  Users,
-  Bell,
-  FileText,
-  Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Receipt,
-  UserCog,
   Loader2,
-  UtensilsCrossed,
-  Key,
-  Tag,
-  Target,
-  ShoppingCart,
-  Warehouse,
-  Contact,
-  Truck,
-  ChefHat,
-  Monitor,
-  Handshake,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
-import { hasPermission, type Permission } from "@/lib/permissions";
-import { hasFeature, type TierFeatures } from "@/lib/tier-config";
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ElementType;
-  permission?: Permission;
-  featureKey?: keyof TierFeatures;
-  requiresTableManagement?: boolean;
-  openInNewTab?: boolean;
-}
-
-const navigation: NavItem[] = [
-  {
-    name: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    permission: "dashboard:view",
-  },
-  {
-    name: "Orders",
-    href: "/dashboard/orders",
-    icon: ShoppingCart,
-    permission: "orders:view",
-    openInNewTab: true,
-  },
-  {
-    name: "POS",
-    href: "/pos",
-    icon: Monitor,
-    permission: "pos:access",
-    featureKey: "pos",
-    openInNewTab: true,
-  },
-  {
-    name: "Kitchen (KDS)",
-    href: "/kitchen",
-    icon: ChefHat,
-    permission: "kitchen:access",
-    featureKey: "kitchenDisplay",
-  },
-  {
-    name: "Transactions",
-    href: "/dashboard/transactions",
-    icon: Receipt,
-    permission: "transactions:view",
-  },
-  {
-    name: "Manual POS Entry",
-    href: "/dashboard/transactions/manual",
-    icon: Receipt,
-    permission: "transactions:manual",
-  },
-  {
-    name: "Branches",
-    href: "/dashboard/branches",
-    icon: Building2,
-    permission: "branches:view",
-  },
-  {
-    name: "Floor board",
-    href: "/dashboard/tables",
-    icon: LayoutGrid,
-    permission: "tables:view",
-    featureKey: "tableManagement",
-    requiresTableManagement: true,
-  },
-  {
-    name: "Sales Analytics",
-    href: "/dashboard/sales",
-    icon: TrendingUp,
-    permission: "sales:view",
-    featureKey: "salesAnalytics",
-  },
-  {
-    name: "Inventory",
-    href: "/dashboard/inventory",
-    icon: Package,
-    permission: "inventory:view",
-    featureKey: "inventory",
-  },
-  {
-    name: "Warehouse",
-    href: "/dashboard/warehouse",
-    icon: Warehouse,
-    permission: "warehouse:view",
-    featureKey: "warehouse",
-  },
-  {
-    name: "Products",
-    href: "/dashboard/menu",
-    icon: UtensilsCrossed,
-    permission: "menu:view",
-  },
-  {
-    name: "Categories",
-    href: "/dashboard/categories",
-    icon: Tag,
-    permission: "categories:view",
-  },
-  {
-    name: "Customers",
-    href: "/dashboard/customers",
-    icon: Contact,
-    permission: "customers:view",
-    featureKey: "crm",
-  },
-  {
-    name: "Suppliers",
-    href: "/dashboard/suppliers",
-    icon: Handshake,
-    permission: "warehouse:view",
-    featureKey: "warehouse",
-  },
-  {
-    name: "Delivery",
-    href: "/dashboard/delivery",
-    icon: Truck,
-    permission: "delivery:view",
-    featureKey: "delivery",
-  },
-  {
-    name: "Branch Targets",
-    href: "/dashboard/targets",
-    icon: Target,
-    permission: "targets:view",
-    featureKey: "targets",
-  },
-  {
-    name: "Staff",
-    href: "/dashboard/staff",
-    icon: Users,
-    permission: "staff:view",
-    featureKey: "staffManagement",
-  },
-  {
-    name: "Alerts",
-    href: "/dashboard/alerts",
-    icon: Bell,
-    permission: "alerts:view",
-    featureKey: "alerts",
-  },
-  {
-    name: "Reports",
-    href: "/dashboard/reports",
-    icon: FileText,
-    permission: "reports:view",
-    featureKey: "advancedReports",
-  },
-  {
-    name: "API Keys",
-    href: "/dashboard/api-keys",
-    icon: Key,
-    permission: "api-keys:view",
-    featureKey: "apiAccess",
-  },
-];
-
-const bottomNavigation: NavItem[] = [
-  {
-    name: "User Management",
-    href: "/dashboard/users",
-    icon: UserCog,
-    permission: "users:view",
-  },
-  {
-    name: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
-    permission: "settings:view",
-  },
-];
+import { usePermissions } from "@/contexts/permissions-context";
+import {
+  DASHBOARD_BOTTOM_NAVIGATION,
+  DASHBOARD_NAVIGATION,
+  filterNavItems,
+  type RouteAccessContext,
+} from "@/lib/permissions/routes";
 
 interface SidebarProps {
   className?: string;
-  userRole?: Role;
   orgTier?: SubscriptionTier;
   tableManagementEnabled?: boolean;
 }
 
 export function Sidebar({
   className,
-  userRole = "STAFF",
   orgTier = "FREE",
   tableManagementEnabled = false,
 }: SidebarProps) {
+  const { permissions, role } = usePermissions();
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // Filter navigation items based on user permissions
-  const filteredNavigation = navigation.filter(
-    (item) => {
-      const hasRole = !item.permission || hasPermission(userRole, item.permission);
-      const hasTier = !item.featureKey || hasFeature(orgTier, item.featureKey);
-      if (item.requiresTableManagement && !tableManagementEnabled) return false;
-      return hasRole && hasTier;
-    }
+  const accessCtx: RouteAccessContext = useMemo(
+    () => ({
+      permissions,
+      orgTier,
+      tableManagementEnabled,
+      role,
+    }),
+    [permissions, orgTier, tableManagementEnabled, role],
   );
-  const filteredBottomNavigation = bottomNavigation.filter(
-    (item) => !item.permission || hasPermission(userRole, item.permission)
+
+  const filteredNavigation = useMemo(
+    () => filterNavItems(DASHBOARD_NAVIGATION, accessCtx),
+    [accessCtx],
+  );
+  const filteredBottomNavigation = useMemo(
+    () => filterNavItems(DASHBOARD_BOTTOM_NAVIGATION, accessCtx),
+    [accessCtx],
   );
 
   const handleSignOut = async () => {
@@ -265,15 +83,17 @@ export function Sidebar({
         className
       )}
     >
-      {/* Blue gradient overlay */}
       <div className="absolute inset-0 bg-linear-to-b from-blue-500/5 via-transparent to-blue-600/5 pointer-events-none" />
-      
+
       <div className={cn(
         "flex items-center relative z-10 py-0",
         collapsed ? "h-16 justify-center px-2" : "h-16 justify-between px-4"
       )}>
         {!collapsed ? (
-          <Link href="/dashboard" className="flex items-center gap-2 flex-1">
+          <Link
+            href={filteredNavigation[0]?.href ?? "/dashboard/account"}
+            className="flex items-center gap-2 flex-1"
+          >
             <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary shadow-lg shadow-primary/25 shrink-0">
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
@@ -282,7 +102,10 @@ export function Sidebar({
             </span>
           </Link>
         ) : (
-          <Link href="/dashboard" className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary shadow-lg shadow-primary/25 mx-auto">
+          <Link
+            href={filteredNavigation[0]?.href ?? "/dashboard/account"}
+            className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary shadow-lg shadow-primary/25 mx-auto"
+          >
             <TrendingUp className="h-5 w-5 text-white" />
           </Link>
         )}
@@ -308,10 +131,8 @@ export function Sidebar({
       <ScrollArea className="flex-1 px-3 py-4 overflow-y-auto">
         <nav className="space-y-1 min-w-0">
           {filteredNavigation.map((item) => {
-            // Use exact matching to prevent parent routes from being active when on child routes
-            // Exception: /dashboard only matches exact
             const isActive = pathname === item.href;
-            
+
             return (
               <Link
                 key={item.name}
