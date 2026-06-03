@@ -59,6 +59,13 @@ export async function createUser(input: CreateUserInput) {
     const auth = await requirePermission("users:create");
     if (!auth.ok) return { success: false, error: auth.error };
 
+    if (auth.ctx.user.role !== "SUPER_ADMIN" && input.role === "SUPER_ADMIN") {
+      return {
+        success: false,
+        error: "Only Super Admin can create users with the Super Admin role",
+      };
+    }
+
     // Check if email already exists
     const existing = await db.user.findUnique({
       where: { email: input.email },
@@ -120,6 +127,29 @@ export async function updateUser(input: UpdateUserInput) {
   try {
     const auth = await requirePermission("users:edit");
     if (!auth.ok) return { success: false, error: auth.error };
+
+    const existingUser = await db.user.findUnique({
+      where: { id: input.id },
+      select: { role: true },
+    });
+    if (!existingUser) {
+      return { success: false, error: "User not found" };
+    }
+
+    if (auth.ctx.user.role !== "SUPER_ADMIN") {
+      if (existingUser.role === "SUPER_ADMIN") {
+        return {
+          success: false,
+          error: "Only Super Admin can edit Super Admin users",
+        };
+      }
+      if (input.role === "SUPER_ADMIN") {
+        return {
+          success: false,
+          error: "Only Super Admin can assign the Super Admin role",
+        };
+      }
+    }
 
     const { id, branchId, assignedWarehouseId, pin, clearPin, ...rest } = input;
     const data: Record<string, unknown> = { ...rest };

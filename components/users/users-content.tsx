@@ -43,8 +43,9 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { AddUserForm, EditUserForm, ResetPasswordDialog } from "@/components/users/user-forms";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { authClient } from "@/lib/auth-client";
 import { Role } from "@/lib/generated/prisma/client";
-import { getRoleShortName, USER_ASSIGNABLE_ROLES } from "@/lib/permissions/labels";
+import { getRoleShortName, getUserAssignableRoles } from "@/lib/permissions/labels";
 
 interface User {
   id: string;
@@ -78,6 +79,9 @@ interface UsersContentProps {
 }
 
 export function UsersContent({ users, branches, warehouses, currentCount, maxUsers }: UsersContentProps) {
+  const { data: session } = authClient.useSession();
+  const actorRole = ((session?.user as { role?: Role } | undefined)?.role ?? "STAFF") as Role;
+  const filterableRoles = getUserAssignableRoles(actorRole);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -236,7 +240,7 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
-              {USER_ASSIGNABLE_ROLES.map((role) => (
+              {filterableRoles.map((role) => (
                 <SelectItem key={role} value={role}>
                   {getRoleShortName(role)}
                 </SelectItem>

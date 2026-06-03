@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { clearPermissionsMemo, getEffectivePermissions } from "@/lib/permissions/resolver";
 import {
   canManageRoleMatrix,
+  getPermissionContext,
   requirePermission,
 } from "@/lib/permissions/require";
 import {
@@ -35,29 +36,13 @@ function sanitizePermissionsForActor(
   return [...new Set(filtered)];
 }
 
-function lockAdminSelfPermissions(
-  actorRole: Role,
-  targetRole: Role,
-  permissions: Permission[],
-): Permission[] {
-  if (actorRole !== "ADMIN" || targetRole !== "ADMIN") {
-    return permissions;
-  }
-  const locked = new Set(permissions);
-  locked.add("roles:view");
-  locked.add("roles:manage");
-  locked.add("users:view");
-  locked.add("users:edit");
-  return [...locked];
-}
-
 export async function getOrgRolePermissionMatrix(role: Role) {
-  const auth = await requirePermission("roles:view");
-  if (!auth.ok) return { success: false as const, error: auth.error };
-
-  if (!canManageRoleMatrix(auth.ctx.user.role)) {
-    return { success: false as const, error: "Only administrators can manage role permissions" };
+  const ctx = await getPermissionContext();
+  if (!ctx) return { success: false as const, error: "Unauthorized" };
+  if (!canManageRoleMatrix(ctx.user.role)) {
+    return { success: false as const, error: "Only Super Admin can manage role permissions" };
   }
+  const auth = { ok: true as const, ctx };
 
   if (role === "SUPER_ADMIN") {
     return {
@@ -97,12 +82,12 @@ export async function updateOrgRolePermissions(input: {
   role: Role;
   permissions: Permission[];
 }) {
-  const auth = await requirePermission("roles:manage");
-  if (!auth.ok) return { success: false as const, error: auth.error };
-
-  if (!canManageRoleMatrix(auth.ctx.user.role)) {
-    return { success: false as const, error: "Only administrators can manage role permissions" };
+  const ctx = await getPermissionContext();
+  if (!ctx) return { success: false as const, error: "Unauthorized" };
+  if (!canManageRoleMatrix(ctx.user.role)) {
+    return { success: false as const, error: "Only Super Admin can manage role permissions" };
   }
+  const auth = { ok: true as const, ctx };
 
   if (input.role === "SUPER_ADMIN") {
     return { success: false as const, error: "Super Admin permissions cannot be changed" };
@@ -112,12 +97,7 @@ export async function updateOrgRolePermissions(input: {
     return { success: false as const, error: "Invalid role" };
   }
 
-  let permissions = sanitizePermissionsForActor(auth.ctx.user.role, input.permissions);
-  permissions = lockAdminSelfPermissions(
-    auth.ctx.user.role,
-    input.role,
-    permissions,
-  );
+  const permissions = sanitizePermissionsForActor(auth.ctx.user.role, input.permissions);
 
   await replaceRolePermissions(db, auth.ctx.organizationId, input.role, permissions);
   clearPermissionsMemo();
@@ -139,12 +119,12 @@ export async function updateOrgRolePermissions(input: {
 }
 
 export async function resetRolePermissionsToDefaults(role: Role) {
-  const auth = await requirePermission("roles:manage");
-  if (!auth.ok) return { success: false as const, error: auth.error };
-
-  if (!canManageRoleMatrix(auth.ctx.user.role)) {
-    return { success: false as const, error: "Only administrators can manage role permissions" };
+  const ctx = await getPermissionContext();
+  if (!ctx) return { success: false as const, error: "Unauthorized" };
+  if (!canManageRoleMatrix(ctx.user.role)) {
+    return { success: false as const, error: "Only Super Admin can manage role permissions" };
   }
+  const auth = { ok: true as const, ctx };
 
   if (role === "SUPER_ADMIN") {
     return { success: false as const, error: "Super Admin permissions cannot be reset" };

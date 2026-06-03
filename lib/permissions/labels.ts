@@ -75,6 +75,14 @@ export const USER_ASSIGNABLE_ROLES = [
   "COMMISSARY_STAFF",
 ] as const satisfies readonly Role[];
 
+/** Roles an actor may assign when creating or editing users. */
+export function getUserAssignableRoles(actorRole: Role): Role[] {
+  if (actorRole === "SUPER_ADMIN") {
+    return [...USER_ASSIGNABLE_ROLES];
+  }
+  return USER_ASSIGNABLE_ROLES.filter((role) => role !== "SUPER_ADMIN");
+}
+
 /** Optional longer labels for user create/edit role dropdowns. */
 export const roleFormLabels: Partial<Record<Role, string>> = {
   SUPER_ADMIN: "Super Admin (Platform Owner)",

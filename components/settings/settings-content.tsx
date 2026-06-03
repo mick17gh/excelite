@@ -75,14 +75,14 @@ export function SettingsContent() {
   const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
   const { hasPermission } = usePermissions();
-  const canViewRoles = hasPermission("roles:view");
   const canPurgeData = hasPermission("transactions:purge");
   const canManagePlatform = hasPermission("subscriptions:manage");
   const canViewOrganization = hasPermission("organization:view");
   const canViewSubscription = hasPermission("subscriptions:view");
-  
+
   // User data
   const [user, setUser] = useState<UserData | null>(null);
+  const canViewRolePermissions = user?.role === "SUPER_ADMIN";
   const [isLoading, setIsLoading] = useState(true);
   const [organizationTier, setOrganizationTier] = useState<"FREE" | "PRO" | "ENTERPRISE">("FREE");
   
@@ -312,7 +312,7 @@ export function SettingsContent() {
           <ChefHat className="mr-1.5 h-3.5 w-3.5" />
           Dine-in
         </TabsTrigger>
-        {canViewRoles && (
+        {canViewRolePermissions && (
           <TabsTrigger value="role-permissions" className="text-xs">
             <Key className="mr-1.5 h-3.5 w-3.5" />
             Permissions
@@ -724,7 +724,7 @@ export function SettingsContent() {
         )}
       </TabsContent>
 
-      {canViewRoles && user && (
+      {canViewRolePermissions && user && (
         <TabsContent value="role-permissions">
           <RolePermissionsTab actorRole={user.role as Role} />
         </TabsContent>

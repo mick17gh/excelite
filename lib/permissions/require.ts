@@ -64,8 +64,9 @@ export async function requirePermission(
   return { ok: true, ctx };
 }
 
+/** Role permission matrix (Settings → Permissions) is Super Admin only. */
 export function canManageRoleMatrix(role: Role): boolean {
-  return role === "ADMIN" || role === "SUPER_ADMIN";
+  return role === "SUPER_ADMIN";
 }
 
 export async function actorHasPermission(permission: Permission): Promise<boolean> {

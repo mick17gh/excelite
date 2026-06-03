@@ -76,8 +76,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "tables:view",
     "tables:manage",
     "tables:assign",
-    "roles:view",
-    "roles:manage",
   ],
 
   EXECUTIVE: [

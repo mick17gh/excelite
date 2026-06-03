@@ -24,7 +24,8 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { createUser, updateUser, resetUserPassword } from "@/lib/actions/users";
 import { Role } from "@/lib/generated/prisma/client";
-import { getRoleFormLabel, USER_ASSIGNABLE_ROLES } from "@/lib/permissions/labels";
+import { authClient } from "@/lib/auth-client";
+import { getRoleFormLabel, getUserAssignableRoles } from "@/lib/permissions/labels";
 
 interface Branch {
   id: string;
@@ -58,6 +59,9 @@ interface AddUserFormProps {
 }
 
 export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUserFormProps) {
+  const { data: session } = authClient.useSession();
+  const actorRole = ((session?.user as { role?: Role } | undefined)?.role ?? "STAFF") as Role;
+  const assignableRoles = getUserAssignableRoles(actorRole);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -248,7 +252,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {USER_ASSIGNABLE_ROLES.map((role) => (
+                  {assignableRoles.map((role) => (
                     <SelectItem key={role} value={role}>
                       {getRoleFormLabel(role)}
                     </SelectItem>
@@ -339,6 +343,9 @@ interface EditUserFormProps {
 }
 
 export function EditUserForm({ open, onOpenChange, user, branches, warehouses }: EditUserFormProps) {
+  const { data: session } = authClient.useSession();
+  const actorRole = ((session?.user as { role?: Role } | undefined)?.role ?? "STAFF") as Role;
+  const assignableRoles = getUserAssignableRoles(actorRole);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -430,6 +437,12 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
 
   if (!user) return null;
 
+  const isSuperAdminUser = user.role === "SUPER_ADMIN";
+  const canEditRole = actorRole === "SUPER_ADMIN" || !isSuperAdminUser;
+  const roleSelectOptions: Role[] = assignableRoles.includes(user.role as Role)
+    ? assignableRoles
+    : ([...assignableRoles, user.role as Role] as Role[]);
+
   const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF", "WAITER", "SALES"].includes(formData.role);
   const requiresWarehouse = ["WAREHOUSE_STAFF", "COMMISSARY_STAFF"].includes(formData.role);
   const filteredWarehouses = warehouses.filter((w) =>
@@ -508,21 +521,27 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
 
             <div className="grid gap-2">
               <Label htmlFor="role">Role</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {USER_ASSIGNABLE_ROLES.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {getRoleFormLabel(role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {canEditRole ? (
+                <Select
+                  value={formData.role}
+                  onValueChange={(value) => setFormData({ ...formData, role: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleSelectOptions.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {getRoleFormLabel(role)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm text-muted-foreground rounded-md border px-3 py-2">
+                  {getRoleFormLabel(user.role as Role)} — only Super Admin can change this role
+                </p>
+              )}
             </div>
 
             {requiresBranch && (
