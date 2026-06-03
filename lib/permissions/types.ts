@@ -1,3 +1,9 @@
+import type { ReportTypePermission } from "@/lib/permissions/report-permissions";
+import {
+  ALL_REPORT_TYPE_PERMISSIONS,
+  REPORT_TYPE_PERMISSION_LABELS,
+} from "@/lib/permissions/report-permissions";
+
 export type Permission =
   | "dashboard:view"
   | "dashboard:analytics"
@@ -31,6 +37,7 @@ export type Permission =
   | "reports:view"
   | "reports:generate"
   | "reports:export"
+  | ReportTypePermission
   | "alerts:view"
   | "alerts:manage"
   | "targets:view"
@@ -64,6 +71,10 @@ export type Permission =
   | "customers:view"
   | "customers:create"
   | "customers:edit"
+  | "suppliers:view"
+  | "suppliers:create"
+  | "suppliers:edit"
+  | "suppliers:delete"
   | "delivery:view"
   | "delivery:manage"
   | "subscriptions:view"
@@ -109,6 +120,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "reports:view",
   "reports:generate",
   "reports:export",
+  ...ALL_REPORT_TYPE_PERMISSIONS,
   "alerts:view",
   "alerts:manage",
   "targets:view",
@@ -142,6 +154,10 @@ export const ALL_PERMISSIONS: Permission[] = [
   "customers:view",
   "customers:create",
   "customers:edit",
+  "suppliers:view",
+  "suppliers:create",
+  "suppliers:edit",
+  "suppliers:delete",
   "delivery:view",
   "delivery:manage",
   "subscriptions:view",
@@ -233,6 +249,11 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    id: "report-types",
+    label: "Report types",
+    permissions: [...ALL_REPORT_TYPE_PERMISSIONS],
+  },
+  {
     id: "users",
     label: "Users & Roles",
     permissions: [
@@ -291,8 +312,12 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   },
   {
     id: "customers",
-    label: "Customers & Delivery",
+    label: "Supplier, Customer & Delivery",
     permissions: [
+      "suppliers:view",
+      "suppliers:create",
+      "suppliers:edit",
+      "suppliers:delete",
       "customers:view",
       "customers:create",
       "customers:edit",
@@ -333,9 +358,10 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "transactions:purge": "Purge data",
   "sales:view": "View sales",
   "sales:analytics": "Sales analytics",
-  "reports:view": "View reports",
-  "reports:generate": "Generate reports",
-  "reports:export": "Export reports",
+  "reports:view": "Access reports page",
+  "reports:generate": "All report types (full access)",
+  "reports:export": "Export reports (CSV/Excel)",
+  ...REPORT_TYPE_PERMISSION_LABELS,
   "alerts:view": "View alerts",
   "alerts:manage": "Manage alerts",
   "targets:view": "View targets",
@@ -368,6 +394,10 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "customers:view": "View customers",
   "customers:create": "Create customers",
   "customers:edit": "Edit customers",
+  "suppliers:view": "View suppliers",
+  "suppliers:create": "Create suppliers",
+  "suppliers:edit": "Edit suppliers",
+  "suppliers:delete": "Delete suppliers",
   "delivery:view": "View delivery",
   "delivery:manage": "Manage delivery",
   "subscriptions:view": "View subscription",

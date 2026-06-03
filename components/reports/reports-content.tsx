@@ -51,6 +51,9 @@ import { toast } from "sonner";
 import { generateReportData, type ReportId } from "@/lib/actions/reports";
 import { downloadReportCSV, downloadReportXLSX } from "@/lib/utils/report-export";
 import { useCurrency } from "@/contexts/currency-context";
+import { REPORT_CATALOG } from "@/lib/reports/catalog";
+import { usePermissions } from "@/contexts/permissions-context";
+import { canAccessReport, canExportReports } from "@/lib/reports/permissions";
 
 interface Branch {
   id: string;
@@ -73,172 +76,66 @@ interface ReportType {
   tableManagementOnly?: boolean;
 }
 
-const reportTypes: ReportType[] = [
-  {
-    id: "executive-summary",
-    name: "Executive Performance & Insight",
-    description: "Per-branch P&L, margins, YTD growth, and customer loyalty metrics",
-    icon: TrendingUp,
-    category: "Executive",
-    frequency: "Weekly",
-  },
-  {
-    id: "weekly-performance",
-    name: "Weekly Performance Digest",
-    description: "Daily sales, WoW growth, peak hours, labor cost, and void/refund tracking",
-    icon: BarChart3,
-    category: "Performance",
-    frequency: "Weekly",
-  },
-  {
-    id: "kitchen-efficiency",
-    name: "Kitchen & Operational Efficiency",
-    description: "Prep times, SLA variance, and kitchen throughput KPIs",
-    icon: ChefHat,
-    category: "Operations",
-    frequency: "Daily",
-  },
-  {
-    id: "menu-performance",
-    name: "Menu Performance",
-    description: "Item profitability, add-on rates, and Star/Dog/Puzzle/Workhorse ranking",
-    icon: UtensilsCrossed,
-    category: "Sales",
-    frequency: "Weekly",
-  },
-  {
-    id: "sales-report",
-    name: "Sales & Revenue Report",
-    description: "Comprehensive sales data by channel, daypart, and menu items",
-    icon: DollarSign,
-    category: "Sales",
-    frequency: "Daily",
-  },
-  {
-    id: "manual-entries",
-    name: "Manual Entries Report",
-    description: "Summary of all manual POS entries including revenue by channel and branch",
-    icon: FileText,
-    category: "Sales",
-    frequency: "Weekly",
-  },
-  {
-    id: "inventory-report",
-    name: "Branch Inventory Status",
-    description:
-      "On-hand stock at each branch (retail / kitchen). Hub stock is in warehouse reports.",
-    icon: Package,
-    category: "Inventory",
-    frequency: "Daily",
-  },
-  {
-    id: "warehouse-stock",
-    name: "Warehouse Stock Report",
-    description: "Central hub quantities, valuation, and low-stock lines by warehouse",
-    icon: Building2,
-    category: "Warehouse",
-    frequency: "Daily",
-  },
-  {
-    id: "warehouse-activity",
-    name: "Warehouse Activity",
-    description:
-      "Transfers to branches, inbound receipts, warehouse waste, and outbound usage/adjustments in the period",
-    icon: Truck,
-    category: "Warehouse",
-    frequency: "Weekly",
-  },
-  {
-    id: "waste-variance",
-    name: "Waste & Variance Report",
-    description: "Waste analysis, shrinkage tracking, and variance explanations",
-    icon: Trash2,
-    category: "Operations",
-    frequency: "Weekly",
-  },
-  {
-    id: "reconciliation-summary",
-    name: "Stock Reconciliation Summary",
-    description: "End-of-shift count sessions with shortage, overage, and variance cost by branch",
-    icon: ClipboardCheck,
-    category: "Inventory",
-    frequency: "Daily",
-  },
-  {
-    id: "staff-report",
-    name: "Staff Scheduling Report",
-    description: "Staff utilization, shift coverage, and labor cost analysis",
-    icon: Users,
-    category: "HR",
-    frequency: "Weekly",
-  },
-  {
-    id: "orders-overview",
-    name: "Orders Overview",
-    description: "Unified orders by status, source, channel type, and branch with line-level export",
-    icon: ShoppingCart,
-    category: "Orders",
-    frequency: "Daily",
-  },
-  {
-    id: "dine-in-service",
-    name: "Dine-In & Table Service",
-    description: "Closed table sessions: covers, revenue per cover, and turn times",
-    icon: UtensilsCrossed,
-    category: "Operations",
-    frequency: "Daily",
-    tableManagementOnly: true,
-  },
-  {
-    id: "waiter-performance",
-    name: "Waiter Performance",
-    description: "Tables served, covers, sales, and average turn time by waiter",
-    icon: Users,
-    category: "Operations",
-    frequency: "Weekly",
-    tableManagementOnly: true,
-  },
-  {
-    id: "table-section-performance",
-    name: "Table Section Performance",
-    description: "Dine-in metrics grouped by dining section",
-    icon: LayoutGrid,
-    category: "Operations",
-    frequency: "Weekly",
-    tableManagementOnly: true,
-  },
-  {
-    id: "customer-insights",
-    name: "Customer Insights",
-    description: "Repeat buyers, revenue by customer, and ranking for loyalty follow-ups",
-    icon: UserCircle,
-    category: "Customers",
-    frequency: "Weekly",
-  },
-  {
-    id: "pos-sales-report",
-    name: "POS Terminal Sales",
-    description: "In-venue POS tickets, channels, and top menu items",
-    icon: Store,
-    category: "POS",
-    frequency: "Daily",
-  },
-  {
-    id: "cash-transactions",
-    name: "POS Terminal Report",
-    description: "Terminal payments by method, MoMo references, and success/fail status",
-    icon: CreditCard,
-    category: "Finance",
-    frequency: "Daily",
-  },
-];
+const REPORT_ICONS: Record<ReportId, React.ElementType> = {
+  "executive-summary": TrendingUp,
+  "weekly-performance": BarChart3,
+  "kitchen-efficiency": ChefHat,
+  "menu-performance": UtensilsCrossed,
+  "sales-report": DollarSign,
+  "manual-entries": FileText,
+  "inventory-report": Package,
+  "warehouse-stock": Building2,
+  "warehouse-activity": Truck,
+  "waste-variance": Trash2,
+  "reconciliation-summary": ClipboardCheck,
+  "staff-report": Users,
+  "orders-overview": ShoppingCart,
+  "dine-in-service": UtensilsCrossed,
+  "waiter-performance": Users,
+  "table-section-performance": LayoutGrid,
+  "customer-insights": UserCircle,
+  "pos-sales-report": Store,
+  "cash-transactions": CreditCard,
+};
+
+const REPORT_FREQUENCY: Partial<Record<ReportId, string>> = {
+  "executive-summary": "Weekly",
+  "weekly-performance": "Weekly",
+  "kitchen-efficiency": "Daily",
+  "menu-performance": "Weekly",
+  "sales-report": "Daily",
+  "manual-entries": "Weekly",
+  "inventory-report": "Daily",
+  "warehouse-stock": "Daily",
+  "warehouse-activity": "Weekly",
+  "waste-variance": "Weekly",
+  "reconciliation-summary": "Daily",
+  "staff-report": "Weekly",
+  "orders-overview": "Daily",
+  "dine-in-service": "Daily",
+  "waiter-performance": "Weekly",
+  "table-section-performance": "Weekly",
+  "customer-insights": "Weekly",
+  "pos-sales-report": "Daily",
+  "cash-transactions": "Daily",
+};
+
+const reportTypes: ReportType[] = REPORT_CATALOG.map((entry) => ({
+  ...entry,
+  icon: REPORT_ICONS[entry.id],
+  frequency: REPORT_FREQUENCY[entry.id] ?? "Weekly",
+}));
 
 export function ReportsContent({
   branches,
   tableManagementEnabled = false,
 }: ReportsContentProps) {
+  const { permissions } = usePermissions();
+  const canExport = canExportReports(permissions);
   const visibleReports = reportTypes.filter(
-    (r) => !r.tableManagementOnly || tableManagementEnabled,
+    (r) =>
+      (!r.tableManagementOnly || tableManagementEnabled) &&
+      canAccessReport(permissions, r.id),
   );
   const { formatCurrency } = useCurrency();
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -473,28 +370,32 @@ export function ReportsContent({
           </div>
 
           <div className="flex items-center justify-end gap-2 px-6 py-4 border-t shrink-0 bg-background">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                exportReportToCSV(data, reportType.id);
-                toast.success("Exported to CSV");
-              }}
-            >
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                exportReportToExcel(data, reportType.id);
-                toast.success("Exported to Excel");
-              }}
-            >
-              <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-              Excel
-            </Button>
+            {canExport ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    exportReportToCSV(data, reportType.id);
+                    toast.success("Exported to CSV");
+                  }}
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    exportReportToExcel(data, reportType.id);
+                    toast.success("Exported to Excel");
+                  }}
+                >
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                  Excel
+                </Button>
+              </>
+            ) : null}
             <Button size="sm" onClick={() => setViewingReport(null)}>
               Close
             </Button>
@@ -557,6 +458,12 @@ export function ReportsContent({
       {/* Available Reports */}
       <div>
         <h2 className="text-sm font-semibold mb-3">Available Reports</h2>
+        {visibleReports.length === 0 ? (
+          <p className="text-sm text-muted-foreground rounded-lg border border-dashed p-6 text-center">
+            No reports are assigned to your role. Ask an administrator to enable report types in
+            Settings → Permissions.
+          </p>
+        ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibleReports.map((report) => {
             const Icon = report.icon;
@@ -605,8 +512,8 @@ export function ReportsContent({
                       variant="outline"
                       className="h-8 text-xs"
                       onClick={() => handleGenerateReport(report.id, "csv")}
-                      disabled={isGenerating || isPending}
-                      title="Export to CSV"
+                      disabled={isGenerating || isPending || !canExport}
+                      title={canExport ? "Export to CSV" : "Export not permitted for your role"}
                     >
                       <Download className="h-3.5 w-3.5" />
                     </Button>
@@ -615,8 +522,8 @@ export function ReportsContent({
                       variant="outline"
                       className="h-8 text-xs"
                       onClick={() => handleGenerateReport(report.id, "excel")}
-                      disabled={isGenerating || isPending}
-                      title="Export to Excel"
+                      disabled={isGenerating || isPending || !canExport}
+                      title={canExport ? "Export to Excel" : "Export not permitted for your role"}
                     >
                       <FileSpreadsheet className="h-3.5 w-3.5" />
                     </Button>
@@ -626,6 +533,7 @@ export function ReportsContent({
             );
           })}
         </div>
+        )}
       </div>
 
       {/* Report Preview Dialog */}

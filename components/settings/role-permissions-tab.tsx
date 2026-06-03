@@ -31,6 +31,10 @@ import {
   PLATFORM_ONLY_PERMISSIONS,
   type Permission,
 } from "@/lib/permissions/types";
+import {
+  ALL_REPORT_TYPE_PERMISSIONS,
+  isReportTypePermissionString,
+} from "@/lib/permissions/report-permissions";
 import { roleDisplayNames } from "@/lib/permissions/labels";
 import {
   getOrgRolePermissionMatrix,
@@ -71,12 +75,53 @@ export function RolePermissionsTab({ actorRole }: RolePermissionsTabProps) {
   const platformOnlySet = useMemo(() => new Set(PLATFORM_ONLY_PERMISSIONS), []);
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
 
+  const isPermissionChecked = (permission: Permission) => {
+    if (isReportTypePermissionString(permission)) {
+      return (
+        permissionSet.has(permission) || permissionSet.has("reports:generate")
+      );
+    }
+    return permissionSet.has(permission);
+  };
+
   const togglePermission = (permission: Permission, checked: boolean) => {
     if (readOnly) return;
     if (actorRole !== "SUPER_ADMIN" && platformOnlySet.has(permission)) {
       toast.error("Only Super Admin can assign this permission");
       return;
     }
+
+    if (permission === "reports:generate") {
+      setPermissions((prev) => {
+        if (checked) {
+          return [
+            ...new Set<Permission>([
+              ...prev,
+              "reports:generate",
+              ...ALL_REPORT_TYPE_PERMISSIONS,
+            ]),
+          ];
+        }
+        return prev.filter(
+          (p) => p !== "reports:generate" && !isReportTypePermissionString(p),
+        );
+      });
+      return;
+    }
+
+    if (isReportTypePermissionString(permission)) {
+      setPermissions((prev) => {
+        let next: Permission[] = checked
+          ? [...new Set<Permission>([...prev, permission])]
+          : prev.filter((p) => p !== permission);
+        if (!checked) {
+          next = next.filter((p) => p !== "reports:generate");
+        }
+        return next;
+      });
+      return;
+    }
+
     setPermissions((prev) =>
       checked ? [...new Set([...prev, permission])] : prev.filter((p) => p !== permission),
     );
@@ -165,12 +210,12 @@ export function RolePermissionsTab({ actorRole }: RolePermissionsTabProps) {
           ) : (
             <Accordion
               type="multiple"
-              defaultValue={[PERMISSION_GROUPS[0]?.id].filter(Boolean)}
+              defaultValue={[PERMISSION_GROUPS[0]?.id, "report-types"].filter(Boolean)}
               className="max-h-[min(60vh,520px)] overflow-y-auto rounded-lg border px-3"
             >
               {PERMISSION_GROUPS.map((group) => {
                 const enabledCount = group.permissions.filter((p) =>
-                  permissionSet.has(p),
+                  isPermissionChecked(p),
                 ).length;
                 return (
                   <AccordionItem key={group.id} value={group.id} className="border-b last:border-b-0">
@@ -191,7 +236,7 @@ export function RolePermissionsTab({ actorRole }: RolePermissionsTabProps) {
                             <div key={permission} className="flex items-start gap-2">
                               <Checkbox
                                 id={`perm-${permission}`}
-                                checked={permissionSet.has(permission)}
+                                checked={isPermissionChecked(permission)}
                                 disabled={platformLocked}
                                 onCheckedChange={(c) =>
                                   togglePermission(permission, c === true)

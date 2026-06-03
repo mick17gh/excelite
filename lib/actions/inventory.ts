@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { UnitType, StockMovementType, TransferStatus } from "@/lib/generated/prisma/client";
 import { logTransfer } from "@/lib/services/audit";
+import { requirePermission } from "@/lib/permissions/require";
 
 export interface CreateInventoryItemInput {
   name: string;
@@ -523,6 +524,14 @@ export async function updateBranchTransferStatus(
 
 export async function getSuppliers() {
   try {
+    const auth = await requirePermission("suppliers:view");
+    if (!auth.ok) {
+      const warehouseAuth = await requirePermission("warehouse:view");
+      if (!warehouseAuth.ok) {
+        return { success: false, error: auth.error, data: [] };
+      }
+    }
+
     const suppliers = await db.supplier.findMany({
       where: { deletedAt: null, isActive: true },
       orderBy: { name: "asc" },
@@ -567,6 +576,9 @@ export interface CreateSupplierInput {
 
 export async function createSupplier(input: CreateSupplierInput) {
   try {
+    const auth = await requirePermission("suppliers:create");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     const supplier = await db.supplier.create({
       data: {
         name: input.name,
@@ -588,6 +600,7 @@ export async function createSupplier(input: CreateSupplierInput) {
     });
 
     revalidatePath("/dashboard/inventory");
+    revalidatePath("/dashboard/suppliers");
     return { success: true, data: supplier };
   } catch (error) {
     console.error("[createSupplier] Error:", error);
@@ -626,6 +639,9 @@ export async function getSuppliersForManagement(
   filters?: string | SupplierManagementFilters,
 ) {
   try {
+    const auth = await requirePermission("suppliers:view");
+    if (!auth.ok) return { success: false, error: auth.error, data: [] };
+
     const normalized: SupplierManagementFilters =
       typeof filters === "string" ? { search: filters } : (filters ?? {});
     const fromDate = normalized.from ? new Date(normalized.from) : undefined;
@@ -721,6 +737,9 @@ export async function getSupplierSupplyDetails(
   filters?: SupplierSupplyDetailsFilters,
 ) {
   try {
+    const auth = await requirePermission("suppliers:view");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     const page = filters?.page && filters.page > 0 ? filters.page : 1;
     const pageSize =
       filters?.pageSize && filters.pageSize > 0
@@ -878,6 +897,9 @@ export async function getSupplierSupplyDetails(
 
 export async function getSupplierById(id: string) {
   try {
+    const auth = await requirePermission("suppliers:view");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     const supplier = await db.supplier.findUnique({
       where: { id },
       include: { warehouseInbound: true },
@@ -901,6 +923,9 @@ export async function getSupplierById(id: string) {
 
 export async function updateSupplier(input: UpdateSupplierInput) {
   try {
+    const auth = await requirePermission("suppliers:edit");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     const { id, ...fields } = input;
     const supplier = await db.supplier.update({
       where: { id },
@@ -921,6 +946,9 @@ export async function updateSupplier(input: UpdateSupplierInput) {
 
 export async function deleteSupplier(id: string) {
   try {
+    const auth = await requirePermission("suppliers:delete");
+    if (!auth.ok) return { success: false, error: auth.error };
+
     await db.supplier.update({
       where: { id },
       data: { isActive: false, deletedAt: new Date() },

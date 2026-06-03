@@ -29,7 +29,7 @@ export interface ReportResult {
 
 export async function generateReportData(input: GenerateReportInput): Promise<ReportResult> {
   try {
-    const authResult = await resolveReportViewer();
+    const authResult = await resolveReportViewer(input.reportId);
     if (!authResult.ok) {
       return { success: false, error: authResult.error };
     }

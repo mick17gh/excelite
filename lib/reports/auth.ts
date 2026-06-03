@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
 import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import { Role } from "@/lib/generated/prisma/client";
+import type { ReportId } from "@/lib/reports/types";
+import { canAccessReport } from "@/lib/reports/permissions";
 
 export interface ReportViewerContext {
   userId: string;
@@ -10,7 +12,9 @@ export interface ReportViewerContext {
   branchId: string | null;
 }
 
-export async function resolveReportViewer(): Promise<
+export async function resolveReportViewer(
+  reportId?: ReportId,
+): Promise<
   { ok: true; viewer: ReportViewerContext } | { ok: false; error: string }
 > {
   const session = await auth.api.getSession({
@@ -27,8 +31,15 @@ export async function resolveReportViewer(): Promise<
     return { ok: false, error: "Organization not found" };
   }
   const permissions = await getEffectivePermissions(organizationId, role);
-  if (!hasPermissionInList(permissions, "reports:generate")) {
-    return { ok: false, error: "You do not have permission to generate reports" };
+  if (reportId) {
+    if (!canAccessReport(permissions, reportId)) {
+      return { ok: false, error: "You do not have permission to generate this report" };
+    }
+  } else if (
+    !hasPermissionInList(permissions, "reports:generate") &&
+    !hasPermissionInList(permissions, "reports:view")
+  ) {
+    return { ok: false, error: "You do not have permission to access reports" };
   }
 
   return {

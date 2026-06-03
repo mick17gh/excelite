@@ -27,12 +27,15 @@ import type { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { hasFeature, type TierFeatures } from "@/lib/tier-config";
 import { hasAnyPermissionInList, hasPermissionInList } from "@/lib/permissions/check-list";
 import type { Permission } from "@/lib/permissions/types";
+import { REPORTS_MODULE_PERMISSIONS } from "@/lib/reports/permissions";
 
 export type NavItem = {
   name: string;
   href: string;
   icon: ElementType;
   permission?: Permission;
+  /** Show when the user has any of these permissions */
+  permissionsAny?: Permission[];
   featureKey?: keyof TierFeatures;
   requiresTableManagement?: boolean;
   openInNewTab?: boolean;
@@ -126,7 +129,7 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
     name: "Suppliers",
     href: "/dashboard/suppliers",
     icon: Handshake,
-    permission: "warehouse:view",
+    permissionsAny: ["suppliers:view", "warehouse:view"],
     featureKey: "warehouse",
   },
   {
@@ -161,7 +164,7 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
     name: "Reports",
     href: "/dashboard/reports",
     icon: FileText,
-    permission: "reports:view",
+    permissionsAny: REPORTS_MODULE_PERMISSIONS,
     featureKey: "advancedReports",
   },
   {
@@ -253,7 +256,7 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   },
   {
     match: (p) => p === "/dashboard/suppliers" || p.startsWith("/dashboard/suppliers/"),
-    permissions: ["warehouse:view"],
+    permissions: ["suppliers:view", "warehouse:view"],
     featureKey: "warehouse",
   },
   {
@@ -270,7 +273,7 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   { match: (p) => p === "/dashboard/alerts" || p.startsWith("/dashboard/alerts/"), permissions: ["alerts:view"], featureKey: "alerts" },
   {
     match: (p) => p === "/dashboard/reports" || p.startsWith("/dashboard/reports/"),
-    permissions: ["reports:view"],
+    permissions: REPORTS_MODULE_PERMISSIONS,
     featureKey: "advancedReports",
   },
   {
@@ -307,7 +310,11 @@ export function canAccessNavItem(
   item: NavItem,
   ctx: RouteAccessContext,
 ): boolean {
-  if (item.permission && !hasAnyPermissionInList(ctx.permissions, [item.permission])) {
+  if (item.permissionsAny?.length) {
+    if (!hasAnyPermissionInList(ctx.permissions, item.permissionsAny)) {
+      return false;
+    }
+  } else if (item.permission && !hasAnyPermissionInList(ctx.permissions, [item.permission])) {
     return false;
   }
   if (item.featureKey && !hasFeature(ctx.orgTier, item.featureKey, ctx.role)) {
