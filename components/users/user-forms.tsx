@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { createUser, updateUser, resetUserPassword } from "@/lib/actions/users";
 import { Role } from "@/lib/generated/prisma/client";
+import { getRoleFormLabel, USER_ASSIGNABLE_ROLES } from "@/lib/permissions/labels";
 
 interface Branch {
   id: string;
@@ -140,7 +141,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
     }
   };
 
-  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF", "WAITER"].includes(formData.role);
+  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF", "WAITER", "SALES"].includes(formData.role);
   const requiresWarehouse = ["WAREHOUSE_STAFF", "COMMISSARY_STAFF"].includes(formData.role);
   const filteredWarehouses = warehouses.filter((w) =>
     formData.role === "COMMISSARY_STAFF"
@@ -247,20 +248,11 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SUPER_ADMIN">Super Admin (Platform Owner)</SelectItem>
-                  <SelectItem value="ADMIN">Admin (Organization Owner)</SelectItem>
-                  <SelectItem value="EXECUTIVE">Executive (Strategic Controls)</SelectItem>
-                  <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
-                  <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
-                  <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
-                  <SelectItem value="STAFF">Staff (POS, KDS, Orders & Customers)</SelectItem>
-                  <SelectItem value="WAITER">Waiter (table service POS)</SelectItem>
-                  <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
-                  <SelectItem value="AUDITOR">Auditor (Read-Only)</SelectItem>
-                  <SelectItem value="DEVELOPER">Developer (API Access)</SelectItem>
-                  <SelectItem value="CALL_CENTER">Call Center</SelectItem>
-                  <SelectItem value="WAREHOUSE_STAFF">Warehouse Staff</SelectItem>
-                  <SelectItem value="COMMISSARY_STAFF">Commissary Staff</SelectItem>
+                  {USER_ASSIGNABLE_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {getRoleFormLabel(role)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -438,7 +430,7 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
 
   if (!user) return null;
 
-  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF", "WAITER"].includes(formData.role);
+  const requiresBranch = ["BRANCH_MANAGER", "SUPERVISOR", "STAFF", "KITCHEN_STAFF", "WAREHOUSE_STAFF", "WAITER", "SALES"].includes(formData.role);
   const requiresWarehouse = ["WAREHOUSE_STAFF", "COMMISSARY_STAFF"].includes(formData.role);
   const filteredWarehouses = warehouses.filter((w) =>
     formData.role === "COMMISSARY_STAFF"
@@ -524,20 +516,11 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="EXECUTIVE">Executive</SelectItem>
-                  <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
-                  <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
-                  <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
-                  <SelectItem value="STAFF">Staff</SelectItem>
-                  <SelectItem value="WAITER">Waiter</SelectItem>
-                  <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
-                  <SelectItem value="AUDITOR">Auditor</SelectItem>
-                  <SelectItem value="DEVELOPER">Developer</SelectItem>
-                  <SelectItem value="CALL_CENTER">Call Center</SelectItem>
-                  <SelectItem value="WAREHOUSE_STAFF">Warehouse Staff</SelectItem>
-                  <SelectItem value="COMMISSARY_STAFF">Commissary Staff</SelectItem>
+                  {USER_ASSIGNABLE_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {getRoleFormLabel(role)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

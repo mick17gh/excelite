@@ -28,6 +28,10 @@ enum Role {
   WAREHOUSE_STAFF
   COMMISSARY_STAFF
   WAITER
+  PROCUREMENT
+  SALES
+  ACCOUNTS
+  GENERIC
 }
 
 enum DiningTableStatus {

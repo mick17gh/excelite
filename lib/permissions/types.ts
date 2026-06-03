@@ -395,4 +395,8 @@ export const EDITABLE_MATRIX_ROLES = [
   "WAREHOUSE_STAFF",
   "COMMISSARY_STAFF",
   "WAITER",
+  "PROCUREMENT",
+  "SALES",
+  "ACCOUNTS",
+  "GENERIC",
 ] as const;

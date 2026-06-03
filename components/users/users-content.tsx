@@ -43,6 +43,8 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { AddUserForm, EditUserForm, ResetPasswordDialog } from "@/components/users/user-forms";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { Role } from "@/lib/generated/prisma/client";
+import { getRoleShortName, USER_ASSIGNABLE_ROLES } from "@/lib/permissions/labels";
 
 interface User {
   id: string;
@@ -134,24 +136,16 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
       CALL_CENTER: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
       WAREHOUSE_STAFF: "bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-400",
       COMMISSARY_STAFF: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+      PROCUREMENT: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-400",
+      SALES: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
+      ACCOUNTS: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+      GENERIC: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300",
     };
-    const labels: Record<string, string> = {
-      SUPER_ADMIN: "Super Admin",
-      ADMIN: "Admin",
-      EXECUTIVE: "Executive",
-      OPERATIONS_MANAGER: "Ops Manager",
-      BRANCH_MANAGER: "Branch Manager",
-      SUPERVISOR: "Supervisor",
-      STAFF: "Staff",
-      WAITER: "Waiter",
-      KITCHEN_STAFF: "Kitchen Staff",
-      AUDITOR: "Auditor",
-      DEVELOPER: "Developer",
-      CALL_CENTER: "Call Center",
-      WAREHOUSE_STAFF: "Warehouse",
-      COMMISSARY_STAFF: "Commissary",
-    };
-    return <Badge className={colors[role] || "bg-slate-100 text-slate-700"}>{labels[role] || role}</Badge>;
+    return (
+      <Badge className={colors[role] || "bg-slate-100 text-slate-700"}>
+        {getRoleShortName(role as Role)}
+      </Badge>
+    );
   };
 
   const getInitials = (name: string) => {
@@ -242,20 +236,11 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-              <SelectItem value="ADMIN">Admin</SelectItem>
-              <SelectItem value="EXECUTIVE">Executive</SelectItem>
-              <SelectItem value="OPERATIONS_MANAGER">Ops Manager</SelectItem>
-              <SelectItem value="BRANCH_MANAGER">Branch Manager</SelectItem>
-              <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
-              <SelectItem value="STAFF">Staff</SelectItem>
-              <SelectItem value="WAITER">Waiter</SelectItem>
-              <SelectItem value="KITCHEN_STAFF">Kitchen Staff</SelectItem>
-              <SelectItem value="AUDITOR">Auditor</SelectItem>
-              <SelectItem value="DEVELOPER">Developer</SelectItem>
-              <SelectItem value="CALL_CENTER">Call Center</SelectItem>
-              <SelectItem value="WAREHOUSE_STAFF">Warehouse</SelectItem>
-              <SelectItem value="COMMISSARY_STAFF">Commissary</SelectItem>
+              {USER_ASSIGNABLE_ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {getRoleShortName(role)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>

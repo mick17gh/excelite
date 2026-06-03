@@ -100,6 +100,14 @@ const ROLE_CONTEXT: Record<Role, string> = {
     'User is Warehouse Staff: central warehouse hub stock, inbound, transfers to branches, and warehouse waste. Branch-only retail stock is under Branch inventory.',
   COMMISSARY_STAFF:
     'User is Commissary Staff: back kitchen production, material issue from raw warehouse, and branch dispatch requests (requires raw warehouse approval).',
+  PROCUREMENT:
+    'User is Procurement: suppliers, warehouse inbound, inventory transfers, and stock receiving.',
+  SALES:
+    'User is Sales: POS, orders, customers, targets, and sales analytics for their scope.',
+  ACCOUNTS:
+    'User is Accounts: transactions, sales records, financial reports, and reconciliation views.',
+  GENERIC:
+    'User has a custom Generic role; effective access is defined by org permissions — do not assume module access beyond what data queries return.',
 };
 
 const INTENT_PROMPTS: Record<QueryIntent, string> = {
