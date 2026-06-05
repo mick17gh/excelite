@@ -71,6 +71,37 @@ function generateOrderNumber(): string {
   return `${prefix}-${timestamp}${random}`;
 }
 
+/** Order.cashierId is a User id; Transaction.staffId must reference Staff. */
+async function resolveTransactionStaffId(
+  cashierUserId: string | null | undefined,
+  branchId: string,
+): Promise<string | null> {
+  if (!cashierUserId) return null;
+
+  const existingStaff = await db.staff.findFirst({
+    where: { id: cashierUserId, branchId, deletedAt: null },
+    select: { id: true },
+  });
+  if (existingStaff) return existingStaff.id;
+
+  const cashierUser = await db.user.findUnique({
+    where: { id: cashierUserId },
+    select: { email: true },
+  });
+  if (!cashierUser?.email) return null;
+
+  const staffByEmail = await db.staff.findFirst({
+    where: {
+      branchId,
+      email: cashierUser.email,
+      deletedAt: null,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  return staffByEmail?.id ?? null;
+}
+
 export interface CreatePosOrderItemInput {
   menuItemId: string;
   quantity: number;
@@ -560,11 +591,15 @@ export async function completeOrder(input: CompleteOrderInput) {
       const channel = channelMap[order.type] || "DINE_IN";
 
       const transactionRef = `TXN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const transactionStaffId = await resolveTransactionStaffId(
+        order.cashierId,
+        order.branchId,
+      );
       const transaction = await db.transaction.create({
         data: {
           transactionRef,
           branchId: order.branchId,
-          staffId: order.cashierId,
+          staffId: transactionStaffId,
           paymentMethod: input.paymentMethod,
           amount: Number(order.total) + (input.tip || 0),
           tip: input.tip || 0,
