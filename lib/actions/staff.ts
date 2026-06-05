@@ -40,6 +40,7 @@ export interface UpdateStaffInput {
   phone?: string;
   jobRoleId?: string;
   hourlyRate?: number;
+  hireDate?: Date;
   branchId?: string;
   isActive?: boolean;
 }

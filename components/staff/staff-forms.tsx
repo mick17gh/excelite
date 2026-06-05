@@ -53,6 +53,7 @@ export interface StaffMemberRecord {
   jobRoleId: string;
   hourlyRate: number;
   branchId: string;
+  hireDate: Date | string;
   isActive: boolean;
   role?: string;
   roleCode?: string;
@@ -290,6 +291,7 @@ export function EditStaffForm({
     jobRoleId: "",
     hourlyRate: "",
     branchId: "",
+    hireDate: format(new Date(), "yyyy-MM-dd"),
     isActive: true,
   });
 
@@ -308,6 +310,7 @@ export function EditStaffForm({
       jobRoleId: staff.jobRoleId,
       hourlyRate: String(staff.hourlyRate),
       branchId: staff.branchId,
+      hireDate: format(new Date(staff.hireDate), "yyyy-MM-dd"),
       isActive: staff.isActive,
     });
   }, [staff, open]);
@@ -331,6 +334,7 @@ export function EditStaffForm({
         phone: formData.phone || undefined,
         jobRoleId: formData.jobRoleId,
         hourlyRate: parseFloat(formData.hourlyRate),
+        hireDate: new Date(formData.hireDate),
         branchId: formData.branchId,
         isActive: formData.isActive,
       });
@@ -430,23 +434,35 @@ export function EditStaffForm({
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="edit-branch">Branch</Label>
-              <Select
-                value={formData.branchId}
-                onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-branch">Branch</Label>
+                <Select
+                  value={formData.branchId}
+                  onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-hireDate">Hire Date</Label>
+                <Input
+                  id="edit-hireDate"
+                  type="date"
+                  value={formData.hireDate}
+                  onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
+                  required
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

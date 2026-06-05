@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,37 @@ import { useCurrency } from "@/contexts/currency-context";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { TablePagination } from "@/components/ui/table-pagination";
+
+function useTabPagination<T>(items: T[], defaultPageSize = 10) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }, [items, page, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+  };
+
+  return {
+    page,
+    pageSize,
+    totalPages,
+    paginatedItems,
+    setPage,
+    handlePageSizeChange,
+  };
+}
 
 interface Branch {
   id: string;
@@ -133,6 +164,12 @@ export function BranchDetailsContent({
   const { formatCurrency } = useCurrency();
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const transactionsPagination = useTabPagination(transactions);
+  const inventoryPagination = useTabPagination(inventory);
+  const staffPagination = useTabPagination(staff);
+  const usersPagination = useTabPagination(users);
+  const targetsPagination = useTabPagination(targets);
 
   // Use sales data for accurate revenue (includes manual POS entries)
   const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
@@ -328,7 +365,7 @@ export function BranchDetailsContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transactions.slice(0, 10).map((transaction) => (
+                    {transactionsPagination.paginatedItems.map((transaction) => (
                       <TableRow key={transaction.id}>
                         <TableCell className="font-medium">
                           {transaction.transactionRef}
@@ -342,6 +379,16 @@ export function BranchDetailsContent({
                     ))}
                   </TableBody>
                 </Table>
+              )}
+              {transactions.length > 0 && (
+                <TablePagination
+                  currentPage={transactionsPagination.page}
+                  totalPages={transactionsPagination.totalPages}
+                  totalItems={transactions.length}
+                  pageSize={transactionsPagination.pageSize}
+                  onPageChange={transactionsPagination.setPage}
+                  onPageSizeChange={transactionsPagination.handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>
@@ -371,7 +418,7 @@ export function BranchDetailsContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inventory.map((item) => (
+                    {inventoryPagination.paginatedItems.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{Number(item.currentStock).toLocaleString()}</TableCell>
@@ -396,6 +443,16 @@ export function BranchDetailsContent({
                     ))}
                   </TableBody>
                 </Table>
+              )}
+              {inventory.length > 0 && (
+                <TablePagination
+                  currentPage={inventoryPagination.page}
+                  totalPages={inventoryPagination.totalPages}
+                  totalItems={inventory.length}
+                  pageSize={inventoryPagination.pageSize}
+                  onPageChange={inventoryPagination.setPage}
+                  onPageSizeChange={inventoryPagination.handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>
@@ -423,12 +480,12 @@ export function BranchDetailsContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {staff.map((member: any) => {
-                      const name = member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim();
-                      const status = member.status || member.dutyStatus || 'UNKNOWN';
+                    {staffPagination.paginatedItems.map((member: StaffMember) => {
+                      const name = member.name || `${member.firstName || ""} ${member.lastName || ""}`.trim();
+                      const status = member.status || member.dutyStatus || "UNKNOWN";
                       return (
                         <TableRow key={member.id}>
-                          <TableCell className="font-medium">{name || 'Unknown'}</TableCell>
+                          <TableCell className="font-medium">{name || "Unknown"}</TableCell>
                           <TableCell>{member.role}</TableCell>
                           <TableCell>
                             <Badge
@@ -444,6 +501,16 @@ export function BranchDetailsContent({
                     })}
                   </TableBody>
                 </Table>
+              )}
+              {staff.length > 0 && (
+                <TablePagination
+                  currentPage={staffPagination.page}
+                  totalPages={staffPagination.totalPages}
+                  totalItems={staff.length}
+                  pageSize={staffPagination.pageSize}
+                  onPageChange={staffPagination.setPage}
+                  onPageSizeChange={staffPagination.handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>
@@ -473,13 +540,13 @@ export function BranchDetailsContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
+                    {usersPagination.paginatedItems.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.name}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {user.role.replace('_', ' ')}
+                            {user.role.replace("_", " ")}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -496,6 +563,16 @@ export function BranchDetailsContent({
                     ))}
                   </TableBody>
                 </Table>
+              )}
+              {users.length > 0 && (
+                <TablePagination
+                  currentPage={usersPagination.page}
+                  totalPages={usersPagination.totalPages}
+                  totalItems={users.length}
+                  pageSize={usersPagination.pageSize}
+                  onPageChange={usersPagination.setPage}
+                  onPageSizeChange={usersPagination.handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>
@@ -525,7 +602,7 @@ export function BranchDetailsContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {targets.map((target) => {
+                    {targetsPagination.paginatedItems.map((target) => {
                       const progress = target.targetValue > 0
                         ? (target.currentValue / target.targetValue) * 100
                         : 0;
@@ -553,6 +630,16 @@ export function BranchDetailsContent({
                     })}
                   </TableBody>
                 </Table>
+              )}
+              {targets.length > 0 && (
+                <TablePagination
+                  currentPage={targetsPagination.page}
+                  totalPages={targetsPagination.totalPages}
+                  totalItems={targets.length}
+                  pageSize={targetsPagination.pageSize}
+                  onPageChange={targetsPagination.setPage}
+                  onPageSizeChange={targetsPagination.handlePageSizeChange}
+                />
               )}
             </CardContent>
           </Card>
