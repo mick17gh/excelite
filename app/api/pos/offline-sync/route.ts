@@ -89,11 +89,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resultJson = {
-      orderId: existing.orderId,
-      orderNumber: orderRow?.orderNumber ?? (completeResult.data as { orderNumber?: string })?.orderNumber,
-      complete: completeResult.data,
-    };
+    const resultJson = JSON.parse(
+      JSON.stringify({
+        orderId: existing.orderId,
+        orderNumber:
+          orderRow?.orderNumber ?? completeResult.data.orderNumber,
+        complete: completeResult.data,
+      }),
+    );
 
     await db.posOfflineMutation.update({
       where: { clientMutationId },
@@ -167,11 +170,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const resultJson = {
-    orderId,
-    orderNumber,
-    complete: completeResult.data,
-  };
+  const resultJson = JSON.parse(
+    JSON.stringify({
+      orderId,
+      orderNumber,
+      complete: completeResult.data,
+    }),
+  );
 
   await db.posOfflineMutation.update({
     where: { clientMutationId },

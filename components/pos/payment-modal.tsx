@@ -15,7 +15,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { CreditCard, DollarSign, Smartphone, Building2, Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, UtensilsCrossed, Package, Truck, WifiOff } from "lucide-react";
+import { Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, UtensilsCrossed, Package, Truck, WifiOff } from "lucide-react";
+import { SplitPaymentForm } from "@/components/payments/split-payment-form";
+import {
+  cashChangeFromTenders,
+  totalCashReceived,
+  orderPaymentMethodFromTenders,
+  type PaymentTender,
+} from "@/lib/payments/tenders";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createCustomer } from "@/lib/actions/customers";
 import { useCurrency } from "@/contexts/currency-context";
@@ -52,6 +59,7 @@ interface PaymentModalProps {
 
 export interface PaymentData {
   paymentMethod: string;
+  tenders?: PaymentTender[];
   amountPaid: number;
   change: number;
   customerId?: string;
@@ -70,15 +78,6 @@ const orderTypeOptions = [
   { value: "TAKEOUT", label: "Takeout", icon: Package, color: "bg-amber-500/10 border-amber-500 text-amber-600" },
   { value: "DELIVERY", label: "Delivery", icon: Truck, color: "bg-blue-500/10 border-blue-500 text-blue-600" },
 ];
-
-const paymentMethods = [
-  { value: "CASH", label: "Cash", icon: DollarSign, color: "bg-emerald-500/10 border-emerald-500 text-emerald-600" },
-  { value: "CARD", label: "Card", icon: CreditCard, color: "bg-blue-500/10 border-blue-500 text-blue-600" },
-  { value: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone, color: "bg-amber-500/10 border-amber-500 text-amber-600" },
-  { value: "BANK_TRANSFER", label: "Bank Transfer", icon: Building2, color: "bg-purple-500/10 border-purple-500 text-purple-600" },
-];
-
-const quickAmounts = [50, 100, 200, 500];
 
 export function PaymentModal({
   open,
@@ -101,7 +100,6 @@ export function PaymentModal({
 }: PaymentModalProps) {
   const { formatCurrency } = useCurrency();
   const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
-  const [amountPaid, setAmountPaid] = useState<string>("");
   const [localOrderType, setLocalOrderType] = useState(initialOrderType);
   const [notes, setNotes] = useState("");
   const [complimentaryReason, setComplimentaryReason] = useState("");
@@ -128,15 +126,6 @@ export function PaymentModal({
   const orderTypeOptionsFiltered = offlineRestricted
     ? orderTypeOptions.filter((o) => o.value !== "DELIVERY")
     : orderTypeOptions;
-
-  const paymentMethodsFiltered = offlineRestricted
-    ? paymentMethods.filter((m) => m.value === "CASH")
-    : [
-        ...paymentMethods,
-        ...(allowComplimentary
-          ? [{ value: "COMPLIMENTARY", label: "Complimentary", icon: Check, color: "bg-rose-500/10 border-rose-500 text-rose-600" }]
-          : []),
-      ];
 
   const handleOrderTypeChange = (type: string) => {
     setLocalOrderType(type);
@@ -194,7 +183,6 @@ export function PaymentModal({
 
     if (justOpened) {
       setPaymentMethod("CASH");
-      setAmountPaid("");
       setCustomerId("walk-in");
       setNotes("");
       setDeliveryAddress("");
@@ -220,52 +208,48 @@ export function PaymentModal({
     });
   }, [open, offlineRestricted, initialOrderType, customers, onOrderTypeChange]);
 
-  // Update amount when payment method or total changes
-  useEffect(() => {
-    if (open) {
-      setAmountPaid(paymentMethod === "CASH" ? "" : total.toFixed(2));
-    }
-  }, [paymentMethod, total, open]);
+  const isValidComplimentary =
+    paymentMethod === "COMPLIMENTARY" && complimentaryReason.trim().length > 0;
 
-  const amountPaidNum = Math.round((parseFloat(amountPaid) || 0) * 100) / 100;
-  const change = Math.round((amountPaidNum - total) * 100) / 100;
-  const isValidPayment =
-    paymentMethod === "COMPLIMENTARY"
-      ? complimentaryReason.trim().length > 0
-      : paymentMethod === "CASH"
-        ? amountPaidNum >= Math.round(total * 100) / 100
-        : true;
-
-  const handleComplete = () => {
-    if (!isValidPayment) return;
-
+  const buildPaymentPayload = (tenders?: PaymentTender[]) => {
     const selectedCustomer = localCustomers.find((c) => c.id === customerId);
-    onComplete({
-      paymentMethod,
-      amountPaid: paymentMethod === "COMPLIMENTARY" ? 0 : paymentMethod === "CASH" ? amountPaidNum : total,
-      change: paymentMethod === "CASH" ? Math.max(0, change) : 0,
+    const method = tenders ? orderPaymentMethodFromTenders(tenders) : paymentMethod;
+    const amountPaid = tenders ? totalCashReceived(tenders) : 0;
+    const change = tenders ? cashChangeFromTenders(tenders) : 0;
+
+    return {
+      paymentMethod: method,
+      tenders,
+      amountPaid,
+      change,
       customerId: customerId !== "walk-in" ? customerId : undefined,
       customerName: selectedCustomer?.name || undefined,
       orderType: localOrderType,
       notes: notes.trim() || undefined,
       complimentaryReason:
         paymentMethod === "COMPLIMENTARY" ? complimentaryReason.trim() : undefined,
-      ...(isDelivery ? {
-        deliveryAddress: deliveryAddress.trim() || undefined,
-        deliveryPhone: deliveryPhone.trim() || undefined,
-        deliveryNotes: deliveryNotes.trim() || undefined,
-        deliveryFee: deliveryFee || undefined,
-      } : {}),
-    });
+      ...(isDelivery
+        ? {
+            deliveryAddress: deliveryAddress.trim() || undefined,
+            deliveryPhone: deliveryPhone.trim() || undefined,
+            deliveryNotes: deliveryNotes.trim() || undefined,
+            deliveryFee: deliveryFee || undefined,
+          }
+        : {}),
+    };
   };
 
-  const handleQuickAmount = (amount: number) => {
-    const newAmount = (amountPaidNum || 0) + amount;
-    setAmountPaid(newAmount.toFixed(2));
+  const handleSplitPayment = (tenders: PaymentTender[]) => {
+    if (offlineRestricted && (tenders.length > 1 || tenders.some((t) => t.method !== "CASH"))) {
+      return;
+    }
+    setPaymentMethod(orderPaymentMethodFromTenders(tenders));
+    onComplete(buildPaymentPayload(tenders));
   };
 
-  const handleExactAmount = () => {
-    setAmountPaid(total.toFixed(2));
+  const handleComplimentaryComplete = () => {
+    if (!isValidComplimentary) return;
+    onComplete(buildPaymentPayload());
   };
 
   const displayTax = tax ?? 0;
@@ -359,115 +343,40 @@ export function PaymentModal({
               </div>
             </div>
 
-            {/* Payment Methods */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Payment Method</Label>
-              <div className={cn("grid gap-3", offlineRestricted ? "grid-cols-1" : "grid-cols-2")}>
-                {paymentMethodsFiltered.map((method) => {
-                  const Icon = method.icon;
-                  const isSelected = paymentMethod === method.value;
-                  return (
-                    <button
-                      key={method.value}
-                      type="button"
-                      className={cn(
-                        "flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left",
-                        isSelected
-                          ? method.color
-                          : "border-border hover:border-muted-foreground/30"
-                      )}
-                      onClick={() => setPaymentMethod(method.value)}
-                    >
-                      <div className={cn(
-                        "w-10 h-10 rounded-lg flex items-center justify-center",
-                        isSelected ? "bg-current/10" : "bg-muted"
-                      )}>
-                        <Icon className={cn("h-5 w-5", isSelected ? "" : "text-muted-foreground")} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{method.label}</p>
-                      </div>
-                      {isSelected && (
-                        <Check className="h-5 w-5" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {paymentMethod === "COMPLIMENTARY" && (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Authorization reason *</Label>
-                <Textarea
-                  value={complimentaryReason}
-                  onChange={(e) => setComplimentaryReason(e.target.value)}
-                  placeholder="e.g. CEO approval, staff meal, VIP guest"
-                  rows={2}
-                />
-              </div>
-            )}
-
-            {/* Cash Amount Input */}
-            {paymentMethod === "CASH" && (
+            {allowComplimentary && !offlineRestricted && (
               <div className="space-y-3">
-                <Label htmlFor="amountPaid" className="text-sm font-medium">
-                  Amount Received
-                </Label>
-                <Input
-                  id="amountPaid"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(e.target.value)}
-                  placeholder={`Enter amount (min: ${formatCurrency(total)})`}
-                  className="h-12 text-lg font-semibold"
-                />
-                
-                {/* Quick Amounts */}
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExactAmount}
-                    className="h-9"
-                  >
-                    Exact ({formatCurrency(total)})
-                  </Button>
-                  {quickAmounts.map((amount) => (
-                    <Button
-                      key={amount}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickAmount(amount)}
-                      className="h-9"
-                    >
-                      +{formatCurrency(amount)}
-                    </Button>
-                  ))}
-                </div>
-
-                {/* Change Display */}
-                {amountPaidNum > 0 && (
-                  <div className={cn(
-                    "rounded-lg p-3 text-center",
-                    change >= 0 ? "bg-emerald-500/10" : "bg-destructive/10"
-                  )}>
-                    {change >= 0 ? (
-                      <p className="text-emerald-600 font-semibold">
-                        Change: {formatCurrency(change)}
-                      </p>
-                    ) : (
-                      <p className="text-destructive font-semibold">
-                        Short: {formatCurrency(Math.abs(change))}
-                      </p>
-                    )}
+                <Button
+                  type="button"
+                  variant={paymentMethod === "COMPLIMENTARY" ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() =>
+                    setPaymentMethod((m) => (m === "COMPLIMENTARY" ? "CASH" : "COMPLIMENTARY"))
+                  }
+                >
+                  Complimentary order
+                </Button>
+                {paymentMethod === "COMPLIMENTARY" && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Authorization reason *</Label>
+                    <Textarea
+                      value={complimentaryReason}
+                      onChange={(e) => setComplimentaryReason(e.target.value)}
+                      placeholder="e.g. CEO approval, staff meal, VIP guest"
+                      rows={2}
+                    />
                   </div>
                 )}
               </div>
+            )}
+
+            {paymentMethod !== "COMPLIMENTARY" && (
+              <SplitPaymentForm
+                total={total}
+                disabled={isProcessing}
+                offlineRestricted={offlineRestricted}
+                submitLabel={isProcessing ? "Processing..." : "Complete Payment"}
+                onSubmit={handleSplitPayment}
+              />
             )}
 
             {/* Customer Selection */}
@@ -608,23 +517,25 @@ export function PaymentModal({
           >
             Cancel
           </Button>
-          <Button
-            onClick={handleComplete}
-            disabled={isProcessing || !isValidPayment}
-            className="flex-2 h-12 text-base font-semibold"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Check className="mr-2 h-5 w-5" />
-                Complete Payment
-              </>
-            )}
-          </Button>
+          {paymentMethod === "COMPLIMENTARY" && (
+            <Button
+              onClick={handleComplimentaryComplete}
+              disabled={isProcessing || !isValidComplimentary}
+              className="flex-[2] h-12 text-base font-semibold"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-5 w-5" />
+                  Authorize Complimentary
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -658,8 +658,11 @@ export function PosContent({
     const branch = liveBranches.find((b) => b.id === branchId);
 
     const queueOffline = async () => {
-      if (paymentData.paymentMethod !== "CASH") {
-        toast.error("Offline checkout is cash only");
+      if (
+        paymentData.paymentMethod !== "CASH" ||
+        (paymentData.tenders && (paymentData.tenders.length > 1 || paymentData.tenders.some((t) => t.method !== "CASH")))
+      ) {
+        toast.error("Offline checkout is cash only (single payment)");
         return;
       }
       if ((paymentData.orderType as OrderType) === "DELIVERY") {
@@ -784,6 +787,7 @@ export function PosContent({
               })
             : await completeOrder({
                 orderId: result.data.id,
+                tenders: paymentData.tenders,
                 paymentMethod: paymentData.paymentMethod,
                 amountReceived: paymentData.amountPaid,
                 tip: 0,
@@ -808,6 +812,11 @@ export function PosContent({
 
         setCompletedOrder({
           ...result.data,
+          paymentMethod: completedPayment.paymentMethod ?? paymentData.paymentMethod,
+          payments: paymentData.tenders?.map((t) => ({
+            paymentMethod: t.method,
+            amount: t.amount,
+          })),
           change: completedPayment.change ?? paymentData.change,
         });
         setIsPaymentOpen(false);

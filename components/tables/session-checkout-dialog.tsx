@@ -9,33 +9,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { SplitPaymentForm } from "@/components/payments/split-payment-form";
+import type { PaymentTender } from "@/lib/payments/tenders";
 import {
   getTableSessionCheckout,
   settleTableSession,
 } from "@/lib/actions/table-session-checkout";
 import { useCurrency } from "@/contexts/currency-context";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import {
-  Building2,
-  CreditCard,
-  DollarSign,
-  Loader2,
-  Smartphone,
-} from "lucide-react";
-
-const paymentMethods = [
-  { value: "CASH", label: "Cash", icon: DollarSign },
-  { value: "CARD", label: "Card", icon: CreditCard },
-  { value: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone },
-  { value: "BANK_TRANSFER", label: "Bank Transfer", icon: Building2 },
-];
-
-const quickAmounts = [50, 100, 200, 500];
+import { Loader2 } from "lucide-react";
 
 interface SessionCheckoutDialogProps {
   open: boolean;
@@ -72,14 +56,10 @@ export function SessionCheckoutDialog({
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
   const [checkout, setCheckout] = useState<CheckoutData | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState("CASH");
-  const [amountPaid, setAmountPaid] = useState("");
 
   useEffect(() => {
     if (!open || !sessionId) {
       setCheckout(null);
-      setAmountPaid("");
-      setPaymentMethod("CASH");
       return;
     }
     let cancelled = false;
@@ -94,7 +74,6 @@ export function SessionCheckoutDialog({
       }
       if ("data" in res && res.data) {
         setCheckout(res.data);
-        setAmountPaid(res.data.unpaidTotal.toFixed(2));
       }
     });
     return () => {
@@ -102,25 +81,12 @@ export function SessionCheckoutDialog({
     };
   }, [open, sessionId, onOpenChange]);
 
-  useEffect(() => {
-    if (open && checkout && paymentMethod !== "CASH") {
-      setAmountPaid(checkout.unpaidTotal.toFixed(2));
-    }
-  }, [paymentMethod, open, checkout]);
-
-  const total = checkout?.unpaidTotal ?? 0;
-  const amountPaidNum = Math.round((parseFloat(amountPaid) || 0) * 100) / 100;
-  const change = Math.round((amountPaidNum - total) * 100) / 100;
-  const isValidPayment =
-    paymentMethod === "CASH" ? amountPaidNum >= Math.round(total * 100) / 100 : true;
-
-  const handleSubmit = () => {
-    if (!sessionId || !checkout || !isValidPayment) return;
+  const handleSplitPayment = (tenders: PaymentTender[]) => {
+    if (!sessionId || !checkout) return;
     startTransition(async () => {
       const res = await settleTableSession({
         sessionId,
-        paymentMethod,
-        amountReceived: paymentMethod === "CASH" ? amountPaidNum : total,
+        tenders,
       });
       if ("error" in res && res.error) {
         toast.error(res.error);
@@ -201,95 +167,20 @@ export function SessionCheckoutDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {paymentMethods.map((m) => {
-                    const Icon = m.icon;
-                    const active = paymentMethod === m.value;
-                    return (
-                      <button
-                        key={m.value}
-                        type="button"
-                        className={cn(
-                          "flex items-center gap-2 rounded-lg border-2 p-3 text-sm font-medium transition-colors",
-                          active
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-muted-foreground/30",
-                        )}
-                        onClick={() => setPaymentMethod(m.value)}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {paymentMethod === "CASH" && (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="amount-paid">Amount received</Label>
-                      <Input
-                        id="amount-paid"
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        value={amountPaid}
-                        onChange={(e) => setAmountPaid(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {quickAmounts.map((a) => (
-                        <Button
-                          key={a}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setAmountPaid(
-                              (amountPaidNum + a).toFixed(2),
-                            )
-                          }
-                        >
-                          +{formatCurrency(a)}
-                        </Button>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAmountPaid(total.toFixed(2))}
-                      >
-                        Exact
-                      </Button>
-                    </div>
-                    {change > 0 && (
-                      <p className="text-sm font-medium text-emerald-600">
-                        Change: {formatCurrency(change)}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <SplitPaymentForm
+                  total={checkout.unpaidTotal}
+                  disabled={isPending}
+                  submitLabel={isPending ? "Processing..." : `Pay ${formatCurrency(checkout.unpaidTotal)}`}
+                  onSubmit={handleSplitPayment}
+                />
               </>
             )}
           </div>
         </ScrollArea>
 
         <DialogFooter className="p-6 pt-4 border-t shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending} className="w-full">
             Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={isPending || loading || !checkout || !isValidPayment}
-          >
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>Pay {checkout ? formatCurrency(checkout.unpaidTotal) : ""}</>
-            )}
           </Button>
         </DialogFooter>
       </DialogContent>

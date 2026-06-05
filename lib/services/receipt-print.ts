@@ -7,6 +7,10 @@ import {
   type ReceiptDisplayOrder,
   type ReceiptLineItem,
 } from "@/lib/services/receipt-display";
+import {
+  formatReceiptPaymentHtml,
+  type ReceiptPaymentLine,
+} from "@/lib/payments/payment-methods";
 
 export type PrintableReceiptItem = ReceiptLineItem & {
   name?: string;
@@ -19,6 +23,7 @@ export type PrintableReceiptOrder = ReceiptDisplayOrder & {
   createdAt?: string;
   customerName?: string;
   paymentMethod?: string;
+  payments?: ReceiptPaymentLine[];
   type?: string;
   branch?: { name?: string; code?: string };
   branchName?: string;
@@ -103,9 +108,11 @@ export function buildReceiptPrintHtml(
   </div>`
       : "";
 
-  const paymentLine = order.paymentMethod
-    ? `<p>Payment: ${String(order.paymentMethod).replace(/_/g, " ")}</p>`
-    : "";
+  const paymentLine = formatReceiptPaymentHtml(
+    order.paymentMethod,
+    order.payments,
+    formatCurrency,
+  );
 
   return `
 <!DOCTYPE html>

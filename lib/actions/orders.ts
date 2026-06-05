@@ -257,6 +257,7 @@ export async function getOrders(filters?: {
           currency: p.currency,
           status: p.status,
           provider: p.provider,
+          paymentMethod: p.paymentMethod,
           paidAt: p.paidAt?.toISOString() || null,
         })),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -419,6 +420,7 @@ export async function getOrderById(id: string) {
           currency: p.currency,
           status: p.status,
           provider: p.provider,
+          paymentMethod: p.paymentMethod,
           providerRef: p.providerRef,
           paidAt: p.paidAt?.toISOString() || null,
           metadata: p.metadata,

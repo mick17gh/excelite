@@ -11,6 +11,12 @@ import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
 import { isTableManagementEnabledForBranch } from "@/lib/features/table-management";
 import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
 import { completeOrder } from "@/lib/actions/pos";
+import {
+  allocateTendersToOrder,
+  cashChangeFromTenders,
+  normalizePaymentMethod,
+  type PaymentTender,
+} from "@/lib/payments/tenders";
 
 type CheckoutActor = {
   userId: string;
@@ -101,7 +107,8 @@ export async function getTableSessionCheckout(sessionId: string) {
 
 export async function settleTableSession(input: {
   sessionId: string;
-  paymentMethod: string;
+  paymentMethod?: string;
+  tenders?: PaymentTender[];
   amountReceived?: number;
   tip?: number;
 }) {
@@ -140,7 +147,16 @@ export async function settleTableSession(input: {
   const tabTotal =
     Math.round(unpaidOrders.reduce((s, o) => s + Number(o.total), 0) * 100) / 100;
   const tip = input.tip ?? 0;
-  const amountReceived = input.amountReceived ?? tabTotal + tip;
+  const sessionTenders: PaymentTender[] =
+    input.tenders?.length
+      ? input.tenders
+      : [
+          {
+            method: normalizePaymentMethod(input.paymentMethod || "CASH") || "CASH",
+            amount: tabTotal,
+            amountReceived: input.amountReceived,
+          },
+        ];
 
   const paidOrderIds: string[] = [];
   const errors: string[] = [];
@@ -150,10 +166,15 @@ export async function settleTableSession(input: {
     const isLast = i === unpaidOrders.length - 1;
     const orderTotal = Number(order.total);
     const orderTip = isLast ? tip : 0;
-    const orderAmountReceived = isLast ? amountReceived : orderTotal + orderTip;
+    const orderTenders = allocateTendersToOrder(orderTotal, tabTotal, sessionTenders);
+    const orderAmountReceived = orderTenders.reduce(
+      (sum, t) => sum + (t.amountReceived ?? t.amount),
+      0,
+    );
 
     const result = await completeOrder({
       orderId: order.id,
+      tenders: orderTenders,
       paymentMethod: input.paymentMethod,
       amountReceived: orderAmountReceived,
       tip: orderTip,
@@ -187,7 +208,7 @@ export async function settleTableSession(input: {
   revalidatePath("/pos");
   revalidatePath(`/dashboard/branches/${session.branchId}/tables`);
 
-  const change = Math.max(0, Math.round((amountReceived - tabTotal - tip) * 100) / 100);
+  const change = Math.max(0, cashChangeFromTenders(sessionTenders));
 
   return {
     data: {

@@ -2,23 +2,17 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CreditCard, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
-  recordPayment,
+  recordSplitPayment,
   refundPayment,
   initializePaystackOrderPayment,
 } from "@/lib/actions/payments";
+import { SplitPaymentForm } from "@/components/payments/split-payment-form";
+import { formatPaymentMethodLabel } from "@/lib/payments/payment-methods";
+import type { PaymentTender } from "@/lib/payments/tenders";
 import { useCurrency } from "@/contexts/currency-context";
 
 interface PaymentItem {
@@ -28,6 +22,7 @@ interface PaymentItem {
   currency: string;
   status: string;
   provider: string;
+  paymentMethod?: string | null;
   paidAt: string | null;
 }
 
@@ -58,9 +53,6 @@ export function PaymentPanel({
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPaystackInitializing, setIsPaystackInitializing] = useState(false);
-  const [amount, setAmount] = useState(orderTotal);
-  const [provider, setProvider] = useState("cash");
-  const [providerRef, setProviderRef] = useState("");
   const { formatCurrency } = useCurrency();
 
   const totalPaid = Math.round(
@@ -68,26 +60,15 @@ export function PaymentPanel({
   ) / 100;
   const remaining = Math.round((orderTotal - totalPaid) * 100) / 100;
 
-  const handleRecordPayment = async () => {
-    if (amount <= 0) {
-      toast.error("Amount must be greater than 0");
-      return;
-    }
+  const handleRecordSplitPayment = async (tenders: PaymentTender[]) => {
     setIsSubmitting(true);
     try {
-      const result = await recordPayment({
-        orderId,
-        amount,
-        provider,
-        providerRef: providerRef.trim() || undefined,
-        paymentMethod: provider,
-      });
+      const result = await recordSplitPayment({ orderId, tenders });
       if (result.error) {
         toast.error(result.error);
       } else {
         toast.success("Payment recorded");
         setShowForm(false);
-        setProviderRef("");
         await onRefresh?.();
       }
     } catch {
@@ -163,7 +144,7 @@ export function PaymentPanel({
                 Pay with Paystack
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => { setShowForm(!showForm); setAmount(remaining); }}>
+            <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
               <Plus className="mr-1 h-3 w-3" />Record Payment
             </Button>
           </div>
@@ -179,34 +160,16 @@ export function PaymentPanel({
 
       {/* Payment Form */}
       {showForm && (
-        <div className="border rounded-md p-3 space-y-3 bg-muted/30">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1">
-              <Label className="text-xs">Amount</Label>
-              <Input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
-            </div>
-            <div className="grid gap-1">
-              <Label className="text-xs">Method</Label>
-              <Select value={provider} onValueChange={setProvider}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="momo">Mobile Money</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid gap-1">
-            <Label className="text-xs">Reference (optional)</Label>
-            <Input value={providerRef} onChange={(e) => setProviderRef(e.target.value)} placeholder="Transaction ref" />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleRecordPayment} disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-              Record
+        <div className="border rounded-md p-3 bg-muted/30">
+          <SplitPaymentForm
+            total={remaining}
+            disabled={isSubmitting}
+            submitLabel={isSubmitting ? "Recording..." : "Record payment"}
+            onSubmit={handleRecordSplitPayment}
+          />
+          <div className="flex justify-end mt-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+              Cancel
             </Button>
           </div>
         </div>
@@ -219,7 +182,9 @@ export function PaymentPanel({
             <div key={p.id} className="flex items-center justify-between px-3 py-2 text-sm">
               <div className="flex-1 min-w-0">
                 <span className="font-mono text-xs">{p.reference}</span>
-                <span className="ml-2 text-muted-foreground capitalize">{p.provider}</span>
+                <span className="ml-2 text-muted-foreground">
+                  {formatPaymentMethodLabel(p.paymentMethod || p.provider)}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">{p.status}</Badge>

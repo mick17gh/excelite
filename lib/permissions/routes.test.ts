@@ -4,6 +4,7 @@ import {
   filterNavItems,
   DASHBOARD_NAVIGATION,
   isAuthOnlyPath,
+  resolveAppBackHref,
   resolveSafeLandingHref,
 } from "./routes";
 import type { Permission } from "./types";
@@ -50,5 +51,23 @@ describe("permission routes", () => {
 
   it("falls back to account when no nav permissions", () => {
     expect(resolveSafeLandingHref(ctx([]))).toBe("/dashboard/account");
+  });
+
+  it("pos back goes to orders when dashboard is disabled", () => {
+    expect(
+      resolveAppBackHref("/pos", ctx(["pos:access", "orders:view"])),
+    ).toBe("/dashboard/orders");
+  });
+
+  it("pos back goes to dashboard when allowed", () => {
+    expect(
+      resolveAppBackHref("/pos", ctx(["dashboard:view", "pos:access"])),
+    ).toBe("/dashboard");
+  });
+
+  it("pos back falls back to account for pos-only staff", () => {
+    expect(resolveAppBackHref("/pos", ctx(["pos:access"]))).toBe(
+      "/dashboard/account",
+    );
   });
 });

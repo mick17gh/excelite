@@ -42,6 +42,7 @@ interface PaymentItem {
   currency: string;
   status: string;
   provider: string;
+  paymentMethod?: string | null;
   paidAt: string | null;
 }
 

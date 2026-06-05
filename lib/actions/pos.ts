@@ -20,6 +20,12 @@ import { validateTableSessionForOrder } from "@/lib/features/table-session-valid
 import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import {
+  settleOrderWithTenders,
+  type SettleOrderResult,
+} from "@/lib/payments/settle-order";
+import type { PaymentTender } from "@/lib/payments/tenders";
+import { normalizePaymentMethod } from "@/lib/payments/tenders";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -470,272 +476,56 @@ export async function updatePosOrderStatus(orderId: string, status: OrderStatus)
 
 export interface CompleteOrderInput {
   orderId: string;
-  paymentMethod: string;
+  paymentMethod?: string;
   amountReceived: number;
   tip?: number;
-  createSale?: boolean; // Create a sale record for reporting
-  skipStatusComplete?: boolean; // When true, leave order IN_PROGRESS so kitchen drives it to COMPLETED
+  createSale?: boolean;
+  skipStatusComplete?: boolean;
+  tenders?: PaymentTender[];
 }
 
-export async function completeOrder(input: CompleteOrderInput) {
-  try {
-    // Get the order with items
+export async function completeOrder(
+  input: CompleteOrderInput,
+): Promise<
+  { success: true; data: SettleOrderResult } | { success: false; error: string }
+> {
+  let tenders = input.tenders;
+  if (!tenders?.length) {
     const order = await db.order.findUnique({
       where: { id: input.orderId },
-      include: {
-        items: {
-          include: {
-            menuItem: true,
-            selections: { select: { menuItemOptionId: true } },
-          },
-        },
-      },
+      select: { total: true },
     });
+    if (!order) return { success: false, error: "Order not found" };
 
-    if (!order) {
-      return { success: false, error: "Order not found" };
-    }
-
-    if (order.status !== "COMPLETED" && order.paymentStatus !== "PAID") {
-      const { assertCartStockAvailable } = await import(
-        "@/lib/services/menu-stock-availability"
-      );
-      const stockCheck = await assertCartStockAvailable(
-        order.branchId,
-        order.items.map((item) => ({
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-          menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
-          menuItemName: item.menuItem?.name,
-        }))
-      );
-      if (!stockCheck.ok) {
-        return { success: false, error: stockCheck.error };
-      }
-    }
-
-    // Idempotent replay (e.g. offline sync retry): order already finalized
-    if (order.status === "COMPLETED" || order.paymentStatus === "PAID") {
-      if (order.tableSessionId) {
-        await closeTableSessionIfAllOrdersPaid(
-          order.tableSessionId,
-          order.branchId,
-        );
-      }
-      const totalWithTip = Number(order.total) + (input.tip || 0);
-      const change = input.amountReceived - totalWithTip;
-      return {
-        success: true,
-        data: {
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          total: Number(order.total),
-          tip: input.tip || 0,
-          totalWithTip,
-          amountReceived: input.amountReceived,
-          change: Math.max(0, change),
-          paymentMethod: order.paymentMethod || input.paymentMethod,
-          saleId: null,
-        },
-      };
-    }
-
-    // Update order status and payment
-    // If skipStatusComplete (kitchen toggle on), leave as IN_PROGRESS so kitchen drives COMPLETED
-    const orderStatus = input.skipStatusComplete ? "IN_PROGRESS" : "COMPLETED";
-    await db.order.update({
-      where: { id: input.orderId },
-      data: {
-        status: orderStatus,
-        paymentMethod: input.paymentMethod,
-        paymentStatus: "PAID",
-        ...(orderStatus === "COMPLETED" ? { closedAt: new Date() } : {}),
+    const tip = input.tip ?? 0;
+    const expected = Math.round((Number(order.total) + tip) * 100) / 100;
+    const method = normalizePaymentMethod(input.paymentMethod || "CASH") || "CASH";
+    tenders = [
+      {
+        method,
+        amount: expected,
+        amountReceived: method === "CASH" ? input.amountReceived : undefined,
       },
-    });
-
-    if (order.tableSessionId) {
-      await closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId);
-    }
-
-    // Create Payment record
-    const paymentRef = `PAY-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    await db.payment.create({
-      data: {
-        orderId: order.id,
-        reference: paymentRef,
-        amount: Number(order.total) + (input.tip || 0),
-        status: "PAID",
-        provider: "pos",
-        paidAt: new Date(),
-      },
-    });
-
-    // Create sale record if requested
-    let saleId: string | null = null;
-    if (input.createSale !== false) {
-      const saleNumber = `SALE-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-
-      const hour = new Date().getHours();
-      let dayPart: "BREAKFAST" | "LUNCH" | "DINNER" | "LATE_NIGHT" = "LATE_NIGHT";
-      if (hour >= 6 && hour < 11) dayPart = "BREAKFAST";
-      else if (hour >= 11 && hour < 15) dayPart = "LUNCH";
-      else if (hour >= 15 && hour < 21) dayPart = "DINNER";
-
-      // Map OrderType to SalesChannel for sale record
-      const channelMap: Record<string, SalesChannel> = {
-        DINE_IN: "DINE_IN",
-        TAKEOUT: "TAKEOUT",
-        DELIVERY: "DELIVERY",
-        APP: "APP",
-      };
-      const channel = channelMap[order.type] || "DINE_IN";
-
-      const transactionRef = `TXN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-      const transactionStaffId = await resolveTransactionStaffId(
-        order.cashierId,
-        order.branchId,
-      );
-      const transaction = await db.transaction.create({
-        data: {
-          transactionRef,
-          branchId: order.branchId,
-          staffId: transactionStaffId,
-          paymentMethod: input.paymentMethod,
-          amount: Number(order.total) + (input.tip || 0),
-          tip: input.tip || 0,
-          transactionDate: new Date(),
-        },
-      });
-
-      const allOptionIds = order.items.flatMap((i) =>
-        i.selections?.map((s) => s.menuItemOptionId) || []
-      );
-      const optionRows = allOptionIds.length
-        ? await db.menuItemOption.findMany({
-            where: { id: { in: allOptionIds } },
-            select: { id: true, costDelta: true },
-          })
-        : [];
-      const optCostDelta = new Map(
-        optionRows.map((o) => [o.id, o.costDelta != null ? Number(o.costDelta) : 0])
-      );
-
-      const sale = await db.sale.create({
-        data: {
-          saleNumber,
-          branchId: order.branchId,
-          transactionId: transaction.id,
-          subtotal: order.subtotal,
-          tax: order.tax,
-          total: order.total,
-          channel,
-          dayPart,
-          customerCount: 1,
-          saleDate: new Date(),
-          items: {
-            create: order.items.map((item) => {
-              const oids = item.selections?.map((s) => s.menuItemOptionId) || [];
-              const optionCostSum = oids.reduce((s, id) => s + (optCostDelta.get(id) || 0), 0);
-              const unitCost =
-                Math.round(((item.menuItem?.cost ? Number(item.menuItem.cost) : 0) + optionCostSum) * 100) / 100;
-              return {
-                menuItemId: item.menuItemId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                unitCost,
-                total: item.lineTotal,
-                discount: 0,
-                configurationLabel: item.configurationLabel,
-                configurationKey: item.configurationKey,
-                selections:
-                  oids.length > 0
-                    ? { create: oids.map((menuItemOptionId) => ({ menuItemOptionId })) }
-                    : undefined,
-              };
-            }),
-          },
-        },
-      });
-      saleId = sale.id;
-
-      await logCreate(
-        "Sale",
-        sale.id,
-        {
-          saleNumber,
-          orderId: order.id,
-          branchId: order.branchId,
-          total: Number(order.total),
-          paymentMethod: input.paymentMethod,
-        }
-      );
-
-      // Deduct branch inventory based on recipes (non-blocking)
-      try {
-        await deductInventoryForSale(
-          order.items.map((item) => ({
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-            menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
-          })),
-          order.branchId,
-          order.id
-        );
-      } catch (err) {
-        console.warn("[completeOrder] Inventory deduction failed:", err);
-      }
-    }
-
-    const totalWithTip = Number(order.total) + (input.tip || 0);
-    const change = input.amountReceived - totalWithTip;
-
-    // Auto-send SMS payment receipt if customer has name and phone
-    try {
-      await sendPaymentReceiptSMS(order.id);
-    } catch (err) {
-      console.warn("[completeOrder] Failed to send payment receipt SMS:", err);
-    }
-
-    // Auto-create delivery request for DELIVERY orders
-    if (order.type === "DELIVERY") {
-      try {
-        await createDeliveryRequest({
-          orderId: order.id,
-          deliveryAddress: order.deliveryAddress || undefined,
-          deliveryPhone: order.deliveryPhone || undefined,
-          customerName: order.customerName || undefined,
-          fee: Number(order.deliveryFee) || 0,
-          notes: order.deliveryNotes || undefined,
-        });
-      } catch (err) {
-        console.warn("[completeOrder] Failed to create delivery request:", err);
-      }
-    }
-
-    revalidatePath("/pos");
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/orders");
-    revalidatePath("/dashboard/transactions");
-    revalidatePath("/dashboard/delivery");
-
-    return {
-      success: true,
-      data: {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        total: Number(order.total),
-        tip: input.tip || 0,
-        totalWithTip,
-        amountReceived: input.amountReceived,
-        change: Math.max(0, change),
-        paymentMethod: input.paymentMethod,
-        saleId,
-      },
-    };
-  } catch (error) {
-    console.error("[completeOrder] Error:", error);
-    return { success: false, error: "Failed to complete order" };
+    ];
   }
+  const result = await settleOrderWithTenders({
+    orderId: input.orderId,
+    tenders,
+    tip: input.tip,
+    createSale: input.createSale,
+    skipStatusComplete: input.skipStatusComplete,
+    paymentProvider: "pos",
+  });
+
+  if (!result.success) return result;
+
+  revalidatePath("/pos");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/transactions");
+  revalidatePath("/dashboard/delivery");
+
+  return result;
 }
 
 // Send order items to kitchen (used from POS UI)

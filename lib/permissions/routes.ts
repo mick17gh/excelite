@@ -349,12 +349,22 @@ export function canAccessPath(pathname: string, ctx: RouteAccessContext): boolea
   return canAccessRouteRule(rule, ctx);
 }
 
-export function getFirstAccessibleNavHref(ctx: RouteAccessContext): string | null {
+export function getFirstAccessibleNavHref(
+  ctx: RouteAccessContext,
+  options?: { exclude?: string[] },
+): string {
+  const exclude = new Set(options?.exclude ?? []);
   const items = [...DASHBOARD_NAVIGATION, ...DASHBOARD_BOTTOM_NAVIGATION];
   for (const item of items) {
+    if (exclude.has(item.href)) continue;
     if (canAccessNavItem(item, ctx)) return item.href;
   }
   return "/dashboard/account";
+}
+
+/** Back target from standalone apps (POS, kitchen) — never the current app route. */
+export function resolveAppBackHref(appPath: string, ctx: RouteAccessContext): string {
+  return getFirstAccessibleNavHref(ctx, { exclude: [appPath] });
 }
 
 export function filterNavItems(items: NavItem[], ctx: RouteAccessContext): NavItem[] {
@@ -367,5 +377,5 @@ export function resolveSafeLandingHref(ctx: RouteAccessContext): string {
   if (hasPermissionInList(ctx.permissions, "pos:access")) return "/pos";
   if (hasPermissionInList(ctx.permissions, "orders:view")) return "/dashboard/orders";
   if (hasPermissionInList(ctx.permissions, "kitchen:access")) return "/kitchen";
-  return getFirstAccessibleNavHref(ctx) ?? "/dashboard/account";
+  return getFirstAccessibleNavHref(ctx);
 }

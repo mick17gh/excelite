@@ -2,11 +2,15 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { PaymentStatus, SalesChannel } from "@/lib/generated/prisma/client";
-import { sendPaymentReceiptSMS } from "@/lib/services/sms-notifications";
-import { deductInventoryForSale } from "@/lib/services/inventory-deduction";
+import { PaymentStatus } from "@/lib/generated/prisma/client";
 import { getEnvPaystackSecretKey, isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
-import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
+import { finalizeOrderFromExistingPayments } from "@/lib/payments/settle-order";
+import {
+  normalizePaymentMethod,
+  roundMoney,
+  validateTenders,
+  type PaymentTender,
+} from "@/lib/payments/tenders";
 
 export interface RecordPaymentInput {
   orderId: string;
@@ -66,159 +70,8 @@ async function initializePaystackTransaction(params: {
   });
 }
 
-async function settleOrderIfFullyPaid(orderId: string, paymentMethod: string) {
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    include: {
-      items: {
-        include: {
-          menuItem: { select: { cost: true, name: true } },
-          selections: { select: { menuItemOptionId: true } },
-        },
-      },
-      payments: { where: { status: "PAID" } },
-    },
-  });
-
-  if (!order) return;
-
-  const totalPaid = order.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-  if (totalPaid < Number(order.total)) return;
-
-  const alreadyPaid = order.paymentStatus === "PAID";
-  await db.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus: "PAID",
-      paymentMethod,
-      orderReceivedTime: order.orderReceivedTime || new Date(),
-    },
-  });
-
-  if (alreadyPaid) {
-    if (order.tableSessionId) {
-      await closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId);
-    }
-    return;
-  }
-
-  const transactionRef = `TXN-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-  const transaction = await db.transaction.create({
-    data: {
-      transactionRef,
-      branchId: order.branchId,
-      paymentMethod,
-      amount: Number(order.total),
-      tip: 0,
-      transactionDate: new Date(),
-    },
-  });
-
-  const saleNumber = `SALE-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-  const hour = new Date().getHours();
-  let dayPart: "BREAKFAST" | "LUNCH" | "DINNER" | "LATE_NIGHT" = "LATE_NIGHT";
-  if (hour >= 6 && hour < 11) dayPart = "BREAKFAST";
-  else if (hour >= 11 && hour < 15) dayPart = "LUNCH";
-  else if (hour >= 15 && hour < 21) dayPart = "DINNER";
-
-  const channelMap: Record<string, SalesChannel> = {
-    DINE_IN: "DINE_IN",
-    TAKEOUT: "TAKEOUT",
-    DELIVERY: "DELIVERY",
-    APP: "APP",
-  };
-  const channel = channelMap[order.type] || "DINE_IN";
-
-  const { assertCartStockAvailable } = await import(
-    "@/lib/services/menu-stock-availability"
-  );
-  const stockCheck = await assertCartStockAvailable(
-    order.branchId,
-    order.items.map((item) => ({
-      menuItemId: item.menuItemId,
-      quantity: item.quantity,
-      menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
-      menuItemName: item.menuItem?.name,
-    }))
-  );
-  if (!stockCheck.ok) {
-    console.warn("[settleOrderIfFullyPaid] Stock check failed:", stockCheck.error);
-    return;
-  }
-
-  const allOptionIds = order.items.flatMap((i) =>
-    i.selections?.map((s) => s.menuItemOptionId) || []
-  );
-  const optionRows = allOptionIds.length
-    ? await db.menuItemOption.findMany({
-        where: { id: { in: allOptionIds } },
-        select: { id: true, costDelta: true },
-      })
-    : [];
-  const optCostDelta = new Map(
-    optionRows.map((o) => [o.id, o.costDelta != null ? Number(o.costDelta) : 0])
-  );
-
-  await db.sale.create({
-    data: {
-      saleNumber,
-      branchId: order.branchId,
-      transactionId: transaction.id,
-      subtotal: order.subtotal,
-      tax: order.tax,
-      total: order.total,
-      channel,
-      dayPart,
-      customerCount: 1,
-      saleDate: new Date(),
-      items: {
-        create: order.items.map((item) => {
-          const oids = item.selections?.map((s) => s.menuItemOptionId) || [];
-          const optionCostSum = oids.reduce((s, id) => s + (optCostDelta.get(id) || 0), 0);
-          const unitCost =
-            Math.round(((item.menuItem?.cost ? Number(item.menuItem.cost) : 0) + optionCostSum) * 100) / 100;
-          return {
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            unitCost,
-            total: item.lineTotal,
-            discount: 0,
-            configurationLabel: item.configurationLabel,
-            configurationKey: item.configurationKey,
-            selections:
-              oids.length > 0
-                ? { create: oids.map((menuItemOptionId) => ({ menuItemOptionId })) }
-                : undefined,
-          };
-        }),
-      },
-    },
-  });
-
-  try {
-    await deductInventoryForSale(
-      order.items.map((item) => ({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
-      })),
-      order.branchId,
-      order.id
-    );
-  } catch (err) {
-    console.warn("[settleOrderIfFullyPaid] Inventory deduction failed:", err);
-  }
-
-  try {
-    await sendPaymentReceiptSMS(order.id);
-  } catch (err) {
-    console.warn("[settleOrderIfFullyPaid] Failed to send payment receipt SMS:", err);
-  }
-
-  if (order.tableSessionId) {
-    await closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId);
-  }
+async function settleOrderIfFullyPaid(orderId: string) {
+  await finalizeOrderFromExistingPayments(orderId);
 }
 
 export async function getPaymentsByOrder(orderId: string) {
@@ -237,6 +90,7 @@ export async function getPaymentsByOrder(orderId: string) {
         currency: p.currency,
         status: p.status,
         provider: p.provider,
+        paymentMethod: p.paymentMethod,
         providerRef: p.providerRef,
         paidAt: p.paidAt?.toISOString() || null,
         createdAt: p.createdAt.toISOString(),
@@ -252,6 +106,9 @@ export async function recordPayment(input: RecordPaymentInput) {
   try {
     const reference = `PAY-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 4).toUpperCase()}`;
 
+    const method =
+      normalizePaymentMethod(input.paymentMethod || input.provider || "cash") || "CASH";
+
     const payment = await db.payment.create({
       data: {
         orderId: input.orderId,
@@ -260,12 +117,13 @@ export async function recordPayment(input: RecordPaymentInput) {
         currency: input.currency || "GHS",
         status: "PAID",
         provider: input.provider || "manual",
+        paymentMethod: method,
         providerRef: input.providerRef || null,
         paidAt: new Date(),
       },
     });
 
-    await settleOrderIfFullyPaid(input.orderId, input.paymentMethod || input.provider || "manual");
+    await settleOrderIfFullyPaid(input.orderId);
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/transactions");
@@ -289,6 +147,58 @@ export async function recordPayment(input: RecordPaymentInput) {
   } catch (error) {
     console.error("[recordPayment] Error:", error);
     return { error: "Failed to record payment" };
+  }
+}
+
+export async function recordSplitPayment(input: {
+  orderId: string;
+  tenders: PaymentTender[];
+}) {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: input.orderId },
+      include: { payments: { where: { status: "PAID" } } },
+    });
+    if (!order) return { error: "Order not found" };
+    if (order.paymentStatus === "PAID") return { error: "Order is already paid" };
+
+    const totalPaid = roundMoney(
+      order.payments.reduce((sum, p) => sum + Number(p.amount), 0),
+    );
+    const orderTotal = roundMoney(Number(order.total));
+    const remaining = roundMoney(orderTotal - totalPaid);
+
+    const validation = validateTenders(remaining, input.tenders);
+    if (!validation.ok) return { error: validation.error };
+
+    await db.$transaction(async (tx) => {
+      for (const tender of input.tenders) {
+        const reference = `PAY-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 4).toUpperCase()}`;
+        await tx.payment.create({
+          data: {
+            orderId: input.orderId,
+            reference,
+            amount: tender.amount,
+            currency: "GHS",
+            status: "PAID",
+            provider: "manual",
+            paymentMethod: tender.method,
+            providerRef: tender.reference?.trim() || null,
+            paidAt: new Date(),
+          },
+        });
+      }
+    });
+
+    await settleOrderIfFullyPaid(input.orderId);
+
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/transactions");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    console.error("[recordSplitPayment] Error:", error);
+    return { error: "Failed to record split payment" };
   }
 }
 
@@ -485,6 +395,7 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
         currency: payload.data.currency,
         status: "PAID",
         provider: "paystack",
+        paymentMethod: "CARD",
         providerRef: String(payload.data.id),
         paidAt: payload.data.paid_at ? new Date(payload.data.paid_at) : new Date(),
         metadata: payload.data,
@@ -496,6 +407,7 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
         currency: payload.data.currency,
         status: "PAID",
         provider: "paystack",
+        paymentMethod: "CARD",
         providerRef: String(payload.data.id),
         paidAt: payload.data.paid_at ? new Date(payload.data.paid_at) : new Date(),
         metadata: payload.data,
@@ -512,7 +424,7 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
       data: { status: "FAILED" },
     });
 
-    await settleOrderIfFullyPaid(order.id, "PAYSTACK");
+    await settleOrderIfFullyPaid(order.id);
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/transactions");

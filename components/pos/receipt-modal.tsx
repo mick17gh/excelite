@@ -23,11 +23,13 @@ import {
   type ReceiptLineItem,
 } from "@/lib/services/receipt-display";
 import { printOrderReceipt, receiptLineLabel } from "@/lib/services/receipt-print";
+import { formatPaymentMethodLabel } from "@/lib/payments/payment-methods";
 
 type ReceiptOrderShape = Record<string, unknown> & ReceiptDisplayOrder & {
   orderNumber?: string;
   type?: string;
   paymentMethod?: string;
+  payments?: Array<{ paymentMethod?: string | null; amount: number }>;
   customerName?: string;
   createdAt?: string;
   branch?: { name?: string; code?: string };
@@ -193,10 +195,20 @@ export function ReceiptModal({
                 <span>Type:</span>
                 <span>{(order.type ?? "").replace(/_/g, " ")}</span>
               </div>
-              {order.paymentMethod ? (
+              {order.payments && order.payments.length > 1 ? (
+                <div className="space-y-1">
+                  <span className="font-medium">Payment:</span>
+                  {order.payments.map((p, i) => (
+                    <div key={i} className="flex justify-between pl-2 text-xs">
+                      <span>{formatPaymentMethodLabel(p.paymentMethod)}</span>
+                      <span>{formatCurrency(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : order.paymentMethod ? (
                 <div className="flex justify-between">
                   <span>Payment:</span>
-                  <span>{String(order.paymentMethod).replace(/_/g, " ")}</span>
+                  <span>{formatPaymentMethodLabel(order.paymentMethod)}</span>
                 </div>
               ) : null}
             </div>
@@ -299,7 +311,14 @@ function generateReceiptText(
       : "Date: —",
     order.customerName ? `Customer: ${order.customerName}` : "",
     `Type: ${(order.type ?? "").replace(/_/g, " ")}`,
-    order.paymentMethod ? `Payment: ${String(order.paymentMethod).replace(/_/g, " ")}` : "",
+    ...(order.payments && order.payments.length > 1
+      ? order.payments.map(
+          (p) =>
+            `${formatPaymentMethodLabel(p.paymentMethod)}:${" ".repeat(20)}${formatCurrency(p.amount)}`,
+        )
+      : order.paymentMethod
+        ? [`Payment: ${formatPaymentMethodLabel(order.paymentMethod)}`]
+        : []),
     "-".repeat(40),
     ...order.items?.map((item) =>
       `${receiptLineLabel(item)}${" ".repeat(20)}${formatCurrency(receiptLineAmount(item))}`
