@@ -49,12 +49,18 @@ enum TableSessionStatus {
   VOID
 }
 
-enum StaffRole {
-  MANAGER
+enum StaffJobRoleCategory {
+  MANAGEMENT
   KITCHEN
-  SERVICE
-  CASHIER
-  DELIVERY
+  FRONT_OF_HOUSE
+  OPERATIONS
+  CORPORATE
+}
+
+enum ShiftTemplate {
+  MORNING
+  EVENING
+  FULL
 }
 
 enum DutyStatus {
@@ -496,6 +502,30 @@ model TaxConfig {
   @@map("tax_config")
 }
 
+model StaffJobRole {
+  id                   String               @id @default(cuid())
+  organizationId       String
+  name                 String
+  code                 String
+  category             StaffJobRoleCategory?
+  description          String?
+  sortOrder            Int                  @default(0)
+  isActive             Boolean              @default(true)
+  defaultShiftTemplate ShiftTemplate?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  deletedAt            DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  staff        Staff[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@index([organizationId, sortOrder])
+  @@map("staff_job_role")
+}
+
 model Staff {
   id         String     @id @default(cuid())
   employeeId String     @unique
@@ -503,7 +533,7 @@ model Staff {
   lastName   String
   email      String?
   phone      String?
-  role       StaffRole
+  jobRoleId  String
   hourlyRate Decimal    @db.Decimal(10, 2)
   hireDate   DateTime
   branchId   String
@@ -515,11 +545,12 @@ model Staff {
 
   // Relations
   branch       Branch          @relation(fields: [branchId], references: [id])
+  jobRole      StaffJobRole    @relation(fields: [jobRoleId], references: [id])
   schedules    StaffSchedule[]
   transactions Transaction[]
 
   @@index([branchId])
-  @@index([role])
+  @@index([jobRoleId])
   @@index([dutyStatus])
   @@map("staff")
 }
@@ -1452,6 +1483,7 @@ model Organization {
   subscription        Subscription?
   warehouses          Warehouse[]
   inventoryCategories InventoryCategoryMaster[]
+  staffJobRoles       StaffJobRole[]
   rolePermissions     OrgRolePermission[]
 
   @@index([tier])

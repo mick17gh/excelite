@@ -851,13 +851,37 @@ export async function bulkCreateStaff(items: BulkStaffInput[]) {
       return { success: false, error: "No staff members provided" };
     }
 
-    // Generate employee IDs for items without one
+    const organizationId = await getSessionOrganizationId();
+    if (!organizationId) {
+      return { success: false, error: "Organization not found" };
+    }
+
+    const { ensureDefaultStaffJobRoles } = await import("@/lib/staff/job-role-seed");
+    await ensureDefaultStaffJobRoles(organizationId);
+
+    const jobRoles = await db.staffJobRole.findMany({
+      where: { organizationId, isActive: true, deletedAt: null },
+      select: { id: true, code: true, name: true },
+    });
+    const codeToId = new Map(jobRoles.map((r) => [r.code.toUpperCase(), r.id]));
+    const nameToId = new Map(jobRoles.map((r) => [r.name.toLowerCase(), r.id]));
+    const validCodes = jobRoles.map((r) => r.code);
+
+    const resolveJobRoleId = (roleValue: string): string | null => {
+      const upper = roleValue.trim().toUpperCase().replace(/\s+/g, "_");
+      if (codeToId.has(upper)) return codeToId.get(upper)!;
+      const byName = nameToId.get(roleValue.trim().toLowerCase());
+      if (byName) return byName;
+      return null;
+    };
+
     const itemsWithIds = items.map((item, index) => ({
       ...item,
-      employeeId: item.employeeId || `EMP-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`,
+      employeeId:
+        item.employeeId ||
+        `EMP-${Date.now().toString(36).toUpperCase()}${index.toString().padStart(3, "0")}`,
     }));
 
-    // Check for duplicate employee IDs
     const existingIds = await db.staff.findMany({
       where: {
         employeeId: { in: itemsWithIds.map((i) => i.employeeId) },
@@ -873,13 +897,11 @@ export async function bulkCreateStaff(items: BulkStaffInput[]) {
       return { success: false, error: "All employee IDs already exist" };
     }
 
-    // Validate roles
-    const validRoles = ["MANAGER", "KITCHEN", "SERVICE", "CASHIER", "DELIVERY"];
-    const invalidRoles = newItems.filter((i) => !validRoles.includes(i.role.toUpperCase()));
+    const invalidRoles = newItems.filter((i) => !resolveJobRoleId(i.role));
     if (invalidRoles.length > 0) {
-      return { 
-        success: false, 
-        error: `Invalid roles: ${invalidRoles.map((i) => i.role).join(", ")}. Valid roles: ${validRoles.join(", ")}` 
+      return {
+        success: false,
+        error: `Invalid roles: ${invalidRoles.map((i) => i.role).join(", ")}. Valid role codes: ${validCodes.join(", ")}`,
       };
     }
 
@@ -890,7 +912,7 @@ export async function bulkCreateStaff(items: BulkStaffInput[]) {
         lastName: item.lastName.trim(),
         email: item.email?.trim(),
         phone: item.phone?.trim(),
-        role: item.role.toUpperCase() as "MANAGER" | "KITCHEN" | "SERVICE" | "CASHIER" | "DELIVERY",
+        jobRoleId: resolveJobRoleId(item.role)!,
         hourlyRate: item.hourlyRate,
         hireDate: new Date(),
         branchId: item.branchId,

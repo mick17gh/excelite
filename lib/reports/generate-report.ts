@@ -1240,7 +1240,10 @@ async function buildStaffReport(
       ...branchFilter,
       scheduledDate: { gte: input.startDate, lte: input.endDate },
     },
-    include: { staff: true, branch: true },
+    include: {
+      staff: { include: { jobRole: { select: { name: true } } } },
+      branch: true,
+    },
   });
 
   const staffRows = schedules.map((sc) => {
@@ -1251,7 +1254,7 @@ async function buildStaffReport(
       Date: formatReportDateOnly(sc.scheduledDate),
       Branch: sc.branch?.name || "",
       "Staff Name": staffDisplayName(sc.staff),
-      Role: sc.staff?.role || "",
+      Role: sc.staff?.jobRole?.name || "",
       "Scheduled Hours": roundMoney(hours),
       "Labor Cost (GHS)": laborCost,
     };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useState, useRef, useTransition, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -61,16 +61,30 @@ import {
   getSupplierCSVTemplate,
   getStaffCSVTemplate,
   menuVisibilityPreviewLabel,
+  resolveStaffRoleCode,
 } from "@/lib/utils/bulk-import";
+import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
+import { cn } from "@/lib/utils";
+import { staffJobRoleComboboxOptions } from "@/lib/staff/job-role-defaults";
+import type { StaffJobRoleCategory } from "@/lib/generated/prisma/client";
 import { resolveBranchRefsFromList } from "@/lib/menu/branch-availability";
 
 type ImportType = "menu" | "menu-options" | "inventory" | "category" | "supplier" | "staff";
+
+export interface StaffJobRoleImportOption {
+  id: string;
+  name: string;
+  code: string;
+  category: StaffJobRoleCategory | null;
+}
 
 interface BulkImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   type: ImportType;
   branches?: Array<{ id: string; name: string; code?: string }>;
+  jobRoles?: StaffJobRoleImportOption[];
   onSuccess?: () => void;
 }
 
@@ -85,6 +99,7 @@ export function BulkImportDialog({
   onOpenChange,
   type,
   branches = [],
+  jobRoles = [],
   onSuccess,
 }: BulkImportDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -134,7 +149,7 @@ export function BulkImportDialog({
         template = getSupplierCSVTemplate();
         break;
       case "staff":
-        template = getStaffCSVTemplate();
+        template = getStaffCSVTemplate(jobRoles.map((r) => r.code));
         break;
       default:
         template = "";
@@ -246,7 +261,7 @@ export function BulkImportDialog({
       case "supplier":
         if (!row.name && !row.Name) errors.push("Name is required");
         break;
-      case "staff":
+      case "staff": {
         if (!row.firstName && !row["First Name"])
           errors.push("First name is required");
         if (!row.lastName && !row["Last Name"])
@@ -256,7 +271,17 @@ export function BulkImportDialog({
         );
         if (isNaN(hourlyRate) || hourlyRate < 0)
           errors.push("Valid hourly rate is required");
+        const roleRaw = String(row.role || row.Role || "").trim();
+        if (!roleRaw) {
+          errors.push("Job role is required");
+        } else if (
+          jobRoles.length > 0 &&
+          !resolveStaffRoleCode(roleRaw, jobRoles)
+        ) {
+          errors.push("Invalid role — select from dropdown");
+        }
         break;
+      }
     }
 
     return {
@@ -285,7 +310,11 @@ export function BulkImportDialog({
         return;
       }
 
-      const validated = rows.map((row, index) => validateRow(row, index));
+      const normalizedRows =
+        type === "staff"
+          ? rows.map((row) => normalizeStaffRow(row))
+          : rows;
+      const validated = normalizedRows.map((row, index) => validateRow(row, index));
       setParsedData(validated);
       setStep("preview");
     };
@@ -295,6 +324,48 @@ export function BulkImportDialog({
   const removeRow = (index: number) => {
     setParsedData((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const normalizeStaffRow = (row: Record<string, string>): Record<string, string> => {
+    const normalized = { ...row };
+    if (!normalized.firstName && normalized["First Name"]) {
+      normalized.firstName = normalized["First Name"];
+    }
+    if (!normalized.lastName && normalized["Last Name"]) {
+      normalized.lastName = normalized["Last Name"];
+    }
+    if (!normalized.hourlyRate && normalized["Hourly Rate"]) {
+      normalized.hourlyRate = normalized["Hourly Rate"];
+    }
+    const roleRaw = normalized.role || normalized.Role || "";
+    if (roleRaw && jobRoles.length > 0) {
+      const resolved = resolveStaffRoleCode(roleRaw, jobRoles);
+      if (resolved) normalized.role = resolved;
+    }
+    return normalized;
+  };
+
+  const updateStaffRowField = (
+    index: number,
+    field: "firstName" | "lastName" | "role" | "hourlyRate" | "email" | "phone",
+    value: string,
+  ) => {
+    setParsedData((prev) => {
+      const updated = [...prev];
+      const row = { ...(updated[index].data as Record<string, string>) };
+      row[field] = value;
+      if (field === "firstName") row["First Name"] = value;
+      if (field === "lastName") row["Last Name"] = value;
+      if (field === "hourlyRate") row["Hourly Rate"] = value;
+      if (field === "role") row.Role = value;
+      updated[index] = validateRow(row, index);
+      return updated;
+    });
+  };
+
+  const jobRoleComboboxOptions = useMemo(
+    () => staffJobRoleComboboxOptions(jobRoles, "code"),
+    [jobRoles],
+  );
 
   const handleImport = async () => {
     const validRows = parsedData.filter((r) => r.isValid);
@@ -490,8 +561,10 @@ export function BulkImportDialog({
                 {type === "staff" && (
                   <>
                     Required: <code>firstName</code>, <code>lastName</code>,{" "}
-                    <code>hourlyRate</code>. Optional: <code>employeeId</code>,{" "}
-                    <code>email</code>, <code>phone</code>, <code>role</code>
+                    <code>hourlyRate</code>, <code>role</code> (job role code from
+                    Settings → Job Roles). Optional: <code>employeeId</code>,{" "}
+                    <code>email</code>, <code>phone</code>. You can fix roles and
+                    other fields inline in the preview step.
                   </>
                 )}
               </p>
@@ -599,9 +672,30 @@ export function BulkImportDialog({
                         {index + 1}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {type === "staff"
-                          ? `${String(row.data.firstName || row.data["First Name"] || "")} ${String(row.data.lastName || row.data["Last Name"] || "")}`
-                          : type === "menu-options"
+                        {type === "staff" ? (
+                          <div className="flex flex-col gap-1 min-w-[140px]">
+                            <Input
+                              className="h-7 text-xs"
+                              value={String(
+                                row.data.firstName || row.data["First Name"] || "",
+                              )}
+                              placeholder="First name"
+                              onChange={(e) =>
+                                updateStaffRowField(index, "firstName", e.target.value)
+                              }
+                            />
+                            <Input
+                              className="h-7 text-xs"
+                              value={String(
+                                row.data.lastName || row.data["Last Name"] || "",
+                              )}
+                              placeholder="Last name"
+                              onChange={(e) =>
+                                updateStaffRowField(index, "lastName", e.target.value)
+                              }
+                            />
+                          </div>
+                        ) : type === "menu-options"
                             ? String(
                                 row.data.menuItemSku ||
                                   row.data.menu_sku ||
@@ -684,14 +778,36 @@ export function BulkImportDialog({
                       {type === "staff" && (
                         <>
                           <TableCell>
-                            {String(row.data.role || row.data.Role || "-")}
+                            <Combobox
+                              options={jobRoleComboboxOptions}
+                              value={String(row.data.role || row.data.Role || "")}
+                              onValueChange={(value) =>
+                                updateStaffRowField(index, "role", value)
+                              }
+                              placeholder="Select role..."
+                              searchPlaceholder="Search roles..."
+                              emptyText="No roles found."
+                              className={cn(
+                                "h-8 min-h-8 min-w-[160px] text-xs",
+                                row.errors.some((e) => e.includes("role")) &&
+                                  "border-destructive",
+                              )}
+                            />
                           </TableCell>
                           <TableCell>
-                            {String(
-                              row.data.hourlyRate ||
-                                row.data["Hourly Rate"] ||
-                                "-",
-                            )}
+                            <Input
+                              className="h-8 text-xs w-24"
+                              type="number"
+                              step="0.01"
+                              value={String(
+                                row.data.hourlyRate ||
+                                  row.data["Hourly Rate"] ||
+                                  "",
+                              )}
+                              onChange={(e) =>
+                                updateStaffRowField(index, "hourlyRate", e.target.value)
+                              }
+                            />
                           </TableCell>
                         </>
                       )}

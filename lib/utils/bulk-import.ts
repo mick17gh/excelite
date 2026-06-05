@@ -346,14 +346,34 @@ export function parseStaffCSV(rows: ParsedCSVRow[], defaultBranchId: string): Bu
     .filter((item) => item.firstName.trim().length > 0 && item.lastName.trim().length > 0);
 }
 
-export function getStaffCSVTemplate(): string {
+export function getStaffCSVTemplate(roleCodes?: string[]): string {
   const headers = ["employeeId", "firstName", "lastName", "email", "phone", "role", "hourlyRate"];
   const examples = [
     ["EMP-001", "John", "Doe", "john.doe@restaurant.com", "+233 20 111 2222", "MANAGER", "25.00"],
     ["EMP-002", "Jane", "Smith", "jane.smith@restaurant.com", "+233 24 333 4444", "KITCHEN", "15.00"],
     ["EMP-003", "Bob", "Wilson", "", "+233 50 555 6666", "SERVICE", "12.00"],
+    ["EMP-004", "Alice", "Brown", "alice@company.com", "", "HR", "20.00"],
   ];
-  return [headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
+  const comment =
+    roleCodes && roleCodes.length > 0
+      ? `# Valid role codes (from Settings > Job Roles): ${roleCodes.join(", ")}`
+      : "# role column must match a job role code from Settings > Job Roles";
+  return [comment, headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
+}
+
+/** Resolve a CSV role string to a job role code using known org roles. */
+export function resolveStaffRoleCode(
+  roleValue: string,
+  jobRoles: Array<{ code: string; name: string }>
+): string | null {
+  const trimmed = roleValue.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase().replace(/\s+/g, "_");
+  const byCode = jobRoles.find((r) => r.code.toUpperCase() === upper);
+  if (byCode) return byCode.code;
+  const byName = jobRoles.find((r) => r.name.toLowerCase() === trimmed.toLowerCase());
+  if (byName) return byName.code;
+  return null;
 }
 
 // =====================================

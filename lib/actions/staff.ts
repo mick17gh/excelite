@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { StaffRole, DutyStatus } from "@/lib/generated/prisma/client";
+import { DutyStatus } from "@/lib/generated/prisma/client";
 
 export interface PaginationParams {
   page?: number;
@@ -26,7 +26,7 @@ export interface CreateStaffInput {
   lastName: string;
   email?: string;
   phone?: string;
-  role: StaffRole;
+  jobRoleId: string;
   hourlyRate: number;
   branchId: string;
   hireDate: Date;
@@ -38,7 +38,7 @@ export interface UpdateStaffInput {
   lastName?: string;
   email?: string;
   phone?: string;
-  role?: StaffRole;
+  jobRoleId?: string;
   hourlyRate?: number;
   branchId?: string;
   isActive?: boolean;
@@ -51,6 +51,67 @@ function generateEmployeeId(): string {
   return `${prefix}-${timestamp}${random}`;
 }
 
+function mapStaffRecord(s: {
+  id: string;
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  jobRoleId: string;
+  hourlyRate: { toString(): string } | number;
+  hireDate: Date;
+  branchId: string;
+  isActive: boolean;
+  dutyStatus: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+  branch?: unknown;
+  jobRole?: {
+    id: string;
+    name: string;
+    code: string;
+    category: string | null;
+    defaultShiftTemplate: string | null;
+  } | null;
+}) {
+  return {
+    id: s.id,
+    employeeId: s.employeeId,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    email: s.email,
+    phone: s.phone,
+    jobRoleId: s.jobRoleId,
+    role: s.jobRole?.name ?? "Unknown",
+    roleCode: s.jobRole?.code ?? "",
+    jobRole: s.jobRole ?? null,
+    hourlyRate: Number(s.hourlyRate),
+    hireDate: s.hireDate,
+    branchId: s.branchId,
+    isActive: s.isActive,
+    dutyStatus: s.dutyStatus,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+    deletedAt: s.deletedAt,
+    branch: s.branch,
+  };
+}
+
+const staffInclude = {
+  branch: true,
+  jobRole: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      category: true,
+      defaultShiftTemplate: true,
+    },
+  },
+} as const;
+
 export async function createStaff(input: CreateStaffInput) {
   try {
     const staff = await db.staff.create({
@@ -60,23 +121,18 @@ export async function createStaff(input: CreateStaffInput) {
         lastName: input.lastName,
         email: input.email,
         phone: input.phone,
-        role: input.role,
+        jobRoleId: input.jobRoleId,
         hourlyRate: input.hourlyRate,
         branchId: input.branchId,
         hireDate: input.hireDate,
         isActive: true,
         dutyStatus: "OFF_DUTY",
       },
+      include: staffInclude,
     });
 
     revalidatePath("/dashboard/staff");
-    return { 
-      success: true, 
-      data: {
-        ...staff,
-        hourlyRate: Number(staff.hourlyRate)
-      }
-    };
+    return { success: true, data: mapStaffRecord(staff) };
   } catch (error) {
     console.error("[createStaff] Error:", error);
     return { success: false, error: "Failed to create staff member" };
@@ -89,16 +145,11 @@ export async function updateStaff(input: UpdateStaffInput) {
     const staff = await db.staff.update({
       where: { id },
       data,
+      include: staffInclude,
     });
 
     revalidatePath("/dashboard/staff");
-    return { 
-      success: true, 
-      data: {
-        ...staff,
-        hourlyRate: Number(staff.hourlyRate)
-      }
-    };
+    return { success: true, data: mapStaffRecord(staff) };
   } catch (error) {
     console.error("[updateStaff] Error:", error);
     return { success: false, error: "Failed to update staff member" };
@@ -137,9 +188,7 @@ export async function getStaff(
     const [staff, totalItems] = await Promise.all([
       db.staff.findMany({
         where,
-        include: {
-          branch: true,
-        },
+        include: staffInclude,
         orderBy: { lastName: "asc" },
         skip,
         take: pageSize,
@@ -147,29 +196,9 @@ export async function getStaff(
       db.staff.count({ where }),
     ]);
 
-    // Convert Decimal fields to plain numbers
-    const convertedStaff = staff.map((s) => ({
-      id: s.id,
-      employeeId: s.employeeId,
-      firstName: s.firstName,
-      lastName: s.lastName,
-      email: s.email,
-      phone: s.phone,
-      role: s.role,
-      hourlyRate: Number(s.hourlyRate),
-      hireDate: s.hireDate,
-      branchId: s.branchId,
-      isActive: s.isActive,
-      dutyStatus: s.dutyStatus,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-      deletedAt: s.deletedAt,
-      branch: s.branch,
-    }));
-
     return {
       success: true,
-      data: convertedStaff,
+      data: staff.map(mapStaffRecord),
       pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) },
     };
   } catch (error) {
@@ -188,7 +217,7 @@ export async function getStaffById(id: string) {
     const staff = await db.staff.findUnique({
       where: { id },
       include: {
-        branch: true,
+        ...staffInclude,
         schedules: {
           orderBy: { scheduledDate: "desc" },
           take: 10,
@@ -200,26 +229,10 @@ export async function getStaffById(id: string) {
       return { success: false, error: "Staff member not found" };
     }
 
-    // Convert Decimal fields to plain numbers
     return {
       success: true,
       data: {
-        id: staff.id,
-        employeeId: staff.employeeId,
-        firstName: staff.firstName,
-        lastName: staff.lastName,
-        email: staff.email,
-        phone: staff.phone,
-        role: staff.role,
-        hourlyRate: Number(staff.hourlyRate),
-        hireDate: staff.hireDate,
-        branchId: staff.branchId,
-        isActive: staff.isActive,
-        dutyStatus: staff.dutyStatus,
-        createdAt: staff.createdAt,
-        updatedAt: staff.updatedAt,
-        deletedAt: staff.deletedAt,
-        branch: staff.branch,
+        ...mapStaffRecord(staff),
         schedules: staff.schedules,
       },
     };
@@ -265,12 +278,8 @@ export async function clockIn(staffId: string, notes?: string) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Find today's schedule or create one
     let schedule = await db.staffSchedule.findFirst({
-      where: {
-        staffId,
-        scheduledDate: today,
-      },
+      where: { staffId, scheduledDate: today },
     });
 
     if (schedule) {
@@ -284,7 +293,6 @@ export async function clockIn(staffId: string, notes?: string) {
       });
     }
 
-    // Update staff duty status
     await db.staff.update({
       where: { id: staffId },
       data: { dutyStatus: "ON_DUTY" },
@@ -303,13 +311,8 @@ export async function clockOut(staffId: string, notes?: string) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Find today's schedule
     const schedule = await db.staffSchedule.findFirst({
-      where: {
-        staffId,
-        scheduledDate: today,
-        status: "ON_DUTY",
-      },
+      where: { staffId, scheduledDate: today, status: "ON_DUTY" },
     });
 
     if (schedule) {
@@ -323,7 +326,6 @@ export async function clockOut(staffId: string, notes?: string) {
       });
     }
 
-    // Update staff duty status
     await db.staff.update({
       where: { id: staffId },
       data: { dutyStatus: "OFF_DUTY" },
@@ -342,16 +344,14 @@ export async function getStaffSummary() {
     const branches = await db.branch.findMany({
       where: { deletedAt: null, isActive: true },
       include: {
-        staff: {
-          where: { deletedAt: null, isActive: true },
-        },
+        staff: { where: { deletedAt: null, isActive: true } },
       },
     });
 
     const summary = branches.map((branch) => {
       const totalStaff = branch.staff.length;
       const onDuty = branch.staff.filter((s) => s.dutyStatus === "ON_DUTY").length;
-      const required = Math.ceil(totalStaff * 0.6); // Assume 60% staffing requirement
+      const required = Math.ceil(totalStaff * 0.6);
 
       let status: "adequate" | "understaffed" | "overstaffed" = "adequate";
       if (onDuty < required * 0.8) status = "understaffed";
@@ -382,46 +382,25 @@ export async function getStaffByBranch(branchId?: string) {
         isActive: true,
         ...(branchId && { branchId }),
       },
-      include: {
-        branch: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-          },
-        },
-      },
+      include: staffInclude,
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
     });
 
-    // Convert Decimal fields to plain numbers
-    const convertedStaff = staff.map((s) => ({
-      id: s.id,
-      employeeId: s.employeeId,
-      firstName: s.firstName,
-      lastName: s.lastName,
-      email: s.email,
-      phone: s.phone,
-      role: s.role,
-      hourlyRate: Number(s.hourlyRate),
-      hireDate: s.hireDate,
-      branchId: s.branchId,
-      isActive: s.isActive,
-      dutyStatus: s.dutyStatus,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-      deletedAt: s.deletedAt,
-      branch: s.branch,
-    }));
-
-    return { success: true, data: convertedStaff };
+    return { success: true, data: staff.map(mapStaffRecord) };
   } catch (error) {
     console.error("[getStaffByBranch] Error:", error);
     return { success: false, error: "Failed to fetch staff", data: [] };
   }
 }
 
-// Get schedules for a date range
+const scheduleStaffSelect = {
+  id: true,
+  employeeId: true,
+  firstName: true,
+  lastName: true,
+  jobRole: { select: { id: true, name: true, code: true, defaultShiftTemplate: true } },
+} as const;
+
 export async function getSchedules(
   branchId?: string,
   startDate?: Date,
@@ -429,44 +408,36 @@ export async function getSchedules(
 ) {
   try {
     const start = startDate || new Date();
-    const end = endDate || new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000); // Default to 7 days
+    const end = endDate || new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const schedules = await db.staffSchedule.findMany({
       where: {
         ...(branchId && { branchId }),
-        scheduledDate: {
-          gte: start,
-          lte: end,
-        },
+        scheduledDate: { gte: start, lte: end },
       },
       include: {
-        staff: {
-          select: {
-            id: true,
-            employeeId: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-        branch: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        staff: { select: scheduleStaffSelect },
+        branch: { select: { id: true, name: true } },
       },
       orderBy: [{ scheduledDate: "asc" }, { shiftStart: "asc" }],
     });
 
-    return { success: true, data: schedules };
+    const mapped = schedules.map((s) => ({
+      ...s,
+      staff: {
+        ...s.staff,
+        role: s.staff.jobRole?.name ?? "Unknown",
+        roleCode: s.staff.jobRole?.code ?? "",
+      },
+    }));
+
+    return { success: true, data: mapped };
   } catch (error) {
     console.error("[getSchedules] Error:", error);
     return { success: false, error: "Failed to fetch schedules", data: [] };
   }
 }
 
-// Update a schedule
 export async function updateSchedule(
   scheduleId: string,
   data: {
@@ -490,13 +461,9 @@ export async function updateSchedule(
   }
 }
 
-// Delete a schedule
 export async function deleteSchedule(scheduleId: string) {
   try {
-    await db.staffSchedule.delete({
-      where: { id: scheduleId },
-    });
-
+    await db.staffSchedule.delete({ where: { id: scheduleId } });
     revalidatePath("/dashboard/staff");
     return { success: true };
   } catch (error) {
@@ -505,7 +472,6 @@ export async function deleteSchedule(scheduleId: string) {
   }
 }
 
-// Batch create schedules (e.g., weekly scheduling)
 export interface BatchScheduleInput {
   staffId: string;
   branchId: string;
@@ -539,38 +505,23 @@ export async function batchCreateSchedules(input: BatchScheduleInput) {
   }
 }
 
-// Get weekly schedule view for a branch
 export async function getWeeklySchedule(branchId: string, weekStart: Date) {
   try {
     const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
 
-    // Use a single optimized query with timeout handling
-    const schedules = await Promise.race([
+    const schedules = (await Promise.race([
       db.staffSchedule.findMany({
         where: {
           branchId,
-          scheduledDate: {
-            gte: weekStart,
-            lte: weekEnd,
-          },
+          scheduledDate: { gte: weekStart, lte: weekEnd },
         },
-        include: {
-          staff: {
-            select: {
-              id: true,
-              employeeId: true,
-              firstName: true,
-              lastName: true,
-              role: true,
-            },
-          },
-        },
+        include: { staff: { select: scheduleStaffSelect } },
         orderBy: [{ scheduledDate: "asc" }, { shiftStart: "asc" }],
       }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 8000)
-      )
-    ]) as Array<{
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Query timeout")), 8000)
+      ),
+    ])) as Array<{
       id: string;
       staffId: string;
       branchId: string;
@@ -582,12 +533,28 @@ export async function getWeeklySchedule(branchId: string, weekStart: Date) {
         employeeId: string;
         firstName: string;
         lastName: string;
-        role: string;
+        jobRole: { id: string; name: string; code: string; defaultShiftTemplate: string | null } | null;
       };
     }>;
 
-    // Group by date
-    const weekDays: { [key: string]: typeof schedules } = {};
+    const weekDays: Record<
+      string,
+      Array<{
+        id: string;
+        staffId: string;
+        branchId: string;
+        scheduledDate: Date;
+        shiftStart: Date;
+        shiftEnd: Date;
+        staff: {
+          id: string;
+          employeeId: string;
+          firstName: string;
+          lastName: string;
+          role: string;
+        };
+      }>
+    > = {};
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000);
       const dateKey = date.toISOString().split("T")[0];
@@ -597,33 +564,46 @@ export async function getWeeklySchedule(branchId: string, weekStart: Date) {
     schedules.forEach((schedule) => {
       const dateKey = schedule.scheduledDate.toISOString().split("T")[0];
       if (weekDays[dateKey]) {
-        weekDays[dateKey].push(schedule);
+        weekDays[dateKey].push({
+          id: schedule.id,
+          staffId: schedule.staffId,
+          branchId: schedule.branchId,
+          scheduledDate: schedule.scheduledDate,
+          shiftStart: schedule.shiftStart,
+          shiftEnd: schedule.shiftEnd,
+          staff: {
+            id: schedule.staff.id,
+            employeeId: schedule.staff.employeeId,
+            firstName: schedule.staff.firstName,
+            lastName: schedule.staff.lastName,
+            role: schedule.staff.jobRole?.name ?? "Unknown",
+          },
+        });
       }
     });
 
     return { success: true, data: weekDays };
   } catch (error) {
     console.error("[getWeeklySchedule] Error:", error);
-    
-    // Return empty week structure on error to prevent UI crashes
+
     const emptyWeek: { [key: string]: any[] } = {};
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000);
       const dateKey = date.toISOString().split("T")[0];
       emptyWeek[dateKey] = [];
     }
-    
-    return { 
-      success: false, 
-      error: error instanceof Error && error.message === 'Query timeout' 
-        ? "Request timed out. Please try again." 
-        : "Failed to fetch weekly schedule", 
-      data: emptyWeek 
+
+    return {
+      success: false,
+      error:
+        error instanceof Error && error.message === "Query timeout"
+          ? "Request timed out. Please try again."
+          : "Failed to fetch weekly schedule",
+      data: emptyWeek,
     };
   }
 }
 
-// Swap shifts between two staff members
 export async function swapShifts(schedule1Id: string, schedule2Id: string) {
   try {
     const [schedule1, schedule2] = await Promise.all([
@@ -635,7 +615,6 @@ export async function swapShifts(schedule1Id: string, schedule2Id: string) {
       return { success: false, error: "One or both schedules not found" };
     }
 
-    // Swap staff IDs
     await Promise.all([
       db.staffSchedule.update({
         where: { id: schedule1Id },
@@ -655,27 +634,21 @@ export async function swapShifts(schedule1Id: string, schedule2Id: string) {
   }
 }
 
-// Get staff availability (who's not scheduled for a given date)
 export async function getAvailableStaff(branchId: string, date: Date) {
   try {
     const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
 
-    // Get staff who are scheduled for this date
     const scheduledStaffIds = await db.staffSchedule.findMany({
       where: {
         branchId,
-        scheduledDate: {
-          gte: dayStart,
-          lte: dayEnd,
-        },
+        scheduledDate: { gte: dayStart, lte: dayEnd },
       },
       select: { staffId: true },
     });
 
     const scheduledIds = scheduledStaffIds.map((s) => s.staffId);
 
-    // Get active staff not scheduled
     const availableStaff = await db.staff.findMany({
       where: {
         branchId,
@@ -683,40 +656,42 @@ export async function getAvailableStaff(branchId: string, date: Date) {
         deletedAt: null,
         id: { notIn: scheduledIds },
       },
-      select: {
-        id: true,
-        employeeId: true,
-        firstName: true,
-        lastName: true,
-        role: true,
+      include: {
+        jobRole: { select: { id: true, name: true, code: true } },
       },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
     });
 
-    return { success: true, data: availableStaff };
+    return {
+      success: true,
+      data: availableStaff.map((s) => ({
+        id: s.id,
+        employeeId: s.employeeId,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        role: s.jobRole?.name ?? "Unknown",
+        roleCode: s.jobRole?.code ?? "",
+      })),
+    };
   } catch (error) {
     console.error("[getAvailableStaff] Error:", error);
     return { success: false, error: "Failed to fetch available staff", data: [] };
   }
 }
 
-// Get timesheet data for payroll
 export async function getTimesheetData(
   branchId?: string,
   startDate?: Date,
   endDate?: Date
 ) {
   try {
-    const start = startDate || new Date(new Date().setDate(1)); // First of current month
-    const end = endDate || new Date(); // Today
+    const start = startDate || new Date(new Date().setDate(1));
+    const end = endDate || new Date();
 
     const schedules = await db.staffSchedule.findMany({
       where: {
         ...(branchId && { branchId }),
-        scheduledDate: {
-          gte: start,
-          lte: end,
-        },
+        scheduledDate: { gte: start, lte: end },
         actualStart: { not: null },
       },
       include: {
@@ -726,26 +701,29 @@ export async function getTimesheetData(
             employeeId: true,
             firstName: true,
             lastName: true,
-            role: true,
             hourlyRate: true,
+            jobRole: { select: { id: true, name: true, code: true } },
           },
         },
-        branch: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        branch: { select: { id: true, name: true } },
       },
       orderBy: [{ staffId: "asc" }, { scheduledDate: "asc" }],
     });
 
-    // Calculate hours worked per staff
+    type TimesheetStaff = {
+      id: string;
+      employeeId: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+      hourlyRate: number;
+    };
+
     const timesheetMap = new Map<
       string,
       {
-        staff: typeof schedules[0]["staff"];
-        branch: typeof schedules[0]["branch"];
+        staff: TimesheetStaff;
+        branch: (typeof schedules)[0]["branch"];
         totalHours: number;
         schedules: typeof schedules;
       }
@@ -761,12 +739,21 @@ export async function getTimesheetData(
           (1000 * 60 * 60);
       }
 
+      const staffWithRole: TimesheetStaff = {
+        id: schedule.staff.id,
+        employeeId: schedule.staff.employeeId,
+        firstName: schedule.staff.firstName,
+        lastName: schedule.staff.lastName,
+        role: schedule.staff.jobRole?.name ?? "Unknown",
+        hourlyRate: Number(schedule.staff.hourlyRate),
+      };
+
       if (existing) {
         existing.totalHours += hoursWorked;
         existing.schedules.push(schedule);
       } else {
         timesheetMap.set(schedule.staffId, {
-          staff: schedule.staff,
+          staff: staffWithRole,
           branch: schedule.branch,
           totalHours: hoursWorked,
           schedules: [schedule],
@@ -775,21 +762,19 @@ export async function getTimesheetData(
     });
 
     const timesheets = Array.from(timesheetMap.values()).map((entry) => ({
-      staff: {
-        ...entry.staff,
-        hourlyRate: Number(entry.staff.hourlyRate)
-      },
+      staff: entry.staff,
       branch: entry.branch,
       totalHours: Math.round(entry.totalHours * 100) / 100,
       estimatedPay:
         Math.round(entry.totalHours * Number(entry.staff.hourlyRate) * 100) / 100,
-      schedules: entry.schedules.map(schedule => ({
+      schedules: entry.schedules.map((schedule) => ({
         ...schedule,
         staff: {
           ...schedule.staff,
-          hourlyRate: Number(schedule.staff.hourlyRate)
-        }
-      }))
+          role: schedule.staff.jobRole?.name ?? "Unknown",
+          hourlyRate: Number(schedule.staff.hourlyRate),
+        },
+      })),
     }));
 
     return { success: true, data: timesheets };

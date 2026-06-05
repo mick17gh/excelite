@@ -52,8 +52,9 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { scheduleShift, clockIn, clockOut, getWeeklySchedule, getTimesheetData } from "@/lib/actions/staff";
-import { AddStaffForm } from "./staff-forms";
+import { AddStaffForm, type StaffJobRoleOption } from "./staff-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
+import { listStaffJobRoles } from "@/lib/actions/staff-job-roles";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -127,6 +128,8 @@ interface StaffContentProps {
     firstName: string;
     lastName: string;
     role: string;
+    roleCode?: string;
+    defaultShiftTemplate?: string | null;
     branchId: string;
     dutyStatus: string;
   }>;
@@ -190,6 +193,22 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
   // Add staff dialog state
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [jobRoles, setJobRoles] = useState<StaffJobRoleOption[]>([]);
+
+  useEffect(() => {
+    listStaffJobRoles({ activeOnly: true }).then((res) => {
+      if (res.success && res.data) {
+        setJobRoles(
+          res.data.map((r) => ({
+            id: r.id,
+            name: r.name,
+            code: r.code,
+            category: r.category,
+          })),
+        );
+      }
+    });
+  }, []);
 
   const totalStaff = summary.reduce((sum, s) => sum + s.totalStaff, 0);
   const totalOnDuty = summary.reduce((sum, s) => sum + s.onDuty, 0);
@@ -276,15 +295,35 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
     }
   };
 
-  const getRoleBadge = (role: string) => {
+  const getRoleBadge = (role: string, roleCode?: string) => {
     const colors: Record<string, string> = {
       MANAGER: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
       KITCHEN: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
       SERVICE: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
       CASHIER: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
       DELIVERY: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+      HR: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
     };
-    return <Badge className={colors[role] || "bg-slate-100 text-slate-700"}>{role}</Badge>;
+    const key = roleCode ?? role;
+    return (
+      <Badge className={colors[key] || "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}>
+        {role}
+      </Badge>
+    );
+  };
+
+  const resolveShiftTemplateForStaff = (staff: {
+    roleCode?: string;
+    defaultShiftTemplate?: string | null;
+  }) => {
+    const template = staff.defaultShiftTemplate;
+    if (template === "MORNING") return shiftTemplates.morning;
+    if (template === "EVENING") return shiftTemplates.evening;
+    if (template === "FULL") return shiftTemplates.full;
+    if (staff.roleCode === "KITCHEN") return shiftTemplates.morning;
+    if (staff.roleCode === "SERVICE") return shiftTemplates.evening;
+    if (staff.roleCode === "MANAGER") return shiftTemplates.full;
+    return shiftTemplates.full;
   };
 
   // Handle shift template selection
@@ -452,10 +491,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
       
       for (const staff of staffToSchedule) {
         // Assign different shifts based on role
-        let shiftTemplate = shiftTemplates.full;
-        if (staff.role === 'KITCHEN') shiftTemplate = shiftTemplates.morning;
-        if (staff.role === 'SERVICE') shiftTemplate = shiftTemplates.evening;
-        if (staff.role === 'MANAGER') shiftTemplate = shiftTemplates.full;
+        const shiftTemplate = resolveShiftTemplateForStaff(staff);
 
         const shiftStart = new Date(dateObj);
         const [startHour, startMin] = shiftTemplate.start.split(":").map(Number);
@@ -1222,10 +1258,11 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
       </Dialog>
 
       {/* Add Staff Form */}
-      <AddStaffForm 
-        open={isAddStaffOpen} 
-        onOpenChange={setIsAddStaffOpen} 
-        branches={branches} 
+      <AddStaffForm
+        open={isAddStaffOpen}
+        onOpenChange={setIsAddStaffOpen}
+        branches={branches}
+        jobRoles={jobRoles}
       />
 
       {/* Bulk Import Dialog */}
@@ -1234,6 +1271,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
         onOpenChange={setIsBulkImportOpen}
         type="staff"
         branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+        jobRoles={jobRoles}
         onSuccess={() => window.location.reload()}
       />
     </div>

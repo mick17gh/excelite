@@ -62,7 +62,8 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     description: 'Staff members, roles, and duty status by branch',
     fields: [
       { name: 'name', type: 'string', description: 'Staff member name (first + last)' },
-      { name: 'role', type: 'enum', description: 'Staff role', enumValues: ['MANAGER', 'KITCHEN', 'SERVICE', 'CASHIER', 'DELIVERY'] },
+      { name: 'role', type: 'string', description: 'Staff job role name (from organization StaffJobRole)' },
+      { name: 'roleCode', type: 'string', description: 'Staff job role code (e.g. MANAGER, KITCHEN, HR)' },
       { name: 'dutyStatus', type: 'enum', description: 'Current duty status', enumValues: ['ON_DUTY', 'OFF_DUTY', 'ON_LEAVE', 'SICK'] },
       { name: 'branch', type: 'reference', description: 'Assigned branch', referenceTo: 'branch' },
       { name: 'hireDate', type: 'date', description: 'Employment start date' },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +30,12 @@ import {
   Calculator,
   CreditCard,
   ChefHat,
+  Briefcase,
 } from "lucide-react";
 import { OrganizationTab } from "./organization-tab";
 import { SubscriptionTab } from "./subscription-tab";
 import { KitchenStationsTab } from "./kitchen-stations-tab";
+import { JobRolesTab } from "./job-roles-tab";
 import { PlatformAdminTab } from "./platform-admin-tab";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -72,6 +75,8 @@ interface UserData {
 }
 
 export function SettingsContent() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") || "profile";
   const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
   const { hasPermission } = usePermissions();
@@ -79,6 +84,7 @@ export function SettingsContent() {
   const canManagePlatform = hasPermission("subscriptions:manage");
   const canViewOrganization = hasPermission("organization:view");
   const canViewSubscription = hasPermission("subscriptions:view");
+  const canEditStaff = hasPermission("staff:edit");
 
   // User data
   const [user, setUser] = useState<UserData | null>(null);
@@ -266,7 +272,7 @@ export function SettingsContent() {
   }
 
   return (
-    <Tabs defaultValue="profile" className="w-full">
+    <Tabs defaultValue={initialTab} className="w-full">
       <TabsList className="mb-6 h-9">
         <TabsTrigger value="profile" className="text-xs">
           <User className="mr-1.5 h-3.5 w-3.5" />
@@ -298,6 +304,12 @@ export function SettingsContent() {
           <ChefHat className="mr-1.5 h-3.5 w-3.5" />
           Kitchen
         </TabsTrigger>
+        {canEditStaff && (
+          <TabsTrigger value="job-roles" className="text-xs">
+            <Briefcase className="mr-1.5 h-3.5 w-3.5" />
+            Job Roles
+          </TabsTrigger>
+        )}
         {canViewSubscription && (
           <TabsTrigger value="subscription" className="text-xs">
             <CreditCard className="mr-1.5 h-3.5 w-3.5" />
@@ -705,6 +717,12 @@ export function SettingsContent() {
       <TabsContent value="kitchen">
         <KitchenStationsTab />
       </TabsContent>
+
+      {canEditStaff && (
+        <TabsContent value="job-roles">
+          <JobRolesTab />
+        </TabsContent>
+      )}
 
       {canViewSubscription && (
         <TabsContent value="subscription">

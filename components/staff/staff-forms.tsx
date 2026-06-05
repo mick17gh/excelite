@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,8 +23,10 @@ import {
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { Combobox } from "@/components/ui/combobox";
 import { createStaff, scheduleShift, clockIn, clockOut } from "@/lib/actions/staff";
-import { StaffRole } from "@/lib/generated/prisma/client";
+import { staffJobRoleComboboxOptions } from "@/lib/staff/job-role-defaults";
+import type { StaffJobRoleCategory } from "@/lib/generated/prisma/client";
 
 interface Branch {
   id: string;
@@ -32,37 +34,58 @@ interface Branch {
   code: string;
 }
 
+export interface StaffJobRoleOption {
+  id: string;
+  name: string;
+  code: string;
+  category: StaffJobRoleCategory | null;
+}
+
 // Add Staff Form
 interface AddStaffFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   branches: Branch[];
+  jobRoles: StaffJobRoleOption[];
 }
 
-export function AddStaffForm({ open, onOpenChange, branches }: AddStaffFormProps) {
+export function AddStaffForm({ open, onOpenChange, branches, jobRoles }: AddStaffFormProps) {
+  const defaultJobRoleId =
+    jobRoles.find((r) => r.code === "SERVICE")?.id ?? jobRoles[0]?.id ?? "";
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
-    role: "SERVICE",
+    jobRoleId: defaultJobRoleId,
     hourlyRate: "",
     branchId: "",
     hireDate: format(new Date(), "yyyy-MM-dd"),
   });
+
+  const jobRoleOptions = useMemo(
+    () => staffJobRoleComboboxOptions(jobRoles, "id"),
+    [jobRoles],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      if (!formData.jobRoleId) {
+        toast.error("Please select a job role");
+        return;
+      }
+
       const result = await createStaff({
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email || undefined,
         phone: formData.phone || undefined,
-        role: formData.role as StaffRole,
+        jobRoleId: formData.jobRoleId,
         hourlyRate: parseFloat(formData.hourlyRate),
         branchId: formData.branchId,
         hireDate: new Date(formData.hireDate),
@@ -76,7 +99,7 @@ export function AddStaffForm({ open, onOpenChange, branches }: AddStaffFormProps
           lastName: "",
           email: "",
           phone: "",
-          role: "SERVICE",
+          jobRoleId: defaultJobRoleId,
           hourlyRate: "",
           branchId: "",
           hireDate: format(new Date(), "yyyy-MM-dd"),
@@ -152,24 +175,15 @@ export function AddStaffForm({ open, onOpenChange, branches }: AddStaffFormProps
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="role">Role</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => setFormData({ ...formData, role: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MANAGER">Manager</SelectItem>
-                    <SelectItem value="ASSISTANT_MANAGER">Assistant Manager</SelectItem>
-                    <SelectItem value="KITCHEN">Kitchen Staff</SelectItem>
-                    <SelectItem value="SERVICE">Service Staff</SelectItem>
-                    <SelectItem value="CASHIER">Cashier</SelectItem>
-                    <SelectItem value="DELIVERY">Delivery</SelectItem>
-                    <SelectItem value="CLEANER">Cleaner</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="jobRole">Job Role</Label>
+                <Combobox
+                  options={jobRoleOptions}
+                  value={formData.jobRoleId}
+                  onValueChange={(value) => setFormData({ ...formData, jobRoleId: value })}
+                  placeholder="Search job roles..."
+                  searchPlaceholder="Search by role or category..."
+                  emptyText="No job roles found."
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="hourlyRate">Hourly Rate (GH₵)</Label>

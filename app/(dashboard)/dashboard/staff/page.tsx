@@ -36,6 +36,8 @@ export default async function StaffPage() {
     email: string | null;
     phone: string | null;
     role: string;
+    roleCode?: string;
+    jobRole?: { defaultShiftTemplate?: string | null } | null;
     hourlyRate: number | string;
     hireDate: Date;
     branchId: string;
@@ -47,7 +49,8 @@ export default async function StaffPage() {
     branch: { id: string; name: string; code: string } | null;
   }) => ({
     ...staff,
-    hourlyRate: Number(staff.hourlyRate)
+    hourlyRate: Number(staff.hourlyRate),
+    defaultShiftTemplate: staff.jobRole?.defaultShiftTemplate ?? null,
   }));
   
   // Create a map of staff schedules for today

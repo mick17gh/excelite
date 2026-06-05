@@ -508,7 +508,10 @@ export async function getStaffPerformance(branchId?: string, startDate?: Date, e
           isActive: true,
           ...branchFilter,
         },
-        include: { branch: true },
+        include: {
+          branch: true,
+          jobRole: { select: { name: true } },
+        },
       }),
       db.staffSchedule.findMany({
         where: {
@@ -553,7 +556,7 @@ export async function getStaffPerformance(branchId?: string, startDate?: Date, e
       return {
         id: s.id,
         name: `${s.firstName} ${s.lastName}`,
-        role: s.role.replace(/_/g, " "),
+        role: s.jobRole?.name ?? "Unknown",
         branch: s.branch?.name || "Unknown",
         scheduledHours: Math.round(scheduledHours * 10) / 10,
         hoursWorked: Math.round(hoursWorked * 10) / 10,
