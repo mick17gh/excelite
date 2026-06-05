@@ -12,7 +12,7 @@ export default async function StaffPage() {
   const today = new Date();
   const [branchesResult, staffResult, , schedulesResult] = await Promise.all([
     getBranches(),
-    getStaff(),
+    getStaff(undefined, { page: 1, pageSize: 500 }),
     getStaffSummary(),
     getSchedules(undefined, today, today),
   ]);
@@ -35,6 +35,7 @@ export default async function StaffPage() {
     lastName: string;
     email: string | null;
     phone: string | null;
+    jobRoleId: string;
     role: string;
     roleCode?: string;
     jobRole?: { defaultShiftTemplate?: string | null } | null;

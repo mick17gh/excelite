@@ -17,26 +17,61 @@ async function main() {
     console.log(`\nProcessing org: ${org.name} (${org.id})`);
 
     const existing = await db.staffJobRole.findMany({
-      where: { organizationId: org.id, deletedAt: null },
-      select: { id: true, code: true },
+      where: { organizationId: org.id },
+      select: { id: true, code: true, deletedAt: true },
     });
     const codeToId = new Map(existing.map((r) => [r.code, r.id]));
 
     for (const def of DEFAULT_STAFF_JOB_ROLES) {
-      if (codeToId.has(def.code)) continue;
-      const created = await db.staffJobRole.create({
-        data: {
-          organizationId: org.id,
-          name: def.name,
-          code: def.code,
-          category: def.category,
-          sortOrder: def.sortOrder,
-          defaultShiftTemplate: def.defaultShiftTemplate ?? null,
-          isActive: true,
-        },
-      });
-      codeToId.set(def.code, created.id);
-      console.log(`  Created role: ${def.code}`);
+      const rowId = codeToId.get(def.code);
+      if (rowId) {
+        const row = existing.find((r) => r.code === def.code);
+        if (row?.deletedAt) {
+          await db.staffJobRole.update({
+            where: { id: rowId },
+            data: {
+              deletedAt: null,
+              name: def.name,
+              category: def.category,
+              sortOrder: def.sortOrder,
+              defaultShiftTemplate: def.defaultShiftTemplate ?? null,
+              isActive: true,
+            },
+          });
+          console.log(`  Restored role: ${def.code}`);
+        }
+        continue;
+      }
+      try {
+        const created = await db.staffJobRole.create({
+          data: {
+            organizationId: org.id,
+            name: def.name,
+            code: def.code,
+            category: def.category,
+            sortOrder: def.sortOrder,
+            defaultShiftTemplate: def.defaultShiftTemplate ?? null,
+            isActive: true,
+          },
+        });
+        codeToId.set(def.code, created.id);
+        console.log(`  Created role: ${def.code}`);
+      } catch (error: unknown) {
+        const prismaCode =
+          error && typeof error === "object" && "code" in error
+            ? (error as { code: string }).code
+            : null;
+        if (prismaCode === "P2002") {
+          const found = await db.staffJobRole.findFirst({
+            where: { organizationId: org.id, code: def.code },
+            select: { id: true },
+          });
+          if (found) codeToId.set(def.code, found.id);
+          console.log(`  Skipped existing role: ${def.code}`);
+          continue;
+        }
+        throw error;
+      }
     }
 
     const staffRows = await db.$queryRaw<

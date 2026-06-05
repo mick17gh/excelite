@@ -7,7 +7,12 @@ import { revalidatePath } from "next/cache";
 import type { Permission } from "@/lib/permissions/types";
 import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
 import { resolveOrganizationIdForSession } from "@/lib/permissions/require";
-import type { Role, ShiftTemplate, StaffJobRoleCategory } from "@/lib/generated/prisma/client";
+import {
+  Prisma,
+  type Role,
+  type ShiftTemplate,
+  type StaffJobRoleCategory,
+} from "@/lib/generated/prisma/client";
 import { ensureDefaultStaffJobRoles } from "@/lib/staff/job-role-seed";
 
 type JobRoleActor = {
@@ -41,13 +46,16 @@ export async function listStaffJobRoles(options?: {
   }
 
   const orgId = options?.organizationId ?? actor.organizationId;
-  await ensureDefaultStaffJobRoles(orgId);
+  try {
+    await ensureDefaultStaffJobRoles(orgId);
+  } catch (error) {
+    console.error("ensureDefaultStaffJobRoles failed:", error);
+  }
 
   const rows = await db.staffJobRole.findMany({
     where: {
       organizationId: orgId,
-      deletedAt: null,
-      ...(options?.activeOnly ? { isActive: true } : {}),
+      ...(options?.activeOnly ? { deletedAt: null, isActive: true } : {}),
     },
     include: {
       _count: { select: { staff: { where: { deletedAt: null } } } },
@@ -64,7 +72,7 @@ export async function listStaffJobRoles(options?: {
       category: r.category,
       description: r.description,
       sortOrder: r.sortOrder,
-      isActive: r.isActive,
+      isActive: r.deletedAt ? false : r.isActive,
       defaultShiftTemplate: r.defaultShiftTemplate,
       staffCount: r._count.staff,
     })),
@@ -91,18 +99,68 @@ export async function createStaffJobRole(input: {
     return { success: false, error: "Name and code are required" };
   }
 
-  await db.staffJobRole.create({
-    data: {
+  const duplicate = await db.staffJobRole.findFirst({
+    where: {
       organizationId: actor.organizationId,
-      name,
-      code,
-      category: input.category ?? null,
-      description: input.description?.trim() || null,
-      sortOrder: input.sortOrder ?? 0,
-      isActive: input.isActive ?? true,
-      defaultShiftTemplate: input.defaultShiftTemplate ?? null,
+      OR: [{ code }, { name }],
     },
+    include: { _count: { select: { staff: { where: { deletedAt: null } } } } },
   });
+
+  if (duplicate) {
+    const canReuse =
+      duplicate.deletedAt !== null && duplicate._count.staff === 0;
+
+    if (canReuse) {
+      await db.staffJobRole.update({
+        where: { id: duplicate.id },
+        data: {
+          name,
+          code,
+          category: input.category ?? null,
+          description: input.description?.trim() || null,
+          sortOrder: input.sortOrder ?? 0,
+          isActive: input.isActive ?? true,
+          defaultShiftTemplate: input.defaultShiftTemplate ?? null,
+          deletedAt: null,
+        },
+      });
+      revalidatePath("/dashboard/staff");
+      revalidatePath("/dashboard/settings");
+      return { success: true };
+    }
+
+    const field = duplicate.code === code ? "code" : "name";
+    const isArchived = duplicate.deletedAt !== null || !duplicate.isActive;
+    const hint = isArchived ? " Restore it from the Archived list instead." : "";
+    return {
+      success: false,
+      error: `A job role with this ${field} already exists.${hint}`,
+    };
+  }
+
+  try {
+    await db.staffJobRole.create({
+      data: {
+        organizationId: actor.organizationId,
+        name,
+        code,
+        category: input.category ?? null,
+        description: input.description?.trim() || null,
+        sortOrder: input.sortOrder ?? 0,
+        isActive: input.isActive ?? true,
+        defaultShiftTemplate: input.defaultShiftTemplate ?? null,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return { success: false, error: "A job role with this code or name already exists." };
+    }
+    throw error;
+  }
 
   revalidatePath("/dashboard/staff");
   revalidatePath("/dashboard/settings");
@@ -166,17 +224,10 @@ export async function archiveStaffJobRole(id: string) {
   });
   if (!existing) return { success: false, error: "Job role not found" };
 
-  if (existing._count.staff > 0) {
-    await db.staffJobRole.update({
-      where: { id },
-      data: { isActive: false },
-    });
-  } else {
-    await db.staffJobRole.update({
-      where: { id },
-      data: { deletedAt: new Date(), isActive: false },
-    });
-  }
+  await db.staffJobRole.update({
+    where: { id },
+    data: { isActive: false, deletedAt: null },
+  });
 
   revalidatePath("/dashboard/staff");
   revalidatePath("/dashboard/settings");

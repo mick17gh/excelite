@@ -346,7 +346,13 @@ export function parseStaffCSV(rows: ParsedCSVRow[], defaultBranchId: string): Bu
     .filter((item) => item.firstName.trim().length > 0 && item.lastName.trim().length > 0);
 }
 
-export function getStaffCSVTemplate(roleCodes?: string[]): string {
+export interface StaffCSVTemplateRole {
+  code: string;
+  name: string;
+  category?: string | null;
+}
+
+export function getStaffCSVTemplate(jobRoles?: StaffCSVTemplateRole[]): string {
   const headers = ["employeeId", "firstName", "lastName", "email", "phone", "role", "hourlyRate"];
   const examples = [
     ["EMP-001", "John", "Doe", "john.doe@restaurant.com", "+233 20 111 2222", "MANAGER", "25.00"],
@@ -354,11 +360,67 @@ export function getStaffCSVTemplate(roleCodes?: string[]): string {
     ["EMP-003", "Bob", "Wilson", "", "+233 50 555 6666", "SERVICE", "12.00"],
     ["EMP-004", "Alice", "Brown", "alice@company.com", "", "HR", "20.00"],
   ];
-  const comment =
-    roleCodes && roleCodes.length > 0
-      ? `# Valid role codes (from Settings > Job Roles): ${roleCodes.join(", ")}`
-      : "# role column must match a job role code from Settings > Job Roles";
-  return [comment, headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
+
+  const roleComments = buildStaffRoleTemplateComments(jobRoles);
+  return [...roleComments, headers.join(","), ...examples.map((e) => e.join(","))].join("\n");
+}
+
+function buildStaffRoleTemplateComments(jobRoles?: StaffCSVTemplateRole[]): string[] {
+  const lines = [
+    "# Staff import template",
+    "# Required columns: firstName, lastName, hourlyRate, role",
+    "# role column: use a job role CODE exactly as listed below (manage roles in Settings > Job Roles)",
+    "#",
+  ];
+
+  const roles = jobRoles?.length ? jobRoles : [];
+  if (roles.length === 0) {
+    lines.push("# Download again after opening Import CSV to load your organization's job roles.");
+    lines.push("#");
+    return lines;
+  }
+
+  const byCategory = new Map<string, StaffCSVTemplateRole[]>();
+  for (const role of roles) {
+    const key = role.category?.trim() || "OTHER";
+    if (!byCategory.has(key)) byCategory.set(key, []);
+    byCategory.get(key)!.push(role);
+  }
+
+  const categoryOrder = [
+    "MANAGEMENT",
+    "KITCHEN",
+    "FRONT_OF_HOUSE",
+    "OPERATIONS",
+    "CORPORATE",
+    "OTHER",
+  ];
+
+  const sortedCategories = [
+    ...categoryOrder.filter((c) => byCategory.has(c)),
+    ...[...byCategory.keys()].filter((c) => !categoryOrder.includes(c)),
+  ];
+
+  const categoryLabels: Record<string, string> = {
+    MANAGEMENT: "Management",
+    KITCHEN: "Kitchen",
+    FRONT_OF_HOUSE: "Frontline",
+    OPERATIONS: "Operations",
+    CORPORATE: "Corporate",
+    OTHER: "Other",
+  };
+
+  for (const category of sortedCategories) {
+    const group = byCategory.get(category);
+    if (!group?.length) continue;
+    lines.push(`# ${categoryLabels[category] ?? category}`);
+    for (const role of group) {
+      lines.push(`#   ${role.code} - ${role.name}`);
+    }
+    lines.push("#");
+  }
+
+  return lines;
 }
 
 /** Resolve a CSV role string to a job role code using known org roles. */

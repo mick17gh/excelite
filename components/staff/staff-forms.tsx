@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,8 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Combobox } from "@/components/ui/combobox";
-import { createStaff, scheduleShift, clockIn, clockOut } from "@/lib/actions/staff";
+import { Switch } from "@/components/ui/switch";
+import { createStaff, updateStaff, scheduleShift, clockIn, clockOut } from "@/lib/actions/staff";
 import { staffJobRoleComboboxOptions } from "@/lib/staff/job-role-defaults";
 import type { StaffJobRoleCategory } from "@/lib/generated/prisma/client";
 
@@ -42,14 +43,31 @@ export interface StaffJobRoleOption {
 }
 
 // Add Staff Form
+export interface StaffMemberRecord {
+  id: string;
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  jobRoleId: string;
+  hourlyRate: number;
+  branchId: string;
+  isActive: boolean;
+  role?: string;
+  roleCode?: string;
+  dutyStatus?: string;
+}
+
 interface AddStaffFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   branches: Branch[];
   jobRoles: StaffJobRoleOption[];
+  onSuccess?: () => void;
 }
 
-export function AddStaffForm({ open, onOpenChange, branches, jobRoles }: AddStaffFormProps) {
+export function AddStaffForm({ open, onOpenChange, branches, jobRoles, onSuccess }: AddStaffFormProps) {
   const defaultJobRoleId =
     jobRoles.find((r) => r.code === "SERVICE")?.id ?? jobRoles[0]?.id ?? "";
 
@@ -93,6 +111,7 @@ export function AddStaffForm({ open, onOpenChange, branches, jobRoles }: AddStaf
 
       if (result.success) {
         toast.success("Staff member added successfully");
+        onSuccess?.();
         onOpenChange(false);
         setFormData({
           firstName: "",
@@ -237,6 +256,214 @@ export function AddStaffForm({ open, onOpenChange, branches, jobRoles }: AddStaf
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Staff
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface EditStaffFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  branches: Branch[];
+  jobRoles: StaffJobRoleOption[];
+  staff: StaffMemberRecord | null;
+  onSuccess?: () => void;
+}
+
+export function EditStaffForm({
+  open,
+  onOpenChange,
+  branches,
+  jobRoles,
+  staff,
+  onSuccess,
+}: EditStaffFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    jobRoleId: "",
+    hourlyRate: "",
+    branchId: "",
+    isActive: true,
+  });
+
+  const jobRoleOptions = useMemo(
+    () => staffJobRoleComboboxOptions(jobRoles, "id"),
+    [jobRoles],
+  );
+
+  useEffect(() => {
+    if (!staff || !open) return;
+    setFormData({
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      email: staff.email ?? "",
+      phone: staff.phone ?? "",
+      jobRoleId: staff.jobRoleId,
+      hourlyRate: String(staff.hourlyRate),
+      branchId: staff.branchId,
+      isActive: staff.isActive,
+    });
+  }, [staff, open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!staff) return;
+    setIsSubmitting(true);
+
+    try {
+      if (!formData.jobRoleId) {
+        toast.error("Please select a job role");
+        return;
+      }
+
+      const result = await updateStaff({
+        id: staff.id,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        jobRoleId: formData.jobRoleId,
+        hourlyRate: parseFloat(formData.hourlyRate),
+        branchId: formData.branchId,
+        isActive: formData.isActive,
+      });
+
+      if (result.success) {
+        toast.success("Staff member updated");
+        onSuccess?.();
+        onOpenChange(false);
+      } else {
+        toast.error(result.error || "Failed to update staff member");
+      }
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      toast.error("Failed to update staff member");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!staff) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Edit Staff Member</DialogTitle>
+          <DialogDescription>
+            Update employee details for {staff.firstName} {staff.lastName} ({staff.employeeId})
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-firstName">First Name</Label>
+                <Input
+                  id="edit-firstName"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-lastName">Last Name</Label>
+                <Input
+                  id="edit-lastName"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-phone">Phone</Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-jobRole">Job Role</Label>
+                <Combobox
+                  options={jobRoleOptions}
+                  value={formData.jobRoleId}
+                  onValueChange={(value) => setFormData({ ...formData, jobRoleId: value })}
+                  placeholder="Search job roles..."
+                  searchPlaceholder="Search by role or category..."
+                  emptyText="No job roles found."
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-hourlyRate">Hourly Rate (GH₵)</Label>
+                <Input
+                  id="edit-hourlyRate"
+                  type="number"
+                  step="0.01"
+                  value={formData.hourlyRate}
+                  onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-branch">Branch</Label>
+              <Select
+                value={formData.branchId}
+                onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+              />
+              <Label>Active employee</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
             </Button>
           </DialogFooter>
         </form>

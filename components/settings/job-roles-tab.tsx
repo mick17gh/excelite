@@ -179,7 +179,7 @@ export function JobRolesTab() {
       toast.error(res.error || "Failed to archive job role");
       return;
     }
-    toast.success(row.staffCount > 0 ? "Job role archived" : "Job role deleted");
+    toast.success("Job role archived");
     await loadRoles();
     router.refresh();
   };

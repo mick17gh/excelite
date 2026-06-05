@@ -149,7 +149,13 @@ export function BulkImportDialog({
         template = getSupplierCSVTemplate();
         break;
       case "staff":
-        template = getStaffCSVTemplate(jobRoles.map((r) => r.code));
+        template = getStaffCSVTemplate(
+          jobRoles.map((r) => ({
+            code: r.code,
+            name: r.name,
+            category: r.category,
+          })),
+        );
         break;
       default:
         template = "";
@@ -164,7 +170,11 @@ export function BulkImportDialog({
   };
 
   const parseCSV = (content: string): Record<string, string>[] => {
-    const lines = content.trim().split("\n");
+    const lines = content
+      .trim()
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith("#"));
     if (lines.length < 2) return [];
 
     const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
@@ -445,7 +455,12 @@ export function BulkImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+      <DialogContent
+        className={cn(
+          "max-h-[85vh] flex flex-col overflow-hidden",
+          type === "staff" ? "max-w-5xl" : "max-w-3xl",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>
             Import{" "}

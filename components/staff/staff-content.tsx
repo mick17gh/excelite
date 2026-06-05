@@ -48,16 +48,27 @@ import {
   CalendarDays,
   DollarSign,
   Upload,
+  Edit,
+  List,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { scheduleShift, clockIn, clockOut, getWeeklySchedule, getTimesheetData } from "@/lib/actions/staff";
-import { AddStaffForm, type StaffJobRoleOption } from "./staff-forms";
+import {
+  AddStaffForm,
+  EditStaffForm,
+  type StaffJobRoleOption,
+  type StaffMemberRecord,
+} from "./staff-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { listStaffJobRoles } from "@/lib/actions/staff-job-roles";
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 import { useBranchRestrictions, filterBranchesForUser } from "@/hooks/use-branch-restrictions";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { useRouter } from "next/navigation";
+import { usePermissions } from "@/contexts/permissions-context";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface StaffSummary {
   branchId: string;
@@ -122,27 +133,31 @@ interface StaffContentProps {
   summary: StaffSummary[];
   schedule: StaffMember[];
   branches: Branch[];
-  allStaff?: Array<{
-    id: string;
-    employeeId: string;
-    firstName: string;
-    lastName: string;
-    role: string;
-    roleCode?: string;
-    defaultShiftTemplate?: string | null;
-    branchId: string;
-    dutyStatus: string;
-  }>;
+  allStaff?: StaffMemberRecord[];
 }
 
 export function StaffContent({ summary, schedule, branches, allStaff = [] }: StaffContentProps) {
+  const router = useRouter();
+  const { hasPermission } = usePermissions();
+  const { formatCurrency } = useCurrency();
+  const canEditStaff = hasPermission("staff:edit");
+
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isPending, startTransition] = useTransition();
   
-  // Pagination state
+  // Schedule tab pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // Staff list tab
+  const [listSearch, setListSearch] = useState("");
+  const [listBranchFilter, setListBranchFilter] = useState<string>("all");
+  const [listActiveFilter, setListActiveFilter] = useState<"all" | "active" | "inactive">("all");
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
+  const [editingStaff, setEditingStaff] = useState<StaffMemberRecord | null>(null);
+  const [isEditStaffOpen, setIsEditStaffOpen] = useState(false);
   
   // Schedule dialog state
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -235,6 +250,49 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
     const startIndex = (currentPage - 1) * pageSize;
     return filteredSchedule.slice(startIndex, startIndex + pageSize);
   }, [filteredSchedule, currentPage, pageSize]);
+
+  const filteredStaffList = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    return allStaff.filter((member) => {
+      const matchesBranch =
+        listBranchFilter === "all" || member.branchId === listBranchFilter;
+      const matchesActive =
+        listActiveFilter === "all" ||
+        (listActiveFilter === "active" && member.isActive) ||
+        (listActiveFilter === "inactive" && !member.isActive);
+      const matchesSearch =
+        !q ||
+        member.firstName.toLowerCase().includes(q) ||
+        member.lastName.toLowerCase().includes(q) ||
+        member.employeeId.toLowerCase().includes(q) ||
+        (member.email?.toLowerCase().includes(q) ?? false) ||
+        (member.role?.toLowerCase().includes(q) ?? false);
+      return matchesBranch && matchesActive && matchesSearch;
+    });
+  }, [allStaff, listBranchFilter, listActiveFilter, listSearch]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [listBranchFilter, listActiveFilter, listSearch]);
+
+  const listTotalPages = Math.max(1, Math.ceil(filteredStaffList.length / listPageSize));
+  const paginatedStaffList = useMemo(() => {
+    const start = (listPage - 1) * listPageSize;
+    return filteredStaffList.slice(start, start + listPageSize);
+  }, [filteredStaffList, listPage, listPageSize]);
+
+  useEffect(() => {
+    if (listPage > listTotalPages) setListPage(listTotalPages);
+  }, [listPage, listTotalPages]);
+
+  const openEditStaff = (member: StaffMemberRecord) => {
+    setEditingStaff(member);
+    setIsEditStaffOpen(true);
+  };
+
+  const handleStaffSaved = () => {
+    router.refresh();
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -667,10 +725,14 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue="staff-list" className="w-full">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <TabsList className="h-9">
             <TabsTrigger value="overview" className="text-xs px-3">Branch Overview</TabsTrigger>
+            <TabsTrigger value="staff-list" className="text-xs px-3">
+              <List className="mr-1.5 h-3.5 w-3.5" />
+              Staff List
+            </TabsTrigger>
             <TabsTrigger value="schedule" className="text-xs px-3">Todays Schedule</TabsTrigger>
             <TabsTrigger value="weekly" className="text-xs px-3" onClick={() => {
               if (selectedBranchForWeek) loadWeeklySchedule(selectedBranchForWeek);
@@ -738,6 +800,162 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="staff-list" className="mt-6">
+          <Card className="glass">
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle>Staff Directory</CardTitle>
+                  <CardDescription>
+                    View and edit employee records. Use the edit icon to update details.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative w-full sm:w-48">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search staff..."
+                      className="pl-8 h-9"
+                      value={listSearch}
+                      onChange={(e) => setListSearch(e.target.value)}
+                    />
+                  </div>
+                  <Select value={listBranchFilter} onValueChange={setListBranchFilter}>
+                    <SelectTrigger className="w-40 h-9">
+                      <SelectValue placeholder="Branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      {availableBranches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={listActiveFilter}
+                    onValueChange={(v) =>
+                      setListActiveFilter(v as "all" | "active" | "inactive")
+                    }
+                  >
+                    <SelectTrigger className="w-32 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Employee</TableHead>
+                    <TableHead className="text-xs">Job Role</TableHead>
+                    <TableHead className="text-xs">Branch</TableHead>
+                    <TableHead className="text-xs">Contact</TableHead>
+                    <TableHead className="text-xs text-right">Hourly Rate</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    {canEditStaff && (
+                      <TableHead className="text-xs text-right w-16">Edit</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedStaffList.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={canEditStaff ? 7 : 6}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        No staff members found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedStaffList.map((member) => {
+                      const branchName =
+                        branches.find((b) => b.id === member.branchId)?.name ?? "—";
+                      return (
+                        <TableRow key={member.id}>
+                          <TableCell className="py-2">
+                            <div>
+                              <p className="text-sm font-medium">
+                                {member.firstName} {member.lastName}
+                              </p>
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {member.employeeId}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {getRoleBadge(member.role ?? "Unknown", member.roleCode)}
+                          </TableCell>
+                          <TableCell className="py-2 text-sm">{branchName}</TableCell>
+                          <TableCell className="py-2 text-sm text-muted-foreground">
+                            <div className="space-y-0.5">
+                              {member.email && <p className="text-xs">{member.email}</p>}
+                              {member.phone && <p className="text-xs">{member.phone}</p>}
+                              {!member.email && !member.phone && "—"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2 text-sm text-right">
+                            {formatCurrency(member.hourlyRate)}
+                          </TableCell>
+                          <TableCell className="py-2">
+                            <div className="flex flex-col gap-1 items-start">
+                              {member.isActive ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">
+                                  Inactive
+                                </Badge>
+                              )}
+                              {member.dutyStatus && getStatusBadge(member.dutyStatus)}
+                            </div>
+                          </TableCell>
+                          {canEditStaff && (
+                            <TableCell className="py-2 text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openEditStaff(member)}
+                                title="Edit staff member"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+              {filteredStaffList.length > 0 && (
+                <TablePagination
+                  currentPage={listPage}
+                  totalPages={listTotalPages}
+                  totalItems={filteredStaffList.length}
+                  pageSize={listPageSize}
+                  onPageChange={setListPage}
+                  onPageSizeChange={(size) => {
+                    setListPageSize(size);
+                    setListPage(1);
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1263,6 +1481,19 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
         onOpenChange={setIsAddStaffOpen}
         branches={branches}
         jobRoles={jobRoles}
+        onSuccess={handleStaffSaved}
+      />
+
+      <EditStaffForm
+        open={isEditStaffOpen}
+        onOpenChange={(open) => {
+          setIsEditStaffOpen(open);
+          if (!open) setEditingStaff(null);
+        }}
+        staff={editingStaff}
+        branches={branches}
+        jobRoles={jobRoles}
+        onSuccess={handleStaffSaved}
       />
 
       {/* Bulk Import Dialog */}
@@ -1272,7 +1503,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
         type="staff"
         branches={branches.map((b) => ({ id: b.id, name: b.name }))}
         jobRoles={jobRoles}
-        onSuccess={() => window.location.reload()}
+        onSuccess={handleStaffSaved}
       />
     </div>
   );
