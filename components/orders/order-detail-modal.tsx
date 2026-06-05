@@ -222,7 +222,7 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
             </div>
             <div>
               <p className="text-muted-foreground">Placed By</p>
-              <p className="font-medium">{order.placedBy || order.assignedBy || "—"}</p>
+              <p className="font-medium">{order.placedBy || "—"}</p>
             </div>
           </div>
 

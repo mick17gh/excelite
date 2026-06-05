@@ -12,15 +12,50 @@ import {
 import { filterOrderItemsForKitchenStation } from "@/lib/kitchen/category-routing";
 import { getKitchenEligibleOrderItems } from "@/lib/kitchen/ticket-items";
 import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
+import { resolveOrderPlacedByName } from "@/lib/orders/placed-by";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 // Helper to serialize Decimal fields from raw Prisma order objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serializeOrderItem(item: Record<string, any>) {
+  return {
+    id: item.id as string,
+    orderId: item.orderId as string,
+    menuItemId: item.menuItemId as string,
+    quantity: item.quantity as number,
+    unitPrice: Number(item.unitPrice),
+    lineTotal: Number(item.lineTotal),
+    notes: item.notes ?? null,
+    configurationLabel: item.configurationLabel ?? null,
+    configurationKey: item.configurationKey ?? null,
+    menuItemOptionIds:
+      item.selections?.map((s: { menuItemOptionId: string }) => s.menuItemOptionId) ?? [],
+    menuItem: item.menuItem
+      ? {
+          id: item.menuItem.id as string,
+          name: item.menuItem.name as string,
+          sku: item.menuItem.sku as string,
+          price: Number(item.menuItem.price),
+          cost: item.menuItem.cost != null ? Number(item.menuItem.cost) : null,
+          category: item.menuItem.category
+            ? { name: item.menuItem.category.name as string }
+            : null,
+        }
+      : null,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeOrder(order: Record<string, any>) {
   return {
-    ...order,
     id: order.id as string,
     orderNumber: order.orderNumber as string,
+    customerId: order.customerId ?? null,
+    customerName: order.customerName ?? null,
     branchId: order.branchId as string,
+    assignedBy: order.assignedBy ?? null,
+    source: order.source,
     type: order.type as OrderType,
     status: order.status as OrderStatus,
     paymentStatus: order.paymentStatus as PaymentStatus,
@@ -29,16 +64,17 @@ function serializeOrder(order: Record<string, any>) {
     discount: Number(order.discount),
     deliveryFee: Number(order.deliveryFee),
     total: Number(order.total),
+    paymentMethod: order.paymentMethod ?? null,
+    notes: order.notes ?? null,
+    deliveryAddress: order.deliveryAddress ?? null,
+    deliveryCity: order.deliveryCity ?? null,
+    deliveryNeighborhood: order.deliveryNeighborhood ?? null,
+    deliveryPhone: order.deliveryPhone ?? null,
+    deliveryNotes: order.deliveryNotes ?? null,
     deliveryLat: order.deliveryLat ? Number(order.deliveryLat) : null,
     deliveryLng: order.deliveryLng ? Number(order.deliveryLng) : null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    items: order.items?.map((item: Record<string, any>) => ({
-      ...item,
-      unitPrice: Number(item.unitPrice),
-      lineTotal: Number(item.lineTotal),
-      menuItemOptionIds:
-        item.selections?.map((s: { menuItemOptionId: string }) => s.menuItemOptionId) ?? [],
-    })) || [],
+    items: order.items?.map(serializeOrderItem) ?? [],
+    branch: order.branch ? { name: order.branch.name as string } : null,
     createdAt: order.createdAt?.toISOString?.() ?? order.createdAt,
     updatedAt: order.updatedAt?.toISOString?.() ?? order.updatedAt,
   };
@@ -175,7 +211,7 @@ export async function getOrders(filters?: {
         taxRate: order.branch?.taxRate != null ? Number(order.branch.taxRate) : 0,
         taxEnabled: order.branch?.taxEnabled ?? true,
         assignedBy: order.assignedByUser?.name || null,
-        placedBy: order.cashier?.name || order.assignedByUser?.name || null,
+        placedBy: resolveOrderPlacedByName(order),
         tableLabel: order.tableSession?.table.label ?? null,
         tableSection: order.tableSession?.table.section?.name ?? null,
         tableCovers: order.tableSession?.guestCount ?? null,
@@ -306,8 +342,8 @@ export async function getOrderById(id: string) {
         orderNumber: order.orderNumber,
         customerId: order.customerId,
         branchId: order.branchId,
-        assignedBy: order.assignedBy,
-        placedBy: order.cashier?.name || order.assignedByUser?.name || null,
+        assignedBy: order.assignedByUser?.name || null,
+        placedBy: resolveOrderPlacedByName(order),
         source: order.source,
         type: order.type,
         status: order.status,
@@ -538,12 +574,16 @@ export async function createOrder(input: CreateOrderInput) {
       inclusive: branch?.taxInclusive ?? false,
     });
 
+    const session = await auth.api.getSession({ headers: await headers() });
+    const placedByUserId = session?.user?.id ?? null;
+
     const order = await db.order.create({
       data: {
         orderNumber,
         customerId: input.customerId || null,
         customerName: input.customerName || null,
         branchId: input.branchId,
+        assignedBy: placedByUserId,
         source: input.source,
         type: input.type,
         status: "NEW",

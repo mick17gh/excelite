@@ -18,6 +18,8 @@ import { requireTableForDineInAtBranch } from "@/lib/features/table-management";
 import { markTableOrdering } from "@/lib/actions/tables";
 import { validateTableSessionForOrder } from "@/lib/features/table-session-validation";
 import { closeTableSessionIfAllOrdersPaid } from "@/lib/features/table-session-lifecycle";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 // Helper to serialize Decimal fields from Prisma order objects for client components
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,6 +119,9 @@ export async function createPosOrder(input: CreatePosOrderInput) {
         error: "Select and seat a table before placing a dine-in order",
       };
     }
+
+    const session = await auth.api.getSession({ headers: await headers() });
+    const currentUserId = session?.user?.id ?? null;
 
     let tableSessionId: string | null = input.tableSessionId ?? null;
     let assignedBy: string | null = input.assignedBy ?? null;
@@ -256,8 +261,8 @@ export async function createPosOrder(input: CreatePosOrderInput) {
       data: {
         orderNumber,
         branchId: input.branchId,
-        cashierId: input.cashierId || null,
-        assignedBy,
+        cashierId: input.cashierId || currentUserId,
+        assignedBy: assignedBy ?? currentUserId,
         tableSessionId,
         customerId: input.customerId || null,
         customerName: input.customerName || null,

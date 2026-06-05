@@ -471,7 +471,7 @@ export function OrdersContent({
                 <TableHead>Source</TableHead>
                 <TableHead>Type</TableHead>
                 {tableManagementEnabled && <TableHead>Table</TableHead>}
-                {tableManagementEnabled && <TableHead>Waiter</TableHead>}
+                <TableHead>Placed By</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Payment</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -483,7 +483,7 @@ export function OrdersContent({
               {filteredOrders.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={tableManagementEnabled ? 12 : 10}
+                    colSpan={tableManagementEnabled ? 12 : 11}
                     className="text-center py-8 text-muted-foreground"
                   >
                     No orders found
@@ -517,11 +517,9 @@ export function OrdersContent({
                               : "—"}
                         </TableCell>
                       )}
-                      {tableManagementEnabled && (
-                        <TableCell className="text-sm text-muted-foreground">
-                          {order.tableWaiter || order.assignedBy || "—"}
-                        </TableCell>
-                      )}
+                      <TableCell className="text-sm text-muted-foreground">
+                        {order.placedBy || order.assignedBy || "—"}
+                      </TableCell>
                       <TableCell>
                         <Badge className={STATUS_COLORS[order.status] || "bg-slate-100 text-slate-700"}>
                           {STATUS_LABELS[order.status] || order.status}
