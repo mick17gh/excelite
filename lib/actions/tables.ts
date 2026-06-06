@@ -843,20 +843,55 @@ export async function getFloorBoardData(branchId: string) {
   };
 }
 
+function actorCanUsePosTables(actor: TableActor): boolean {
+  return (
+    actorCan(actor, "pos:access") ||
+    actorCan(actor, "tables:view") ||
+    actorCan(actor, "tables:assign")
+  );
+}
+
 export async function getPosTableContext(branchId: string) {
+  const actor = await getActor();
+  if (!actor || !actorCanUsePosTables(actor)) {
+    return { data: { enabled: false as const } };
+  }
+
   const enabled = await isTableManagementEnabledForBranch(branchId);
   if (!enabled) return { data: { enabled: false as const } };
 
-  const setup = await getBranchTableSetup(branchId);
-  if ("error" in setup) {
-    return { data: { enabled: true as const, tables: [], sections: [] } };
-  }
+  const tables = await db.diningTable.findMany({
+    where: { branchId },
+    include: {
+      section: { select: { name: true } },
+      sessions: {
+        where: { status: "OPEN" },
+        take: 1,
+        include: {
+          opener: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: [{ section: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+  });
 
   return {
     data: {
       enabled: true as const,
-      sections: setup.data.sections,
-      tables: setup.data.tables,
+      tables: tables.map((t) => ({
+        id: t.id,
+        label: t.label,
+        status: t.status,
+        sectionName: t.section?.name ?? null,
+        capacity: t.capacity,
+        openSession: t.sessions[0]
+          ? {
+              id: t.sessions[0].id,
+              guestCount: t.sessions[0].guestCount,
+              openedByName: t.sessions[0].opener.name,
+            }
+          : null,
+      })),
     },
   };
 }

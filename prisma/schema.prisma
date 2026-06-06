@@ -1468,6 +1468,7 @@ model Organization {
   paystackPublicKey  String?
   paystackSecretKey  String?
   paystackEnabled             Boolean            @default(false)
+  paystackDashboardEnabled    Boolean            @default(false)
   complimentaryApproverRoles  Json?
   enforceCommissaryRouting    Boolean            @default(false)
   tableManagementEnabled      Boolean            @default(false)

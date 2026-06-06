@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
+import { isPaystackDashboardEnabledForOrg } from "@/lib/paystack/credentials";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, OrderSource, OrderType, PaymentStatus } from "@/lib/generated/prisma/client";
 import { createDeliveryRequest } from "@/lib/actions/delivery";
@@ -163,7 +163,7 @@ export async function getOrders(filters?: {
               organization: {
                 select: {
                   features: true,
-                  paystackEnabled: true,
+                  paystackDashboardEnabled: true,
                 },
               },
             },
@@ -227,7 +227,7 @@ export async function getOrders(filters?: {
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         paystackEnabled: order.branch?.organization
-          ? isPaystackEnabledForOrg(order.branch.organization)
+          ? isPaystackDashboardEnabledForOrg(order.branch.organization)
           : false,
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
@@ -315,7 +315,7 @@ export async function getOrderById(id: string) {
             organization: {
               select: {
                 features: true,
-                paystackEnabled: true,
+                paystackDashboardEnabled: true,
               },
             },
           },
@@ -356,7 +356,7 @@ export async function getOrderById(id: string) {
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         paystackEnabled: order.branch?.organization
-          ? isPaystackEnabledForOrg(order.branch.organization)
+          ? isPaystackDashboardEnabledForOrg(order.branch.organization)
           : false,
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,

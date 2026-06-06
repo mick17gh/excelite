@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { hasFeature, isSuperAdmin } from "@/lib/tier-config";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES, type StorefrontTemplateId } from "@/lib/storefront/templates";
-import { isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
+import { isPaystackStorefrontEnabledForOrg } from "@/lib/paystack/credentials";
 import { getStoreAvailabilityByHours, type BusinessHours } from "@/lib/storefront/hours";
 import { getPrimaryBannerUrl, resolveStoreBanners, type StoreBanner } from "@/lib/storefront/banners";
 
@@ -138,7 +138,7 @@ export function buildPublicStoreConfig(
       deliveryEnabled: org.deliveryEnabled,
       pickupEnabled: org.pickupEnabled,
       cashEnabled: true,
-      paystackEnabled: isPaystackEnabledForOrg(org),
+      paystackEnabled: isPaystackStorefrontEnabledForOrg(org),
     },
     operations: {
       deliveryRadiusKm: org.deliveryRadius ? Number(org.deliveryRadius) : 0,

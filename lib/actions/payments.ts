@@ -3,7 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { PaymentStatus } from "@/lib/generated/prisma/client";
-import { getEnvPaystackSecretKey, isPaystackEnabledForOrg } from "@/lib/paystack/credentials";
+import {
+  getEnvPaystackSecretKey,
+  isPaystackDashboardEnabledForOrg,
+  type PaystackOrgFlags,
+} from "@/lib/paystack/credentials";
 import { finalizeOrderFromExistingPayments } from "@/lib/payments/settle-order";
 import {
   normalizePaymentMethod,
@@ -33,13 +37,10 @@ function buildPaystackReference(orderNumber: string): string {
   return `PSTK-${orderNumber}-${ts}-${rand}`;
 }
 
-function resolvePaystackCredentials(org: {
-  paystackEnabled: boolean | null;
-  features: unknown;
-}) {
+function resolvePaystackCredentials(org: PaystackOrgFlags) {
   const secret = getEnvPaystackSecretKey();
   return {
-    enabled: isPaystackEnabledForOrg(org),
+    enabled: isPaystackDashboardEnabledForOrg(org),
     secret,
   };
 }
@@ -256,7 +257,7 @@ export async function initializePaystackOrderPayment(input: InitializePaystackOr
             organization: {
               select: {
                 features: true,
-                paystackEnabled: true,
+                paystackDashboardEnabled: true,
               },
             },
           },
@@ -353,7 +354,7 @@ export async function verifyPaystackOrderPayment(input: { orderId: string; refer
             organization: {
               select: {
                 features: true,
-                paystackEnabled: true,
+                paystackDashboardEnabled: true,
               },
             },
           },

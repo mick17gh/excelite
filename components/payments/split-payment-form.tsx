@@ -23,6 +23,7 @@ import {
   MAX_TENDER_LINES,
   roundMoney,
   sumTenderAmounts,
+  validateTenders,
   type PaymentTender,
 } from "@/lib/payments/tenders";
 
@@ -96,7 +97,15 @@ export function SplitPaymentForm({
   const remaining = roundMoney(total - allocated);
 
   const tenders = linesToTenders(lines);
-  const canSubmit = remaining === 0 && tenders.length > 0 && !disabled;
+  const tenderValidation = useMemo(() => {
+    if (remaining !== 0 || tenders.length === 0) return null;
+    return validateTenders(total, tenders);
+  }, [remaining, tenders, total]);
+  const canSubmit =
+    remaining === 0 &&
+    tenders.length > 0 &&
+    !disabled &&
+    (tenderValidation?.ok ?? false);
   const cashChange = tenders.reduce((change, tender) => {
     if (tender.method !== "CASH") return change;
     const received = tender.amountReceived ?? tender.amount;
@@ -258,11 +267,22 @@ export function SplitPaymentForm({
                     type="number"
                     min="0"
                     step="0.01"
-                    className="h-9"
+                    className={cn(
+                      "h-9",
+                      line.amountReceived.trim() &&
+                        (parseFloat(line.amountReceived) || 0) < (parseFloat(line.amount) || 0) &&
+                        "border-destructive focus-visible:ring-destructive",
+                    )}
                     placeholder={line.amount || "0.00"}
                     value={line.amountReceived}
                     onChange={(e) => updateLine(line.id, { amountReceived: e.target.value })}
                   />
+                  {line.amountReceived.trim() &&
+                    (parseFloat(line.amountReceived) || 0) < (parseFloat(line.amount) || 0) && (
+                      <p className="text-xs text-destructive">
+                        Cash received must be at least {formatCurrency(parseFloat(line.amount) || 0)}
+                      </p>
+                    )}
                 </div>
               ) : (
                 <div className="space-y-1.5">

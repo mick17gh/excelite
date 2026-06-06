@@ -383,9 +383,9 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
 
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div>
-            <span className="text-sm">Enable Paystack</span>
+            <span className="text-sm">Enable Paystack (Online Store)</span>
             <p className="text-xs text-muted-foreground">
-              Controls Paystack for dashboard and storefront payments. Keys are configured in PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY (server) and NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY (storefront).
+              Enables Paystack checkout on your online store only. Keys are configured in PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY (server) and NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY (storefront).
             </p>
           </div>
           <Switch checked={form.paystackEnabled} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, paystackEnabled: checked }))} />

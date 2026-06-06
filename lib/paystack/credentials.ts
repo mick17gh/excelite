@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 
 export type PaystackOrgFlags = {
-  paystackEnabled: boolean | null;
-  features: unknown;
+  paystackEnabled?: boolean | null;
+  paystackDashboardEnabled?: boolean | null;
+  features?: unknown;
 };
 
 export function getEnvPaystackPublicKey(): string | null {
@@ -17,14 +18,25 @@ export function isPaystackConfiguredInEnv(): boolean {
   return Boolean(getEnvPaystackPublicKey() && getEnvPaystackSecretKey());
 }
 
-export function isOrgPaystackFeatureEnabled(org: PaystackOrgFlags): boolean {
+export function isOrgPaystackStorefrontFeatureEnabled(org: PaystackOrgFlags): boolean {
   return Boolean(
     org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true
   );
 }
 
-export function isPaystackEnabledForOrg(org: PaystackOrgFlags): boolean {
-  return isOrgPaystackFeatureEnabled(org) && isPaystackConfiguredInEnv();
+export function isOrgPaystackDashboardFeatureEnabled(org: PaystackOrgFlags): boolean {
+  return Boolean(
+    org.paystackDashboardEnabled ||
+      (org.features as Record<string, unknown> | null)?.paystackDashboardEnabled === true
+  );
+}
+
+export function isPaystackStorefrontEnabledForOrg(org: PaystackOrgFlags): boolean {
+  return isOrgPaystackStorefrontFeatureEnabled(org) && isPaystackConfiguredInEnv();
+}
+
+export function isPaystackDashboardEnabledForOrg(org: PaystackOrgFlags): boolean {
+  return isOrgPaystackDashboardFeatureEnabled(org) && isPaystackConfiguredInEnv();
 }
 
 export async function getPaystackSecretForOrganization(organizationId: string): Promise<string | null> {
@@ -32,6 +44,6 @@ export async function getPaystackSecretForOrganization(organizationId: string): 
     where: { id: organizationId },
     select: { paystackEnabled: true, features: true },
   });
-  if (!org || !isOrgPaystackFeatureEnabled(org)) return null;
+  if (!org || !isOrgPaystackStorefrontFeatureEnabled(org)) return null;
   return getEnvPaystackSecretKey();
 }

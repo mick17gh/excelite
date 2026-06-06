@@ -38,7 +38,6 @@ export type NavItem = {
   permissionsAny?: Permission[];
   featureKey?: keyof TierFeatures;
   requiresTableManagement?: boolean;
-  openInNewTab?: boolean;
 };
 
 export type RouteAccessRule = {
@@ -57,7 +56,6 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
     href: "/dashboard/orders",
     icon: ShoppingCart,
     permission: "orders:view",
-    openInNewTab: true,
   },
   {
     name: "POS",
@@ -65,7 +63,6 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
     icon: Monitor,
     permission: "pos:access",
     featureKey: "pos",
-    openInNewTab: true,
   },
   {
     name: "Kitchen (KDS)",

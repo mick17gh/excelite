@@ -137,8 +137,6 @@ export function Sidebar({
               <Link
                 key={item.name}
                 href={item.href}
-                target={item.openInNewTab ? "_blank" : undefined}
-                rel={item.openInNewTab ? "noopener noreferrer" : undefined}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-smooth min-w-0",
                   isActive

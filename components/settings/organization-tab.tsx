@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { Building2, Users, GitBranch, Warehouse, Save, Loader2, Upload, Image as ImageIcon, X } from "lucide-react";
+import { Building2, Users, GitBranch, Warehouse, Save, Loader2, Upload, Image as ImageIcon, X, CreditCard } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { getOrganization, updateOrganization } from "@/lib/actions/organization";
 import { getTierLimits, TIER_DISPLAY_NAMES } from "@/lib/tier-config";
@@ -31,6 +32,7 @@ interface OrgData {
   branchCount: number;
   warehouseCount: number;
   createdAt: string;
+  paystackDashboardEnabled?: boolean;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -51,6 +53,8 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
   const [storeLogoUrl, setStoreLogoUrl] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const [paystackDashboardEnabled, setPaystackDashboardEnabled] = useState(false);
+  const [isSavingPayments, setIsSavingPayments] = useState(false);
 
   useEffect(() => {
     loadOrg();
@@ -66,6 +70,7 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
         setStoreLogoUrl(result.data.storeLogoUrl || "");
         setLogoPreview(result.data.storeLogoUrl || null);
         setSelectedLogoFile(null);
+        setPaystackDashboardEnabled(Boolean(result.data.paystackDashboardEnabled));
       }
     } catch {
       toast.error("Failed to load organization");
@@ -100,6 +105,26 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
     setSelectedLogoFile(null);
     setLogoPreview(null);
     setStoreLogoUrl("");
+  };
+
+  const handleSavePayments = async () => {
+    if (!org) return;
+    setIsSavingPayments(true);
+    try {
+      const result = await updateOrganization({
+        id: org.id,
+        paystackDashboardEnabled,
+      });
+      if (result.error) toast.error(result.error);
+      else {
+        setOrg((prev) => (prev ? { ...prev, paystackDashboardEnabled } : prev));
+        toast.success("Payment settings saved");
+      }
+    } catch {
+      toast.error("Failed to save payment settings");
+    } finally {
+      setIsSavingPayments(false);
+    }
   };
 
   const handleSave = async () => {
@@ -250,6 +275,43 @@ export function OrganizationTab({ organizationId }: OrganizationTabProps) {
           <div className="flex justify-end">
             <Button size="sm" onClick={handleSave} disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+              Save
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CreditCard className="h-4 w-4" />
+            Payments
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Dashboard payment options. Online store Paystack is configured separately in Online Store settings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 pt-0 space-y-4">
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <span className="text-sm">Enable Paystack (Dashboard)</span>
+              <p className="text-xs text-muted-foreground">
+                Shows &quot;Pay with Paystack&quot; on dashboard orders. Independent from the online store toggle.
+                Keys: PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY.
+              </p>
+            </div>
+            <Switch
+              checked={paystackDashboardEnabled}
+              onCheckedChange={setPaystackDashboardEnabled}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleSavePayments} disabled={isSavingPayments}>
+              {isSavingPayments ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="mr-1.5 h-3.5 w-3.5" />
+              )}
               Save
             </Button>
           </div>

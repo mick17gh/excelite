@@ -60,6 +60,7 @@ export interface UpdateOrganizationInput {
   facebookUrl?: string | null;
   instagramUrl?: string | null;
   paystackEnabled?: boolean;
+  paystackDashboardEnabled?: boolean;
   tableManagementEnabled?: boolean;
 }
 
@@ -174,6 +175,9 @@ export async function getOrganization(id?: string) {
         facebookUrl: org.facebookUrl,
         instagramUrl: org.instagramUrl,
         paystackEnabled: org.paystackEnabled || (org.features as Record<string, unknown> | null)?.paystackEnabled === true,
+        paystackDashboardEnabled:
+          org.paystackDashboardEnabled ||
+          (org.features as Record<string, unknown> | null)?.paystackDashboardEnabled === true,
         trialEndsAt: org.trialEndsAt?.toISOString() || null,
         subscriptionEndsAt: org.subscriptionEndsAt?.toISOString() || null,
         userCount: org._count.users,
@@ -447,6 +451,18 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
         ...currentFeatures,
         ...(input.features || {}),
         paystackEnabled: input.paystackEnabled,
+      };
+    }
+    if (input.paystackDashboardEnabled !== undefined) {
+      data.paystackDashboardEnabled = input.paystackDashboardEnabled;
+      const currentFeatures =
+        (data.features as Record<string, unknown> | null) ||
+        (existingOrg.features as Record<string, unknown> | null) ||
+        {};
+      data.features = {
+        ...currentFeatures,
+        ...(input.features || {}),
+        paystackDashboardEnabled: input.paystackDashboardEnabled,
       };
     }
     const org = await db.organization.update({
