@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,23 +59,35 @@ function linesToTenders(lines: TenderLine[]): PaymentTender[] {
     .filter((t) => t.amount > 0);
 }
 
+export type SplitPaymentFormHandle = {
+  submit: () => void;
+};
+
 export interface SplitPaymentFormProps {
   total: number;
   disabled?: boolean;
   offlineRestricted?: boolean;
   submitLabel?: string;
   showSplitToggle?: boolean;
+  hideSubmitButton?: boolean;
+  onCanSubmitChange?: (canSubmit: boolean) => void;
   onSubmit: (tenders: PaymentTender[]) => void;
 }
 
-export function SplitPaymentForm({
-  total,
-  disabled = false,
-  offlineRestricted = false,
-  submitLabel = "Complete payment",
-  showSplitToggle = true,
-  onSubmit,
-}: SplitPaymentFormProps) {
+export const SplitPaymentForm = forwardRef<SplitPaymentFormHandle, SplitPaymentFormProps>(
+  function SplitPaymentForm(
+    {
+      total,
+      disabled = false,
+      offlineRestricted = false,
+      submitLabel = "Complete payment",
+      showSplitToggle = true,
+      hideSubmitButton = false,
+      onCanSubmitChange,
+      onSubmit,
+    },
+    ref,
+  ) {
   const { formatCurrency } = useCurrency();
   const [splitMode, setSplitMode] = useState(false);
   const [lines, setLines] = useState<TenderLine[]>([newLine("CASH", total.toFixed(2))]);
@@ -135,6 +147,11 @@ export function SplitPaymentForm({
     if (!canSubmit) return;
     onSubmit(tenders);
   };
+
+  useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
+  useEffect(() => {
+    onCanSubmitChange?.(canSubmit);
+  }, [canSubmit, onCanSubmitChange]);
 
   return (
     <div className="space-y-4">
@@ -314,15 +331,18 @@ export function SplitPaymentForm({
         </div>
       )}
 
-      <Button
-        type="button"
-        className="w-full"
-        disabled={!canSubmit}
-        onClick={handleSubmit}
-      >
-        {submitLabel}
-        {canSubmit && splitMode && ` (${sumTenderAmounts(tenders)} allocated)`}
-      </Button>
+      {!hideSubmitButton && (
+        <Button
+          type="button"
+          className="w-full"
+          disabled={!canSubmit}
+          onClick={handleSubmit}
+        >
+          {submitLabel}
+          {canSubmit && splitMode && ` (${sumTenderAmounts(tenders)} allocated)`}
+        </Button>
+      )}
     </div>
   );
-}
+},
+);

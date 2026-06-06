@@ -863,7 +863,7 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                     <TableHead className="text-xs">Job Role</TableHead>
                     <TableHead className="text-xs">Branch</TableHead>
                     <TableHead className="text-xs">Contact</TableHead>
-                    <TableHead className="text-xs text-right">Hourly Rate</TableHead>
+                    <TableHead className="text-xs">Hire Date</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
                     {canEditStaff && (
                       <TableHead className="text-xs text-right w-16">Edit</TableHead>
@@ -907,8 +907,8 @@ export function StaffContent({ summary, schedule, branches, allStaff = [] }: Sta
                               {!member.email && !member.phone && "—"}
                             </div>
                           </TableCell>
-                          <TableCell className="py-2 text-sm text-right">
-                            {formatCurrency(member.hourlyRate)}
+                          <TableCell className="py-2 text-sm text-muted-foreground">
+                            {format(new Date(member.hireDate), "MMM d, yyyy")}
                           </TableCell>
                           <TableCell className="py-2">
                             <div className="flex flex-col gap-1 items-start">

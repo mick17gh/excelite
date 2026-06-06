@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import type { SplitPaymentFormHandle } from "@/components/payments/split-payment-form";
 import {
   Dialog,
   DialogContent,
@@ -113,6 +114,8 @@ export function PaymentModal({
   const [newCustPhone, setNewCustPhone] = useState("");
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const wasOpenRef = useRef(false);
+  const splitPaymentRef = useRef<SplitPaymentFormHandle>(null);
+  const [canCompletePayment, setCanCompletePayment] = useState(false);
 
   // Delivery fields
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -182,6 +185,7 @@ export function PaymentModal({
     wasOpenRef.current = true;
 
     if (justOpened) {
+      setCanCompletePayment(false);
       setPaymentMethod("CASH");
       setCustomerId("walk-in");
       setNotes("");
@@ -371,9 +375,12 @@ export function PaymentModal({
 
             {paymentMethod !== "COMPLIMENTARY" && (
               <SplitPaymentForm
+                ref={splitPaymentRef}
                 total={total}
                 disabled={isProcessing}
                 offlineRestricted={offlineRestricted}
+                hideSubmitButton
+                onCanSubmitChange={setCanCompletePayment}
                 submitLabel={isProcessing ? "Processing..." : "Complete Payment"}
                 onSubmit={handleSplitPayment}
               />
@@ -504,6 +511,27 @@ export function PaymentModal({
                 className="resize-none"
               />
             </div>
+
+            {paymentMethod !== "COMPLIMENTARY" && (
+              <Button
+                type="button"
+                className="w-full h-12 text-base font-semibold"
+                disabled={isProcessing || !canCompletePayment}
+                onClick={() => splitPaymentRef.current?.submit()}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-2 h-5 w-5" />
+                    Complete Payment
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </ScrollArea>
 
