@@ -15,12 +15,38 @@ Organization logo from Settings → Organization (`storeLogoUrl`) is exposed on 
     "logoUrl": "https://cdn.example.com/logo.png"
   },
   "branches": [
-    { "id": "clx...", "name": "Main Branch", "code": "MAIN" }
-  ]
+    {
+      "id": "clx...",
+      "name": "Main Branch",
+      "code": "MAIN",
+      "currency": "GHS",
+      "taxRate": 0.125,
+      "taxInclusive": true
+    }
+  ],
+  "checkout": {
+    "currency": "GHS",
+    "minimumOrderAmount": 0,
+    "deliveryFee": 0,
+    "taxRate": 0.125,
+    "taxInclusive": true
+  }
 }
 ```
 
 Use `store.logoUrl` in the header; omit or fallback when `null`.
+
+### Tax (per branch)
+
+Each entry in `branches` includes that branch's tax settings:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `taxRate` | number | Decimal rate (e.g. `0.125` = 12.5%). `0` when tax is disabled. |
+| `taxInclusive` | boolean | `true` = menu prices include tax; `false` = tax added at checkout. |
+| `currency` | `"GHS"` \| `"NGN"` | Branch currency for totals. |
+
+After the customer selects a branch, read tax from `branches.find(b => b.id === branchId)` — **not** from top-level `checkout.taxRate` / `checkout.taxInclusive` (those mirror the first branch only and are deprecated).
 
 ## Menu (`GET /api/public/store/{organizationId}/menu`)
 
@@ -42,9 +68,9 @@ GET /api/public/store/{orgId}/menu?branchId={branchId}
 ## Recommended client flow
 
 1. Load **config** → show logo, list `branches` for picker.
-2. User selects branch → store `branchId` in session/state.
+2. User selects branch → store `branchId` in session/state; cache that branch's `taxRate`, `taxInclusive`, and `currency` for cart totals.
 3. Load **menu** with `?branchId=...` → render categories and items.
-4. On branch change, refetch menu and clear cart lines that are no longer available.
+4. On branch change, refetch menu, update tax settings from the new branch, and clear cart lines that are no longer available.
 5. Create order with the same `branchId` (existing orders API already requires it).
 
 ## Orders

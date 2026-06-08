@@ -40,11 +40,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ organiz
   return applyCors(
     req,
     NextResponse.json({
-      data: org.branches.map((branch) => ({
-        id: branch.id,
-        name: branch.name,
-        code: branch.code,
-      })),
+      data: cfg.branches,
     }),
     allowedOrigins
   );

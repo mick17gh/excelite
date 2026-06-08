@@ -7,6 +7,16 @@ import { getPrimaryBannerUrl, resolveStoreBanners, type StoreBanner } from "@/li
 
 export type { StoreBanner };
 
+export type PublicStoreBranch = {
+  id: string;
+  name: string;
+  code: string;
+  currency: "GHS" | "NGN";
+  /** Decimal rate (e.g. 0.125 for 12.5%). Zero when tax is disabled for the branch. */
+  taxRate: number;
+  taxInclusive: boolean;
+};
+
 export type PublicStoreConfig = {
   organizationId: string;
   store: {
@@ -31,7 +41,9 @@ export type PublicStoreConfig = {
     currency: "GHS" | "NGN";
     minimumOrderAmount: number;
     deliveryFee: number;
+    /** @deprecated Use the selected branch's `taxRate` from `branches`. Kept for backward compatibility (first branch). */
     taxRate: number;
+    /** @deprecated Use the selected branch's `taxInclusive` from `branches`. Kept for backward compatibility (first branch). */
     taxInclusive: boolean;
   };
   features: {
@@ -60,8 +72,43 @@ export type PublicStoreConfig = {
     weekly: BusinessHours;
   };
   theme: Record<string, unknown> | null;
-  branches: { id: string; name: string; code: string }[];
+  branches: PublicStoreBranch[];
 };
+
+type StorefrontBranchRow = {
+  id: string;
+  name: string;
+  code: string;
+  currency: string | null;
+  taxEnabled: boolean;
+  taxRate: unknown;
+  taxInclusive: boolean;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+};
+
+export function branchTaxRateDecimal(branch: Pick<StorefrontBranchRow, "taxEnabled" | "taxRate">): number {
+  return branch.taxEnabled ? Number(branch.taxRate || 0) / 100 : 0;
+}
+
+export function toPublicStoreBranch(branch: StorefrontBranchRow): PublicStoreBranch {
+  return {
+    id: branch.id,
+    name: branch.name,
+    code: branch.code,
+    currency: branch.currency === "NGN" ? "NGN" : "GHS",
+    taxRate: branchTaxRateDecimal(branch),
+    taxInclusive: branch.taxInclusive ?? false,
+  };
+}
+
+export function findPublicStoreBranch(
+  config: Pick<PublicStoreConfig, "branches">,
+  branchId: string
+): PublicStoreBranch | undefined {
+  return config.branches.find((branch) => branch.id === branchId);
+}
 
 export async function getOrganizationForStorefront(organizationId: string) {
   return db.organization.findUnique({
@@ -69,6 +116,7 @@ export async function getOrganizationForStorefront(organizationId: string) {
     include: {
       branches: {
         where: { deletedAt: null, isActive: true, onlineStoreVisible: true },
+        orderBy: { name: "asc" },
         select: { id: true, name: true, code: true, currency: true, taxEnabled: true, taxRate: true, taxInclusive: true, address: true, city: true, country: true },
       },
     },
@@ -94,15 +142,17 @@ export function buildPublicStoreConfig(
   const businessHours = (org.businessHours as BusinessHours | null) ?? null;
   const timeZone = org.storeTimezone || "Africa/Accra";
   const availability = getStoreAvailabilityByHours(businessHours, timeZone);
-  const firstBranch = org.branches[0];
-  const currency = ((firstBranch?.currency === "NGN" ? "NGN" : "GHS") as "GHS" | "NGN");
-  const taxRate = firstBranch?.taxEnabled ? Number(firstBranch.taxRate || 0) / 100 : 0;
+  const publicBranches = org.branches.map(toPublicStoreBranch);
+  const firstBranch = publicBranches[0];
+  const currency = firstBranch?.currency ?? "GHS";
+  const taxRate = firstBranch?.taxRate ?? 0;
   const hoursDescription = Object.keys(businessHours || {}).length > 0
     ? "See weekly schedule"
     : "Always open";
   const rawTheme = (org.storeTheme as Record<string, unknown> | null) ?? {};
-  const contactAddress = firstBranch
-    ? [firstBranch.address, firstBranch.city, firstBranch.country].filter(Boolean).join(", ")
+  const contactBranch = org.branches[0];
+  const contactAddress = contactBranch
+    ? [contactBranch.address, contactBranch.city, contactBranch.country].filter(Boolean).join(", ")
     : null;
   const banners = resolveStoreBanners(org.storeBanners, org.storeBannerUrl);
 
@@ -168,7 +218,7 @@ export function buildPublicStoreConfig(
       radius: rawTheme.radius || "0.75rem",
       fontFamily: rawTheme.fontFamily || "Inter, sans-serif",
     },
-    branches: org.branches.map((branch) => ({ id: branch.id, name: branch.name, code: branch.code })),
+    branches: publicBranches,
   };
 }
 
