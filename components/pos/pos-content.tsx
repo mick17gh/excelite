@@ -887,9 +887,9 @@ export function PosContent({
         <div className="flex flex-wrap items-center gap-3 pb-3 shrink-0">
           {/* Branch Selector */}
           <Select value={branchId} onValueChange={handleBranchChange}>
-            <SelectTrigger className="w-[180px] h-10 bg-background">
-              <Store className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Select Branch" />
+            <SelectTrigger className="h-10 min-w-[240px] max-w-[320px] w-[min(320px,40vw)] bg-background">
+              <Store className="h-4 w-4 mr-2 shrink-0 text-muted-foreground" />
+              <SelectValue placeholder="Select Branch" className="truncate" />
             </SelectTrigger>
             <SelectContent>
               {liveBranches.map((b) => (

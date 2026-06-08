@@ -93,6 +93,8 @@ export async function listKitchenTickets(branchId?: string, stationId?: string) 
   try {
     const tickets = await db.kitchenTicket.findMany({
       where: {
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+        order: { status: { not: "CANCELLED" } },
         ...(stationId && { stationId }),
         ...(branchId && { station: { branchId } }),
       },

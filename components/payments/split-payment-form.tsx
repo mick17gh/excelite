@@ -45,17 +45,23 @@ function newLine(method: SplittablePaymentMethodCode = "CASH", amount = ""): Ten
   };
 }
 
-function linesToTenders(lines: TenderLine[]): PaymentTender[] {
+function linesToTenders(lines: TenderLine[], requireCashReceived = false): PaymentTender[] {
   return lines
-    .map((line) => ({
-      method: line.method,
-      amount: roundMoney(parseFloat(line.amount) || 0),
-      reference: line.reference.trim() || undefined,
-      amountReceived:
-        line.method === "CASH" && line.amountReceived.trim()
-          ? roundMoney(parseFloat(line.amountReceived) || 0)
-          : undefined,
-    }))
+    .map((line) => {
+      const amount = roundMoney(parseFloat(line.amount) || 0);
+      let amountReceived: number | undefined;
+      if (line.method === "CASH" && line.amountReceived.trim()) {
+        amountReceived = roundMoney(parseFloat(line.amountReceived) || 0);
+      } else if (line.method === "CASH" && requireCashReceived) {
+        amountReceived = 0;
+      }
+      return {
+        method: line.method,
+        amount,
+        reference: line.reference.trim() || undefined,
+        amountReceived,
+      };
+    })
     .filter((t) => t.amount > 0);
 }
 
@@ -70,7 +76,9 @@ export interface SplitPaymentFormProps {
   submitLabel?: string;
   showSplitToggle?: boolean;
   hideSubmitButton?: boolean;
+  requireCashReceived?: boolean;
   onCanSubmitChange?: (canSubmit: boolean) => void;
+  onSubmitLabelChange?: (label: string) => void;
   onSubmit: (tenders: PaymentTender[]) => void;
 }
 
@@ -83,7 +91,9 @@ export const SplitPaymentForm = forwardRef<SplitPaymentFormHandle, SplitPaymentF
       submitLabel = "Complete payment",
       showSplitToggle = true,
       hideSubmitButton = false,
+      requireCashReceived = false,
       onCanSubmitChange,
+      onSubmitLabelChange,
       onSubmit,
     },
     ref,
@@ -108,20 +118,19 @@ export const SplitPaymentForm = forwardRef<SplitPaymentFormHandle, SplitPaymentF
   );
   const remaining = roundMoney(total - allocated);
 
-  const tenders = linesToTenders(lines);
+  const tenders = linesToTenders(lines, requireCashReceived);
   const tenderValidation = useMemo(() => {
     if (remaining !== 0 || tenders.length === 0) return null;
-    return validateTenders(total, tenders);
-  }, [remaining, tenders, total]);
+    return validateTenders(total, tenders, { requireCashReceived });
+  }, [remaining, tenders, total, requireCashReceived]);
   const canSubmit =
     remaining === 0 &&
     tenders.length > 0 &&
     !disabled &&
     (tenderValidation?.ok ?? false);
   const cashChange = tenders.reduce((change, tender) => {
-    if (tender.method !== "CASH") return change;
-    const received = tender.amountReceived ?? tender.amount;
-    return roundMoney(change + Math.max(0, received - tender.amount));
+    if (tender.method !== "CASH" || tender.amountReceived == null) return change;
+    return roundMoney(change + Math.max(0, tender.amountReceived - tender.amount));
   }, 0);
 
   const updateLine = (id: string, patch: Partial<TenderLine>) => {
@@ -148,10 +157,20 @@ export const SplitPaymentForm = forwardRef<SplitPaymentFormHandle, SplitPaymentF
     onSubmit(tenders);
   };
 
+  const displaySubmitLabel = useMemo(() => {
+    if (canSubmit && splitMode) {
+      return `${submitLabel} (${sumTenderAmounts(tenders)} allocated)`;
+    }
+    return submitLabel;
+  }, [canSubmit, splitMode, submitLabel, tenders]);
+
   useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
   useEffect(() => {
     onCanSubmitChange?.(canSubmit);
   }, [canSubmit, onCanSubmitChange]);
+  useEffect(() => {
+    onSubmitLabelChange?.(displaySubmitLabel);
+  }, [displaySubmitLabel, onSubmitLabelChange]);
 
   return (
     <div className="space-y-4">
@@ -279,21 +298,33 @@ export const SplitPaymentForm = forwardRef<SplitPaymentFormHandle, SplitPaymentF
 
               {line.method === "CASH" ? (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Cash received</Label>
+                  <Label className="text-xs">
+                    Cash received{requireCashReceived ? " *" : ""}
+                  </Label>
                   <Input
                     type="number"
                     min="0"
                     step="0.01"
                     className={cn(
                       "h-9",
-                      line.amountReceived.trim() &&
-                        (parseFloat(line.amountReceived) || 0) < (parseFloat(line.amount) || 0) &&
-                        "border-destructive focus-visible:ring-destructive",
+                      (requireCashReceived &&
+                        !line.amountReceived.trim() &&
+                        (parseFloat(line.amount) || 0) > 0) ||
+                        (line.amountReceived.trim() &&
+                          (parseFloat(line.amountReceived) || 0) <
+                            (parseFloat(line.amount) || 0))
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : "",
                     )}
-                    placeholder={line.amount || "0.00"}
+                    placeholder={requireCashReceived ? "Enter amount received" : line.amount || "0.00"}
                     value={line.amountReceived}
                     onChange={(e) => updateLine(line.id, { amountReceived: e.target.value })}
                   />
+                  {requireCashReceived &&
+                    !line.amountReceived.trim() &&
+                    (parseFloat(line.amount) || 0) > 0 && (
+                      <p className="text-xs text-destructive">Enter cash received</p>
+                    )}
                   {line.amountReceived.trim() &&
                     (parseFloat(line.amountReceived) || 0) < (parseFloat(line.amount) || 0) && (
                       <p className="text-xs text-destructive">

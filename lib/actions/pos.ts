@@ -703,11 +703,8 @@ export async function voidPosOrder(orderId: string, reason: string) {
       },
     });
 
-    // Cancel associated kitchen tickets
-    await db.kitchenTicket.updateMany({
-      where: { orderId },
-      data: { status: "CANCELLED" },
-    });
+    const { cancelKitchenTicketsForOrder } = await import("@/lib/kitchen/cancel-tickets");
+    await cancelKitchenTicketsForOrder(orderId);
 
     // Create audit log
     await logCreate(

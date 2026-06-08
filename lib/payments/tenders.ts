@@ -44,6 +44,7 @@ export function orderPaymentMethodFromTenders(tenders: PaymentTender[]): string 
 export function validateTenders(
   total: number,
   tenders: PaymentTender[],
+  options?: { requireCashReceived?: boolean },
 ): { ok: true } | { ok: false; error: string } {
   if (!tenders.length) {
     return { ok: false, error: "Add at least one payment line" };
@@ -59,8 +60,11 @@ export function validateTenders(
     if (tender.amount <= 0) {
       return { ok: false, error: "Each payment amount must be greater than zero" };
     }
-    if (tender.method === "CASH" && tender.amountReceived != null) {
-      if (roundMoney(tender.amountReceived) < roundMoney(tender.amount)) {
+    if (tender.method === "CASH") {
+      if (options?.requireCashReceived && (tender.amountReceived == null || tender.amountReceived <= 0)) {
+        return { ok: false, error: "Enter cash received" };
+      }
+      if (tender.amountReceived != null && roundMoney(tender.amountReceived) < roundMoney(tender.amount)) {
         return { ok: false, error: "Cash received must cover the cash portion" };
       }
     }

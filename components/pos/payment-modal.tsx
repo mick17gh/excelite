@@ -116,6 +116,7 @@ export function PaymentModal({
   const wasOpenRef = useRef(false);
   const splitPaymentRef = useRef<SplitPaymentFormHandle>(null);
   const [canCompletePayment, setCanCompletePayment] = useState(false);
+  const [paymentSubmitLabel, setPaymentSubmitLabel] = useState("Complete Payment");
 
   // Delivery fields
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -186,6 +187,7 @@ export function PaymentModal({
 
     if (justOpened) {
       setCanCompletePayment(false);
+      setPaymentSubmitLabel("Complete Payment");
       setPaymentMethod("CASH");
       setCustomerId("walk-in");
       setNotes("");
@@ -373,19 +375,6 @@ export function PaymentModal({
               </div>
             )}
 
-            {paymentMethod !== "COMPLIMENTARY" && (
-              <SplitPaymentForm
-                ref={splitPaymentRef}
-                total={total}
-                disabled={isProcessing}
-                offlineRestricted={offlineRestricted}
-                hideSubmitButton
-                onCanSubmitChange={setCanCompletePayment}
-                submitLabel={isProcessing ? "Processing..." : "Complete Payment"}
-                onSubmit={handleSplitPayment}
-              />
-            )}
-
             {/* Customer Selection */}
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-2">
@@ -513,23 +502,28 @@ export function PaymentModal({
             </div>
 
             {paymentMethod !== "COMPLIMENTARY" && (
+              <SplitPaymentForm
+                ref={splitPaymentRef}
+                total={total}
+                disabled={isProcessing}
+                offlineRestricted={offlineRestricted}
+                hideSubmitButton
+                requireCashReceived
+                onCanSubmitChange={setCanCompletePayment}
+                onSubmitLabelChange={setPaymentSubmitLabel}
+                submitLabel="Complete Payment"
+                onSubmit={handleSplitPayment}
+              />
+            )}
+
+            {paymentMethod !== "COMPLIMENTARY" && (
               <Button
                 type="button"
-                className="w-full h-12 text-base font-semibold"
+                className="w-full"
                 disabled={isProcessing || !canCompletePayment}
                 onClick={() => splitPaymentRef.current?.submit()}
               >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Check className="mr-2 h-5 w-5" />
-                    Complete Payment
-                  </>
-                )}
+                {isProcessing ? "Processing..." : paymentSubmitLabel}
               </Button>
             )}
           </div>

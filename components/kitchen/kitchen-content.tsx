@@ -241,7 +241,7 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
     return tickets.filter((t) => {
       const branchOk = branchId === "all" || t.station.branchId === branchId;
       const stationOk = stationId === "all" || t.station.id === stationId;
-      return branchOk && stationOk && t.status !== "COMPLETED";
+      return branchOk && stationOk && t.status !== "COMPLETED" && t.status !== "CANCELLED";
     });
   }, [tickets, branchId, stationId]);
 

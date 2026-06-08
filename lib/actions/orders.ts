@@ -704,6 +704,11 @@ export async function updateOrderStatus(input: { id: string; status: OrderStatus
       data: { status: input.status },
     });
 
+    if (input.status === "CANCELLED") {
+      const { cancelKitchenTicketsForOrder } = await import("@/lib/kitchen/cancel-tickets");
+      await cancelKitchenTicketsForOrder(input.id);
+    }
+
     revalidatePath("/dashboard/orders");
     revalidatePath("/kitchen");
     return { data: serializeOrder(order) };
@@ -782,7 +787,11 @@ export async function cancelOrder(id: string, reason?: string) {
       },
     });
 
+    const { cancelKitchenTicketsForOrder } = await import("@/lib/kitchen/cancel-tickets");
+    await cancelKitchenTicketsForOrder(id);
+
     revalidatePath("/dashboard/orders");
+    revalidatePath("/kitchen");
     return { data: serializeOrder(order) };
   } catch (error) {
     console.error("[cancelOrder] Error:", error);
