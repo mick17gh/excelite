@@ -56,7 +56,7 @@ import {
 } from "@/components/inventory/inventory-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { updateBranchTransferStatus } from "@/lib/actions/inventory";
-import { updateTransferStatus as updateWarehouseTransferStatus } from "@/lib/actions/warehouse";
+import { receiveWarehouseTransferAtBranch } from "@/lib/actions/warehouse";
 import { TransferStatus } from "@/lib/generated/prisma/client";
 import { toast } from "sonner";
 import { useCurrency } from "@/contexts/currency-context";
@@ -146,12 +146,15 @@ interface WarehouseTransfer {
 
 const TRANSFER_STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  APPROVED: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
   IN_TRANSIT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   AWAITING_WAREHOUSE_APPROVAL:
     "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
+
+const RECEIVABLE_WAREHOUSE_TRANSFER_STATUSES = new Set(["PENDING", "APPROVED", "IN_TRANSIT"]);
 
 interface BranchWarehouseReturn {
   id: string;
@@ -204,6 +207,21 @@ export function InventoryContent({
   const { canViewAllBranches, userBranchId, userRole, isLoading: authLoading } = useBranchRestrictions();
   const { hasPermission } = usePermissions();
   const canReconcile = hasPermission("inventory:reconcile");
+  const canReceiveWarehouseTransfer = hasPermission("inventory:transfer");
+
+  const canReceiveTransferForBranch = (toBranchId: string) =>
+    canReceiveWarehouseTransfer &&
+    (canViewAllBranches || !userBranchId || toBranchId === userBranchId);
+
+  const handleReceiveWarehouseTransfer = async (transferId: string) => {
+    const result = await receiveWarehouseTransferAtBranch(transferId);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Transfer marked as received");
+    router.refresh();
+  };
   
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -939,8 +957,8 @@ export function InventoryContent({
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{new Date(record.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                         <TableCell>
-                          {record.status === "IN_TRANSIT" &&
-                            (canViewAllBranches || !userBranchId || record.toBranchId === userBranchId) && (
+                          {RECEIVABLE_WAREHOUSE_TRANSFER_STATUSES.has(record.status) &&
+                            canReceiveTransferForBranch(record.toBranchId) && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -949,20 +967,10 @@ export function InventoryContent({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    onClick={async () => {
-                                      const res = await updateWarehouseTransferStatus(
-                                        record.id,
-                                        "COMPLETED" as TransferStatus
-                                      );
-                                      if (res.data) {
-                                        toast.success("Transfer marked as received");
-                                      } else {
-                                        toast.error(res.error || "Failed to update transfer");
-                                      }
-                                    }}
+                                    onClick={() => handleReceiveWarehouseTransfer(record.id)}
                                   >
                                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                                    Mark Received
+                                    Mark received
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>

@@ -3,7 +3,10 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { UnitType, TransferStatus } from "@/lib/generated/prisma/client";
-import { assertWarehouseMutationAllowed } from "@/lib/actions/warehouse-auth";
+import {
+  assertBranchReceiveAllowed,
+  assertWarehouseMutationAllowed,
+} from "@/lib/actions/warehouse-auth";
 import {
   branchLimitsFromWarehouseItem,
   normalizeWarehouseMaxStock,
@@ -344,14 +347,32 @@ export async function createWarehouseTransfer(
   }
 }
 
-export async function updateTransferStatus(id: string, status: TransferStatus, userId?: string) {
+export async function updateTransferStatus(
+  id: string,
+  status: TransferStatus,
+  userId?: string,
+  options?: { asBranchReceive?: boolean },
+) {
   try {
     const existing = await db.warehouseBranchTransfer.findUnique({ where: { id } });
     if (!existing) return { error: "Transfer not found" };
 
-    const auth = await assertWarehouseMutationAllowed(existing.warehouseId);
-    if (!auth.ok) return { error: auth.error };
-    const actorId = userId ?? auth.ctx.userId;
+    let actorId = userId;
+    if (options?.asBranchReceive) {
+      if (status !== "COMPLETED") {
+        return { error: "Branch receive only supports marking transfers as completed" };
+      }
+      if (!["PENDING", "APPROVED", "IN_TRANSIT"].includes(existing.status)) {
+        return { error: "This transfer cannot be received" };
+      }
+      const branchAuth = await assertBranchReceiveAllowed(existing.toBranchId);
+      if (!branchAuth.ok) return { error: branchAuth.error };
+      actorId = actorId ?? branchAuth.ctx.userId;
+    } else {
+      const auth = await assertWarehouseMutationAllowed(existing.warehouseId);
+      if (!auth.ok) return { error: auth.error };
+      actorId = actorId ?? auth.ctx.userId;
+    }
 
     if (status === "IN_TRANSIT" && existing.status === "APPROVED") {
       // ok
@@ -458,6 +479,11 @@ export async function updateTransferStatus(id: string, status: TransferStatus, u
     console.error("[updateTransferStatus] Error:", error);
     return { error: "Failed to update transfer status" };
   }
+}
+
+/** Branch managers receive incoming warehouse stock at their branch. */
+export async function receiveWarehouseTransferAtBranch(id: string) {
+  return updateTransferStatus(id, "COMPLETED", undefined, { asBranchReceive: true });
 }
 
 export async function getWarehouseStats() {

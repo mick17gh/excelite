@@ -69,7 +69,7 @@ export async function sendOrderPlacedSMS(orderId: string) {
     const customerPhone = order.customer?.phone || order.deliveryPhone;
     if (!customerName || !customerPhone) return;
 
-    const message = `Hi ${customerName}, your order #${order.orderNumber} has been received${order.branch?.name ? ` at ${order.branch.name}` : ""}. We'll notify you when it is ready.`;
+    const message = `Hi ${customerName}, your order #${order.orderNumber}${order.branch?.name ? ` at ${order.branch.name}` : ""} has been received. If you haven't paid yet, please complete payment to confirm your order. We'll notify you when it's ready.`;
     const smsResult = await sendSMS(customerPhone, message);
 
     await db.orderNotification.create({
