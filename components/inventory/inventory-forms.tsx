@@ -251,7 +251,7 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
       });
 
       if (result.success) {
-        toast.success("Waste log recorded successfully");
+        toast.success("Loss recorded successfully");
         onOpenChange(false);
         setFormData({
           branchId: "",
@@ -262,11 +262,11 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
           notes: "",
         });
       } else {
-        toast.error(result.error || "Failed to record waste");
+        toast.error(result.error || "Failed to record loss");
       }
     } catch (error) {
-      console.error("Error recording waste:", error);
-      toast.error("Failed to record waste");
+      console.error("Error recording loss:", error);
+      toast.error("Failed to record loss");
     } finally {
       setIsSubmitting(false);
     }
@@ -276,9 +276,9 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 px-6 pt-6">
-          <DialogTitle>Record Waste</DialogTitle>
+          <DialogTitle>Record Loss</DialogTitle>
           <DialogDescription>
-            Log wasted or spoiled inventory items
+            Record lost or spoiled inventory items
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -323,7 +323,7 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="quantity">Quantity Wasted</Label>
+                <Label htmlFor="quantity">Quantity Lost</Label>
                 <Input
                   id="quantity"
                   type="number"
@@ -335,7 +335,7 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="wasteType">Waste Type</Label>
+                <Label htmlFor="wasteType">Loss Type</Label>
                 <Select
                   value={formData.wasteType}
                   onValueChange={(value) => setFormData({ ...formData, wasteType: value })}
@@ -358,7 +358,7 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
               <Label htmlFor="reason">Reason</Label>
               <Input
                 id="reason"
-                placeholder="Explain why this was wasted"
+                placeholder="Explain why this was lost"
                 value={formData.reason}
                 onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                 required
@@ -381,7 +381,7 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
             </Button>
             <Button type="submit" disabled={isSubmitting} variant="destructive">
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Record Waste
+              Record Loss
             </Button>
           </DialogFooter>
         </form>

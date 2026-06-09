@@ -1,7 +1,7 @@
 import type { SplittablePaymentMethodCode } from "@/lib/payments/payment-methods";
 
 export type PaymentTender = {
-  method: SplittablePaymentMethodCode;
+  method: SplittablePaymentMethodCode | "COMPLIMENTARY";
   amount: number;
   reference?: string;
   amountReceived?: number;
@@ -53,9 +53,21 @@ export function validateTenders(
     return { ok: false, error: `Maximum ${MAX_TENDER_LINES} payment lines allowed` };
   }
 
+  const roundedTotal = roundMoney(total);
+
   for (const tender of tenders) {
-    if (!normalizePaymentMethod(tender.method)) {
+    const isComplimentary = tender.method === "COMPLIMENTARY";
+    if (!isComplimentary && !normalizePaymentMethod(tender.method)) {
       return { ok: false, error: "Invalid payment method" };
+    }
+    if (isComplimentary) {
+      if (roundedTotal !== 0) {
+        return { ok: false, error: "Complimentary payment is only valid for zero-total orders" };
+      }
+      if (roundMoney(tender.amount) !== 0) {
+        return { ok: false, error: "Complimentary payment amount must be zero" };
+      }
+      continue;
     }
     if (tender.amount <= 0) {
       return { ok: false, error: "Each payment amount must be greater than zero" };
@@ -74,10 +86,10 @@ export function validateTenders(
   }
 
   const tenderTotal = sumTenderAmounts(tenders);
-  if (Math.abs(tenderTotal - roundMoney(total)) > 0.01) {
+  if (Math.abs(tenderTotal - roundedTotal) > 0.01) {
     return {
       ok: false,
-      error: `Payment lines must total ${roundMoney(total).toFixed(2)} (currently ${tenderTotal.toFixed(2)})`,
+      error: `Payment lines must total ${roundedTotal.toFixed(2)} (currently ${tenderTotal.toFixed(2)})`,
     };
   }
 

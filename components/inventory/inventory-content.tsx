@@ -697,7 +697,7 @@ export function InventoryContent({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsWasteOpen(true)}>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Log Waste
+                  Record Loss
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setIsTransferOpen(true)}>

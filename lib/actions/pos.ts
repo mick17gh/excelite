@@ -499,7 +499,10 @@ export async function completeOrder(
 
     const tip = input.tip ?? 0;
     const expected = Math.round((Number(order.total) + tip) * 100) / 100;
-    const method = normalizePaymentMethod(input.paymentMethod || "CASH") || "CASH";
+    const isComplimentary = input.paymentMethod === "COMPLIMENTARY";
+    const method = isComplimentary
+      ? "COMPLIMENTARY"
+      : normalizePaymentMethod(input.paymentMethod || "CASH") || "CASH";
     tenders = [
       {
         method,
