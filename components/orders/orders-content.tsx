@@ -346,7 +346,7 @@ export function OrdersContent({
   return (
     <div className="space-y-4">
       {/* KPI Cards */}
-      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-3">
         <Card className="kpi-card rounded-xl">
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
@@ -389,7 +389,7 @@ export function OrdersContent({
           </CardContent>
         </Card>
 
-        <Card className="kpi-card rounded-xl">
+        {/* <Card className="kpi-card rounded-xl">
           <CardContent className="p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -401,7 +401,7 @@ export function OrdersContent({
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Filters */}
