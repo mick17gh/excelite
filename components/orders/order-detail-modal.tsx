@@ -151,6 +151,7 @@ const SOURCE_LABELS: Record<string, string> = {
   WHATSAPP: "WhatsApp",
   WALK_IN: "Walk-in",
   POS: "POS",
+  SOCIAL_MEDIA: "Social Media",
 };
 
 const TYPE_LABELS: Record<string, string> = {

@@ -439,7 +439,13 @@ export function CreateOrderDialog({
     try {
       const result = await createOrder({
         branchId,
-        source: source as "CALL_CENTER" | "ONLINE" | "WHATSAPP" | "WALK_IN" | "POS",
+        source: source as
+          | "CALL_CENTER"
+          | "ONLINE"
+          | "WHATSAPP"
+          | "WALK_IN"
+          | "POS"
+          | "SOCIAL_MEDIA",
         type: type as "DINE_IN" | "TAKEOUT" | "DELIVERY",
         customerId:
           customerId && customerId !== "walk-in" ? customerId : undefined,
@@ -677,6 +683,7 @@ export function CreateOrderDialog({
                   <SelectItem value="CALL_CENTER">Call Center</SelectItem>
                   <SelectItem value="ONLINE">Online</SelectItem>
                   <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                  <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
                   <SelectItem value="POS">POS</SelectItem>
                 </SelectContent>
               </Select>

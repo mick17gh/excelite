@@ -92,6 +92,7 @@ export function mapOrderSourceLabel(source: string): string {
     WHATSAPP: "WhatsApp",
     WALK_IN: "Walk-in",
     POS: "POS",
+    SOCIAL_MEDIA: "Social Media",
   };
   return map[source] || source;
 }

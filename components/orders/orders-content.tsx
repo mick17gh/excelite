@@ -166,6 +166,7 @@ const SOURCE_LABELS: Record<string, string> = {
   WHATSAPP: "WhatsApp",
   WALK_IN: "Walk-in",
   POS: "POS",
+  SOCIAL_MEDIA: "Social Media",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -438,6 +439,7 @@ export function OrdersContent({
               <SelectItem value="ONLINE">Online</SelectItem>
               <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
               <SelectItem value="WALK_IN">Walk-in</SelectItem>
+              <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
               <SelectItem value="POS">POS</SelectItem>
             </SelectContent>
           </Select>

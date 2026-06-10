@@ -206,7 +206,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
     fields: [
       { name: 'orderNumber', type: 'string', description: 'Order reference' },
       { name: 'status', type: 'enum', description: 'Kitchen/fulfillment status', enumValues: ['NEW', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED'] },
-      { name: 'source', type: 'enum', description: 'Order source channel', enumValues: ['CALL_CENTER', 'ONLINE', 'WHATSAPP', 'WALK_IN', 'POS'] },
+      { name: 'source', type: 'enum', description: 'Order source channel', enumValues: ['CALL_CENTER', 'ONLINE', 'WHATSAPP', 'WALK_IN', 'POS', 'SOCIAL_MEDIA'] },
       { name: 'total', type: 'currency', description: 'Order total' },
       { name: 'paymentStatus', type: 'enum', description: 'Payment state', enumValues: ['PENDING', 'PAID', 'FAILED', 'REFUNDED'] },
       { name: 'branch', type: 'reference', description: 'Fulfilling branch', referenceTo: 'branch' },

@@ -232,6 +232,7 @@ enum OrderSource {
   WHATSAPP
   WALK_IN
   POS
+  SOCIAL_MEDIA
 }
 
 enum PaymentStatus {
