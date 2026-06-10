@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getBranchById } from "@/lib/actions/branches";
+import { serializeBranchScalarsForClient } from "@/lib/branches/serialize-client";
 import { getTransactions, getSales } from "@/lib/actions/transactions";
 import { getInventoryItems } from "@/lib/actions/inventory";
 import { getStaffByBranch } from "@/lib/actions/staff";
@@ -8,6 +8,8 @@ import { getTargets } from "@/lib/actions/targets";
 import { BranchDetailsContent } from "@/components/branches/branch-details-content";
 import { notFound } from "next/navigation";
 import { isTableManagementEnabled, isTableManagementEnabledForBranch } from "@/lib/features/table-management";
+import { db } from "@/lib/db";
+import { isPaystackAnyChannelEnabledForOrg } from "@/lib/paystack/credentials";
 
 export const metadata = {
   title: "Branch Details | ServStack",
@@ -22,7 +24,7 @@ export default async function BranchDetailsPage({
   const { id } = await params;
 
   const [
-    branchResult,
+    branchRecord,
     transactionsResult,
     salesResult,
     inventoryResult,
@@ -30,7 +32,7 @@ export default async function BranchDetailsPage({
     usersResult,
     targetsResult,
   ] = await Promise.all([
-    getBranchById(id),
+    db.branch.findUnique({ where: { id } }),
     getTransactions(id),
     getSales(id),
     getInventoryItems(id),
@@ -39,29 +41,14 @@ export default async function BranchDetailsPage({
     getTargets(id),
   ]);
 
-  if (!branchResult.success || !branchResult.data) {
+  if (!branchRecord) {
     notFound();
   }
 
-  // Defensive serialization guard for client component props.
-  // Some environments can still retain Prisma Decimal wrappers in nested payloads.
-  const branch = {
-    ...JSON.parse(JSON.stringify(branchResult.data)),
-    taxRate: Number((branchResult.data as any).taxRate ?? 0),
-    latitude:
-      (branchResult.data as any).latitude != null
-        ? Number((branchResult.data as any).latitude)
-        : null,
-    longitude:
-      (branchResult.data as any).longitude != null
-        ? Number((branchResult.data as any).longitude)
-        : null,
-  };
+  const branch = serializeBranchScalarsForClient(branchRecord);
   const rawTransactions = transactionsResult.data || [];
   const rawSales = salesResult.data || [];
   const rawInventory = inventoryResult.data || [];
-  const staff = staffResult.data || [];
-  const users = usersResult.data || [];
   const targetsData = targetsResult.data || [];
   
   // Convert Decimal fields to numbers
@@ -93,12 +80,54 @@ export default async function BranchDetailsPage({
     status: item.status,
   }));
   
-  // Targets already converted in getTargets action
-  const targets = targetsData;
+  const staff = (staffResult.data ?? []).map((s) => ({
+    id: s.id,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    role: s.role,
+    dutyStatus: s.dutyStatus,
+  }));
+
+  const users = (usersResult.data ?? []).map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    branchId: u.branchId,
+    branchName: u.branchName,
+    isActive: u.isActive,
+    createdAt:
+      u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+  }));
+
+  const targets = (targetsData as Array<Record<string, unknown>>).map((target) => ({
+    id: String(target.id),
+    targetType: String(target.targetType),
+    period: String(target.period),
+    targetValue: Number(target.targetValue),
+    currentValue: Number(target.currentValue),
+    periodStart:
+      target.periodStart instanceof Date
+        ? target.periodStart.toISOString()
+        : String(target.periodStart),
+    periodEnd:
+      target.periodEnd instanceof Date
+        ? target.periodEnd.toISOString()
+        : String(target.periodEnd),
+  }));
   const orgTableManagementEnabled = branch.organizationId
     ? await isTableManagementEnabled(branch.organizationId)
     : false;
   const tableManagementEnabled = await isTableManagementEnabledForBranch(id);
+
+  let paystackEnabled = false;
+  if (branch.organizationId) {
+    const org = await db.organization.findUnique({
+      where: { id: branch.organizationId },
+      select: { paystackEnabled: true, paystackDashboardEnabled: true, features: true },
+    });
+    if (org) paystackEnabled = isPaystackAnyChannelEnabledForOrg(org);
+  }
 
   return (
     <div className="space-y-6">
@@ -113,6 +142,7 @@ export default async function BranchDetailsPage({
           targets={targets}
           tableManagementEnabled={tableManagementEnabled}
           orgTableManagementEnabled={orgTableManagementEnabled}
+          paystackEnabled={paystackEnabled}
         />
       </Suspense>
     </div>

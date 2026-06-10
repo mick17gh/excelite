@@ -34,6 +34,8 @@ import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { BranchPaystackPanel } from "@/components/branches/branch-paystack-panel";
+import type { BranchScalarsForClient } from "@/lib/branches/serialize-client";
 
 function useTabPagination<T>(items: T[], defaultPageSize = 10) {
   const [page, setPage] = useState(1);
@@ -65,20 +67,7 @@ function useTabPagination<T>(items: T[], defaultPageSize = 10) {
   };
 }
 
-interface Branch {
-  id: string;
-  name: string;
-  code: string;
-  address?: string | null;
-  city: string;
-  phoneNumber?: string | null;
-  email?: string | null;
-  currency?: string | null;
-  isActive: boolean;
-  onlineStoreVisible?: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+type Branch = BranchScalarsForClient;
 
 interface Transaction {
   id: string;
@@ -148,6 +137,7 @@ interface BranchDetailsContentProps {
   targets: Target[];
   tableManagementEnabled?: boolean;
   orgTableManagementEnabled?: boolean;
+  paystackEnabled?: boolean;
 }
 
 export function BranchDetailsContent({
@@ -160,6 +150,7 @@ export function BranchDetailsContent({
   targets,
   tableManagementEnabled = false,
   orgTableManagementEnabled = false,
+  paystackEnabled = false,
 }: BranchDetailsContentProps) {
   const { formatCurrency } = useCurrency();
   const router = useRouter();
@@ -280,6 +271,17 @@ export function BranchDetailsContent({
           </CardContent>
         </Card>
       </div>
+
+      <BranchPaystackPanel
+        branchId={branch.id}
+        branchName={branch.name}
+        paystackEnabled={paystackEnabled}
+        paystackSubaccountCode={branch.paystackSubaccountCode}
+        paystackSubaccountActive={branch.paystackSubaccountActive}
+        paystackSubaccountSource={branch.paystackSubaccountSource}
+        settlementAccountName={branch.settlementAccountName}
+        settlementAccountNumber={branch.settlementAccountNumber}
+      />
 
       {/* Branch Details */}
       <Card>

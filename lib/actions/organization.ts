@@ -543,13 +543,15 @@ export async function generateStorefrontConfig(organizationId: string) {
     data: {
       data: canonical,
       meta: {
-        version: "1.4",
+        version: "1.5",
         apiBaseUrl,
         publicEndpoints,
         notes: {
           menu: "Fetch live menu via GET .../menu?branchId={id} after the customer picks a branch (includes optionGroups). Omit branchId to return all active items.",
           orders: "POST items[].menuItemOptionIds with selected option ids from menu.optionGroups[].options[].id",
           tax: "Use branches[].taxRate and branches[].taxInclusive for the customer's selected branchId. checkout.taxRate/taxInclusive are deprecated (first branch only).",
+          paystack:
+            "When features.paystackEnabled is true, only show Paystack checkout for branches where branches[].paystackConfigured is true. Each branch must have a linked Paystack subaccount (ACCT_...) in dashboard Branch settings before card payments work.",
         },
       },
     },

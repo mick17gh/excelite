@@ -40,7 +40,30 @@ describe("storefront branch tax helpers", () => {
       currency: "GHS",
       taxRate: 0.2,
       taxInclusive: true,
+      paystackConfigured: false,
     });
+  });
+
+  it("sets paystackConfigured when branch has active subaccount", () => {
+    expect(
+      toPublicStoreBranch(
+        {
+          id: "b1",
+          name: "Main",
+          code: "MAIN",
+          currency: "GHS",
+          taxEnabled: false,
+          taxRate: 0,
+          taxInclusive: false,
+          address: null,
+          city: null,
+          country: null,
+          paystackSubaccountCode: "ACCT_test",
+          paystackSubaccountActive: true,
+        },
+        { includePaystackStatus: true },
+      ),
+    ).toMatchObject({ paystackConfigured: true });
   });
 
   it("finds branch tax settings by id", () => {
@@ -53,6 +76,7 @@ describe("storefront branch tax helpers", () => {
           currency: "GHS",
           taxRate: 0.125,
           taxInclusive: false,
+          paystackConfigured: false,
         },
         {
           id: "b2",
@@ -61,6 +85,7 @@ describe("storefront branch tax helpers", () => {
           currency: "GHS",
           taxRate: 0.2,
           taxInclusive: true,
+          paystackConfigured: false,
         },
       ],
     };
@@ -141,6 +166,7 @@ describe("buildPublicStoreConfig", () => {
         currency: "GHS",
         taxRate: 0.125,
         taxInclusive: false,
+        paystackConfigured: false,
       },
       {
         id: "b-inclusive",
@@ -149,6 +175,7 @@ describe("buildPublicStoreConfig", () => {
         currency: "GHS",
         taxRate: 0.2,
         taxInclusive: true,
+        paystackConfigured: false,
       },
     ]);
     expect(config.checkout.taxRate).toBe(0.125);

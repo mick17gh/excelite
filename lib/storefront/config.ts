@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { hasFeature, isSuperAdmin } from "@/lib/tier-config";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES, type StorefrontTemplateId } from "@/lib/storefront/templates";
 import { isPaystackStorefrontEnabledForOrg } from "@/lib/paystack/credentials";
+import { branchHasPaystackSettlement } from "@/lib/paystack/initialize";
 import { getStoreAvailabilityByHours, type BusinessHours } from "@/lib/storefront/hours";
 import { getPrimaryBannerUrl, resolveStoreBanners, type StoreBanner } from "@/lib/storefront/banners";
 
@@ -15,6 +16,8 @@ export type PublicStoreBranch = {
   /** Decimal rate (e.g. 0.125 for 12.5%). Zero when tax is disabled for the branch. */
   taxRate: number;
   taxInclusive: boolean;
+  /** True when org Paystack is on and this branch has a linked subaccount. */
+  paystackConfigured: boolean;
 };
 
 export type PublicStoreConfig = {
@@ -83,6 +86,8 @@ type StorefrontBranchRow = {
   taxEnabled: boolean;
   taxRate: unknown;
   taxInclusive: boolean;
+  paystackSubaccountCode?: string | null;
+  paystackSubaccountActive?: boolean | null;
   address: string | null;
   city: string | null;
   country: string | null;
@@ -92,7 +97,10 @@ export function branchTaxRateDecimal(branch: Pick<StorefrontBranchRow, "taxEnabl
   return branch.taxEnabled ? Number(branch.taxRate || 0) / 100 : 0;
 }
 
-export function toPublicStoreBranch(branch: StorefrontBranchRow): PublicStoreBranch {
+export function toPublicStoreBranch(
+  branch: StorefrontBranchRow,
+  options?: { includePaystackStatus?: boolean },
+): PublicStoreBranch {
   return {
     id: branch.id,
     name: branch.name,
@@ -100,6 +108,9 @@ export function toPublicStoreBranch(branch: StorefrontBranchRow): PublicStoreBra
     currency: branch.currency === "NGN" ? "NGN" : "GHS",
     taxRate: branchTaxRateDecimal(branch),
     taxInclusive: branch.taxInclusive ?? false,
+    paystackConfigured: options?.includePaystackStatus
+      ? branchHasPaystackSettlement(branch)
+      : false,
   };
 }
 
@@ -117,7 +128,20 @@ export async function getOrganizationForStorefront(organizationId: string) {
       branches: {
         where: { deletedAt: null, isActive: true, onlineStoreVisible: true },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, code: true, currency: true, taxEnabled: true, taxRate: true, taxInclusive: true, address: true, city: true, country: true },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          currency: true,
+          taxEnabled: true,
+          taxRate: true,
+          taxInclusive: true,
+          paystackSubaccountCode: true,
+          paystackSubaccountActive: true,
+          address: true,
+          city: true,
+          country: true,
+        },
       },
     },
   });
@@ -142,7 +166,10 @@ export function buildPublicStoreConfig(
   const businessHours = (org.businessHours as BusinessHours | null) ?? null;
   const timeZone = org.storeTimezone || "Africa/Accra";
   const availability = getStoreAvailabilityByHours(businessHours, timeZone);
-  const publicBranches = org.branches.map(toPublicStoreBranch);
+  const orgPaystackOn = isPaystackStorefrontEnabledForOrg(org);
+  const publicBranches = org.branches.map((branch) =>
+    toPublicStoreBranch(branch, { includePaystackStatus: orgPaystackOn }),
+  );
   const firstBranch = publicBranches[0];
   const currency = firstBranch?.currency ?? "GHS";
   const taxRate = firstBranch?.taxRate ?? 0;

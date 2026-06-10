@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { isPaystackDashboardEnabledForOrg } from "@/lib/paystack/credentials";
+import { isBranchPaystackCheckoutAvailable } from "@/lib/paystack/order-settlement";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, OrderSource, OrderType, PaymentStatus } from "@/lib/generated/prisma/client";
 import { createDeliveryRequest } from "@/lib/actions/delivery";
@@ -160,9 +160,12 @@ export async function getOrders(filters?: {
               taxName: true,
               taxRate: true,
               taxEnabled: true,
+              paystackSubaccountCode: true,
+              paystackSubaccountActive: true,
               organization: {
                 select: {
                   features: true,
+                  paystackEnabled: true,
                   paystackDashboardEnabled: true,
                 },
               },
@@ -226,9 +229,10 @@ export async function getOrders(filters?: {
         total: Number(order.total),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
-        paystackEnabled: order.branch?.organization
-          ? isPaystackDashboardEnabledForOrg(order.branch.organization)
-          : false,
+        paystackEnabled:
+          order.branch?.organization && order.branch
+            ? isBranchPaystackCheckoutAvailable(order.branch.organization, order.branch, "dashboard")
+            : false,
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,
@@ -312,9 +316,12 @@ export async function getOrderById(id: string) {
             taxName: true,
             taxRate: true,
             taxEnabled: true,
+            paystackSubaccountCode: true,
+            paystackSubaccountActive: true,
             organization: {
               select: {
                 features: true,
+                paystackEnabled: true,
                 paystackDashboardEnabled: true,
               },
             },
@@ -355,9 +362,10 @@ export async function getOrderById(id: string) {
         total: Number(order.total),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
-        paystackEnabled: order.branch?.organization
-          ? isPaystackDashboardEnabledForOrg(order.branch.organization)
-          : false,
+        paystackEnabled:
+          order.branch?.organization && order.branch
+            ? isBranchPaystackCheckoutAvailable(order.branch.organization, order.branch, "dashboard")
+            : false,
         notes: order.notes,
         deliveryAddress: order.deliveryAddress,
         deliveryCity: order.deliveryCity,

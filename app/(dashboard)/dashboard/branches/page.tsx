@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { BranchesContent } from "@/components/branches/branches-content";
 import { getBranches, getBranchPerformance } from "@/lib/actions/branches";
+import { pickBranchListItem } from "@/lib/branches/serialize-client";
 import { getOrganization } from "@/lib/actions/organization";
 
 export const metadata = {
@@ -15,13 +16,7 @@ export default async function BranchesPage() {
     getOrganization(),
   ]);
 
-  const branchList = (branchesResult.data || []).map((branch: any) => {
-    const { taxRate, ...rest } = branch;
-    return {
-      ...rest,
-      taxRate: taxRate ? Number(taxRate) : 0,
-    };
-  });
+  const branchList = (branchesResult.data ?? []).map(pickBranchListItem);
   const branchData = performanceResult.data || [];
   const org = orgResult.data;
 

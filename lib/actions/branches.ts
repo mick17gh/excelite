@@ -6,6 +6,10 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { hasFeature, isSuperAdmin, isWithinLimit } from "@/lib/tier-config";
 import type { Role } from "@/lib/generated/prisma/client";
+import {
+  serializeBranchForClient,
+  serializeBranchScalarsForClient,
+} from "@/lib/branches/serialize-client";
 
 async function resolveActorOrganizationId(user: {
   organizationId: string | null;
@@ -184,15 +188,7 @@ export async function createBranch(input: CreateBranchInput) {
 
     revalidatePath("/dashboard/branches");
     revalidatePath(`/dashboard/branches/${branch.id}`);
-    return {
-      success: true,
-      data: {
-        ...JSON.parse(JSON.stringify(branch)),
-        taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-        latitude: branch.latitude ? Number(branch.latitude) : null,
-        longitude: branch.longitude ? Number(branch.longitude) : null,
-      },
-    };
+    return { success: true, data: serializeBranchScalarsForClient(branch) };
   } catch (error) {
     console.error("[createBranch] Error:", error);
     return { success: false, error: "Failed to create branch" };
@@ -281,13 +277,7 @@ export async function updateBranch(input: UpdateBranchInput) {
     revalidatePath(`/dashboard/branches/${id}`);
     return {
       success: true,
-      data: {
-        ...JSON.parse(JSON.stringify(branch)),
-        taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-        latitude: branch.latitude ? Number(branch.latitude) : null,
-        longitude: branch.longitude ? Number(branch.longitude) : null,
-        organizationLinked,
-      },
+      data: { ...serializeBranchScalarsForClient(branch), organizationLinked },
     };
   } catch (error) {
     console.error("[updateBranch] Error:", error);
@@ -317,15 +307,7 @@ export async function getBranches() {
       orderBy: { name: "asc" },
     });
     // Force plain-object serialization to strip Prisma Decimal wrappers
-    const serializedBranches = branches.map(branch => {
-      const plain = JSON.parse(JSON.stringify(branch));
-      return {
-        ...plain,
-        taxRate: branch.taxRate ? Number(branch.taxRate) : 0,
-        latitude: branch.latitude ? Number(branch.latitude) : null,
-        longitude: branch.longitude ? Number(branch.longitude) : null,
-      };
-    });
+    const serializedBranches = branches.map((branch) => serializeBranchScalarsForClient(branch));
     return { success: true, data: serializedBranches };
   } catch (error) {
     console.error("[getBranches] Error:", error);
@@ -347,20 +329,7 @@ export async function getBranchById(id: string) {
       return { success: false, error: "Branch not found" };
     }
 
-    // Force plain-object serialization to strip Prisma Decimal wrappers
-    const convertedBranch = {
-      ...JSON.parse(JSON.stringify(branch)),
-      taxRate: parseFloat(String(branch.taxRate)),
-      latitude: branch.latitude != null ? parseFloat(String(branch.latitude)) : null,
-      longitude: branch.longitude != null ? parseFloat(String(branch.longitude)) : null,
-      staff: branch.staff.map(s => ({
-        ...JSON.parse(JSON.stringify(s)),
-        hourlyRate: parseFloat(String(s.hourlyRate)),
-      })),
-      users: branch.users.map(u => JSON.parse(JSON.stringify(u))),
-    };
-
-    return { success: true, data: convertedBranch };
+    return { success: true, data: serializeBranchForClient(branch) };
   } catch (error) {
     console.error("[getBranchById] Error:", error);
     return { success: false, error: "Failed to fetch branch" };

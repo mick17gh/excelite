@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  isPaystackAnyChannelEnabledForOrg,
   isPaystackDashboardEnabledForOrg,
   isPaystackStorefrontEnabledForOrg,
   type PaystackOrgFlags,
@@ -55,6 +56,17 @@ describe("paystack credentials", () => {
     const legacy = org({ features: { paystackEnabled: true } });
     expect(isPaystackStorefrontEnabledForOrg(legacy)).toBe(true);
     expect(isPaystackDashboardEnabledForOrg(legacy)).toBe(false);
+  });
+
+  it("enables any channel when either storefront or dashboard flag is on", () => {
+    vi.stubEnv("PAYSTACK_PUBLIC_KEY", "pk_test");
+    vi.stubEnv("PAYSTACK_SECRET_KEY", "sk_test");
+
+    expect(isPaystackAnyChannelEnabledForOrg(org({ paystackEnabled: true }))).toBe(true);
+    expect(isPaystackAnyChannelEnabledForOrg(org({ paystackDashboardEnabled: true }))).toBe(
+      true,
+    );
+    expect(isPaystackAnyChannelEnabledForOrg(org())).toBe(false);
   });
 
   it("uses legacy features.paystackDashboardEnabled for dashboard only", () => {

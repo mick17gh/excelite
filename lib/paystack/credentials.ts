@@ -39,6 +39,12 @@ export function isPaystackDashboardEnabledForOrg(org: PaystackOrgFlags): boolean
   return isOrgPaystackDashboardFeatureEnabled(org) && isPaystackConfiguredInEnv();
 }
 
+export function isPaystackAnyChannelEnabledForOrg(org: PaystackOrgFlags): boolean {
+  return (
+    isPaystackStorefrontEnabledForOrg(org) || isPaystackDashboardEnabledForOrg(org)
+  );
+}
+
 export async function getPaystackSecretForOrganization(organizationId: string): Promise<string | null> {
   const org = await db.organization.findUnique({
     where: { id: organizationId },

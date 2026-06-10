@@ -73,6 +73,18 @@ GET /api/public/store/{orgId}/menu?branchId={branchId}
 4. On branch change, refetch menu, update tax settings from the new branch, and clear cart lines that are no longer available.
 5. Create order with the same `branchId` (existing orders API already requires it).
 
+## Paystack checkout
+
+When `features.paystackEnabled` is true in config, each branch exposes `paystackConfigured`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `paystackConfigured` | boolean | `true` when this branch has a linked Paystack subaccount and card checkout is allowed for that branch. |
+
+Only show the Paystack payment option when the customer's selected branch has `paystackConfigured: true`. Admins link or create subaccounts under **Dashboard → Branches → [branch] → Payments**.
+
+Initialize payments with the order's `branchId`; the server routes 100% of funds to that branch's subaccount.
+
 ## Orders
 
 `POST /api/public/store/{organizationId}/orders` validates that each line item is available at `branchId`. Forcing unavailable item IDs returns an error from the server.

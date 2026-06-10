@@ -439,6 +439,15 @@ model Branch {
   showTaxOnReceipt  Boolean   @default(true)
   blockSalesWhenOutOfStock Boolean?
   tableServiceEnabled   Boolean   @default(false)
+  paystackSubaccountCode     String?
+  paystackSubaccountId       Int?
+  settlementBankCode         String?
+  settlementAccountNumber    String?
+  settlementAccountName      String?
+  paystackPercentageCharge   Decimal?  @default(0) @db.Decimal(5, 2)
+  paystackSubaccountActive   Boolean?
+  paystackSubaccountSyncedAt DateTime?
+  paystackSubaccountSource   String?
   organizationId String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt

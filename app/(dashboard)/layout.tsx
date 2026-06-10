@@ -9,6 +9,9 @@ import { PermissionsProvider } from "@/contexts/permissions-context";
 import { loadSessionAccess } from "@/lib/permissions/load-session-access";
 import { enforceRouteAccess } from "@/lib/permissions/page-access";
 import { getRequestPathname } from "@/lib/permissions/request-pathname";
+import { PaystackSetupBanner } from "@/components/dashboard/paystack-setup-banner";
+import { db } from "@/lib/db";
+import { isPaystackAnyChannelEnabledForOrg } from "@/lib/paystack/credentials";
 
 /** Auth and org resolution use request headers — do not statically prerender at build. */
 export const dynamic = "force-dynamic";
@@ -34,10 +37,26 @@ export default async function DashboardLayout({
     enforceRouteAccess(pathname, accessCtx);
   }
 
-  const [notificationsResult, unreadResult] = await Promise.all([
+  const [notificationsResult, unreadResult, orgPaystack, firstBranch] = await Promise.all([
     getNotifications(20),
     getUnreadCount(),
+    db.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        paystackEnabled: true,
+        paystackDashboardEnabled: true,
+        features: true,
+      },
+    }),
+    db.branch.findFirst({
+      where: { organizationId, deletedAt: null, isActive: true },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
+  const paystackAnyEnabled = orgPaystack
+    ? isPaystackAnyChannelEnabledForOrg(orgPaystack)
+    : false;
   const initialNotifications =
     notificationsResult.success && notificationsResult.data
       ? notificationsResult.data
@@ -65,7 +84,14 @@ export default async function DashboardLayout({
             initialNotifications={initialNotifications}
             initialUnreadCount={initialUnreadCount}
           />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10">{children}</main>
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 space-y-4">
+            <PaystackSetupBanner
+              organizationId={organizationId}
+              paystackEnabled={paystackAnyEnabled}
+              firstBranch={firstBranch}
+            />
+            {children}
+          </main>
 
           {canUseAiAssistant && <FloatingChatWidget />}
         </div>

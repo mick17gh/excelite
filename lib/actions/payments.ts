@@ -8,6 +8,8 @@ import {
   isPaystackDashboardEnabledForOrg,
   type PaystackOrgFlags,
 } from "@/lib/paystack/credentials";
+import { buildPaystackInitializeBody } from "@/lib/paystack/initialize";
+import { resolveBranchSubaccountForCheckout } from "@/lib/paystack/order-settlement";
 import { finalizeOrderFromExistingPayments } from "@/lib/payments/settle-order";
 import {
   normalizePaymentMethod,
@@ -47,12 +49,7 @@ function resolvePaystackCredentials(org: PaystackOrgFlags) {
 
 async function initializePaystackTransaction(params: {
   secret: string;
-  email: string;
-  amount: number;
-  reference: string;
-  callbackUrl: string;
-  currency: string;
-  metadata: Record<string, unknown>;
+  body: Record<string, unknown>;
 }) {
   return fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
@@ -60,14 +57,7 @@ async function initializePaystackTransaction(params: {
       Authorization: `Bearer ${params.secret}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      email: params.email,
-      amount: params.amount,
-      reference: params.reference,
-      callback_url: params.callbackUrl,
-      currency: params.currency,
-      metadata: params.metadata,
-    }),
+    body: JSON.stringify(params.body),
   });
 }
 
@@ -252,11 +242,15 @@ export async function initializePaystackOrderPayment(input: InitializePaystackOr
       include: {
         branch: {
           select: {
+            id: true,
             organizationId: true,
             currency: true,
+            paystackSubaccountCode: true,
+            paystackSubaccountActive: true,
             organization: {
               select: {
                 features: true,
+                paystackEnabled: true,
                 paystackDashboardEnabled: true,
               },
             },
@@ -278,24 +272,35 @@ export async function initializePaystackOrderPayment(input: InitializePaystackOr
       return { error: "Paystack is disabled in setup or not fully configured" };
     }
 
+    const settlement = resolveBranchSubaccountForCheckout(
+      org,
+      order.branch,
+      "dashboard",
+    );
+    if (!settlement.ok) {
+      return { error: settlement.error };
+    }
+
     const reference = buildPaystackReference(order.orderNumber);
-    const payload = {
+    const initBody = buildPaystackInitializeBody({
       email: input.email,
       amount: Math.round(Number(order.total) * 100),
       reference,
       callbackUrl: input.callbackUrl,
       currency: order.branch.currency || "GHS",
+      subaccountCode: settlement.subaccountCode,
       metadata: {
         orderId: order.id,
         orderNumber: order.orderNumber,
         organizationId: order.branch.organizationId,
+        branchId: order.branch.id,
         source: "dashboard-orders",
       },
-    };
+    });
 
     let initResponse = await initializePaystackTransaction({
       secret: credentials.secret,
-      ...payload,
+      body: initBody,
     });
 
     if (!initResponse.ok) {

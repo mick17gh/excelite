@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getPaystackSecretForOrganization } from "@/lib/storefront/config";
+import { buildPaystackPaymentMetadata } from "@/lib/paystack/payment-metadata";
 import { recordStorefrontMetric } from "@/lib/storefront/metrics";
 
 export async function POST(req: NextRequest, context: { params: Promise<{ organizationId: string }> }) {
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
   const order = paymentRecord?.order || await db.order.findUnique({ where: { orderNumber: reference } });
   if (!order) return NextResponse.json({ error: "Order not found for reference" }, { status: 404 });
 
+  const paymentMetadata = buildPaystackPaymentMetadata(payload.data);
+
   await db.payment.upsert({
     where: { reference },
     update: {
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
       provider: "paystack",
       providerRef: String(payload.data.id),
       paidAt: payload.data.paid_at ? new Date(payload.data.paid_at) : new Date(),
-      metadata: payload.data,
+      metadata: paymentMetadata,
     },
     create: {
       orderId: order.id,
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
       provider: "paystack",
       providerRef: String(payload.data.id),
       paidAt: payload.data.paid_at ? new Date(payload.data.paid_at) : new Date(),
-      metadata: payload.data,
+      metadata: paymentMetadata,
     },
   });
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getPaystackSecretForOrganization } from "@/lib/storefront/config";
+import { buildPaystackInitializeBody } from "@/lib/paystack/initialize";
+import { resolveBranchSubaccountForCheckout } from "@/lib/paystack/order-settlement";
 
 const payloadSchema = z.object({
   orderNumber: z.string().min(4),
@@ -29,7 +31,24 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
 
   const order = await db.order.findUnique({
     where: { orderNumber: parsed.data.orderNumber },
-    include: { branch: { select: { organizationId: true, currency: true } } },
+    include: {
+      branch: {
+        select: {
+          id: true,
+          organizationId: true,
+          currency: true,
+          paystackSubaccountCode: true,
+          paystackSubaccountActive: true,
+          organization: {
+            select: {
+              paystackEnabled: true,
+              paystackDashboardEnabled: true,
+              features: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!order || order.branch.organizationId !== organizationId) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -41,6 +60,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
     return NextResponse.json({ error: "Order is already paid" }, { status: 409 });
   }
 
+  const org = order.branch.organization;
+  if (!org) {
+    return NextResponse.json({ error: "Organization not found for branch" }, { status: 400 });
+  }
+
+  const settlement = resolveBranchSubaccountForCheckout(org, order.branch, "storefront");
+  if (!settlement.ok) {
+    return NextResponse.json({ error: settlement.error }, { status: 400 });
+  }
+
   const reference = buildPaystackReference(order.orderNumber);
 
   const initResponse = await fetch("https://api.paystack.co/transaction/initialize", {
@@ -49,18 +78,22 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
       Authorization: `Bearer ${secret}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      email: parsed.data.email,
-      amount: Math.round(Number(order.total) * 100),
-      reference,
-      callback_url: parsed.data.callbackUrl,
-      currency: order.branch.currency || "GHS",
-      metadata: {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        organizationId,
-      },
-    }),
+    body: JSON.stringify(
+      buildPaystackInitializeBody({
+        email: parsed.data.email,
+        amount: Math.round(Number(order.total) * 100),
+        reference,
+        callbackUrl: parsed.data.callbackUrl,
+        currency: order.branch.currency || "GHS",
+        subaccountCode: settlement.subaccountCode,
+        metadata: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          organizationId,
+          branchId: order.branch.id,
+        },
+      }),
+    ),
   });
 
   if (!initResponse.ok) {

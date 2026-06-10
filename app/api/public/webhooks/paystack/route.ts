@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getPaystackSecretForOrganization } from "@/lib/storefront/config";
+import { buildPaystackPaymentMetadata } from "@/lib/paystack/payment-metadata";
 
 function verifyPaystackSignature(body: string, signature: string | null, secret: string): boolean {
   if (!signature) return false;
@@ -41,6 +42,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Order not found for reference" }, { status: 404 });
   }
 
+  const paymentMetadata = buildPaystackPaymentMetadata(
+    event.data as Record<string, unknown>,
+  );
+
   await db.payment.upsert({
     where: { reference: event.data.reference },
     update: {
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
       currency: event.data.currency || "GHS",
       providerRef: String(event.data.id || ""),
       paidAt: event.data.paid_at ? new Date(event.data.paid_at) : new Date(),
-      metadata: event.data,
+      metadata: paymentMetadata,
     },
     create: {
       orderId: order.id,
@@ -60,7 +65,7 @@ export async function POST(req: NextRequest) {
       provider: "paystack",
       providerRef: String(event.data.id || ""),
       paidAt: event.data.paid_at ? new Date(event.data.paid_at) : new Date(),
-      metadata: event.data,
+      metadata: paymentMetadata,
     },
   });
 
