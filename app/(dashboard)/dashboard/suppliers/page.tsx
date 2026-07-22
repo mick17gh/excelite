@@ -3,7 +3,7 @@ import { getSuppliersForManagement } from "@/lib/actions/inventory";
 import { SuppliersContent } from "@/components/suppliers/suppliers-content";
 
 export const metadata = {
-  title: "Suppliers | ServStack",
+  title: "Suppliers",
   description: "Manage supplier reliability, terms, and spend history",
 };
 

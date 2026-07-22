@@ -62,6 +62,7 @@ import { shouldShowTaxBreakdown } from "@/lib/services/receipt-display";
 import { useMenuStockAvailability } from "@/hooks/use-menu-stock-availability";
 import { validateMenuItemStockForSale } from "@/lib/actions/menu-stock-availability";
 import { Badge } from "@/components/ui/badge";
+import { orderModalHeaderClass } from "@/components/orders/order-styles";
 
 interface Branch {
   id: string;
@@ -512,23 +513,23 @@ export function CreateOrderDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto relative">
+      <DialogContent className="w-[95vw] max-w-[800px] max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col rounded-2xl relative">
         {isSubmitting && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-lg bg-background/85 backdrop-blur-sm">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/85 backdrop-blur-sm">
+            <Loader2 className="h-10 w-10 animate-spin text-[#22C55E]" />
             <p className="text-sm font-medium text-foreground">
               {submitPhase === "opening" ? "Opening order…" : "Creating order…"}
             </p>
           </div>
         )}
-        <DialogHeader>
-          <DialogTitle>Create New Order</DialogTitle>
-          <DialogDescription>
-            Add a new order with items, customer, and delivery details
+        <DialogHeader className={orderModalHeaderClass}>
+          <DialogTitle className="text-white">Create new order</DialogTitle>
+          <DialogDescription className="text-white/60">
+            Add items, customer, and delivery details
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 grid gap-4">
           {/* Order Info Row */}
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
@@ -962,13 +963,14 @@ export function CreateOrderDialog({
             if (!o) setOptionPickerItem(null);
           }}
         >
-          <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{optionPickerItem?.name ?? "Options"}</DialogTitle>
-              <DialogDescription>
-                Choose options for this line. Prices update from your catalog.
+          <DialogContent className="max-w-md max-h-[85vh] p-0 gap-0 overflow-hidden rounded-2xl">
+            <DialogHeader className={orderModalHeaderClass}>
+              <DialogTitle className="text-white">{optionPickerItem?.name ?? "Customize"}</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Choose options for this item
               </DialogDescription>
             </DialogHeader>
+            <div className="px-6 py-4 overflow-y-auto max-h-[50vh]">
             {optionPickerItem?.optionGroups?.map((g) => {
               const picked = pickerSelections[g.id] || [];
               const rangeHint = formatOptionGroupRangeHint(g);
@@ -1003,7 +1005,8 @@ export function CreateOrderDialog({
                 </div>
               );
             })}
-            <DialogFooter className="flex-col sm:flex-col gap-3">
+            </div>
+            <DialogFooter className="flex-col sm:flex-col gap-3 px-6 py-4 border-t bg-muted/20">
               {optionPickerItem?.optionGroups?.length ? (
                 <div className="flex justify-between text-sm w-full border-t pt-3">
                   <span className="text-muted-foreground">Line price</span>
@@ -1035,7 +1038,11 @@ export function CreateOrderDialog({
                 >
                   Cancel
                 </Button>
-                <Button type="button" onClick={confirmOptionPicker}>
+                <Button
+                  type="button"
+                  onClick={confirmOptionPicker}
+                  className="bg-[#22C55E] hover:bg-[#16A34A] text-white"
+                >
                   Add to order
                 </Button>
               </div>
@@ -1043,7 +1050,7 @@ export function CreateOrderDialog({
           </DialogContent>
         </Dialog>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t bg-muted/20 shrink-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -1051,7 +1058,11 @@ export function CreateOrderDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white"
+          >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting
               ? submitPhase === "opening"

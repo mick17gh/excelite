@@ -5,7 +5,7 @@ const ENCRYPTION_PREFIX = "enc:v1:";
 function getEncryptionKey(): Buffer {
   const raw = process.env.STOREFRONT_SECRET_ENCRYPTION_KEY;
   if (!raw || raw.length < 32) {
-    return crypto.createHash("sha256").update("servstack-default-dev-key").digest();
+    return crypto.createHash("sha256").update("excelite-default-dev-key").digest();
   }
   return crypto.createHash("sha256").update(raw).digest();
 }

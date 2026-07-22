@@ -5,7 +5,7 @@ import { getMenuItems } from "@/lib/actions/menu";
 import { getTransactions } from "@/lib/actions/transactions";
 
 export const metadata = {
-  title: "Transactions | ServStack",
+  title: "Transactions",
   description: "Record and manage daily transactions",
 };
 

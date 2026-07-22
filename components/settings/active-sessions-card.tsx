@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ContentCard } from "@/components/dashboard/content-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, X } from "lucide-react";
@@ -73,14 +73,14 @@ export function ActiveSessionsCard() {
   };
 
   return (
-    <Card className="chart-card rounded-xl">
-      <CardHeader className="py-3 px-4">
-        <CardTitle className="text-base">Active Sessions</CardTitle>
-        <CardDescription className="text-xs">
+    <ContentCard padding="none">
+      <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
+        <h3 className="text-base font-semibold text-[#222831]">Active Sessions</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
           Manage your active login sessions
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 pb-4 pt-0">
+        </p>
+      </div>
+      <div className="px-4 pb-4 pt-4">
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -93,7 +93,7 @@ export function ActiveSessionsCard() {
               {sessions.map((session) => (
                 <div
                   key={session.id}
-                  className="flex items-center justify-between p-2 rounded-lg border text-sm"
+                  className="flex items-center justify-between p-2 rounded-lg border text-sm hover:bg-[#22C55E]/5 transition-colors"
                 >
                   <div>
                     <p className="font-medium text-xs">{parseUserAgent(session.userAgent)}</p>
@@ -103,7 +103,7 @@ export function ActiveSessionsCard() {
                     </p>
                   </div>
                   {session.isCurrent ? (
-                    <Badge className="bg-emerald-100 text-emerald-700 text-[10px] h-5">
+                    <Badge variant="outline" className="border-[#22C55E]/30 bg-[#22C55E]/10 text-[#16A34A] text-[10px] h-5">
                       Current
                     </Badge>
                   ) : (
@@ -137,7 +137,7 @@ export function ActiveSessionsCard() {
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </ContentCard>
   );
 }

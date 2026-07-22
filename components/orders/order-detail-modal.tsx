@@ -23,6 +23,13 @@ import {
   shouldShowInclusiveFootnote,
   shouldShowTaxBreakdown,
 } from "@/lib/services/receipt-display";
+import {
+  ORDER_STATUS_STYLES,
+  orderModalHeaderClass,
+  orderSectionCardClass,
+  orderTabListClass,
+} from "@/components/orders/order-styles";
+import { cn } from "@/lib/utils";
 
 interface OrderItem {
   id: string;
@@ -129,14 +136,6 @@ interface OrderDetailModalProps {
   onRefresh?: () => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  NEW: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  IN_PROGRESS: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  READY: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
-
 const STATUS_LABELS: Record<string, string> = {
   NEW: "New",
   IN_PROGRESS: "In Progress",
@@ -195,125 +194,123 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <span className="font-mono">{order.orderNumber}</span>
-            <Badge className={STATUS_COLORS[order.status]}>{STATUS_LABELS[order.status]}</Badge>
+      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col rounded-2xl">
+        <DialogHeader className={orderModalHeaderClass}>
+          <DialogTitle className="flex items-center gap-3 text-white">
+            <span className="font-mono text-lg">#{order.orderNumber}</span>
+            <Badge className={cn("border-0", ORDER_STATUS_STYLES[order.status])}>
+              {STATUS_LABELS[order.status]}
+            </Badge>
           </DialogTitle>
+          <p className="text-sm text-white/60 font-normal">
+            {order.branchName} · {SOURCE_LABELS[order.source] || order.source}
+          </p>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Order Info */}
-          <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className={cn(orderSectionCardClass, "grid grid-cols-2 gap-3 text-sm")}>
             <div>
-              <p className="text-muted-foreground">Branch</p>
-              <p className="font-medium">{order.branchName}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Type</p>
+              <p className="font-medium text-[#222831]">{TYPE_LABELS[order.type] || order.type}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Source</p>
-              <p className="font-medium">{SOURCE_LABELS[order.source] || order.source}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Date</p>
+              <p className="font-medium text-[#222831]">{new Date(order.createdAt).toLocaleString()}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Type</p>
-              <p className="font-medium">{TYPE_LABELS[order.type] || order.type}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Placed by</p>
+              <p className="font-medium text-[#222831]">{order.placedBy || "—"}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Date</p>
-              <p className="font-medium">{new Date(order.createdAt).toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Placed By</p>
-              <p className="font-medium">{order.placedBy || "—"}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Payment</p>
+              <p className="font-medium text-[#16A34A]">{order.paymentStatus}</p>
             </div>
           </div>
 
-          {/* Customer */}
           {order.customerName && (
-            <>
-              <Separator />
-              <div className="text-sm">
-                <p className="text-muted-foreground mb-1">Customer</p>
-                <p className="font-medium">{order.customerName}</p>
-                {order.customerPhone && <p className="text-muted-foreground">{order.customerPhone}</p>}
-              </div>
-            </>
-          )}
-
-          {/* Delivery */}
-          {order.deliveryAddress && (
-            <>
-              <Separator />
-              <div className="text-sm">
-                <p className="text-muted-foreground mb-1">Delivery</p>
-                <p className="font-medium">{order.deliveryAddress}</p>
-                {order.deliveryCity && <p className="text-muted-foreground">{order.deliveryCity}</p>}
-                {order.deliveryNeighborhood && <p className="text-muted-foreground">{order.deliveryNeighborhood}</p>}
-                {order.deliveryPhone && <p className="text-muted-foreground">{order.deliveryPhone}</p>}
-                {order.deliveryNotes && <p className="text-muted-foreground italic">{order.deliveryNotes}</p>}
-                {order.deliveryStatus && (
-                  <Badge variant="outline" className="mt-1">{order.deliveryStatus}</Badge>
-                )}
-              </div>
-            </>
-          )}
-
-          {order.orderReceivedTime && (
-            <div className="text-sm">
-              <p className="text-muted-foreground">Order Received Time</p>
-              <p className="font-medium">{new Date(order.orderReceivedTime).toLocaleString()}</p>
+            <div className={orderSectionCardClass}>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Customer</p>
+              <p className="font-medium text-[#222831]">{order.customerName}</p>
+              {order.customerPhone && (
+                <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
+              )}
             </div>
           )}
 
-          <Separator />
+          {order.deliveryAddress && (
+            <div className={orderSectionCardClass}>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Delivery</p>
+              <p className="font-medium text-[#222831]">{order.deliveryAddress}</p>
+              {order.deliveryCity && <p className="text-sm text-muted-foreground">{order.deliveryCity}</p>}
+              {order.deliveryNeighborhood && (
+                <p className="text-sm text-muted-foreground">{order.deliveryNeighborhood}</p>
+              )}
+              {order.deliveryPhone && <p className="text-sm text-muted-foreground">{order.deliveryPhone}</p>}
+              {order.deliveryNotes && (
+                <p className="text-sm text-muted-foreground italic mt-1">{order.deliveryNotes}</p>
+              )}
+              {order.deliveryStatus && (
+                <Badge variant="outline" className="mt-2 rounded-md">
+                  {order.deliveryStatus}
+                </Badge>
+              )}
+            </div>
+          )}
 
-          {/* Items */}
           <div>
-            <p className="text-sm text-muted-foreground mb-2">Items ({order.items.length})</p>
-            <div className="border rounded-md divide-y">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              Items ({order.items.length})
+            </p>
+            <div className="rounded-xl border border-border divide-y overflow-hidden">
               {order.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between px-3 py-2.5 text-sm bg-card hover:bg-muted/20"
+                >
                   <div className="flex-1 min-w-0">
-                    <span className="font-medium">{item.menuItemName}</span>
-                    <span className="ml-2 text-muted-foreground">x{item.quantity}</span>
-                    {item.notes && <p className="text-xs text-muted-foreground italic">{item.notes}</p>}
+                    <span className="font-medium text-[#222831]">{item.menuItemName}</span>
+                    <span className="ml-2 text-muted-foreground">×{item.quantity}</span>
+                    {item.notes && (
+                      <p className="text-xs text-muted-foreground italic mt-0.5">{item.notes}</p>
+                    )}
                   </div>
-                  <span className="font-medium">{formatCurrency(item.lineTotal)}</span>
+                  <span className="font-semibold text-[#16A34A] shrink-0 ml-2">
+                    {formatCurrency(item.lineTotal)}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Totals */}
-          <div className="border rounded-md p-3 space-y-1 text-sm">
+          <div className={orderSectionCardClass}>
             {showTaxBreakdown ? (
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span>{formatCurrency(order.subtotal)}</span>
               </div>
             ) : null}
             {showTaxBreakdown && order.tax > 0 ? (
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm mt-1">
                 <span className="text-muted-foreground">{receiptTaxLabel(receiptDisplay)}</span>
                 <span>{formatCurrency(order.tax)}</span>
               </div>
             ) : null}
             {order.discount > 0 && (
-              <div className="flex justify-between">
+              <div className="flex justify-between text-sm mt-1">
                 <span className="text-muted-foreground">Discount</span>
                 <span className="text-red-500">-{formatCurrency(order.discount)}</span>
               </div>
             )}
             {order.deliveryFee > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Delivery Fee</span>
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-muted-foreground">Delivery fee</span>
                 <span>{formatCurrency(order.deliveryFee)}</span>
               </div>
             )}
-            <Separator />
-            <div className="flex justify-between font-bold text-base">
+            <Separator className="my-2" />
+            <div className="flex justify-between font-bold text-base text-[#222831]">
               <span>Total</span>
-              <span>{formatCurrency(order.total)}</span>
+              <span className="text-[#16A34A]">{formatCurrency(order.total)}</span>
             </div>
           </div>
 
@@ -323,42 +320,51 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
             </p>
           ) : null}
 
-          {/* Notes */}
           {order.notes && (
-            <div className="text-sm">
-              <p className="text-muted-foreground mb-1">Notes</p>
-              <p>{order.notes}</p>
+            <div className={orderSectionCardClass}>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
+              <p className="text-sm">{order.notes}</p>
             </div>
           )}
 
-          <Separator />
-
-          {/* Send to Kitchen Button */}
           {(order.status === "NEW" || order.status === "IN_PROGRESS") && (
             <div className="flex justify-center">
               <Button
                 onClick={handleSendToKitchen}
                 disabled={isSendingToKitchen}
-                className="bg-orange-500 hover:bg-orange-600 text-white"
+                variant="outline"
+                className="rounded-xl border-white/30 hover:bg-white/15 hover:text-white"
               >
                 {isSendingToKitchen ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <ChefHat className="mr-2 h-4 w-4" />
                 )}
-                {isSendingToKitchen ? "Sending..." : "Send to Kitchen"}
+                {isSendingToKitchen ? "Sending..." : "Send to kitchen"}
               </Button>
             </div>
           )}
 
-          <Separator />
-
-          {/* Tabbed Panels */}
           <Tabs defaultValue="payment" className="w-full">
-            <TabsList className="w-full">
-              <TabsTrigger value="payment" className="flex-1">Payment</TabsTrigger>
-              <TabsTrigger value="notifications" className="flex-1">Notifications</TabsTrigger>
-              <TabsTrigger value="receipt" className="flex-1">Receipt</TabsTrigger>
+            <TabsList className={orderTabListClass}>
+              <TabsTrigger
+                value="payment"
+                className="flex-1 rounded-lg data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+              >
+                Payment
+              </TabsTrigger>
+              <TabsTrigger
+                value="notifications"
+                className="flex-1 rounded-lg data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+              >
+                Notifications
+              </TabsTrigger>
+              <TabsTrigger
+                value="receipt"
+                className="flex-1 rounded-lg data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+              >
+                Receipt
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="payment" className="mt-3">
               <PaymentPanel

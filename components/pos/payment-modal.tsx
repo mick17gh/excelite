@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, UtensilsCrossed, Package, Truck, WifiOff } from "lucide-react";
+import { Loader2, Check, User, FileText, ChevronsUpDown, UserPlus, MapPin, WifiOff } from "lucide-react";
 import { SplitPaymentForm } from "@/components/payments/split-payment-form";
 import {
   cashChangeFromTenders,
@@ -29,6 +29,7 @@ import { createCustomer } from "@/lib/actions/customers";
 import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { posOrderTypes } from "@/components/pos/pos-theme";
 
 interface Customer {
   id: string;
@@ -46,14 +47,12 @@ interface PaymentModalProps {
   taxRate?: number;
   taxInclusive?: boolean;
   taxEnabled?: boolean;
-  /** Sum of line prices (customer-facing merchandise total before delivery) */
   lineTotal?: number;
   onComplete: (paymentData: PaymentData) => void;
   isProcessing?: boolean;
   customers?: Customer[];
   orderType?: string;
   onOrderTypeChange?: (type: string) => void;
-  /** When true: cash only, no delivery type, no new customers (POS offline guardrails). */
   offlineRestricted?: boolean;
   allowComplimentary?: boolean;
 }
@@ -73,12 +72,6 @@ export interface PaymentData {
   deliveryNotes?: string;
   deliveryFee?: number;
 }
-
-const orderTypeOptions = [
-  { value: "DINE_IN", label: "Dine-in", icon: UtensilsCrossed, color: "bg-emerald-500/10 border-emerald-500 text-emerald-600" },
-  { value: "TAKEOUT", label: "Takeout", icon: Package, color: "bg-amber-500/10 border-amber-500 text-amber-600" },
-  { value: "DELIVERY", label: "Delivery", icon: Truck, color: "bg-blue-500/10 border-blue-500 text-blue-600" },
-];
 
 export function PaymentModal({
   open,
@@ -105,7 +98,6 @@ export function PaymentModal({
   const [notes, setNotes] = useState("");
   const [complimentaryReason, setComplimentaryReason] = useState("");
 
-  // Customer combobox state
   const [customerId, setCustomerId] = useState<string>("walk-in");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [localCustomers, setLocalCustomers] = useState<Customer[]>(customers);
@@ -118,7 +110,6 @@ export function PaymentModal({
   const [canCompletePayment, setCanCompletePayment] = useState(false);
   const [paymentSubmitLabel, setPaymentSubmitLabel] = useState("Complete Payment");
 
-  // Delivery fields
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryPhone, setDeliveryPhone] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
@@ -128,8 +119,8 @@ export function PaymentModal({
   const total = Math.round((isDelivery ? totalProp + deliveryFee : totalProp) * 100) / 100;
 
   const orderTypeOptionsFiltered = offlineRestricted
-    ? orderTypeOptions.filter((o) => o.value !== "DELIVERY")
-    : orderTypeOptions;
+    ? posOrderTypes.filter((o) => o.value !== "DELIVERY")
+    : posOrderTypes;
 
   const handleOrderTypeChange = (type: string) => {
     setLocalOrderType(type);
@@ -175,7 +166,6 @@ export function PaymentModal({
     }
   };
 
-  // Reset payment fields only when the modal opens (not when `customers` prop refreshes after create)
   useEffect(() => {
     if (!open) {
       wasOpenRef.current = false;
@@ -264,24 +254,23 @@ export function PaymentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] p-0 gap-0 max-h-[90vh] flex flex-col">
-        <DialogHeader className="p-6 pb-4 border-b shrink-0">
-          <DialogTitle className="text-xl">Complete Payment</DialogTitle>
+      <DialogContent className="sm:max-w-[500px] p-0 gap-0 max-h-[90vh] flex flex-col rounded-2xl overflow-hidden">
+        <DialogHeader className="px-6 py-4 excelite-header-gradient text-white shrink-0 rounded-t-2xl border-b border-white/10">
+          <DialogTitle className="text-lg font-semibold">Complete payment</DialogTitle>
+          <p className="text-sm text-white/60 font-normal">Review total and take payment</p>
         </DialogHeader>
 
         <ScrollArea className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-5">
             {offlineRestricted ? (
-              <Alert className="border-amber-500/50 bg-amber-500/5">
+              <Alert className="border-amber-500/40 bg-amber-500/8 rounded-xl">
                 <WifiOff className="text-amber-700" />
-                <AlertDescription className="text-amber-900 dark:text-amber-200">
-                  Offline checkout: cash only, dine-in or takeout. Orders sync when you are back online;
-                  kitchen and inventory update after sync (not in real time while offline).
+                <AlertDescription className="text-amber-900 dark:text-amber-200 text-sm">
+                  Offline checkout: cash only. Orders sync when you reconnect.
                 </AlertDescription>
               </Alert>
             ) : null}
 
-            {/* Order Type Selector */}
             <div className={cn("grid gap-2", offlineRestricted ? "grid-cols-2" : "grid-cols-3")}>
               {orderTypeOptionsFiltered.map((opt) => {
                 const Icon = opt.icon;
@@ -291,20 +280,21 @@ export function PaymentModal({
                     key={opt.value}
                     type="button"
                     className={cn(
-                      "flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all text-center",
-                      isActive ? opt.color : "border-border hover:border-muted-foreground/30"
+                      "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center",
+                      isActive ? opt.chipClass : "border-border hover:border-[#22C55E]/30 bg-background",
                     )}
                     onClick={() => handleOrderTypeChange(opt.value)}
                   >
-                    <Icon className={cn("h-5 w-5", !isActive && "text-muted-foreground")} />
-                    <span className={cn("text-xs font-medium", !isActive && "text-muted-foreground")}>{opt.label}</span>
+                    <Icon className={cn("h-5 w-5", isActive ? "text-[#16A34A]" : "text-muted-foreground")} />
+                    <span className={cn("text-xs font-medium", !isActive && "text-muted-foreground")}>
+                      {opt.label}
+                    </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Order Summary */}
-            <div className="rounded-xl bg-muted/50 p-4 space-y-3">
+            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
               {taxInclusive && taxEnabled ? (
                 <>
                   <div className="flex justify-between text-sm">
@@ -338,14 +328,14 @@ export function PaymentModal({
               )}
               {isDelivery && deliveryFee > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Delivery Fee</span>
+                  <span className="text-muted-foreground">Delivery fee</span>
                   <span>{formatCurrency(deliveryFee)}</span>
                 </div>
               )}
               <Separator />
-              <div className="flex justify-between">
-                <span className="font-semibold text-lg">Total</span>
-                <span className="font-bold text-xl text-primary">{formatCurrency(total)}</span>
+              <div className="flex justify-between items-baseline">
+                <span className="font-semibold text-[#222831]">Total due</span>
+                <span className="font-bold text-2xl text-[#16A34A]">{formatCurrency(total)}</span>
               </div>
             </div>
 
@@ -354,7 +344,10 @@ export function PaymentModal({
                 <Button
                   type="button"
                   variant={paymentMethod === "COMPLIMENTARY" ? "default" : "outline"}
-                  className="w-full"
+                  className={cn(
+                    "w-full rounded-xl",
+                    paymentMethod === "COMPLIMENTARY" && "excelite-header-gradient hover:opacity-90 text-white",
+                  )}
                   onClick={() =>
                     setPaymentMethod((m) => (m === "COMPLIMENTARY" ? "CASH" : "COMPLIMENTARY"))
                   }
@@ -367,28 +360,28 @@ export function PaymentModal({
                     <Textarea
                       value={complimentaryReason}
                       onChange={(e) => setComplimentaryReason(e.target.value)}
-                      placeholder="e.g. CEO approval, staff meal, VIP guest"
+                      placeholder="e.g. staff meal, VIP guest"
                       rows={2}
+                      className="rounded-xl"
                     />
                   </div>
                 )}
               </div>
             )}
 
-            {/* Customer Selection */}
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
+                <User className="h-4 w-4 text-[#16A34A]" />
                 Customer
               </Label>
               <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" aria-expanded={customerOpen} className="w-full justify-between h-10 font-normal">
+                  <Button variant="outline" role="combobox" aria-expanded={customerOpen} className="w-full justify-between h-11 font-normal rounded-xl">
                     <span className="truncate">{selectedCustomerLabel}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
+                <PopoverContent className="w-[400px] p-0 rounded-xl" align="start">
                   {!showNewCustomer ? (
                     <Command>
                       <CommandInput placeholder="Search customers..." />
@@ -399,7 +392,7 @@ export function PaymentModal({
                             <CommandGroup>
                               <CommandItem onSelect={() => setShowNewCustomer(true)}>
                                 <UserPlus className="mr-2 h-4 w-4" />
-                                Add New Customer
+                                Add new customer
                               </CommandItem>
                             </CommandGroup>
                             <CommandSeparator />
@@ -408,7 +401,7 @@ export function PaymentModal({
                         <CommandGroup>
                           <CommandItem value="walk-in" onSelect={() => { setCustomerId("walk-in"); setCustomerOpen(false); }}>
                             <Check className={cn("mr-2 h-4 w-4", customerId === "walk-in" ? "opacity-100" : "opacity-0")} />
-                            Walk-in Customer
+                            Walk-in customer
                           </CommandItem>
                           {localCustomers.map((c) => (
                             <CommandItem key={c.id} value={`${c.name} ${c.phone}`} onSelect={() => { setCustomerId(c.id); setCustomerOpen(false); }}>
@@ -425,14 +418,14 @@ export function PaymentModal({
                   ) : (
                     <div className="p-3 space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">New Customer</Label>
+                        <Label className="text-sm font-semibold">New customer</Label>
                         <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowNewCustomer(false)}>Cancel</Button>
                       </div>
-                      <Input placeholder="Customer name" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} autoFocus />
-                      <Input placeholder="Phone number" value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} />
-                      <Button size="sm" className="w-full" onClick={handleCreateCustomer} disabled={isCreatingCustomer || !newCustName.trim() || !newCustPhone.trim()}>
+                      <Input placeholder="Customer name" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} autoFocus className="rounded-lg" />
+                      <Input placeholder="Phone number" value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} className="rounded-lg" />
+                      <Button size="sm" className="w-full bg-[#22C55E] hover:bg-[#16A34A] rounded-lg" onClick={handleCreateCustomer} disabled={isCreatingCustomer || !newCustName.trim() || !newCustPhone.trim()}>
                         {isCreatingCustomer ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserPlus className="mr-2 h-3 w-3" />}
-                        {isCreatingCustomer ? "Creating..." : "Create & Select"}
+                        {isCreatingCustomer ? "Creating..." : "Create & select"}
                       </Button>
                     </div>
                   )}
@@ -440,18 +433,17 @@ export function PaymentModal({
               </Popover>
             </div>
 
-            {/* Delivery Fields */}
             {isDelivery && (
-              <div className="space-y-3 rounded-xl border p-4 bg-blue-500/5">
+              <div className="space-y-3 rounded-xl border border-[#22C55E]/25 p-4 bg-[#22C55E]/5">
                 <Label className="text-sm font-medium flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-blue-500" />
-                  Delivery Details
+                  <MapPin className="h-4 w-4 text-[#16A34A]" />
+                  Delivery details
                 </Label>
                 <Input
                   placeholder="Delivery address"
                   value={deliveryAddress}
                   onChange={(e) => setDeliveryAddress(e.target.value)}
-                  className="h-10"
+                  className="h-10 rounded-lg"
                 />
                 <div className="flex gap-3">
                   <div className="flex-1">
@@ -459,18 +451,18 @@ export function PaymentModal({
                       placeholder="Delivery phone"
                       value={deliveryPhone}
                       onChange={(e) => setDeliveryPhone(e.target.value)}
-                      className="h-10"
+                      className="h-10 rounded-lg"
                     />
                   </div>
                   <div className="w-28">
                     <Input
-                      placeholder="Del. fee"
+                      placeholder="Fee"
                       type="number"
                       min="0"
                       step="0.01"
                       value={deliveryFeeStr}
                       onChange={(e) => setDeliveryFeeStr(e.target.value)}
-                      className="h-10"
+                      className="h-10 rounded-lg"
                     />
                   </div>
                 </div>
@@ -479,12 +471,11 @@ export function PaymentModal({
                   value={deliveryNotes}
                   onChange={(e) => setDeliveryNotes(e.target.value)}
                   rows={2}
-                  className="resize-none"
+                  className="resize-none rounded-lg"
                 />
               </div>
             )}
 
-            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes" className="text-sm font-medium flex items-center gap-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
@@ -493,33 +484,35 @@ export function PaymentModal({
               </Label>
               <Textarea
                 id="notes"
-                placeholder="Any special instructions..."
+                placeholder="Special instructions..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                className="resize-none"
+                className="resize-none rounded-xl"
               />
             </div>
 
             {paymentMethod !== "COMPLIMENTARY" && (
-              <SplitPaymentForm
-                ref={splitPaymentRef}
-                total={total}
-                disabled={isProcessing}
-                offlineRestricted={offlineRestricted}
-                hideSubmitButton
-                requireCashReceived
-                onCanSubmitChange={setCanCompletePayment}
-                onSubmitLabelChange={setPaymentSubmitLabel}
-                submitLabel="Complete Payment"
-                onSubmit={handleSplitPayment}
-              />
+              <div className="rounded-xl border border-border p-4 bg-background">
+                <SplitPaymentForm
+                  ref={splitPaymentRef}
+                  total={total}
+                  disabled={isProcessing}
+                  offlineRestricted={offlineRestricted}
+                  hideSubmitButton
+                  requireCashReceived
+                  onCanSubmitChange={setCanCompletePayment}
+                  onSubmitLabelChange={setPaymentSubmitLabel}
+                  submitLabel="Complete payment"
+                  onSubmit={handleSplitPayment}
+                />
+              </div>
             )}
 
             {paymentMethod !== "COMPLIMENTARY" && (
               <Button
                 type="button"
-                className="w-full"
+                className="w-full h-12 text-base font-semibold rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-md shadow-[#22C55E]/20"
                 disabled={isProcessing || !canCompletePayment}
                 onClick={() => splitPaymentRef.current?.submit()}
               >
@@ -529,13 +522,12 @@ export function PaymentModal({
           </div>
         </ScrollArea>
 
-        {/* Footer */}
-        <div className="p-6 pt-4 border-t shrink-0 flex gap-3">
+        <div className="p-4 border-t bg-muted/20 shrink-0 flex gap-3">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isProcessing}
-            className="flex-1 h-12"
+            className="flex-1 h-11 rounded-xl"
           >
             Cancel
           </Button>
@@ -543,7 +535,7 @@ export function PaymentModal({
             <Button
               onClick={handleComplimentaryComplete}
               disabled={isProcessing || !isValidComplimentary}
-              className="flex-[2] h-12 text-base font-semibold"
+              className="flex-[2] h-11 text-base font-semibold rounded-xl bg-[#22C55E] hover:bg-[#16A34A]"
             >
               {isProcessing ? (
                 <>
@@ -553,7 +545,7 @@ export function PaymentModal({
               ) : (
                 <>
                   <Check className="mr-2 h-5 w-5" />
-                  Authorize Complimentary
+                  Authorize complimentary
                 </>
               )}
             </Button>

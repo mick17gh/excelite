@@ -16,7 +16,7 @@ import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "POS | ServStack",
+  title: "POS",
   description: "Cashier POS for order entry and payments.",
 };
 

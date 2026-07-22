@@ -20,7 +20,8 @@ import {
   setTableBillRequested,
 } from "@/lib/actions/tables";
 import { toast } from "sonner";
-import { Loader2, Receipt } from "lucide-react";
+import { Loader2, Receipt, Users } from "lucide-react";
+import { posSectionLabelClass } from "@/components/pos/pos-theme";
 
 export type PosTableRow = {
   id: string;
@@ -42,8 +43,8 @@ interface TableServicePanelProps {
 }
 
 const STATUS_DOT: Record<string, string> = {
-  AVAILABLE: "bg-emerald-500",
-  SEATED: "bg-blue-500",
+  AVAILABLE: "bg-[#22C55E]",
+  SEATED: "bg-[#16A34A]",
   ORDERING: "bg-amber-500",
   BILL_REQUESTED: "bg-orange-500",
   DIRTY: "bg-slate-400",
@@ -133,19 +134,19 @@ export function TableServicePanel({
   if (!branchId) return null;
 
   return (
-    <div className="border-b bg-muted/30 px-3 py-2 space-y-2">
+    <div className="border-b border-border/60 bg-[#22C55E]/5 px-3 md:px-4 py-2.5 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Tables
-        </p>
+        <p className={posSectionLabelClass}>Tables</p>
         {activeSessionId && activeLabel && (
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">Table {activeLabel}</Badge>
+            <Badge className="excelite-header-gradient hover:opacity-90 text-white border-0 border-white/20">
+              Table {activeLabel}
+            </Badge>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="h-7 text-xs"
+              className="h-7 text-xs rounded-lg border-[#22C55E]/30"
               onClick={requestBill}
               disabled={isPending}
             >
@@ -168,9 +169,9 @@ export function TableServicePanel({
         )}
       </div>
       <ScrollArea className="w-full">
-        <div className="flex gap-2 px-1 py-1">
+        <div className="flex gap-2 px-0.5 py-0.5">
           {tables.length === 0 && isPending && (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin text-[#16A34A]" />
           )}
           {tables.map((t) => {
             const active = t.openSession?.id === activeSessionId;
@@ -180,20 +181,21 @@ export function TableServicePanel({
                 type="button"
                 onClick={() => selectTable(t)}
                 className={cn(
-                  "shrink-0 rounded-md border px-3 py-2 text-left text-sm transition-colors min-w-[72px]",
-                  active && "ring-2 ring-primary ring-offset-1 border-primary",
+                  "shrink-0 rounded-xl border bg-card px-3 py-2 text-left text-sm transition-all min-w-[76px] hover:border-[#22C55E]/40",
+                  active && "ring-2 ring-[#22C55E]/60 border-[#22C55E] shadow-sm",
                   t.status === "BLOCKED" && "opacity-50 cursor-not-allowed",
                 )}
               >
-                <div className="flex items-center gap-1.5 font-semibold">
+                <div className="flex items-center gap-1.5 font-semibold text-[#222831]">
                   <span
                     className={cn("h-2 w-2 rounded-full", STATUS_DOT[t.status] ?? "bg-muted")}
                   />
                   {t.label}
                 </div>
                 {t.openSession && (
-                  <span className="text-[10px] text-muted-foreground">
-                    {t.openSession.guestCount}p
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                    <Users className="h-2.5 w-2.5" />
+                    {t.openSession.guestCount}
                   </span>
                 )}
               </button>
@@ -203,11 +205,11 @@ export function TableServicePanel({
       </ScrollArea>
 
       <Dialog open={seatOpen} onOpenChange={setSeatOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Seat guests</DialogTitle>
+        <DialogContent className="max-w-sm rounded-2xl p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white rounded-t-2xl border-b border-white/10">
+            <DialogTitle className="text-base font-semibold">Seat guests</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
+          <div className="px-6 py-4 space-y-2">
             <Label htmlFor="covers">Number of covers</Label>
             <Input
               id="covers"
@@ -216,13 +218,14 @@ export function TableServicePanel({
               max={99}
               value={guestCount}
               onChange={(e) => setGuestCount(Number(e.target.value) || 1)}
+              className="rounded-xl"
             />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSeatOpen(false)}>
+          <DialogFooter className="px-6 py-4 border-t bg-muted/20">
+            <Button variant="outline" onClick={() => setSeatOpen(false)} className="rounded-xl">
               Cancel
             </Button>
-            <Button onClick={handleSeat} disabled={isPending}>
+            <Button onClick={handleSeat} disabled={isPending} className="rounded-xl bg-[#22C55E] hover:bg-[#16A34A]">
               Open table
             </Button>
           </DialogFooter>

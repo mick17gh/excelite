@@ -1,6 +1,6 @@
 import type { PosOutboxRecord, PosSnapshotV1 } from "@/lib/offline/pos-types";
 
-const DB_NAME = "servstack-pos-offline";
+const DB_NAME = "excelite-pos-offline";
 const DB_VERSION = 1;
 const STORE_SNAPSHOT = "snapshot";
 const STORE_OUTBOX = "outbox";

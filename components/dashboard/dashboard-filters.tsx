@@ -71,3 +71,6 @@ export function DashboardFilters({
     </div>
   );
 }
+
+/** Alias for use in module pages */
+export { DashboardFilters as PageFilters };

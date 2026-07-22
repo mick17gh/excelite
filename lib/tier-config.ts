@@ -44,12 +44,12 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     maxBranches: 1,
     maxUsers: 5,
     maxMenuItems: null,
-    maxWarehouses: 1,
+    maxWarehouses: 0,
     features: {
       pos: true,
-      kitchenDisplay: true,
+      kitchenDisplay: false,
       inventory: true,
-      warehouse: true,
+      warehouse: false,
       salesAnalytics: false,
       advancedReports: false,
       staffManagement: false,
@@ -181,13 +181,13 @@ export function isWithinLimit(
 }
 
 export const TIER_DISPLAY_NAMES: Record<SubscriptionTier, string> = {
-  FREE: "Basic",
+  FREE: "Excelite",
   PRO: "Pro",
   ENTERPRISE: "Premium",
 };
 
 export const TIER_DESCRIPTIONS: Record<SubscriptionTier, string> = {
-  FREE: "Single-branch starter plan with POS, KDS, inventory, and warehouse essentials",
+  FREE: "Everything you need to sell, track orders, and manage stock for your small business",
   PRO: "Growing operations plan with online ordering, delivery, customer management, and AI",
   ENTERPRISE: "Premium enterprise plan with unlimited scale, advanced analytics, and priority support",
 };

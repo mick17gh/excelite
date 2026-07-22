@@ -5,7 +5,7 @@ import { isTableManagementEnabled } from "@/lib/features/table-management";
 import { db } from "@/lib/db";
 
 export const metadata = {
-  title: "Reports | ServStack",
+  title: "Reports",
   description: "Generate and export comprehensive business reports",
 };
 

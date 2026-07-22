@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { checkOnboardingStatus } from "@/lib/actions/onboarding";
 
-export function LoginForm() {
+export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginMode, setLoginMode] = useState<"password" | "pin">("password");
@@ -73,7 +74,11 @@ export function LoginForm() {
     }));
   };
 
-  const getPostLoginRoute = (role?: string | null) => {
+  const getPostLoginRoute = async (role?: string | null) => {
+    const onboarding = await checkOnboardingStatus();
+    if (!onboarding.data?.completed) {
+      return "/onboarding";
+    }
     if (role === "WAITER" || role === "STAFF" || role === "CALL_CENTER") {
       return "/pos";
     }
@@ -101,7 +106,7 @@ export function LoginForm() {
         const payload = (await response.json().catch(() => null)) as
           | { user?: { role?: string | null } }
           | null;
-        const targetRoute = getPostLoginRoute(payload?.user?.role);
+        const targetRoute = await getPostLoginRoute(payload?.user?.role);
         window.location.assign(targetRoute);
         return;
       } else {
@@ -117,7 +122,7 @@ export function LoginForm() {
         }
         const role = (result.data as { user?: { role?: string | null } } | undefined)?.user
           ?.role;
-        const targetRoute = getPostLoginRoute(role);
+        const targetRoute = await getPostLoginRoute(role);
 
         toast.success("Welcome back!");
         // Full navigation so Set-Cookie is applied before the next server render
@@ -132,28 +137,46 @@ export function LoginForm() {
     }
   };
 
+  const isDark = variant === "dark";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 rounded-lg border p-1">
-            <Button
-              type="button"
-              variant={loginMode === "password" ? "default" : "ghost"}
-              className="h-8"
-              onClick={() => switchLoginMode("password")}
-              disabled={isLoading}
-            >
-              Email + Password
-            </Button>
-            <Button
-              type="button"
-              variant={loginMode === "pin" ? "default" : "ghost"}
-              className="h-8"
-              onClick={() => switchLoginMode("pin")}
-              disabled={isLoading}
-            >
-              PIN Only
-            </Button>
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div
+        className={`grid grid-cols-2 gap-1.5 rounded-xl p-1 login-mode-toggle ${
+          isDark ? "" : "bg-[#222831]/5"
+        }`}
+      >
+        <Button
+          type="button"
+          variant={loginMode === "password" ? "default" : "ghost"}
+          className={`h-9 text-xs font-medium rounded-lg transition-all duration-200 cursor-pointer ${
+            loginMode === "password"
+              ? "bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm"
+              : isDark
+                ? "login-mode-inactive hover:bg-white/10 text-white/60"
+                : "hover:bg-white/60"
+          }`}
+          onClick={() => switchLoginMode("password")}
+          disabled={isLoading}
+        >
+          Email + Password
+        </Button>
+        <Button
+          type="button"
+          variant={loginMode === "pin" ? "default" : "ghost"}
+          className={`h-9 text-xs font-medium rounded-lg transition-all duration-200 cursor-pointer ${
+            loginMode === "pin"
+              ? "bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm"
+              : isDark
+                ? "login-mode-inactive hover:bg-white/10 text-white/60"
+                : "hover:bg-white/60"
+          }`}
+          onClick={() => switchLoginMode("pin")}
+          disabled={isLoading}
+        >
+          PIN Only
+        </Button>
+      </div>
 
           {loginMode === "password" ? (
             <>
@@ -169,6 +192,11 @@ export function LoginForm() {
                   }
                   required
                   disabled={isLoading}
+                  className={`h-11 focus-visible:ring-[#22C55E]/30 ${
+                    isDark
+                      ? "bg-white/8 border-white/15 text-white placeholder:text-white/35"
+                      : "bg-white/70 border-[#222831]/10"
+                  }`}
                 />
               </div>
 
@@ -177,7 +205,11 @@ export function LoginForm() {
                   <Label htmlFor="password">Password</Label>
                   <Link
                     href="/forgot-password"
-                    className="text-sm text-primary hover:underline"
+                    className={`text-sm hover:underline font-medium ${
+                      isDark
+                        ? "text-[#4ADE80] hover:text-[#22C55E]"
+                        : "text-[#22C55E] hover:text-[#16A34A]"
+                    }`}
                   >
                     Forgot password?
                   </Link>
@@ -193,6 +225,11 @@ export function LoginForm() {
                     }
                     required
                     disabled={isLoading}
+                    className={`h-11 focus-visible:ring-[#22C55E]/30 pr-10 ${
+                      isDark
+                        ? "bg-white/8 border-white/15 text-white placeholder:text-white/35"
+                        : "bg-white/70 border-[#222831]/10"
+                    }`}
                   />
                   <Button
                     type="button"
@@ -224,7 +261,11 @@ export function LoginForm() {
                     type="password"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    className="h-12 text-center text-lg tracking-widest"
+                    className={`h-12 text-center text-lg tracking-widest focus-visible:ring-[#22C55E]/30 ${
+                      isDark
+                        ? "bg-white/8 border-white/15 text-white"
+                        : "bg-white/70 border-[#222831]/10"
+                    }`}
                     value={digit}
                     onChange={(e) => handlePinChange(index, e.target.value)}
                     onKeyDown={(e) => handlePinKeyDown(index, e)}
@@ -245,12 +286,16 @@ export function LoginForm() {
                 setFormData({ ...formData, rememberMe: checked as boolean })
               }
             />
-            <Label htmlFor="remember" className="text-sm font-normal">
+            <Label htmlFor="remember" className={`text-sm font-normal ${isDark ? "text-white/70" : ""}`}>
               Remember me for 30 days
             </Label>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button
+            type="submit"
+            className="w-full h-11 bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium shadow-md shadow-[#22C55E]/20 transition-all duration-200 hover:shadow-lg hover:shadow-[#22C55E]/30 cursor-pointer"
+            disabled={isLoading}
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

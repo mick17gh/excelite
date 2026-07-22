@@ -23,6 +23,11 @@ import {
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import {
+  dashboardModalHeaderClass,
+  dashboardPrimaryButtonClass,
+} from "@/components/dashboard/dashboard-theme";
+import { cn } from "@/lib/utils";
+import {
   recordOutbound,
   recordWaste,
   transferStock,
@@ -116,9 +121,9 @@ export function OutboundStockForm({ open, onOpenChange, branches, items }: Outbo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 px-6 pt-6">
-          <DialogTitle>Record Outbound Stock</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
+          <DialogTitle className="text-white">Record Outbound Stock</DialogTitle>
+          <DialogDescription className="text-white/80">
             Record stock usage or removal from inventory
           </DialogDescription>
         </DialogHeader>
@@ -275,9 +280,9 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 px-6 pt-6">
-          <DialogTitle>Record Loss</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
+          <DialogTitle className="text-white">Record Loss</DialogTitle>
+          <DialogDescription className="text-white/80">
             Record lost or spoiled inventory items
           </DialogDescription>
         </DialogHeader>
@@ -464,9 +469,9 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 px-6 pt-6">
-          <DialogTitle>Transfer Stock Between Branches</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
+          <DialogTitle className="text-white">Transfer Stock Between Branches</DialogTitle>
+          <DialogDescription className="text-white/80">
             Create a transfer request. It will need to be approved and marked as received before stock moves.
           </DialogDescription>
         </DialogHeader>
@@ -645,9 +650,9 @@ export function AddInventoryItemForm({ open, onOpenChange, branches, categories 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 px-6 pt-6">
-          <DialogTitle>Add Inventory Item</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
+          <DialogTitle className="text-white">Add Inventory Item</DialogTitle>
+          <DialogDescription className="text-white/80">
             Create a new inventory item to track
           </DialogDescription>
         </DialogHeader>
@@ -878,9 +883,9 @@ export function BranchReturnToWarehouseDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 px-6 pt-6">
-          <DialogTitle>Return stock to warehouse</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
+          <DialogTitle className="text-white">Return stock to warehouse</DialogTitle>
+          <DialogDescription className="text-white/80">
             Send branch inventory back to a raw or commissary warehouse.
           </DialogDescription>
         </DialogHeader>

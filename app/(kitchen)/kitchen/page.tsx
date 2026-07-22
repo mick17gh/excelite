@@ -5,7 +5,7 @@ import { listKitchenStations, listKitchenTickets } from "@/lib/actions/kitchen";
 import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 
 export const metadata = {
-  title: "Kitchen Display System | ServStack",
+  title: "Kitchen Display System",
   description: "Kitchen station screens with ticket routing and timers.",
 };
 

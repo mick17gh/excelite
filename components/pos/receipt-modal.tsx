@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Receipt, Printer, Download } from "lucide-react";
+import { Receipt, Printer, Download, CheckCircle2 } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
 import { format } from "date-fns";
 import QRCode from "qrcode";
@@ -86,9 +86,9 @@ function ReceiptTotalsBlock({
           <span>{formatCurrency(Number(order.deliveryFee))}</span>
         </div>
       )}
-      <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
-        <span>TOTAL:</span>
-        <span>{formatCurrency(Number(order.total))}</span>
+      <div className="flex justify-between font-bold text-base border-t border-[#222831]/10 pt-2 mt-2 text-[#222831]">
+        <span>TOTAL</span>
+        <span className="text-[#16A34A]">{formatCurrency(Number(order.total))}</span>
       </div>
     </div>
   );
@@ -148,25 +148,40 @@ export function ReceiptModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[500px]">
-        <DialogHeader className="shrink-0 space-y-1.5 px-6 pt-6">
-          <DialogTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Receipt
-          </DialogTitle>
-          <DialogDescription>Order #{order.orderNumber}</DialogDescription>
+      <DialogContent className="flex max-h-[min(90vh,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[500px] rounded-2xl">
+        <DialogHeader className="shrink-0 px-6 py-4 excelite-header-gradient text-white rounded-t-2xl border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#22C55E]/20">
+              {order.syncPending ? (
+                <Receipt className="h-5 w-5 text-white" />
+              ) : (
+                <CheckCircle2 className="h-5 w-5 text-[#4ADE80]" />
+              )}
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-semibold text-white">
+                {order.syncPending ? "Receipt queued" : "Sale complete"}
+              </DialogTitle>
+              <DialogDescription className="text-white/60">
+                Order #{order.orderNumber}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {order.syncPending ? (
-            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-              This sale is queued on this device and will sync to the server when you are online. Kitchen
-              tickets and inventory run after sync completes.
+            <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-100">
+              Queued on this device — will sync when you are back online.
             </div>
-          ) : null}
-          <div className="rounded-lg border bg-muted/30 p-6 font-mono text-sm space-y-3">
-            <div className="text-center space-y-1 border-b pb-3 mb-3">
-              <h3 className="font-bold text-lg">{order.branch?.name || "Restaurant"}</h3>
+          ) : (
+            <div className="mb-4 rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/8 px-3 py-2.5 text-sm text-[#166534]">
+              Payment recorded successfully.
+            </div>
+          )}
+          <div className="rounded-xl border border-border bg-white dark:bg-card p-5 font-mono text-sm space-y-3 shadow-sm">
+            <div className="text-center space-y-1 border-b border-dashed border-border pb-3 mb-3">
+              <h3 className="font-bold text-base text-[#222831]">{order.branch?.name || "Your shop"}</h3>
               <p className="text-xs text-muted-foreground">
                 {order.branch?.code || ""}
               </p>
@@ -213,18 +228,14 @@ export function ReceiptModal({
               ) : null}
             </div>
 
-            <div className="border-t border-b py-2 my-3">
-              <div className="space-y-1">
+            <div className="border-t border-b border-dashed border-border py-2 my-3">
+              <div className="space-y-1.5">
                 {order.items?.map((item, idx: number) => (
-                  <div key={idx} className="flex justify-between text-xs">
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        {receiptLineLabel(item)}
-                      </div>
+                  <div key={idx} className="flex justify-between text-xs gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{receiptLineLabel(item)}</div>
                     </div>
-                    <div className="ml-2">
-                      {formatCurrency(receiptLineAmount(item))}
-                    </div>
+                    <div className="shrink-0">{formatCurrency(receiptLineAmount(item))}</div>
                   </div>
                 ))}
               </div>
@@ -233,20 +244,17 @@ export function ReceiptModal({
             <ReceiptTotalsBlock order={order} formatCurrency={formatCurrency} />
 
             {order.notes && (
-              <div className="border-t pt-2 mt-3 text-xs">
+              <div className="border-t border-dashed border-border pt-2 mt-3 text-xs">
                 <div className="font-medium mb-1">Notes:</div>
                 <div className="text-muted-foreground">{order.notes}</div>
               </div>
             )}
 
             {qrDataUrl && storefrontQr?.url ? (
-              <div className="flex flex-col items-center gap-2 border-t pt-3 mt-3">
+              <div className="flex flex-col items-center gap-2 border-t border-dashed border-border pt-3 mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={qrDataUrl} alt="Order online QR code" className="h-16 w-16" />
                 <p className="text-center text-xs text-muted-foreground">Scan to order online</p>
-                <p className="max-w-full truncate text-center text-[10px] text-muted-foreground">
-                  {storefrontQr.url}
-                </p>
               </div>
             ) : null}
 
@@ -255,23 +263,23 @@ export function ReceiptModal({
                 Prices include {order.taxName || "tax"}
               </p>
             ) : null}
-            <div className="text-center text-xs text-muted-foreground border-t pt-3 mt-3">
+            <div className="text-center text-xs text-muted-foreground border-t border-dashed border-border pt-3 mt-3">
               Thank you for your business!
             </div>
           </div>
         </div>
 
-        <DialogFooter className="shrink-0 flex-col gap-2 border-t bg-background px-6 py-4 sm:flex-row">
-          <Button variant="outline" onClick={handleDownload} className="w-full sm:w-auto">
+        <DialogFooter className="shrink-0 flex-col gap-2 border-t bg-muted/20 px-6 py-4 sm:flex-row">
+          <Button variant="outline" onClick={handleDownload} className="w-full sm:w-auto rounded-xl">
             <Download className="mr-2 h-4 w-4" />
             Download
           </Button>
-          <Button variant="outline" onClick={handlePrint} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={handlePrint} className="w-full sm:w-auto rounded-xl">
             <Printer className="mr-2 h-4 w-4" />
             Print
           </Button>
-          <Button onClick={onClose} className="w-full sm:w-auto">
-            Close
+          <Button onClick={onClose} className="w-full sm:w-auto rounded-xl bg-[#22C55E] hover:bg-[#16A34A]">
+            Done
           </Button>
         </DialogFooter>
       </DialogContent>

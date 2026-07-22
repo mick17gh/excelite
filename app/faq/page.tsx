@@ -1,5 +1,5 @@
+import Image from "next/image";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -8,175 +8,125 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { TrendingUp, Shield } from "lucide-react";
+import { EXCELITE_BRAND } from "@/lib/excelite-config";
+
+const SALES_EMAIL =
+  process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app";
+
+function buildMailto(subject: string, body: string): string {
+  return `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+const SUPPORT_MAILTO = buildMailto(
+  "Excelite POS support",
+  "Hi,\n\nI have a question about Excelite POS.\n\n",
+);
 
 const faqs: Array<{ question: string; answer: string }> = [
   {
-    question: "What is ServStack?",
+    question: "What is Excelite POS?",
     answer:
-      "ServStack is how modern restaurants stay in control. It brings your orders, sales, kitchen, inventory, and deliveries into one system so you always know what is happening and nothing slips through the cracks.",
+      "Excelite POS is point-of-sale software for small shops and local businesses. It helps you ring up sales, track inventory, and review daily performance from one dashboard.",
   },
   {
-    question: "Who is ServStack built for?",
+    question: "Who is Excelite POS for?",
     answer:
-      "It is designed for restaurant owners who want clarity and control, from single outlets that need tighter operations to growing multi-branch brands and fast-paced restaurants where speed and accuracy matter.",
+      "It is built for small business owners—retail shops, cafés, kiosks, and single-location stores that want a straightforward POS without enterprise complexity.",
   },
   {
     question: "Do I need technical skills to use it?",
     answer:
-      "No. ServStack is built so your team can start using it quickly without technical training or complexity.",
+      "No. Excelite is designed for shop owners and cashiers. If you can use a smartphone or tablet, you can use Excelite POS.",
   },
   {
-    question: "Can ServStack help me avoid missed or confused orders?",
+    question: "How long does setup take?",
     answer:
-      "Yes. Every order, walk-in, phone, or online, flows into one system so your team never loses track or double-processes orders.",
+      "Most businesses add their products and start selling within a day. Our team can walk you through setup if you prefer guided help.",
   },
   {
-    question: "Can I accept different types of payments?",
+    question: "What devices do I need?",
     answer:
-      "Yes. Whether it is cash, mobile money, or other payment methods, ServStack keeps everything recorded in one place.",
+      "Excelite runs in your web browser on a tablet, laptop, or desktop. A receipt printer is optional but recommended for customer receipts.",
   },
   {
-    question: "Can I track my deliveries in real time?",
+    question: "Can I accept cash and mobile money?",
     answer:
-      "Yes. You always know what is being delivered, who is delivering it, and what stage each order is in.",
+      "Yes. Record cash, mobile money, and card payments at checkout. Every payment type is tracked in your sales reports.",
   },
   {
-    question: "Can I see which driver handled each order?",
+    question: "Does inventory update automatically?",
     answer:
-      "Yes. Every delivery is assigned to a specific driver for full visibility and accountability.",
+      "Yes. When you sell an item, stock levels decrease automatically so you always know what is left on the shelf.",
   },
   {
-    question: "Why does delivery tracking matter?",
+    question: "Can I see my daily sales?",
     answer:
-      "Delivery is where many restaurants lose money silently. ServStack gives you control so you can stop leaks and improve reliability.",
+      "Yes. Your dashboard shows today's revenue, transaction count, and payment breakdown—updated as you sell throughout the day.",
   },
   {
-    question: "Can I stop running out of stock or over-ordering?",
+    question: "Can multiple staff use the system?",
     answer:
-      "Yes. ServStack shows what is being used in real time so you can plan better and avoid surprises.",
+      "Yes. Add team members with their own login. Owners and managers can control who has access to the POS and settings.",
   },
   {
-    question: "Can I reduce waste and losses?",
+    question: "Can I switch from my current POS?",
     answer:
-      "Yes. You can clearly see usage patterns and wastage so you make smarter purchasing and production decisions.",
-  },
-  {
-    question: "Do I know my real profit per meal?",
-    answer:
-      "Yes. You do not just see sales; you understand true food cost and margin per item.",
-  },
-  {
-    question: "What changes in the kitchen with ServStack?",
-    answer:
-      "Orders go directly to a digital kitchen screen instead of paper slips, helping your kitchen move faster with fewer mistakes.",
-  },
-  {
-    question: "Will this improve service speed?",
-    answer:
-      "Yes. Less confusion in the kitchen leads to faster output and better customer experience.",
-  },
-  {
-    question: "Can I manage multiple branches easily?",
-    answer:
-      "Yes. You can see every branch in one place and understand which locations are performing best and which need more support.",
-  },
-  {
-    question: "Does ServStack use AI?",
-    answer: "Yes. The Pro tier includes an AI assistant built directly into your system.",
-  },
-  {
-    question: "What does the AI assistant actually help with?",
-    answer:
-      "It helps you understand what is happening in your business, spot trends, highlight issues, and guide better decisions without digging through reports.",
-  },
-  {
-    question: "What kind of insights do I get?",
-    answer:
-      "You get a clear picture of sales, inventory, and performance so you can see what is working and what is not.",
-  },
-  {
-    question: "Can I see my performance in real time?",
-    answer:
-      "Yes. Your dashboard updates live so you operate with current information, not guesswork.",
-  },
-  {
-    question: "Can ServStack work with delivery platforms and other tools?",
-    answer:
-      "Yes. It is built to integrate with external systems that allow connections so your operations stay unified, not fragmented.",
-  },
-  {
-    question: "Is ServStack flexible as my business grows?",
-    answer:
-      "Yes. The system is designed to grow with you, so you can add tools and integrations as needed.",
-  },
-  {
-    question: "How hard is it to set up?",
-    answer:
-      "Setup is guided and straightforward. Whether you have one branch or several, we help you get running without disruption and can recommend hardware.",
-  },
-  {
-    question: "Will my team be trained?",
-    answer:
-      "Yes. We make sure your staff understands the system so you can operate confidently from day one.",
-  },
-  {
-    question: "What if I need help later?",
-    answer:
-      "You are not left alone. Support is available to keep your operations running smoothly.",
-  },
-  {
-    question: "Is there a way to try ServStack first?",
-    answer:
-      "Yes. You can start small and upgrade as you grow. You get a free 30-day trial and a money-back guarantee.",
-  },
-  {
-    question: "Can I upgrade later?",
-    answer:
-      "Yes. Plans are flexible so you only pay for what you need at each stage.",
-  },
-  {
-    question: "Can I move from my existing POS system?",
-    answer:
-      "Yes. We help you transition without disrupting your business operations.",
+      "Yes. We help you move product lists and get your team comfortable with Excelite so the transition is smooth.",
   },
   {
     question: "Will I lose my data when switching?",
     answer:
-      "We support migration so you retain important business data where possible.",
+      "We work with you to import product and stock data where possible so you do not start from scratch.",
   },
   {
     question: "Is my business data safe?",
     answer:
-      "Yes. Your data is securely stored and protected so you can focus on running your business.",
+      "Yes. Your sales and inventory data is stored securely. Only people you authorize can access your account.",
+  },
+  {
+    question: "What if I need help after setup?",
+    answer:
+      "Reach out anytime by email. We are here to answer questions and keep your shop running smoothly.",
+  },
+  {
+    question: "How do I get started?",
+    answer:
+      "Create an account, add your products, and open the POS screen. You can sign up from the Get started button on our homepage.",
   },
 ];
 
 export default function FaqPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl">
+    <div className="min-h-screen bg-white text-[#222831]">
+      <header className="sticky top-0 z-50 w-full border-b border-[#222831]/10 bg-white/90 backdrop-blur-xl">
         <div className="container mx-auto px-4 lg:px-8">
           <nav className="flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-500 shadow-lg shadow-emerald-500/30">
-                <TrendingUp className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight">ServStack</span>
+            <Link href="/" className="flex items-center gap-2.5">
+              <Image
+                src={EXCELITE_BRAND.logo}
+                alt={EXCELITE_BRAND.name}
+                width={36}
+                height={36}
+                className="h-9 w-9 object-contain"
+                priority
+              />
+              <span className="text-lg font-bold tracking-tight">
+                Excelite <span className="text-[#22C55E]">POS</span>
+              </span>
             </Link>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/login" className="hidden sm:block">
                 <Button variant="ghost" size="sm" className="font-medium">
-                  Sign In
+                  Sign in
                 </Button>
               </Link>
               <Link href="/login">
                 <Button
                   size="sm"
-                  className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/25 font-medium"
+                  className="bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium shadow-sm"
                 >
-                  Get Started Free
+                  Get started
                 </Button>
               </Link>
             </div>
@@ -185,26 +135,27 @@ export default function FaqPage() {
       </header>
 
       <main className="py-16 md:py-20">
-        <div className="container mx-auto px-4 lg:px-8 max-w-4xl">
-          <div className="mb-8">
-            <Badge variant="secondary" className="mb-4">
-              FAQ
-            </Badge>
-            <h1 className="text-3xl md:text-4xl font-bold mb-3">ServStack FAQ</h1>
-            <p className="text-muted-foreground">
-              Everything you need to know about setup, operations, growth, and support.
+        <div className="container mx-auto px-4 lg:px-8 max-w-3xl">
+          <div className="mb-10 text-center md:text-left">
+            <p className="text-sm font-medium text-[#22C55E] mb-2">FAQ</p>
+            <h1 className="text-3xl md:text-4xl font-bold mb-3">
+              Questions from small business owners
+            </h1>
+            <p className="text-[#222831]/70 max-w-2xl">
+              Setup, daily operations, payments, and support—everything you need
+              to know about Excelite POS.
             </p>
           </div>
 
-          <Card>
+          <Card className="border-[#222831]/10">
             <CardContent className="p-4 md:p-6">
               <Accordion type="single" collapsible className="w-full">
                 {faqs.map((item, index) => (
                   <AccordionItem key={item.question} value={`faq-${index}`}>
-                    <AccordionTrigger className="text-base font-medium">
+                    <AccordionTrigger className="text-base font-medium text-left">
                       {item.question}
                     </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground leading-relaxed">
+                    <AccordionContent className="text-[#222831]/70 leading-relaxed">
                       {item.answer}
                     </AccordionContent>
                   </AccordionItem>
@@ -213,88 +164,68 @@ export default function FaqPage() {
             </CardContent>
           </Card>
 
-          <div className="mt-8 flex items-center gap-3">
-            <Button asChild variant="outline">
-              <Link href="/">Back to home</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/login">Get started</Link>
-            </Button>
+          <div className="mt-10 rounded-xl bg-[#222831]/[0.03] border border-[#222831]/10 p-6 md:p-8 text-center">
+            <h2 className="font-semibold text-lg mb-2">Still have questions?</h2>
+            <p className="text-sm text-[#222831]/70 mb-6">
+              Our team is happy to help you decide if Excelite POS is right for
+              your shop.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button
+                asChild
+                variant="outline"
+                className="border-[#222831]/20 hover:bg-[#222831]/5 w-full sm:w-auto"
+              >
+                <Link href="/">Back to home</Link>
+              </Button>
+              <Button
+                asChild
+                className="bg-[#22C55E] hover:bg-[#16A34A] text-white w-full sm:w-auto"
+              >
+                <Link href="/login">Get started</Link>
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                className="text-[#222831]/70 w-full sm:w-auto"
+              >
+                <a href={SUPPORT_MAILTO}>Email support</a>
+              </Button>
+            </div>
           </div>
         </div>
       </main>
 
-      <footer className="py-16 border-t">
+      <footer className="py-10 border-t border-[#222831]/10">
         <div className="container mx-auto px-4 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
-            <div className="col-span-2">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-500">
-                  <TrendingUp className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-xl font-bold">ServStack</span>
-              </div>
-              <p className="text-muted-foreground mb-4 max-w-xs">
-                The unified operating system for QSR: orders, kitchen, inventory, and insights in one place.
-              </p>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-emerald-600" />
-                <span className="text-sm text-muted-foreground">Enterprise-grade security</span>
-              </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <Image
+                src={EXCELITE_BRAND.logo}
+                alt={EXCELITE_BRAND.name}
+                width={28}
+                height={28}
+                className="h-7 w-7 object-contain"
+              />
+              <span className="font-semibold">Excelite POS</span>
+            </Link>
+            <div className="flex items-center gap-6 text-sm text-[#222831]/60">
+              <Link href="/" className="hover:text-[#222831] transition-colors">
+                Home
+              </Link>
+              <Link href="/login" className="hover:text-[#222831] transition-colors">
+                Login
+              </Link>
+              <a
+                href={SUPPORT_MAILTO}
+                className="hover:text-[#222831] transition-colors"
+              >
+                Contact
+              </a>
             </div>
-
-            {[
-              {
-                title: "Product",
-                links: [
-                  { label: "Profitability", href: "/#features" },
-                  { label: "Pricing", href: "/#pricing" },
-                  { label: "Testimonials", href: "/#testimonials" },
-                  { label: "FAQ", href: "/faq" },
-                ],
-              },
-              { title: "Company", links: [{ label: "About", href: "/#about" }] },
-              {
-                title: "Support",
-                links: [
-                  { label: "Help Center", href: "#" },
-                  { label: "Documentation", href: "#" },
-                ],
-              },
-            ].map((section) => (
-              <div key={section.title}>
-                <h4 className="font-semibold mb-4">{section.title}</h4>
-                <ul className="space-y-2">
-                  {section.links.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t">
-            <p className="text-sm text-muted-foreground">
-              © 2026 ServStack. All rights reserved.
+            <p className="text-sm text-[#222831]/50">
+              © {new Date().getFullYear()} Excelite POS
             </p>
-            <div className="flex gap-6 text-sm text-muted-foreground">
-              <Link href="#" className="hover:text-foreground transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="#" className="hover:text-foreground transition-colors">
-                Terms of Service
-              </Link>
-              <Link href="#" className="hover:text-foreground transition-colors">
-                Cookie Policy
-              </Link>
-            </div>
           </div>
         </div>
       </footer>

@@ -24,6 +24,7 @@ import {
 import { Loader2, RotateCcw, Save, Shield, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import type { Role } from "@/lib/generated/prisma/client";
+import { LITE_ASSIGNABLE_ROLES, LITE_PERMISSION_GROUP_KEYS } from "@/lib/excelite-config";
 import {
   EDITABLE_MATRIX_ROLES,
   PERMISSION_GROUPS,
@@ -72,6 +73,20 @@ export function RolePermissionsTab({ actorRole }: RolePermissionsTabProps) {
     loadMatrix(selectedRole);
   }, [selectedRole, loadMatrix]);
 
+  const liteRoles = useMemo(
+    () =>
+      EDITABLE_MATRIX_ROLES.filter((role) =>
+        (LITE_ASSIGNABLE_ROLES as readonly string[]).includes(role),
+      ),
+    [],
+  );
+  const litePermissionGroups = useMemo(
+    () =>
+      PERMISSION_GROUPS.filter((group) =>
+        (LITE_PERMISSION_GROUP_KEYS as readonly string[]).includes(group.id),
+      ),
+    [],
+  );
   const platformOnlySet = useMemo(() => new Set(PLATFORM_ONLY_PERMISSIONS), []);
   const permissionSet = useMemo(() => new Set(permissions), [permissions]);
 
@@ -179,7 +194,7 @@ export function RolePermissionsTab({ actorRole }: RolePermissionsTabProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {EDITABLE_MATRIX_ROLES.map((role) => (
+                  {liteRoles.map((role) => (
                     <SelectItem key={role} value={role}>
                       {roleDisplayNames[role]}
                     </SelectItem>
@@ -210,26 +225,35 @@ export function RolePermissionsTab({ actorRole }: RolePermissionsTabProps) {
           ) : (
             <Accordion
               type="multiple"
-              defaultValue={[PERMISSION_GROUPS[0]?.id, "report-types"].filter(Boolean)}
+              defaultValue={[litePermissionGroups[0]?.id].filter(Boolean)}
               className="max-h-[min(60vh,520px)] overflow-y-auto rounded-lg border px-3"
             >
-              {PERMISSION_GROUPS.map((group) => {
-                const enabledCount = group.permissions.filter((p) =>
+              {litePermissionGroups.map((group) => {
+                const visiblePermissions = group.permissions.filter(
+                  (p) =>
+                    !p.startsWith("kitchen:") &&
+                    !p.startsWith("tables:") &&
+                    !p.startsWith("api-keys:") &&
+                    !p.startsWith("subscriptions:"),
+                );
+                const enabledCount = visiblePermissions.filter((p) =>
                   isPermissionChecked(p),
                 ).length;
                 return (
                   <AccordionItem key={group.id} value={group.id} className="border-b last:border-b-0">
                     <AccordionTrigger className="py-3 hover:no-underline">
                       <span className="flex flex-1 items-center justify-between gap-2 pr-2">
-                        <span>{group.label}</span>
+                        <span>
+                          {group.id === "operations" ? "POS & Orders" : group.label}
+                        </span>
                         <Badge variant="outline" className="text-[10px] font-normal shrink-0">
-                          {enabledCount}/{group.permissions.length}
+                          {enabledCount}/{visiblePermissions.length}
                         </Badge>
                       </span>
                     </AccordionTrigger>
                     <AccordionContent className="pb-3">
                       <div className="grid gap-2 sm:grid-cols-2">
-                        {group.permissions.map((permission) => {
+                        {visiblePermissions.map((permission) => {
                           const platformLocked =
                             platformOnlySet.has(permission) && actorRole !== "SUPER_ADMIN";
                           return (

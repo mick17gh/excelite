@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CreditCard, X } from "lucide-react";
 import { countBranchesWithoutPaystackSubaccount } from "@/lib/actions/paystack-branch";
 
-const DISMISS_KEY = "servstack.paystack-setup-banner.dismissed";
+const DISMISS_KEY = "excelite.paystack-setup-banner.dismissed";
 
 interface PaystackSetupBannerProps {
   organizationId: string;
@@ -42,7 +42,7 @@ export function PaystackSetupBanner({
   }
 
   return (
-    <Alert className="border-primary/30 bg-primary/5">
+    <Alert className="content-card border-primary/25 bg-primary/5 rounded-xl">
       <CreditCard className="h-4 w-4" />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -55,7 +55,7 @@ export function PaystackSetupBanner({
         </div>
         <div className="flex shrink-0 gap-2">
           <Button size="sm" asChild>
-            <Link href={`/dashboard/branches/${firstBranch.id}`}>Set up branch</Link>
+            <Link href="/dashboard/settings">Set up payments</Link>
           </Button>
           <Button
             size="sm"

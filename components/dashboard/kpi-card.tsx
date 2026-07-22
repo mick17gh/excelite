@@ -88,7 +88,7 @@ export function KPICard({
   return (
     <Card
       className={cn(
-        "kpi-card rounded-xl group hover:shadow-md transition-shadow overflow-hidden",
+        "kpi-card rounded-xl transition-shadow overflow-hidden",
         className
       )}
     >
@@ -109,7 +109,7 @@ export function KPICard({
             )}
           </div>
           {Icon && (
-            <div className="icon-blue rounded-lg p-1.5 flex-shrink-0">
+            <div className="icon-accent rounded-lg p-1.5 flex-shrink-0">
               <Icon className="h-4 w-4" />
             </div>
           )}

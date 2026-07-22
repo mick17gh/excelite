@@ -22,7 +22,7 @@ interface CurrencyContextType {
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
-const CURRENCY_STORAGE_KEY = "servstack_currency";
+const CURRENCY_STORAGE_KEY = "excelite_currency";
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   // Use lazy initialization to load from localStorage without triggering effects

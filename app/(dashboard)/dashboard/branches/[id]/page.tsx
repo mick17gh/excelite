@@ -12,7 +12,7 @@ import { db } from "@/lib/db";
 import { isPaystackAnyChannelEnabledForOrg } from "@/lib/paystack/credentials";
 
 export const metadata = {
-  title: "Branch Details | ServStack",
+  title: "Branch Details",
   description: "Comprehensive branch information and analytics",
 };
 

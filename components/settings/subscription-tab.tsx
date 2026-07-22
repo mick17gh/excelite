@@ -224,7 +224,7 @@ export function SubscriptionTab() {
                     ))}
                   </ul>
                   {!isCurrent && (
-                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => toast.info("Contact sales@servstack.com")}>
+                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => toast.info("Contact sales@excelite.app")}>
                       Contact Sales
                     </Button>
                   )}

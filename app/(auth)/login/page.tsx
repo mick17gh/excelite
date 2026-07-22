@@ -1,16 +1,23 @@
 import { LoginForm } from "@/components/auth/login-form";
-import { TrendingUp, BarChart3, Package, Users, Bell } from "lucide-react";
+import { BarChart3, Monitor, Package, ShoppingCart, Sparkles } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { EXCELITE_BRAND } from "@/lib/excelite-config";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Login | ServStack",
-  description: "Sign in to your ServStack account",
+  title: "Login",
+  description: `Sign in to your ${EXCELITE_BRAND.name} account`,
 };
 
+const liteFeatures = [
+  { icon: Monitor, label: "Fast POS checkout" },
+  { icon: Package, label: "Inventory tracking" },
+  { icon: BarChart3, label: "Daily sales view" },
+  { icon: ShoppingCart, label: "Order management" },
+];
 
 export default async function LoginPage() {
   const orgBranding = await db.organization.findFirst({
@@ -23,115 +30,106 @@ export default async function LoginPage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  const brandName = orgBranding?.storeName?.trim() || orgBranding?.name?.trim() || "ServStack";
+  const brandName =
+    orgBranding?.storeName?.trim() || orgBranding?.name?.trim() || EXCELITE_BRAND.shortName;
   const brandDescription =
-    orgBranding?.storeDescription?.trim() ||
-    "Run all your branches from one platform. Track sales, manage inventory, optimize operations, and boost profitability.";
-  const logoUrl = orgBranding?.storeLogoUrl || null;
+    orgBranding?.storeDescription?.trim() || EXCELITE_BRAND.tagline;
+  const logoUrl = orgBranding?.storeLogoUrl || EXCELITE_BRAND.logo;
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Side - Gradient Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 gradient-animated" />
-        
-        {/* Decorative orbs */}
-        <div className="absolute top-20 left-20 w-72 h-72 gradient-orb gradient-orb-purple" />
-        <div className="absolute bottom-20 right-20 w-96 h-96 gradient-orb gradient-orb-blue" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 gradient-orb gradient-orb-indigo" />
-        
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 pattern-grid opacity-30" />
-        
-        {/* Content */}
-        <div className="relative z-10 flex items-center justify-center p-12 w-full">
-          <div className="max-w-md text-center text-white">
-            <div className="flex flex-col items-center justify-center gap-4 mb-8">
-              {logoUrl ? (
-                <div className="relative h-24 w-24 overflow-hidden rounded-2xl border border-white/30 bg-white/20 shadow-lg backdrop-blur-sm p-2">
-                  <Image
-                    src={logoUrl}
-                    alt={`${brandName} logo`}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-              ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-lg">
-                  <TrendingUp className="h-10 w-10" />
-                </div>
-              )}
-              <span className="text-3xl font-bold">{brandName}</span>
+    <div className="relative min-h-screen excelite-login-bg overflow-hidden">
+      {/* Full-page background orbs */}
+      <div className="excelite-orb excelite-orb-green w-[500px] h-[500px] -top-32 -left-32 animate-excelite-pulse-ring" />
+      <div className="excelite-orb excelite-orb-green w-[400px] h-[400px] bottom-0 right-1/4 animate-excelite-float-slow opacity-60" />
+      <div className="excelite-orb excelite-orb-green w-[300px] h-[300px] top-1/3 right-0 animate-excelite-float opacity-50" />
+      <div className="absolute inset-0 pattern-grid opacity-[0.06]" />
+
+      <div className="relative z-10 min-h-screen flex flex-col lg:flex-row">
+        {/* Left — branding (over full dark bg) */}
+        <div className="flex-1 flex flex-col justify-center px-6 sm:px-10 lg:px-16 xl:px-20 py-10 lg:py-0">
+          <div className="max-w-lg animate-excelite-fade-up">
+            <div className="flex items-center gap-3 mb-8 lg:mb-10">
+              <div className="relative h-14 w-14 rounded-2xl excelite-glass-dark p-2 animate-excelite-float shrink-0">
+                <Image
+                  src={logoUrl}
+                  alt={EXCELITE_BRAND.name}
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-contain"
+                  unoptimized={logoUrl.startsWith("http")}
+                />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white tracking-tight">{brandName}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-[#22C55E] font-medium">
+                  POS Software
+                </p>
+              </div>
             </div>
-            <p className="text-lg text-white/80 mb-12">
+
+            <h1 className="text-3xl sm:text-4xl xl:text-[2.75rem] font-bold text-white leading-tight mb-4 animate-excelite-fade-up animation-delay-100">
+              Welcome back to your shop
+            </h1>
+            <p className="text-white/60 text-base sm:text-lg leading-relaxed mb-8 lg:mb-10 animate-excelite-fade-up animation-delay-200">
               {brandDescription}
             </p>
-            
-            {/* Feature highlights */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { icon: BarChart3, label: "Real-time Analytics" },
-                { icon: Package, label: "Inventory Control" },
-                { icon: Users, label: "Staff Management" },
-                { icon: Bell, label: "Smart Alerts" },
-              ].map((feature, i) => (
+
+            <div className="hidden sm:grid sm:grid-cols-2 gap-3 animate-excelite-fade-up animation-delay-300">
+              {liteFeatures.map((feature) => (
                 <div
-                  key={i}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20"
+                  key={feature.label}
+                  className="excelite-glass-dark rounded-xl p-4 flex items-center gap-3 transition-all duration-300 hover:bg-white/10 hover:-translate-y-0.5"
                 >
-                  <feature.icon className="h-5 w-5 text-white/80" />
-                  <span className="text-sm text-white/90">{feature.label}</span>
+                  <div className="h-9 w-9 rounded-lg bg-[#22C55E]/20 flex items-center justify-center shrink-0">
+                    <feature.icon className="h-4 w-4 text-[#4ADE80]" />
+                  </div>
+                  <span className="text-sm text-white/90 font-medium">{feature.label}</span>
                 </div>
               ))}
             </div>
+
+            <div className="hidden lg:flex items-center gap-2 text-white/45 text-sm mt-10 animate-excelite-fade-up animation-delay-500">
+              <Sparkles className="h-4 w-4 text-[#22C55E]" />
+              <span>Simple POS built for small businesses</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Right Side - Login Form with subtle gradient */}
-      <div className="flex-1 flex items-center justify-center p-8 relative">
-        {/* Subtle background gradient */}
-        <div className="absolute inset-0 gradient-mesh" />
-        
-        <div className="w-full max-w-md space-y-8 relative z-10">
-          <div className="lg:hidden flex flex-col items-center justify-center gap-3 mb-8">
-            {logoUrl ? (
-              <div className="relative h-16 w-16 overflow-hidden rounded-lg shadow-lg p-1">
-                <Image
-                  src={logoUrl}
-                  alt={`${brandName} logo`}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
+        {/* Right — glass login card */}
+        <div className="flex items-center justify-center px-6 sm:px-10 lg:px-12 xl:px-16 py-10 lg:py-12 lg:w-[480px] xl:w-[520px] shrink-0">
+          <div className="w-full max-w-[420px] animate-excelite-scale-in animation-delay-200">
+            <div className="excelite-glass-login excelite-shimmer-border rounded-2xl p-8 sm:p-10">
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold tracking-tight text-white">Sign in</h2>
+                <p className="text-white/50 mt-2 text-sm">
+                  Enter your credentials to access your dashboard
+                </p>
               </div>
-            ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-lg gradient-primary shadow-lg">
-                <TrendingUp className="h-8 w-8 text-white" />
-              </div>
-            )}
-            <span className="text-2xl font-bold gradient-text">{brandName}</span>
-          </div>
 
-          <div className="text-center">
-            <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
-            <p className="text-muted-foreground mt-2">
-              Sign in to your account to continue
+              <div className="login-form-dark">
+                <LoginForm variant="dark" />
+              </div>
+
+              <p className="text-center text-sm text-white/45 mt-6">
+                Need an account?{" "}
+                <Link
+                  href={`mailto:${process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app"}`}
+                  className="text-[#4ADE80] hover:text-[#22C55E] font-medium transition-colors cursor-pointer"
+                >
+                  Contact us to get started
+                </Link>
+              </p>
+            </div>
+
+            <p className="text-center mt-6">
+              <Link
+                href="/"
+                className="text-xs text-white/35 hover:text-[#4ADE80] transition-colors cursor-pointer"
+              >
+                ← Back to home
+              </Link>
             </p>
           </div>
-
-          <div className="p-8 rounded-2xl bg-card/80 backdrop-blur-sm border shadow-xl gradient-glow">
-            <LoginForm />
-          </div>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline font-medium">
-              Contact your administrator
-            </Link>
-          </p>
         </div>
       </div>
     </div>

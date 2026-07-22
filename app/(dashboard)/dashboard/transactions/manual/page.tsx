@@ -3,7 +3,7 @@ import { getBranches } from "@/lib/actions/branches";
 import { ManualTransactionsContent } from "@/components/transactions/manual-transactions-content";
 
 export const metadata = {
-  title: "Manual POS Entry | ServStack",
+  title: "Manual POS Entry",
   description: "Capture summarized sales from external POS systems for reporting.",
 };
 

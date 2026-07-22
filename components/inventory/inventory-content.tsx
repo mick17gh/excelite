@@ -2,7 +2,17 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import { KPICard } from "@/components/dashboard/kpi-card";
+import { ContentCard } from "@/components/dashboard/content-card";
+import {
+  dashboardTabListClass,
+  dashboardToolbarClass,
+  dashboardPrimaryButtonClass,
+  stockStatusBadgeClass,
+  transferStatusBadgeClass,
+} from "@/components/dashboard/dashboard-theme";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -143,16 +153,6 @@ interface WarehouseTransfer {
   notes: string | null;
   createdAt: string;
 }
-
-const TRANSFER_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  APPROVED: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
-  IN_TRANSIT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  AWAITING_WAREHOUSE_APPROVAL:
-    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
 
 const RECEIVABLE_WAREHOUSE_TRANSFER_STATUSES = new Set(["PENDING", "APPROVED", "IN_TRANSIT"]);
 
@@ -518,34 +518,11 @@ export function InventoryContent({
   );
 
   
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "critical":
-        return (
-          <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-            Critical
-          </Badge>
-        );
-      case "low":
-        return (
-          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-            Low Stock
-          </Badge>
-        );
-      case "overstock":
-        return (
-          <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-            Overstock
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-            Normal
-          </Badge>
-        );
-    }
-  };
+  const getStatusBadge = (status: string) => (
+    <Badge variant="outline" className={stockStatusBadgeClass(status)}>
+      {status === "low" ? "Low Stock" : status}
+    </Badge>
+  );
 
   const getStockPercentage = (current: number, min: number, max: number) => {
     return Math.min((current / max) * 100, 100);
@@ -554,109 +531,51 @@ export function InventoryContent({
   const getStockColor = (status: string) => {
     switch (status) {
       case "critical":
-        return "bg-red-500";
+        return "[&>div]:bg-red-500";
       case "low":
-        return "bg-amber-500";
+        return "[&>div]:bg-amber-500";
       case "overstock":
-        return "bg-blue-500";
+        return "[&>div]:bg-[#222831]";
       default:
-        return "bg-emerald-500";
+        return "[&>div]:bg-[#22C55E]";
     }
   };
 
-  const { formatCurrencyShort } = useCurrency();
-
   return (
     <div className="space-y-4">
-      {/* Summary Cards - Compact */}
       <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Inventory Value</p>
-                <p className="text-base font-bold mt-0.5 truncate">
-                  {totalValue >= 10000 ? formatCurrencyShort(totalValue) : formatCurrency(totalValue)}
-                </p>
-              </div>
-              <div className="icon-blue rounded-lg p-1.5 shrink-0">
-                <Package className="h-4 w-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl border-red-200/50 dark:border-red-800/50">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Critical</p>
-                <p className="text-base font-bold mt-0.5 text-red-600">{criticalItems}</p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-red-100 dark:bg-red-900/30">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl border-amber-200/50 dark:border-amber-800/50">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Low Stock</p>
-                <p className="text-base font-bold mt-0.5 text-amber-600">{lowStockItems}</p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-amber-100 dark:bg-amber-900/30">
-                <TrendingDown className="h-4 w-4 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl border-blue-200/50 dark:border-blue-800/50">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Overstock</p>
-                <p className="text-base font-bold mt-0.5 text-blue-600">{overstockItems}</p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-blue-100 dark:bg-blue-900/30">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <KPICard title="Inventory Value" value={totalValue} format="currency" icon={Package} />
+        <KPICard title="Critical" value={criticalItems} icon={AlertTriangle} />
+        <KPICard title="Low Stock" value={lowStockItems} icon={TrendingDown} />
+        <KPICard title="Overstock" value={overstockItems} icon={TrendingUp} />
       </div>
 
       {/* Tabs for different inventory views */}
       <Tabs defaultValue="all" className="w-full">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <TabsList className="h-8">
-            <TabsTrigger value="all" className="text-xs h-7">All Items</TabsTrigger>
-            <TabsTrigger value="warehouse" className="text-xs h-7">From Warehouse</TabsTrigger>
-            <TabsTrigger value="outbound" className="text-xs h-7">Outbound</TabsTrigger>
-            <TabsTrigger value="transfers" className="text-xs h-7">Branch Transfers</TabsTrigger>
-            <TabsTrigger value="to-warehouse" className="text-xs h-7">To Warehouse</TabsTrigger>
-            <TabsTrigger value="reconciliations" className="text-xs h-7">Reconciliations</TabsTrigger>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <TabsList className={cn(dashboardTabListClass, "h-11 w-full sm:w-auto inline-flex flex-wrap")}>
+            <TabsTrigger value="all" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">All Items</TabsTrigger>
+            <TabsTrigger value="warehouse" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">From Warehouse</TabsTrigger>
+            <TabsTrigger value="outbound" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Outbound</TabsTrigger>
+            <TabsTrigger value="transfers" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Branch Transfers</TabsTrigger>
+            <TabsTrigger value="to-warehouse" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">To Warehouse</TabsTrigger>
+            <TabsTrigger value="reconciliations" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Reconciliations</TabsTrigger>
           </TabsList>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {canReconcile && reconcileBranchId && (
               <Button
-                size="sm"
-                className="h-8"
+                className={cn("h-10 rounded-xl", reconcileSubmittedToday ? "" : dashboardPrimaryButtonClass)}
                 variant={reconcileSubmittedToday ? "outline" : "default"}
                 onClick={() => setIsReconcileOpen(true)}
               >
-                <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
+                <ClipboardCheck className="mr-1.5 h-4 w-4" />
                 {reconcileSubmittedToday ? "View reconciliation" : "Reconcile stock"}
               </Button>
             )}
             <Button
               variant="outline"
-              size="sm"
-              className="h-8"
+              className="h-10 rounded-xl"
               onClick={() => {
                 const exportData = filteredItems.map((i) => ({
                   Name: i.name,
@@ -672,22 +591,18 @@ export function InventoryContent({
                 downloadCSV(exportData, `inventory-${formatDateForFilename()}`);
               }}
             >
-              <Download className="mr-1.5 h-3.5 w-3.5" />
+              <Download className="mr-1.5 h-4 w-4" />
               Export
             </Button>
-            <Button variant="outline" size="sm" className="h-8" onClick={() => setIsBulkImportOpen(true)}>
-              <Upload className="mr-1.5 h-3.5 w-3.5" />
+            <Button variant="outline" className="h-10 rounded-xl" onClick={() => setIsBulkImportOpen(true)}>
+              <Upload className="mr-1.5 h-4 w-4" />
               Import CSV
             </Button>
-            {/* <Button size="sm" className="h-8" onClick={() => setIsAddItemOpen(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Add Item
-            </Button> */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
+                <Button variant="outline" className="h-10 rounded-xl">
                   Actions
-                  <MoreHorizontal className="ml-1.5 h-3.5 w-3.5" />
+                  <MoreHorizontal className="ml-1.5 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -713,13 +628,12 @@ export function InventoryContent({
           </div>
         </div>
 
-        <TabsContent value="all" className="mt-6">
-          <Card className="glass">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <CardTitle>All inventory items</CardTitle>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                <div className="relative w-full sm:w-44">
-                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <TabsContent value="all" className="mt-4">
+          <ContentCard padding="none">
+            <div className={dashboardToolbarClass}>
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <div className="relative w-full sm:w-52">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Search items..."
                     value={searchQuery}
@@ -727,7 +641,7 @@ export function InventoryContent({
                       setSearchQuery(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="h-8 pl-8 text-xs"
+                    className="h-10 pl-9 rounded-xl"
                   />
                 </div>
                 <Select
@@ -737,7 +651,7 @@ export function InventoryContent({
                     setCurrentPage(1);
                   }}
                 >
-                  <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs">
+                  <SelectTrigger className="h-10 w-full sm:w-[140px] rounded-xl">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -755,7 +669,7 @@ export function InventoryContent({
                     setCurrentPage(1);
                   }}
                 >
-                  <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+                  <SelectTrigger className="h-10 w-full sm:w-[150px] rounded-xl">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -775,7 +689,7 @@ export function InventoryContent({
                       setCurrentPage(1);
                     }}
                   >
-                    <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs">
+                    <SelectTrigger className="h-10 w-full sm:w-[150px] rounded-xl">
                       <SelectValue placeholder="Branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -789,11 +703,11 @@ export function InventoryContent({
                   </Select>
                 )}
               </div>
-            </CardHeader>
+            </div>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Item</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Branch</TableHead>
@@ -816,7 +730,7 @@ export function InventoryContent({
                     </TableRow>
                   ) : (
                     paginatedItems.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className="hover:bg-[#22C55E]/5">
                       <TableCell>
                         <div>
                           <p className="font-medium">{item.name}</p>
@@ -843,7 +757,7 @@ export function InventoryContent({
                               item.minStock,
                               item.maxStock > 0 ? item.maxStock : (item.minStock * 3 || 100)
                             )}
-                            className={`h-2 ${getStockColor(item.status)}`}
+                            className={cn("h-2", getStockColor(item.status))}
                           />
                         </div>
                       </TableCell>
@@ -868,19 +782,20 @@ export function InventoryContent({
                 onPageSizeChange={handlePageSizeChange}
               />
             </CardContent>
-          </Card>
+          </ContentCard>
         </TabsContent>
 
-        <TabsContent value="warehouse" className="mt-6">
-          <Card className="glass">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>Warehouse to branch transfers</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Incoming stock from warehouses to branches.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
+        <TabsContent value="warehouse" className="mt-4">
+          <ContentCard padding="none">
+            <div className={dashboardToolbarClass}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
+                <div>
+                  <p className="font-semibold text-[#222831]">Warehouse to branch transfers</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Incoming stock from warehouses to branches.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
                 {canViewAllBranches && (
                   <Select
                     value={warehouseBranchFilter}
@@ -889,7 +804,7 @@ export function InventoryContent({
                       setPageWarehouse(1);
                     }}
                   >
-                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectTrigger className="h-10 w-[150px] rounded-xl">
                       <SelectValue placeholder="Branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -909,7 +824,7 @@ export function InventoryContent({
                     setPageWarehouse(1);
                   }}
                 >
-                  <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectTrigger className="h-10 w-[140px] rounded-xl">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -922,13 +837,14 @@ export function InventoryContent({
                   </SelectContent>
                 </Select>
               </div>
-            </CardHeader>
+              </div>
+            </div>
             <CardContent className="p-0">
               {filteredWarehouseTransfers.length > 0 ? (
                 <>
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead>Item</TableHead>
                       <TableHead>Warehouse</TableHead>
                       <TableHead>Branch</TableHead>
@@ -941,7 +857,7 @@ export function InventoryContent({
                   </TableHeader>
                   <TableBody>
                     {paginatedWarehouseTransfers.map((record) => (
-                      <TableRow key={record.id}>
+                      <TableRow key={record.id} className="hover:bg-[#22C55E]/5">
                         <TableCell>
                           <div>
                             <p className="font-medium">{record.itemName}</p>
@@ -953,7 +869,7 @@ export function InventoryContent({
                         <TableCell className="text-right">{record.quantity}</TableCell>
                         <TableCell className="text-right">{formatCurrency(record.totalCost)}</TableCell>
                         <TableCell>
-                          <Badge className={TRANSFER_STATUS_COLORS[record.status] || ""}>{record.status}</Badge>
+                          <Badge variant="outline" className={transferStatusBadgeClass(record.status)}>{record.status}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{new Date(record.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                         <TableCell>
@@ -997,18 +913,19 @@ export function InventoryContent({
                 </div>
               )}
             </CardContent>
-          </Card>
+          </ContentCard>
         </TabsContent>
 
-        <TabsContent value="outbound" className="mt-6">
-          <Card className="glass">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>Recent outbound stock</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Sales, waste, and adjustments that reduced branch stock.
-                </p>
-              </div>
+        <TabsContent value="outbound" className="mt-4">
+          <ContentCard padding="none">
+            <div className={dashboardToolbarClass}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
+                <div>
+                  <p className="font-semibold text-[#222831]">Recent outbound stock</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Sales, waste, and adjustments that reduced branch stock.
+                  </p>
+                </div>
               {canViewAllBranches && (
                 <Select
                   value={outboundBranchFilter}
@@ -1017,7 +934,7 @@ export function InventoryContent({
                     setPageOutbound(1);
                   }}
                 >
-                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                  <SelectTrigger className="h-10 w-[150px] rounded-xl">
                     <SelectValue placeholder="Branch" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1030,13 +947,14 @@ export function InventoryContent({
                   </SelectContent>
                 </Select>
               )}
-            </CardHeader>
+              </div>
+            </div>
             <CardContent className="p-0">
               {filteredOutboundRecords.length > 0 ? (
                 <>
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead>Item</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Quantity</TableHead>
@@ -1047,7 +965,7 @@ export function InventoryContent({
                   </TableHeader>
                   <TableBody>
                     {paginatedOutboundRecords.map((record) => (
-                      <TableRow key={record.id}>
+                      <TableRow key={record.id} className="hover:bg-[#22C55E]/5">
                         <TableCell>
                           <div>
                             <p className="font-medium">{record.item.name}</p>
@@ -1082,18 +1000,19 @@ export function InventoryContent({
                 </p>
               )}
             </CardContent>
-          </Card>
+          </ContentCard>
         </TabsContent>
 
-        <TabsContent value="transfers" className="mt-6">
-          <Card className="glass">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>Branch-to-branch transfers</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Stock moved between branches.
-                </p>
-              </div>
+        <TabsContent value="transfers" className="mt-4">
+          <ContentCard padding="none">
+            <div className={dashboardToolbarClass}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
+                <div>
+                  <p className="font-semibold text-[#222831]">Branch-to-branch transfers</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Stock moved between branches.
+                  </p>
+                </div>
               <div className="flex flex-wrap gap-2">
                 {canViewAllBranches && (
                   <Select
@@ -1103,7 +1022,7 @@ export function InventoryContent({
                       setPageTransfers(1);
                     }}
                   >
-                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectTrigger className="h-10 w-[150px] rounded-xl">
                       <SelectValue placeholder="Branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1123,7 +1042,7 @@ export function InventoryContent({
                     setPageTransfers(1);
                   }}
                 >
-                  <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectTrigger className="h-10 w-[140px] rounded-xl">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1136,13 +1055,14 @@ export function InventoryContent({
                   </SelectContent>
                 </Select>
               </div>
-            </CardHeader>
+              </div>
+            </div>
             <CardContent className="p-0">
               {filteredTransferRecords.length > 0 ? (
                 <>
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead>Item</TableHead>
                       <TableHead>From</TableHead>
                       <TableHead>To</TableHead>
@@ -1167,7 +1087,7 @@ export function InventoryContent({
                         <TableCell className="text-right">{record.quantity}</TableCell>
                         <TableCell className="text-right">{formatCurrency(record.totalCost)}</TableCell>
                         <TableCell>
-                          <Badge className={TRANSFER_STATUS_COLORS[record.status] || ""}>{record.status}</Badge>
+                          <Badge variant="outline" className={transferStatusBadgeClass(record.status)}>{record.status}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{new Date(record.transferDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</TableCell>
                         <TableCell>
@@ -1229,19 +1149,20 @@ export function InventoryContent({
                 </div>
               )}
             </CardContent>
-          </Card>
+          </ContentCard>
         </TabsContent>
 
-        <TabsContent value="to-warehouse" className="mt-6">
-          <Card className="glass">
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>Returns to warehouse</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Branch stock sent back to warehouses. Pending returns are received or
-                  rejected in the Warehouse section.
-                </p>
-              </div>
+        <TabsContent value="to-warehouse" className="mt-4">
+          <ContentCard padding="none">
+            <div className={dashboardToolbarClass}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between w-full">
+                <div>
+                  <p className="font-semibold text-[#222831]">Returns to warehouse</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Branch stock sent back to warehouses. Pending returns are received or
+                    rejected in the Warehouse section.
+                  </p>
+                </div>
               <div className="flex flex-wrap gap-2">
                 {canViewAllBranches && (
                   <Select
@@ -1251,7 +1172,7 @@ export function InventoryContent({
                       setPageToWarehouse(1);
                     }}
                   >
-                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectTrigger className="h-10 w-[150px] rounded-xl">
                       <SelectValue placeholder="Branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1272,7 +1193,7 @@ export function InventoryContent({
                       setPageToWarehouse(1);
                     }}
                   >
-                    <SelectTrigger className="h-8 w-[160px] text-xs">
+                    <SelectTrigger className="h-10 w-[170px] rounded-xl">
                       <SelectValue placeholder="Warehouse" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1292,7 +1213,7 @@ export function InventoryContent({
                     setPageToWarehouse(1);
                   }}
                 >
-                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                  <SelectTrigger className="h-10 w-[150px] rounded-xl">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1305,13 +1226,14 @@ export function InventoryContent({
                   </SelectContent>
                 </Select>
               </div>
-            </CardHeader>
+              </div>
+            </div>
             <CardContent className="p-0">
               {visibleBranchReturns.length > 0 ? (
                 <>
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="hover:bg-transparent">
                         <TableHead>Date</TableHead>
                         <TableHead>From branch</TableHead>
                         <TableHead>To warehouse</TableHead>
@@ -1324,7 +1246,7 @@ export function InventoryContent({
                     </TableHeader>
                     <TableBody>
                       {paginatedBranchReturns.map((record) => (
-                        <TableRow key={record.id}>
+                        <TableRow key={record.id} className="hover:bg-[#22C55E]/5">
                           <TableCell className="text-sm text-muted-foreground">
                             {formatDisplayDate(record.transferDate)}
                           </TableCell>
@@ -1345,11 +1267,7 @@ export function InventoryContent({
                             {formatCurrency(record.totalCost)}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              className={
-                                TRANSFER_STATUS_COLORS[record.status] || ""
-                              }
-                            >
+                            <Badge variant="outline" className={transferStatusBadgeClass(record.status)}>
                               {record.status.replace(/_/g, " ")}
                             </Badge>
                           </TableCell>
@@ -1385,7 +1303,7 @@ export function InventoryContent({
                 </div>
               )}
             </CardContent>
-          </Card>
+          </ContentCard>
         </TabsContent>
 
         <TabsContent value="reconciliations" className="mt-6">

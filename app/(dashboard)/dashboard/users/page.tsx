@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { UsersContent } from "@/components/users/users-content";
 import { getBranches } from "@/lib/actions/branches";
 import { getUsers } from "@/lib/actions/users";
@@ -6,7 +7,7 @@ import { getOrganization } from "@/lib/actions/organization";
 import { getWarehouses } from "@/lib/actions/warehouse";
 
 export const metadata = {
-  title: "User Management | ServStack",
+  title: "User Management",
   description: "Manage system users and access permissions",
 };
 
@@ -45,14 +46,10 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          User Management
-        </h1>
-        <p className="text-muted-foreground">
-          Manage system users, roles, and access permissions
-        </p>
-      </div>
+      <PageHeader
+        title="User Management"
+        description="Manage system users, roles, and access permissions"
+      />
 
       <Suspense fallback={<UsersLoadingSkeleton />}>
         <UsersContent users={users} branches={branchList} warehouses={warehouseList} currentCount={orgResult.data?.userCount || 0} maxUsers={orgResult.data?.maxUsers || 2} />

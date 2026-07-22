@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { KPICard } from "@/components/dashboard/kpi-card";
+import { ContentCard } from "@/components/dashboard/content-card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,11 @@ import { verifyPaystackOrderPayment } from "@/lib/actions/payments";
 import { CreateOrderDialog } from "./order-forms";
 import { OrderDetailModal } from "./order-detail-modal";
 import { useCurrency } from "@/contexts/currency-context";
+import {
+  orderStatusBadgeClass,
+  ordersToolbarClass,
+  paymentStatusBadgeClass,
+} from "@/components/orders/order-styles";
 
 interface OrderItem {
   id: string;
@@ -151,14 +157,6 @@ interface OrdersContentProps {
   initialPageSize?: number;
   tableManagementEnabled?: boolean;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  NEW: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  IN_PROGRESS: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  READY: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  CANCELLED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-};
 
 const SOURCE_LABELS: Record<string, string> = {
   CALL_CENTER: "Call Center",
@@ -345,81 +343,35 @@ export function OrdersContent({
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
-      <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-3">
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Total Orders</p>
-                <p className="text-base font-bold mt-0.5">{stats.totalOrders}</p>
-              </div>
-              <div className="icon-blue rounded-lg p-1.5 shrink-0">
-                <ShoppingCart className="h-4 w-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Pending</p>
-                <p className="text-base font-bold mt-0.5 text-amber-600">{stats.pendingOrders}</p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-amber-100 dark:bg-amber-900/30">
-                <Clock className="h-4 w-4 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Completed Today</p>
-                <p className="text-base font-bold mt-0.5 text-emerald-600">{stats.completedToday}</p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Today Revenue</p>
-                <p className="text-base font-bold mt-0.5">{formatCurrency(stats.todayRevenue)}</p>
-              </div>
-              <div className="icon-blue rounded-lg p-1.5 shrink-0">
-                <DollarSign className="h-4 w-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card> */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KPICard title="Total Orders" value={stats.totalOrders} icon={ShoppingCart} />
+        <KPICard title="Pending" value={stats.pendingOrders} icon={Clock} />
+        <KPICard title="Completed Today" value={stats.completedToday} icon={CheckCircle2} />
+        <KPICard
+          title="Today's Revenue"
+          value={stats.todayRevenue}
+          format="currency"
+          icon={DollarSign}
+        />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search orders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
+      <ContentCard>
+        <div className={ordersToolbarClass}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search orders..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-10 rounded-xl bg-background border-border/80 focus-visible:ring-[#22C55E]/30"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-36 h-10 rounded-xl">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="NEW">New</SelectItem>
@@ -430,7 +382,7 @@ export function OrdersContent({
             </SelectContent>
           </Select>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="w-full sm:w-36">
+            <SelectTrigger className="w-full sm:w-36 h-10 rounded-xl">
               <SelectValue placeholder="Source" />
             </SelectTrigger>
             <SelectContent>
@@ -444,7 +396,7 @@ export function OrdersContent({
             </SelectContent>
           </Select>
           <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-40 h-10 rounded-xl">
               <SelectValue placeholder="Branch" />
             </SelectTrigger>
             <SelectContent>
@@ -454,49 +406,61 @@ export function OrdersContent({
               ))}
             </SelectContent>
           </Select>
+            </div>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              size="sm"
+              className="h-10 rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm shrink-0"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New order
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          New Order
-        </Button>
-      </div>
 
-      {/* Orders Table */}
-      <Card className="rounded-xl">
-        <CardContent className="p-0">
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Order #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Branch</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Type</TableHead>
-                {tableManagementEnabled && <TableHead>Table</TableHead>}
-                <TableHead>Placed By</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Date</TableHead>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Order #</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Branch</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Source</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</TableHead>
+                {tableManagementEnabled && (
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Table</TableHead>
+                )}
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Placed By</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</TableHead>
+                <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={tableManagementEnabled ? 12 : 11}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    No orders found
+                  <TableCell colSpan={tableManagementEnabled ? 12 : 11} className="text-center py-12">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <ShoppingCart className="h-10 w-10 text-muted-foreground/30" />
+                      <p className="font-medium">No orders found</p>
+                      <p className="text-sm">Try adjusting filters or create a new order</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredOrders.map((order) => {
                   const nextStatus = getNextStatus(order.status);
                   return (
-                    <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedOrder(order)}>
-                      <TableCell className="font-mono text-sm font-medium">{order.orderNumber}</TableCell>
+                    <TableRow
+                      key={order.id}
+                      className="cursor-pointer hover:bg-[#22C55E]/5 transition-colors"
+                      onClick={() => setSelectedOrder(order)}
+                    >
+                      <TableCell className="font-mono text-sm font-semibold text-[#222831]">
+                        {order.orderNumber}
+                      </TableCell>
                       <TableCell>
                         <div>
                           <span className="text-sm">{order.customerName || "Walk-in"}</span>
@@ -507,7 +471,9 @@ export function OrdersContent({
                       </TableCell>
                       <TableCell className="text-sm">{order.branchName}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">{SOURCE_LABELS[order.source] || order.source}</Badge>
+                        <Badge variant="outline" className="text-xs rounded-md border-border/80">
+                          {SOURCE_LABELS[order.source] || order.source}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-sm">{TYPE_LABELS[order.type] || order.type}</TableCell>
                       {tableManagementEnabled && (
@@ -523,25 +489,18 @@ export function OrdersContent({
                         {order.placedBy || order.assignedBy || "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge className={STATUS_COLORS[order.status] || "bg-slate-100 text-slate-700"}>
+                        <Badge className={orderStatusBadgeClass(order.status)}>
                           {STATUS_LABELS[order.status] || order.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            order.paymentStatus === "PAID"
-                              ? "border-green-500 text-green-600"
-                              : order.paymentStatus === "FAILED"
-                              ? "border-red-500 text-red-600"
-                              : "border-amber-500 text-amber-600"
-                          }
-                        >
+                        <Badge variant="outline" className={paymentStatusBadgeClass(order.paymentStatus)}>
                           {order.paymentStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(order.total)}</TableCell>
+                      <TableCell className="text-right font-semibold text-[#16A34A]">
+                        {formatCurrency(order.total)}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(order.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                       </TableCell>
@@ -581,11 +540,11 @@ export function OrdersContent({
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </ContentCard>
 
-      {/* Pagination Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* Pagination */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border bg-card px-4 py-3">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

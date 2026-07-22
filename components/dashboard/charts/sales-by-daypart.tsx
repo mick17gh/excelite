@@ -47,7 +47,7 @@ export function SalesByDaypartChart({
     <Card className="chart-card rounded-xl">
       <CardHeader className="py-3 px-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <div className="icon-blue rounded-lg p-1.5">
+          <div className="icon-accent rounded-lg p-1.5">
             <Clock className="h-4 w-4" />
           </div>
           {title}
@@ -62,7 +62,7 @@ export function SalesByDaypartChart({
             >
               <defs>
                 <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                  <stop offset="0%" stopColor="#22C55E" stopOpacity={1} />
                   <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
                 </linearGradient>
               </defs>

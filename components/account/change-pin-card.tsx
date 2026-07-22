@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ContentCard } from "@/components/dashboard/content-card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PinInput } from "@/components/ui/pin-input";
 import { Loader2, LockKeyhole } from "lucide-react";
 import { toast } from "sonner";
 import { changePin, clearMyPin, getCurrentUser } from "@/lib/actions/settings";
+import { dashboardPrimaryButtonClass } from "@/components/dashboard/dashboard-theme";
 
 export function ChangePinCard() {
   const [isPending, startTransition] = useTransition();
@@ -75,28 +76,30 @@ export function ChangePinCard() {
 
   if (hasPin === null) {
     return (
-      <Card className="chart-card rounded-xl">
-        <CardContent className="flex justify-center py-8">
+      <ContentCard>
+        <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+        </div>
+      </ContentCard>
     );
   }
 
   return (
-    <Card className="chart-card rounded-xl">
-      <CardHeader className="py-3 px-4">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <LockKeyhole className="h-4 w-4" />
-          {hasPin ? "Change PIN" : "Set PIN"}
-        </CardTitle>
-        <CardDescription className="text-xs">
+    <ContentCard padding="none">
+      <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
+        <div className="flex items-center gap-2">
+          <LockKeyhole className="h-4 w-4 text-[#16A34A]" />
+          <h3 className="text-base font-semibold text-[#222831]">
+            {hasPin ? "Change PIN" : "Set PIN"}
+          </h3>
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5">
           {hasPin
             ? "Update your 4-digit PIN for quick sign-in on shared devices"
             : "Create a 4-digit PIN to sign in without your email password"}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 pb-4 pt-0 space-y-4">
+        </p>
+      </div>
+      <div className="px-4 pb-4 pt-4 space-y-4">
         {hasPin ? (
           <div className="space-y-1.5">
             <Label className="text-xs">Current PIN</Label>
@@ -130,16 +133,16 @@ export function ChangePinCard() {
         </div>
 
         <div className="flex flex-wrap gap-2 justify-end">
-          <Button size="sm" onClick={handleChangePin} disabled={isPending || !canSubmit}>
+          <Button className={dashboardPrimaryButtonClass} onClick={handleChangePin} disabled={isPending || !canSubmit}>
             {isPending ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
             ) : null}
             {hasPin ? "Update PIN" : "Set PIN"}
           </Button>
         </div>
 
         {hasPin ? (
-          <div className="space-y-2 pt-2 border-t">
+          <div className="space-y-2 pt-2 border-t border-border/60">
             <p className="text-xs text-muted-foreground">Remove PIN-only sign-in</p>
             <PinInput
               idPrefix="clear-pin"
@@ -149,8 +152,8 @@ export function ChangePinCard() {
             />
             <div className="flex justify-end">
               <Button
-                size="sm"
                 variant="outline"
+                className="rounded-xl"
                 onClick={handleClearPin}
                 disabled={isPending || clearPinValue.length !== 4}
               >
@@ -159,7 +162,7 @@ export function ChangePinCard() {
             </div>
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </ContentCard>
   );
 }

@@ -1,12 +1,11 @@
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { Header } from "@/components/dashboard/header";
-import { FloatingChatWidget } from "@/components/chat";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { hasFeature } from "@/lib/tier-config";
 import { getNotifications, getUnreadCount } from "@/lib/services/notifications";
 import { PermissionsProvider } from "@/contexts/permissions-context";
-import { loadSessionAccess } from "@/lib/permissions/load-session-access";
+import { resolveSessionAccess } from "@/lib/permissions/load-session-access";
 import { enforceRouteAccess } from "@/lib/permissions/page-access";
 import { getRequestPathname } from "@/lib/permissions/request-pathname";
 import { PaystackSetupBanner } from "@/components/dashboard/paystack-setup-banner";
@@ -21,14 +20,17 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const access = await loadSessionAccess();
-  if (!access) {
+  const sessionResult = await resolveSessionAccess();
+  if (sessionResult.kind === "unauthenticated") {
     redirect("/login");
   }
+  if (sessionResult.kind === "onboarding") {
+    redirect("/onboarding");
+  }
 
-  const { role: userRole, permissions, organizationId, accessCtx } = access;
+  const { role: userRole, permissions, organizationId, accessCtx } =
+    sessionResult.access;
   const { orgTier, tableManagementEnabled: tablesNavEnabled } = accessCtx;
-  const canUseAiAssistant = hasFeature(orgTier, "aiAssistant", userRole);
 
   const headerStore = await headers();
   const isServerAction = headerStore.has("next-action");
@@ -77,23 +79,23 @@ export default async function DashboardLayout({
         />
         <div className="flex flex-1 flex-col overflow-hidden relative">
           <div className="absolute inset-0 gradient-mesh pointer-events-none" />
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] gradient-orb gradient-orb-blue opacity-30 pointer-events-none" />
-          <div className="absolute bottom-0 left-1/4 w-[400px] h-[400px] gradient-orb gradient-orb-purple opacity-20 pointer-events-none" />
 
           <Header
             initialNotifications={initialNotifications}
             initialUnreadCount={initialUnreadCount}
           />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-10 space-y-4">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 relative z-10">
+            <div className="mx-auto w-full max-w-7xl space-y-4">
             <PaystackSetupBanner
               organizationId={organizationId}
               paystackEnabled={paystackAnyEnabled}
               firstBranch={firstBranch}
             />
             {children}
+            </div>
           </main>
 
-          {canUseAiAssistant && <FloatingChatWidget />}
+          <MobileNav orgTier={orgTier} tableManagementEnabled={tablesNavEnabled} />
         </div>
       </div>
     </PermissionsProvider>

@@ -3,7 +3,7 @@ import { DeliveryContent } from "@/components/delivery/delivery-content";
 import { getDeliveryRequests, getDeliveryStats } from "@/lib/actions/delivery";
 
 export const metadata = {
-  title: "Delivery | ServStack",
+  title: "Delivery",
   description: "Track and manage delivery requests",
 };
 

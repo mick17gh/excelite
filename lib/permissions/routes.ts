@@ -1,40 +1,25 @@
 import type { ElementType } from "react";
 import {
   LayoutDashboard,
-  LayoutGrid,
-  Building2,
   Package,
-  TrendingUp,
-  Users,
-  Bell,
-  FileText,
   Settings,
-  Receipt,
   UserCog,
   UtensilsCrossed,
-  Key,
   Tag,
-  Target,
   ShoppingCart,
-  Warehouse,
-  Contact,
-  Truck,
-  ChefHat,
   Monitor,
-  Handshake,
 } from "lucide-react";
 import type { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
-import { hasFeature, type TierFeatures } from "@/lib/tier-config";
+import { hasFeature, isSuperAdmin, type TierFeatures } from "@/lib/tier-config";
+import { isLiteBlockedPath } from "@/lib/excelite-config";
 import { hasAnyPermissionInList, hasPermissionInList } from "@/lib/permissions/check-list";
 import type { Permission } from "@/lib/permissions/types";
-import { REPORTS_MODULE_PERMISSIONS } from "@/lib/reports/permissions";
 
 export type NavItem = {
   name: string;
   href: string;
   icon: ElementType;
   permission?: Permission;
-  /** Show when the user has any of these permissions */
   permissionsAny?: Permission[];
   featureKey?: keyof TierFeatures;
   requiresTableManagement?: boolean;
@@ -44,61 +29,22 @@ export type RouteAccessRule = {
   permissions: Permission[];
   featureKey?: keyof TierFeatures;
   requiresTableManagement?: boolean;
-  /** Any signed-in dashboard user (no permission check) */
   authOnly?: boolean;
   match: (pathname: string) => boolean;
 };
 
+/** Excelite lite — core navigation only */
 export const DASHBOARD_NAVIGATION: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
+  { name: "POS", href: "/pos", icon: Monitor, permission: "pos:access", featureKey: "pos" },
   {
     name: "Orders",
     href: "/dashboard/orders",
     icon: ShoppingCart,
     permission: "orders:view",
   },
-  {
-    name: "POS",
-    href: "/pos",
-    icon: Monitor,
-    permission: "pos:access",
-    featureKey: "pos",
-  },
-  {
-    name: "Kitchen (KDS)",
-    href: "/kitchen",
-    icon: ChefHat,
-    permission: "kitchen:access",
-    featureKey: "kitchenDisplay",
-  },
-  {
-    name: "Transactions",
-    href: "/dashboard/transactions",
-    icon: Receipt,
-    permission: "transactions:view",
-  },
-  {
-    name: "Manual POS Entry",
-    href: "/dashboard/transactions/manual",
-    icon: Receipt,
-    permission: "transactions:manual",
-  },
-  { name: "Branches", href: "/dashboard/branches", icon: Building2, permission: "branches:view" },
-  {
-    name: "Floor board",
-    href: "/dashboard/tables",
-    icon: LayoutGrid,
-    permission: "tables:view",
-    featureKey: "tableManagement",
-    requiresTableManagement: true,
-  },
-  {
-    name: "Sales Analytics",
-    href: "/dashboard/sales",
-    icon: TrendingUp,
-    permission: "sales:view",
-    featureKey: "salesAnalytics",
-  },
+  { name: "Products", href: "/dashboard/menu", icon: UtensilsCrossed, permission: "menu:view" },
+  { name: "Categories", href: "/dashboard/categories", icon: Tag, permission: "categories:view" },
   {
     name: "Inventory",
     href: "/dashboard/inventory",
@@ -106,79 +52,13 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
     permission: "inventory:view",
     featureKey: "inventory",
   },
-  {
-    name: "Warehouse",
-    href: "/dashboard/warehouse",
-    icon: Warehouse,
-    permission: "warehouse:view",
-    featureKey: "warehouse",
-  },
-  { name: "Products", href: "/dashboard/menu", icon: UtensilsCrossed, permission: "menu:view" },
-  { name: "Categories", href: "/dashboard/categories", icon: Tag, permission: "categories:view" },
-  {
-    name: "Customers",
-    href: "/dashboard/customers",
-    icon: Contact,
-    permission: "customers:view",
-    featureKey: "crm",
-  },
-  {
-    name: "Suppliers",
-    href: "/dashboard/suppliers",
-    icon: Handshake,
-    permissionsAny: ["suppliers:view", "warehouse:view"],
-    featureKey: "warehouse",
-  },
-  {
-    name: "Delivery",
-    href: "/dashboard/delivery",
-    icon: Truck,
-    permission: "delivery:view",
-    featureKey: "delivery",
-  },
-  {
-    name: "Branch Targets",
-    href: "/dashboard/targets",
-    icon: Target,
-    permission: "targets:view",
-    featureKey: "targets",
-  },
-  {
-    name: "Staff",
-    href: "/dashboard/staff",
-    icon: Users,
-    permission: "staff:view",
-    featureKey: "staffManagement",
-  },
-  {
-    name: "Alerts",
-    href: "/dashboard/alerts",
-    icon: Bell,
-    permission: "alerts:view",
-    featureKey: "alerts",
-  },
-  {
-    name: "Reports",
-    href: "/dashboard/reports",
-    icon: FileText,
-    permissionsAny: REPORTS_MODULE_PERMISSIONS,
-    featureKey: "advancedReports",
-  },
-  {
-    name: "API Keys",
-    href: "/dashboard/api-keys",
-    icon: Key,
-    permission: "api-keys:view",
-    featureKey: "apiAccess",
-  },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
 ];
 
 export const DASHBOARD_BOTTOM_NAVIGATION: NavItem[] = [
   { name: "User Management", href: "/dashboard/users", icon: UserCog, permission: "users:view" },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
 ];
 
-/** Routes any signed-in user may access (no permission keys required) */
 export const AUTH_ONLY_ROUTE_RULES: Pick<RouteAccessRule, "match">[] = [
   { match: (p) => p === "/dashboard/account" || p.startsWith("/dashboard/account/") },
 ];
@@ -187,7 +67,6 @@ export function isAuthOnlyPath(pathname: string): boolean {
   return AUTH_ONLY_ROUTE_RULES.some((rule) => rule.match(pathname));
 }
 
-/** First match wins — most specific rules first */
 export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   {
     match: (p) => p === "/dashboard/account" || p.startsWith("/dashboard/account/"),
@@ -195,88 +74,21 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
     authOnly: true,
   },
   {
-    match: (p) => p === "/dashboard/transactions/manual",
-    permissions: ["transactions:manual"],
-  },
-  {
     match: (p) => p === "/dashboard/inventory-categories",
     permissions: ["categories:view"],
   },
-  {
-    match: (p) => /^\/dashboard\/branches\/[^/]+\/tables/.test(p),
-    permissions: ["tables:view"],
-    featureKey: "tableManagement",
-    requiresTableManagement: true,
-  },
-  {
-    match: (p) => p === "/dashboard/tables" || p.startsWith("/dashboard/tables/"),
-    permissions: ["tables:view"],
-    featureKey: "tableManagement",
-    requiresTableManagement: true,
-  },
   { match: (p) => p === "/pos" || p.startsWith("/pos/"), permissions: ["pos:access"], featureKey: "pos" },
-  {
-    match: (p) => p === "/kitchen" || p.startsWith("/kitchen/"),
-    permissions: ["kitchen:access"],
-    featureKey: "kitchenDisplay",
-  },
   { match: (p) => p === "/dashboard", permissions: ["dashboard:view"] },
   { match: (p) => p === "/dashboard/orders" || p.startsWith("/dashboard/orders/"), permissions: ["orders:view"] },
-  {
-    match: (p) => p === "/dashboard/transactions" || p.startsWith("/dashboard/transactions/"),
-    permissions: ["transactions:view"],
-  },
-  {
-    match: (p) => p === "/dashboard/branches" || p.startsWith("/dashboard/branches/"),
-    permissions: ["branches:view"],
-  },
-  { match: (p) => p === "/dashboard/sales" || p.startsWith("/dashboard/sales/"), permissions: ["sales:view"], featureKey: "salesAnalytics" },
   {
     match: (p) => p === "/dashboard/inventory" || p.startsWith("/dashboard/inventory/"),
     permissions: ["inventory:view"],
     featureKey: "inventory",
   },
-  {
-    match: (p) => p === "/dashboard/warehouse" || p.startsWith("/dashboard/warehouse/"),
-    permissions: ["warehouse:view"],
-    featureKey: "warehouse",
-  },
   { match: (p) => p === "/dashboard/menu" || p.startsWith("/dashboard/menu/"), permissions: ["menu:view"] },
   {
     match: (p) => p === "/dashboard/categories" || p.startsWith("/dashboard/categories/"),
     permissions: ["categories:view"],
-  },
-  {
-    match: (p) => p === "/dashboard/customers" || p.startsWith("/dashboard/customers/"),
-    permissions: ["customers:view"],
-    featureKey: "crm",
-  },
-  {
-    match: (p) => p === "/dashboard/suppliers" || p.startsWith("/dashboard/suppliers/"),
-    permissions: ["suppliers:view", "warehouse:view"],
-    featureKey: "warehouse",
-  },
-  {
-    match: (p) => p === "/dashboard/delivery" || p.startsWith("/dashboard/delivery/"),
-    permissions: ["delivery:view"],
-    featureKey: "delivery",
-  },
-  {
-    match: (p) => p === "/dashboard/targets" || p.startsWith("/dashboard/targets/"),
-    permissions: ["targets:view"],
-    featureKey: "targets",
-  },
-  { match: (p) => p === "/dashboard/staff" || p.startsWith("/dashboard/staff/"), permissions: ["staff:view"], featureKey: "staffManagement" },
-  { match: (p) => p === "/dashboard/alerts" || p.startsWith("/dashboard/alerts/"), permissions: ["alerts:view"], featureKey: "alerts" },
-  {
-    match: (p) => p === "/dashboard/reports" || p.startsWith("/dashboard/reports/"),
-    permissions: REPORTS_MODULE_PERMISSIONS,
-    featureKey: "advancedReports",
-  },
-  {
-    match: (p) => p === "/dashboard/api-keys" || p.startsWith("/dashboard/api-keys/"),
-    permissions: ["api-keys:view"],
-    featureKey: "apiAccess",
   },
   { match: (p) => p === "/dashboard/users" || p.startsWith("/dashboard/users/"), permissions: ["users:view"] },
   {
@@ -303,10 +115,7 @@ export function matchRouteAccessRule(pathname: string): RouteAccessRule | null {
   return null;
 }
 
-export function canAccessNavItem(
-  item: NavItem,
-  ctx: RouteAccessContext,
-): boolean {
+export function canAccessNavItem(item: NavItem, ctx: RouteAccessContext): boolean {
   if (item.permissionsAny?.length) {
     if (!hasAnyPermissionInList(ctx.permissions, item.permissionsAny)) {
       return false;
@@ -323,10 +132,7 @@ export function canAccessNavItem(
   return true;
 }
 
-export function canAccessRouteRule(
-  rule: RouteAccessRule,
-  ctx: RouteAccessContext,
-): boolean {
+export function canAccessRouteRule(rule: RouteAccessRule, ctx: RouteAccessContext): boolean {
   if (rule.authOnly) return true;
   if (!hasAnyPermissionInList(ctx.permissions, rule.permissions)) {
     return false;
@@ -341,8 +147,11 @@ export function canAccessRouteRule(
 }
 
 export function canAccessPath(pathname: string, ctx: RouteAccessContext): boolean {
+  if (isLiteBlockedPath(pathname) && !isSuperAdmin(ctx.role)) {
+    return false;
+  }
   const rule = matchRouteAccessRule(pathname);
-  if (!rule) return true;
+  if (!rule) return !isLiteBlockedPath(pathname);
   return canAccessRouteRule(rule, ctx);
 }
 
@@ -359,7 +168,6 @@ export function getFirstAccessibleNavHref(
   return "/dashboard/account";
 }
 
-/** Back target from standalone apps (POS, kitchen) — never the current app route. */
 export function resolveAppBackHref(appPath: string, ctx: RouteAccessContext): string {
   return getFirstAccessibleNavHref(ctx, { exclude: [appPath] });
 }
@@ -368,11 +176,31 @@ export function filterNavItems(items: NavItem[], ctx: RouteAccessContext): NavIt
   return items.filter((item) => canAccessNavItem(item, ctx));
 }
 
-/** Preferred landing route after login or when a guarded route denies access. */
 export function resolveSafeLandingHref(ctx: RouteAccessContext): string {
   if (hasPermissionInList(ctx.permissions, "dashboard:view")) return "/dashboard";
   if (hasPermissionInList(ctx.permissions, "pos:access")) return "/pos";
   if (hasPermissionInList(ctx.permissions, "orders:view")) return "/dashboard/orders";
-  if (hasPermissionInList(ctx.permissions, "kitchen:access")) return "/kitchen";
   return getFirstAccessibleNavHref(ctx);
 }
+
+/** Mobile bottom nav primary items */
+export const MOBILE_PRIMARY_NAV: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
+  { name: "POS", href: "/pos", icon: Monitor, permission: "pos:access", featureKey: "pos" },
+  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart, permission: "orders:view" },
+];
+
+/** Items shown in mobile "More" sheet */
+export const MOBILE_MORE_NAV: NavItem[] = [
+  { name: "Products", href: "/dashboard/menu", icon: UtensilsCrossed, permission: "menu:view" },
+  { name: "Categories", href: "/dashboard/categories", icon: Tag, permission: "categories:view" },
+  {
+    name: "Inventory",
+    href: "/dashboard/inventory",
+    icon: Package,
+    permission: "inventory:view",
+    featureKey: "inventory",
+  },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
+  { name: "User Management", href: "/dashboard/users", icon: UserCog, permission: "users:view" },
+];

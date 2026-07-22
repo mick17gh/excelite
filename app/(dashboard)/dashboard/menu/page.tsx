@@ -1,10 +1,11 @@
 import { Suspense } from "react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { MenuContent } from "@/components/menu/menu-content";
 import { getMenuItems, getMenuCategories } from "@/lib/actions/menu";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "Products | ServStack",
+  title: "Products",
   description: "Manage your restaurant menu items and products",
 };
 
@@ -23,14 +24,10 @@ export default async function MenuPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Products
-        </h1>
-        <p className="text-muted-foreground">
-          Create and manage your restaurant menu items and products
-        </p>
-      </div>
+      <PageHeader
+        title="Products"
+        description="Create and manage your restaurant menu items and products"
+      />
 
       <Suspense fallback={<MenuLoadingSkeleton />}>
         <MenuContent items={items} categories={categories} branches={branches} />

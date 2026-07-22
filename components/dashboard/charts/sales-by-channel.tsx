@@ -16,7 +16,7 @@ interface SalesByChannelProps {
 }
 
 const COLORS = [
-  "#3b82f6",
+  "#22C55E",
   "#8b5cf6",
   "#06b6d4",
   "#10b981",
@@ -47,7 +47,7 @@ export function SalesByChannelChart({
     <Card className="chart-card rounded-xl">
       <CardHeader className="py-3 px-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <div className="icon-blue rounded-lg p-1.5">
+          <div className="icon-accent rounded-lg p-1.5">
             <PieChartIcon className="h-4 w-4" />
           </div>
           {title}

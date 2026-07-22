@@ -4,7 +4,7 @@ import { getApiKeys } from "@/lib/actions/api-keys";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "API Keys | ServStack",
+  title: "API Keys",
   description: "Manage API keys for external integrations",
 };
 

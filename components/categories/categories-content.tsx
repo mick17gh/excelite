@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ContentCard } from "@/components/dashboard/content-card";
+import { KPICard } from "@/components/dashboard/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,13 +30,20 @@ import {
   Tag,
   Package,
   Upload,
+  Search,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { createCategory, updateCategory, deleteCategory } from "@/lib/actions/categories";
-import { EmptyState } from "@/components/ui/empty-state";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { TablePagination } from "@/components/ui/table-pagination";
+import {
+  dashboardModalHeaderClass,
+  dashboardPrimaryButtonClass,
+  dashboardToolbarClass,
+} from "@/components/dashboard/dashboard-theme";
+import { cn } from "@/lib/utils";
 
 interface Category {
   id: string;
@@ -45,12 +53,14 @@ interface Category {
 
 interface CategoriesContentProps {
   categories: Category[];
+  hideStats?: boolean;
 }
 
-export function CategoriesContent({ categories: initialCategories }: CategoriesContentProps) {
+export function CategoriesContent({ categories: initialCategories, hideStats }: CategoriesContentProps) {
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -147,11 +157,21 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
   const totalCategories = initialCategories.length;
   const totalItems = initialCategories.reduce((sum, cat) => sum + cat.itemCount, 0);
 
-  const totalPages = Math.max(1, Math.ceil(initialCategories.length / pageSize));
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return initialCategories;
+    const q = searchQuery.toLowerCase();
+    return initialCategories.filter((c) => c.name.toLowerCase().includes(q));
+  }, [initialCategories, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCategories.length / pageSize));
   const paginatedCategories = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
-    return initialCategories.slice(startIndex, startIndex + pageSize);
-  }, [initialCategories, currentPage, pageSize]);
+    return filteredCategories.slice(startIndex, startIndex + pageSize);
+  }, [filteredCategories, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -161,93 +181,69 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
 
   return (
     <div className="space-y-4">
-      {/* Summary Cards - Compact */}
-      <div className="grid gap-2 sm:gap-3 grid-cols-3">
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Categories</p>
-                <p className="text-base font-bold mt-0.5">{totalCategories}</p>
-              </div>
-              <div className="icon-blue rounded-lg p-1.5 shrink-0">
-                <Tag className="h-4 w-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Menu Items</p>
-                <p className="text-base font-bold mt-0.5">{totalItems}</p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
-                <Package className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">Avg/Category</p>
-                <p className="text-base font-bold mt-0.5">
-                  {totalCategories > 0 ? Math.round(totalItems / totalCategories) : 0}
-                </p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-blue-100 dark:bg-blue-900/30">
-                <Package className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import CSV
-          </Button>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Category
-          </Button>
+      {!hideStats && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <KPICard title="Categories" value={totalCategories} icon={Tag} />
+          <KPICard title="Menu Items" value={totalItems} icon={Package} />
+          <KPICard
+            title="Avg per Category"
+            value={totalCategories > 0 ? Math.round(totalItems / totalCategories) : 0}
+            icon={TrendingUp}
+          />
         </div>
-      </div>
+      )}
 
-      {/* Categories Table */}
-      <Card className="glass">
-        <CardHeader>
-          <CardTitle>Categories</CardTitle>
-          <CardDescription>
-            Manage your menu categories. Categories cannot be deleted if they have menu items.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {initialCategories.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4">
-              <Tag className="h-12 w-12 text-muted-foreground/30 mb-4" />
-              <h3 className="font-semibold mb-1">No Categories</h3>
-              <p className="text-sm text-muted-foreground text-center mb-4">
-                Create your first category to organize menu items
-              </p>
-              <Button onClick={() => setIsCreateOpen(true)}>
+      <ContentCard padding="none">
+        <div className={dashboardToolbarClass}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search categories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-10 rounded-xl pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                className="h-10 rounded-xl"
+                onClick={() => setIsBulkImportOpen(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import CSV
+              </Button>
+              <Button
+                className={dashboardPrimaryButtonClass}
+                onClick={() => setIsCreateOpen(true)}
+              >
                 <Plus className="mr-2 h-4 w-4" />
-                Create Category
+                Add category
               </Button>
             </div>
-          ) : (
+          </div>
+        </div>
+
+        {filteredCategories.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#22C55E]/10 mb-4">
+              <Tag className="h-8 w-8 text-[#16A34A]/60" />
+            </div>
+            <h3 className="font-semibold text-[#222831] mb-1">No categories found</h3>
+            <p className="text-sm text-muted-foreground text-center mb-4 max-w-sm">
+              Create your first category to organize menu items
+            </p>
+            <Button className={dashboardPrimaryButtonClass} onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add category
+            </Button>
+          </div>
+        ) : (
+          <>
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="hover:bg-transparent">
                   <TableHead>Category Name</TableHead>
                   <TableHead>Menu Items</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -255,24 +251,30 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
               </TableHeader>
               <TableBody>
                 {paginatedCategories.map((category) => (
-                  <TableRow key={category.id}>
+                  <TableRow key={category.id} className="hover:bg-[#22C55E]/5">
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{category.itemCount} items</Badge>
+                      <Badge
+                        variant="outline"
+                        className="border-[#22C55E]/25 bg-[#22C55E]/8 text-[#16A34A]"
+                      >
+                        {category.itemCount} items
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8 rounded-lg"
                           onClick={() => handleEdit(category)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
+                          size="icon"
+                          className="h-8 w-8 rounded-lg text-destructive hover:text-destructive"
                           onClick={() => handleDelete(category.id, category.name, category.itemCount)}
                           disabled={category.itemCount > 0}
                         >
@@ -284,12 +286,10 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                 ))}
               </TableBody>
             </Table>
-          )}
-          {initialCategories.length > 0 && (
             <TablePagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={initialCategories.length}
+              totalItems={filteredCategories.length}
               pageSize={pageSize}
               onPageChange={setCurrentPage}
               onPageSizeChange={(size) => {
@@ -297,20 +297,19 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                 setCurrentPage(1);
               }}
             />
-          )}
-        </CardContent>
-      </Card>
+          </>
+        )}
+      </ContentCard>
 
-      {/* Create Category Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create Category</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
+          <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
+            <DialogTitle className="text-white">Create Category</DialogTitle>
+            <DialogDescription className="text-white/80">
               Add a new category to organize your menu items
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 p-6">
             <div className="space-y-2">
               <Label htmlFor="name">
                 Category Name <span className="text-destructive">*</span>
@@ -320,6 +319,7 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                 placeholder="e.g., Appetizers, Main Course, Desserts"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="h-10 rounded-xl"
               />
             </div>
             <div className="space-y-2">
@@ -329,30 +329,30 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                 placeholder="Brief description of this category"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="h-10 rounded-xl"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
+          <DialogFooter className="px-6 pb-6">
+            <Button variant="outline" className="rounded-xl" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={isSubmitting || !formData.name.trim()}>
+            <Button className={dashboardPrimaryButtonClass} onClick={handleCreate} disabled={isSubmitting || !formData.name.trim()}>
               {isSubmitting ? "Creating..." : "Create Category"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Category Dialog */}
       <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Edit Category</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
+          <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
+            <DialogTitle className="text-white">Edit Category</DialogTitle>
+            <DialogDescription className="text-white/80">
               Update category name. This will update all menu items using this category.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 p-6">
             <div className="space-y-2">
               <Label htmlFor="edit-name">
                 Category Name <span className="text-destructive">*</span>
@@ -362,10 +362,11 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
                 placeholder="e.g., Appetizers, Main Course, Desserts"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="h-10 rounded-xl"
               />
             </div>
             {editingCategory && editingCategory.itemCount > 0 && (
-              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 p-3">
                 <p className="text-xs text-amber-800 dark:text-amber-200">
                   <strong>Note:</strong> This category has {editingCategory.itemCount} menu item(s).
                   Changing the name will update all items.
@@ -373,22 +374,22 @@ export function CategoriesContent({ categories: initialCategories }: CategoriesC
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="px-6 pb-6">
             <Button
               variant="outline"
+              className="rounded-xl"
               onClick={() => setEditingCategory(null)}
               disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={isSubmitting || !formData.name.trim()}>
+            <Button className={dashboardPrimaryButtonClass} onClick={handleUpdate} disabled={isSubmitting || !formData.name.trim()}>
               {isSubmitting ? "Updating..." : "Update Category"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Import Dialog */}
       <BulkImportDialog
         open={isBulkImportOpen}
         onOpenChange={setIsBulkImportOpen}

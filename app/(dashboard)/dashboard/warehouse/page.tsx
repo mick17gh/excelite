@@ -13,7 +13,7 @@ import type { Role } from "@/lib/generated/prisma/client";
 import { listInventoryCategories } from "@/lib/actions/inventory-categories";
 
 export const metadata = {
-  title: "Warehouse | ServStack",
+  title: "Warehouse",
   description: "Manage warehouse inventory and branch transfers",
 };
 

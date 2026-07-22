@@ -16,6 +16,8 @@ import {
 import { Loader2, Bell, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
 import { sendOrderNotification } from "@/lib/actions/order-notifications";
+import { NOTIFICATION_CHANNEL_STYLES, orderSectionCardClass } from "@/components/orders/order-styles";
+import { cn } from "@/lib/utils";
 
 interface Notification {
   id: string;
@@ -38,12 +40,6 @@ interface NotificationsTabProps {
   notifications: Notification[];
   onNotificationSent?: () => void;
 }
-
-const CHANNEL_COLORS: Record<string, string> = {
-  SMS: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  EMAIL: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  WHATSAPP: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-};
 
 export function NotificationsTab({ orderId, customerPhone, customerEmail, notifications, onNotificationSent }: NotificationsTabProps) {
   const [showForm, setShowForm] = useState(false);
@@ -86,17 +82,17 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Notifications</span>
-          <Badge variant="secondary" className="text-xs">{notifications.length}</Badge>
+          <Bell className="h-4 w-4 text-[#16A34A]" />
+          <span className="text-sm font-medium text-[#222831]">Notifications</span>
+          <Badge variant="secondary" className="text-xs rounded-md">{notifications.length}</Badge>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
+        <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setShowForm(!showForm)}>
           <Plus className="mr-1 h-3 w-3" />Send
         </Button>
       </div>
 
       {showForm && (
-        <div className="border rounded-md p-3 space-y-3 bg-muted/30">
+        <div className={cn(orderSectionCardClass, "space-y-3")}>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1">
               <Label className="text-xs">Type</Label>
@@ -133,7 +129,7 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSend} disabled={isSubmitting}>
+            <Button size="sm" className="rounded-lg bg-[#22C55E] hover:bg-[#16A34A]" onClick={handleSend} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Send className="mr-1 h-3 w-3" />}
               Send
             </Button>
@@ -142,12 +138,14 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
       )}
 
       {notifications.length > 0 ? (
-        <div className="border rounded-md divide-y">
+        <div className="rounded-xl border border-border divide-y overflow-hidden">
           {[...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((n) => (
-            <div key={n.id} className="px-3 py-2 text-sm">
+            <div key={n.id} className="px-3 py-2.5 text-sm bg-card">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <Badge className={`text-xs ${CHANNEL_COLORS[n.channel] || ""}`}>{n.channel}</Badge>
+                  <Badge className={cn("text-xs border-0", NOTIFICATION_CHANNEL_STYLES[n.channel] ?? "")}>
+                    {n.channel}
+                  </Badge>
                   <span className="text-xs text-muted-foreground">{n.type.replace(/_/g, " ")}</span>
                 </div>
                 <Badge variant="outline" className={`text-xs ${n.status === "SENT" ? "text-green-600" : n.status === "FAILED" ? "text-red-600" : "text-amber-600"}`}>

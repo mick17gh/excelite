@@ -273,7 +273,7 @@ export const SCHEMA_REGISTRY: SchemaEntity[] = [
   {
     entity: 'reportsModule',
     description:
-      'Exported ServStack reports (Excel with frozen headers): executive performance, weekly digest, kitchen efficiency, menu performance, waste variance, customer insights (PII masked for non-admins), POS terminal, plus sales, inventory, warehouse, staff, orders—not a live query surface',
+      'Exported Excelite POS reports (Excel with frozen headers): executive performance, weekly digest, kitchen efficiency, menu performance, waste variance, customer insights (PII masked for non-admins), POS terminal, plus sales, inventory, warehouse, staff, orders—not a live query surface',
     fields: [
       { name: 'reportName', type: 'string', description: 'Report title' },
       { name: 'period', type: 'string', description: 'User-selected date range' },

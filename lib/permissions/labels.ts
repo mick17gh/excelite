@@ -1,13 +1,14 @@
 import { Role } from "@/lib/generated/prisma/client";
+import { LITE_ASSIGNABLE_ROLES, LITE_ROLE_LABELS } from "@/lib/excelite-config";
 
 export const roleDisplayNames: Record<Role, string> = {
   SUPER_ADMIN: "Super Admin",
-  ADMIN: "Admin",
+  ADMIN: LITE_ROLE_LABELS.ADMIN,
   EXECUTIVE: "Executive",
   OPERATIONS_MANAGER: "Operations Manager",
-  BRANCH_MANAGER: "Branch Manager",
+  BRANCH_MANAGER: LITE_ROLE_LABELS.BRANCH_MANAGER,
   SUPERVISOR: "Supervisor",
-  STAFF: "Staff",
+  STAFF: LITE_ROLE_LABELS.STAFF,
   KITCHEN_STAFF: "Kitchen Staff",
   AUDITOR: "Auditor",
   DEVELOPER: "Developer",
@@ -25,15 +26,15 @@ export const roleDescriptions: Record<Role, string> = {
   SUPER_ADMIN:
     "Platform owner with full access to all features and subscription management",
   ADMIN:
-    "Organization administrator with full operational access (cannot manage subscriptions)",
+    "Full access to all Excelite POS features, users, and settings",
   EXECUTIVE:
     "Company-wide visibility with full operational and strategic controls",
   OPERATIONS_MANAGER:
     "Manage all branches, staff, inventory, orders, and warehouse operations",
   BRANCH_MANAGER:
-    "Manage a specific branch including staff, inventory, orders, and sales",
+    "Manage products, categories, inventory, and orders",
   SUPERVISOR: "Oversee branch operations with limited management capabilities",
-  STAFF: "Dashboard, POS, kitchen (KDS), orders, floor board pay, and customers",
+  STAFF: "POS checkout and order handling with read-only dashboard",
   KITCHEN_STAFF: "Kitchen display access for order preparation",
   AUDITOR: "Read-only access to all data for compliance and auditing",
   DEVELOPER: "API key management and technical settings access",
@@ -53,49 +54,23 @@ export const roleDescriptions: Record<Role, string> = {
     "Blank-slate role — assign permissions in Settings → Permissions for custom access",
 };
 
-/** Roles assignable when creating or editing users (excludes SUPER_ADMIN platform-only flows where restricted). */
-export const USER_ASSIGNABLE_ROLES = [
-  "SUPER_ADMIN",
-  "ADMIN",
-  "EXECUTIVE",
-  "OPERATIONS_MANAGER",
-  "BRANCH_MANAGER",
-  "SUPERVISOR",
-  "STAFF",
-  "WAITER",
-  "KITCHEN_STAFF",
-  "PROCUREMENT",
-  "SALES",
-  "ACCOUNTS",
-  "GENERIC",
-  "AUDITOR",
-  "DEVELOPER",
-  "CALL_CENTER",
-  "WAREHOUSE_STAFF",
-  "COMMISSARY_STAFF",
-] as const satisfies readonly Role[];
+/** Roles assignable when creating or editing users in Excelite lite */
+export const USER_ASSIGNABLE_ROLES = [...LITE_ASSIGNABLE_ROLES] as const satisfies readonly Role[];
 
 /** Roles an actor may assign when creating or editing users. */
 export function getUserAssignableRoles(actorRole: Role): Role[] {
   if (actorRole === "SUPER_ADMIN") {
     return [...USER_ASSIGNABLE_ROLES];
   }
-  return USER_ASSIGNABLE_ROLES.filter((role) => role !== "SUPER_ADMIN");
+  return [...LITE_ASSIGNABLE_ROLES];
 }
 
 /** Optional longer labels for user create/edit role dropdowns. */
 export const roleFormLabels: Partial<Record<Role, string>> = {
   SUPER_ADMIN: "Super Admin (Platform Owner)",
-  ADMIN: "Admin (Organization Owner)",
-  EXECUTIVE: "Executive (Strategic Controls)",
-  STAFF: "Staff (POS, KDS, Orders & Customers)",
-  WAITER: "Waiter (table service POS)",
-  AUDITOR: "Auditor (Read-Only)",
-  DEVELOPER: "Developer (API Access)",
-  PROCUREMENT: "Procurement (Suppliers & warehouse receiving)",
-  SALES: "Sales (POS, orders & customers)",
-  ACCOUNTS: "Accounts (Transactions & reports)",
-  GENERIC: "Generic (custom permissions via matrix)",
+  ADMIN: "Owner — full access",
+  BRANCH_MANAGER: "Manager — products, inventory & orders",
+  STAFF: "Cashier — POS & orders",
 };
 
 export function getRoleFormLabel(role: Role): string {

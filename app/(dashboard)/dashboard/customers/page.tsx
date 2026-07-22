@@ -3,7 +3,7 @@ import { CustomersContent } from "@/components/customers/customers-content";
 import { getCustomers, getCustomerStats } from "@/lib/actions/customers";
 
 export const metadata = {
-  title: "Customers | ServStack",
+  title: "Customers",
   description: "Manage customer relationships and order history",
 };
 

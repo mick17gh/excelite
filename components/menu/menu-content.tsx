@@ -1,13 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { KPICard } from "@/components/dashboard/kpi-card";
+import { ContentCard } from "@/components/dashboard/content-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -45,11 +40,14 @@ import {
   type BranchOption,
 } from "@/components/menu/menu-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
+import { ProductGridCard } from "@/components/menu/product-grid-card";
 import { deleteMenuItem } from "@/lib/actions/menu";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { orderTabListClass, ordersToolbarClass } from "@/components/orders/order-styles";
+import { cn } from "@/lib/utils";
 
 interface MenuItem {
   id: string;
@@ -183,95 +181,31 @@ export function MenuContent({
 
   return (
     <div className="space-y-4">
-      {/* Summary Cards - Compact */}
       <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-4">
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">
-                  Total Items
-                </p>
-                <p className="text-base font-bold mt-0.5">{totalItems}</p>
-              </div>
-              <div className="icon-blue rounded-lg p-1.5 shrink-0">
-                <Package className="h-4 w-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">
-                  Active
-                </p>
-                <p className="text-base font-bold mt-0.5 text-emerald-600">
-                  {activeItems}
-                </p>
-              </div>
-              <div className="rounded-lg p-1.5 shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">
-                  Avg Margin
-                </p>
-                <p className="text-base font-bold mt-0.5">
-                  {avgMargin.toFixed(1)}%
-                </p>
-              </div>
-              <div className="icon-blue rounded-lg p-1.5 shrink-0">
-                <DollarSign className="h-4 w-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="kpi-card rounded-xl">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-muted-foreground truncate">
-                  Categories
-                </p>
-                <p className="text-base font-bold mt-0.5">
-                  {categories.length}
-                </p>
-              </div>
-              <div className="icon-blue rounded-lg p-1.5 shrink-0">
-                <Package className="h-4 w-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <KPICard title="Total Items" value={totalItems} icon={Package} />
+        <KPICard title="Active" value={activeItems} icon={TrendingUp} />
+        <KPICard title="Avg Margin" value={avgMargin} format="percentage" icon={DollarSign} />
+        <KPICard title="Categories" value={categories.length} icon={Package} />
       </div>
 
       {/* Filters and Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center flex-1">
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
+      <ContentCard>
+        <div className={ordersToolbarClass}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center flex-1">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-10 rounded-xl bg-background border-border/80 focus-visible:ring-[#22C55E]/30"
+                />
+              </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               {categories.map((cat) => (
@@ -282,7 +216,7 @@ export function MenuContent({
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-36 h-10 rounded-xl">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -291,135 +225,83 @@ export function MenuContent({
               <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Button variant="outline" className="rounded-xl h-10" onClick={() => setIsBulkImportOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import CSV
+              </Button>
+              <Button variant="outline" className="rounded-xl h-10" onClick={() => setIsBulkOptionsImportOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import options
+              </Button>
+              <Button
+                onClick={() => setIsAddOpen(true)}
+                className="rounded-xl h-10 bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add product
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import CSV
-          </Button>
-          <Button variant="outline" onClick={() => setIsBulkOptionsImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import options
-          </Button>
-          <Button onClick={() => setIsAddOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
-        </div>
-      </div>
+      </ContentCard>
 
       {/* Content Tabs */}
       <Tabs defaultValue="grid" className="w-full">
-        <TabsList>
-          <TabsTrigger value="grid">Grid View</TabsTrigger>
-          <TabsTrigger value="list">List View</TabsTrigger>
-          <TabsTrigger value="categories">By Category</TabsTrigger>
+        <TabsList className={cn(orderTabListClass, "w-full sm:w-auto inline-flex h-11")}>
+          <TabsTrigger
+            value="grid"
+            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+          >
+            Grid
+          </TabsTrigger>
+          <TabsTrigger
+            value="list"
+            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+          >
+            List
+          </TabsTrigger>
+          <TabsTrigger
+            value="categories"
+            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+          >
+            By category
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="grid" className="mt-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <TabsContent value="grid" className="mt-5">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {paginatedItems.map((item) => (
-              <Card
+              <ProductGridCard
                 key={item.id}
-                className="glass transition-smooth hover:card-shadow-hover overflow-hidden"
-              >
-                <div className="relative h-48 bg-muted">
-                  {item.imageUrl ? (
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.name}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <ImageIcon className="h-12 w-12 text-muted-foreground/50" />
-                    </div>
-                  )}
-                  {!item.isActive && (
-                    <div className="absolute top-2 right-2">
-                      <Badge variant="secondary">Inactive</Badge>
-                    </div>
-                  )}
-                </div>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{item.name}</CardTitle>
-                  <CardDescription className="text-xs">
-                    {item.sku} • {item.category}
-                  </CardDescription>
-                  {(() => {
-                    const vis = visibilityBadge(item, branches);
-                    return (
-                      <Badge
-                        variant="outline"
-                        className="mt-2 text-[10px] font-normal"
-                        title={vis.title}
-                      >
-                        {vis.label}
-                      </Badge>
-                    );
-                  })()}
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Price</span>
-                    <span className="font-semibold text-primary">
-                      {formatCurrency(item.price)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Cost</span>
-                    <span className="text-sm">{formatCurrency(item.cost)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      Margin
-                    </span>
-                    <span className="text-sm font-medium text-emerald-600">
-                      {(((item.price - item.cost) / item.price) * 100).toFixed(
-                        1,
-                      )}
-                      %
-                    </span>
-                  </div>
-                  {item.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {item.description}
-                    </p>
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setEditingItem(item)}
-                    >
-                      <Edit className="mr-1 h-3 w-3" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(item.id, item.name)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                item={item}
+                branches={branches}
+                formatCurrency={formatCurrency}
+                onEdit={() => setEditingItem(item)}
+                onDelete={() => handleDelete(item.id, item.name)}
+              />
             ))}
           </div>
           {filteredItems.length === 0 && (
-            <Card className="glass">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="font-medium mb-1">No menu items found</h3>
-                <p className="text-sm text-muted-foreground">
-                  Try adjusting your filters or add a new menu item
+            <ContentCard className="mt-4" padding="none">
+              <div className="flex flex-col items-center justify-center py-16 px-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#22C55E]/10 mb-4">
+                  <Package className="h-8 w-8 text-[#16A34A]/60" />
+                </div>
+                <h3 className="font-semibold text-[#222831] mb-1">No products found</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-sm">
+                  Adjust your filters or add your first product to get started
                 </p>
-              </CardContent>
-            </Card>
+                <Button
+                  className="mt-4 bg-[#22C55E] hover:bg-[#16A34A] text-white rounded-xl"
+                  onClick={() => setIsAddOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add product
+                </Button>
+              </div>
+            </ContentCard>
           )}
           {filteredItems.length > 0 && (
             <TablePagination
@@ -437,8 +319,7 @@ export function MenuContent({
         </TabsContent>
 
         <TabsContent value="list" className="mt-6">
-          <Card className="glass">
-            <CardContent className="p-0">
+          <ContentCard>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -556,51 +437,46 @@ export function MenuContent({
                   }}
                 />
               )}
-            </CardContent>
-          </Card>
+          </ContentCard>
         </TabsContent>
 
-        <TabsContent value="categories" className="mt-6">
-          <div className="space-y-6">
+        <TabsContent value="categories" className="mt-5">
+          <div className="space-y-4">
             {Object.entries(groupedByCategory).map(
               ([category, categoryItems]) => (
-                <Card key={category} className="glass">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5 text-primary" />
-                      {category}
-                      <Badge variant="outline" className="ml-auto">
-                        {categoryItems.length} items
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {categoryItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate">{item.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatCurrency(item.price)}
-                            </p>
-                          </div>
-                          <div className="flex gap-1 ml-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingItem(item)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                          </div>
+                <ContentCard key={category} padding="none" className="overflow-hidden">
+                  <div className="excelite-header-gradient px-4 py-3 flex items-center gap-2 border-b border-white/10">
+                    <Package className="h-4 w-4 text-white/90" />
+                    <span className="font-semibold text-white">{category}</span>
+                    <Badge className="ml-auto bg-white/20 text-white border-0 hover:bg-white/20">
+                      {categoryItems.length}
+                    </Badge>
+                  </div>
+                  <div className="p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {categoryItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setEditingItem(item)}
+                        className="flex items-center gap-3 rounded-xl border border-border/80 bg-card p-3 text-left transition-all hover:border-[#22C55E]/40 hover:shadow-sm"
+                      >
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#22C55E]/8">
+                          {item.imageUrl ? (
+                            <Image src={item.imageUrl} alt="" fill className="object-cover" />
+                          ) : (
+                            <div className="flex h-full items-center justify-center">
+                              <ImageIcon className="h-5 w-5 text-[#16A34A]/40" />
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm text-[#222831] truncate">{item.name}</p>
+                          <p className="text-xs font-semibold text-[#16A34A]">{formatCurrency(item.price)}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </ContentCard>
               ),
             )}
           </div>

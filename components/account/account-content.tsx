@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ContentCard } from "@/components/dashboard/content-card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/actions/settings";
 import { usePermissions } from "@/contexts/permissions-context";
 import { ChangePasswordCard } from "@/components/account/change-password-card";
 import { ChangePinCard } from "@/components/account/change-pin-card";
+import { dashboardPrimaryButtonClass, roleBadgeClass } from "@/components/dashboard/dashboard-theme";
 
 function getInitials(name: string) {
   return name
@@ -61,37 +62,39 @@ export function AccountContent() {
   }
 
   return (
-    <div className="space-y-4 max-w-lg">
-      <Card className="chart-card rounded-xl">
-        <CardHeader className="py-3 px-4">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <User className="h-4 w-4" />
-            My Account
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Your sign-in details. Contact an administrator to change your role or
-            branch assignment.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-14 w-14">
+    <div className="space-y-4 max-w-2xl">
+      <ContentCard padding="none">
+        <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-[#16A34A]" />
+            <h3 className="text-base font-semibold text-[#222831]">My Account</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Your sign-in details. Contact an administrator to change your role or branch assignment.
+          </p>
+        </div>
+        <div className="p-4">
+          <div className="flex items-center gap-4 rounded-xl bg-[#22C55E]/5 border border-[#22C55E]/15 p-4">
+            <Avatar className="h-16 w-16 ring-2 ring-[#22C55E]/30">
               <AvatarImage src={user?.image || undefined} alt={user?.name} />
-              <AvatarFallback className="bg-primary text-primary-foreground">
+              <AvatarFallback className="bg-[#22C55E]/15 text-[#16A34A] text-lg font-semibold">
                 {user ? getInitials(user.name) : "?"}
               </AvatarFallback>
             </Avatar>
-            <div className="space-y-1 min-w-0">
-              <p className="font-medium truncate">{user?.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            <div className="space-y-1.5 min-w-0 flex-1">
+              <p className="font-semibold text-[#222831] truncate">{user?.name}</p>
+              <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
               <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {user?.role ? (
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="outline" className={roleBadgeClass(user.role)}>
                     {formatRole(user.role)}
                   </Badge>
                 ) : null}
                 {user?.branchName ? (
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge
+                    variant="outline"
+                    className="border-[#22C55E]/25 bg-[#22C55E]/8 text-[#16A34A] text-[10px]"
+                  >
                     {user.branchName}
                   </Badge>
                 ) : null}
@@ -99,22 +102,24 @@ export function AccountContent() {
             </div>
           </div>
           {canOpenSettings ? (
-            <Button variant="outline" size="sm" className="mt-4" asChild>
-              <Link href="/dashboard/settings">
-                <Settings className="mr-1.5 h-3.5 w-3.5" />
-                Open full settings
-              </Link>
-            </Button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button className={dashboardPrimaryButtonClass} asChild>
+                <Link href="/dashboard/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Open settings
+                </Link>
+              </Button>
+            </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </ContentCard>
 
       <ChangePasswordCard />
       <ChangePinCard />
 
       <p className="text-xs text-muted-foreground">
         Forgot your password? Use{" "}
-        <Link href="/forgot-password" className="text-primary underline-offset-4 hover:underline">
+        <Link href="/forgot-password" className="text-[#16A34A] underline-offset-4 hover:underline">
           reset password
         </Link>{" "}
         on the sign-in page.

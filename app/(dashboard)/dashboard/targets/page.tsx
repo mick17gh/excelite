@@ -4,7 +4,7 @@ import { getTargets } from "@/lib/actions/targets";
 import { getBranches } from "@/lib/actions/branches";
 
 export const metadata = {
-  title: "Branch Targets & KPIs | ServStack",
+  title: "Branch Targets & KPIs",
   description: "Set and manage performance targets for branches",
 };
 

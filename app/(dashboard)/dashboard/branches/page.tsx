@@ -5,7 +5,7 @@ import { pickBranchListItem } from "@/lib/branches/serialize-client";
 import { getOrganization } from "@/lib/actions/organization";
 
 export const metadata = {
-  title: "Branch Performance | ServStack",
+  title: "Branch Performance",
   description: "Monitor and analyze performance across all restaurant branches",
 };
 

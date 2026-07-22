@@ -21,19 +21,24 @@ export type SessionAccess = {
   accessCtx: RouteAccessContext;
 };
 
-export async function loadSessionAccess(): Promise<SessionAccess | null> {
+export type SessionAccessResult =
+  | { kind: "unauthenticated" }
+  | { kind: "onboarding" }
+  | { kind: "ready"; access: SessionAccess };
+
+export async function resolveSessionAccess(): Promise<SessionAccessResult> {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) return null;
+  if (!session?.user?.id) return { kind: "unauthenticated" };
 
   const role = (session.user.role as Role) || "STAFF";
   const organizationId = await resolveOrganizationIdForSession(session.user.id);
-  if (!organizationId) return null;
+  if (!organizationId) return { kind: "onboarding" };
 
   const org = await db.organization.findUnique({
     where: { id: organizationId },
     select: { id: true, tier: true },
   });
-  if (!org) return null;
+  if (!org) return { kind: "onboarding" };
 
   let permissions: Permission[];
   try {
@@ -46,25 +51,36 @@ export async function loadSessionAccess(): Promise<SessionAccess | null> {
   const orgTier = org.tier as SubscriptionTier;
 
   return {
-    userId: session.user.id,
-    role,
-    organizationId: org.id,
-    permissions,
-    accessCtx: {
-      permissions,
-      orgTier,
-      tableManagementEnabled,
+    kind: "ready",
+    access: {
+      userId: session.user.id,
       role,
+      organizationId: org.id,
+      permissions,
+      accessCtx: {
+        permissions,
+        orgTier,
+        tableManagementEnabled,
+        role,
+      },
     },
   };
 }
 
+export async function loadSessionAccess(): Promise<SessionAccess | null> {
+  const result = await resolveSessionAccess();
+  return result.kind === "ready" ? result.access : null;
+}
+
 export async function requireSessionAccess(): Promise<SessionAccess> {
-  const access = await loadSessionAccess();
-  if (!access) {
+  const result = await resolveSessionAccess();
+  if (result.kind === "unauthenticated") {
     redirect("/login");
   }
-  return access;
+  if (result.kind === "onboarding") {
+    redirect("/onboarding");
+  }
+  return result.access;
 }
 
 export function sessionHasPermission(access: SessionAccess, permission: Permission): boolean {

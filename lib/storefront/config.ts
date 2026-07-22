@@ -267,7 +267,7 @@ export function resolveAllowedStorefrontOrigins(orgConfig: PublicStoreConfig): s
   }
   const slug = orgConfig.store.slug?.trim();
   if (!slug) return [];
-  return [`https://${slug}.servstack.app`];
+  return [`https://${slug}.excelite.app`];
 }
 
 export { getPaystackSecretForOrganization } from "@/lib/paystack/credentials";

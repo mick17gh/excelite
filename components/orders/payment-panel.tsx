@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { paymentStatusBadgeClass, orderSectionCardClass } from "@/components/orders/order-styles";
 import { Loader2, CreditCard, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -91,8 +92,8 @@ export function PaymentPanel({
     setIsPaystackInitializing(true);
     try {
       const fallbackEmail = customerPhone
-        ? `${customerPhone.replace(/\D/g, "") || "guest"}@servstack.app`
-        : `${orderNumber.toLowerCase().replace(/[^a-z0-9]/g, "") || "guest"}@servstack.app`;
+        ? `${customerPhone.replace(/\D/g, "") || "guest"}@excelite.app`
+        : `${orderNumber.toLowerCase().replace(/[^a-z0-9]/g, "") || "guest"}@excelite.app`;
       const email = customerEmail || fallbackEmail;
       const callback = new URL(window.location.href);
       callback.searchParams.set("paystackCallback", "1");
@@ -121,30 +122,26 @@ export function PaymentPanel({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CreditCard className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Payments</span>
-          <Badge
-            variant="outline"
-            className={
-              paymentStatus === "PAID"
-                ? "border-green-500 text-green-600"
-                : paymentStatus === "REFUNDED"
-                ? "border-red-500 text-red-600"
-                : "border-amber-500 text-amber-600"
-            }
-          >
+          <CreditCard className="h-4 w-4 text-[#16A34A]" />
+          <span className="text-sm font-medium text-[#222831]">Payments</span>
+          <Badge variant="outline" className={paymentStatusBadgeClass(paymentStatus)}>
             {paymentStatus}
           </Badge>
         </div>
         {remaining > 0 && (
           <div className="flex items-center gap-2">
             {paystackEnabled && (
-              <Button variant="default" size="sm" onClick={handlePaystackPayment} disabled={isPaystackInitializing}>
+              <Button
+                size="sm"
+                onClick={handlePaystackPayment}
+                disabled={isPaystackInitializing}
+                className="rounded-lg bg-[#22C55E] hover:bg-[#16A34A]"
+              >
                 {isPaystackInitializing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CreditCard className="mr-1 h-3 w-3" />}
                 Pay with Paystack
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
+            <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setShowForm(!showForm)}>
               <Plus className="mr-1 h-3 w-3" />Record Payment
             </Button>
           </div>
@@ -153,14 +150,15 @@ export function PaymentPanel({
 
       {/* Summary */}
       <div className="flex gap-4 text-xs text-muted-foreground">
-        <span>Total: <strong className="text-foreground">{formatCurrency(orderTotal)}</strong></span>
-        <span>Paid: <strong className="text-green-600">{formatCurrency(totalPaid)}</strong></span>
-        {remaining > 0 && <span>Remaining: <strong className="text-amber-600">{formatCurrency(remaining)}</strong></span>}
+        <span>Total: <strong className="text-[#222831]">{formatCurrency(orderTotal)}</strong></span>
+        <span>Paid: <strong className="text-[#16A34A]">{formatCurrency(totalPaid)}</strong></span>
+        {remaining > 0 && (
+          <span>Remaining: <strong className="text-amber-600">{formatCurrency(remaining)}</strong></span>
+        )}
       </div>
 
-      {/* Payment Form */}
       {showForm && (
-        <div className="border rounded-md p-3 bg-muted/30">
+        <div className={orderSectionCardClass}>
           <SplitPaymentForm
             total={remaining}
             disabled={isSubmitting}
@@ -177,7 +175,7 @@ export function PaymentPanel({
 
       {/* Payment History */}
       {payments.length > 0 && (
-        <div className="border rounded-md divide-y">
+        <div className="rounded-xl border border-border divide-y overflow-hidden">
           {payments.map((p) => (
             <div key={p.id} className="flex items-center justify-between px-3 py-2 text-sm">
               <div className="flex-1 min-w-0">

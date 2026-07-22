@@ -53,7 +53,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If has session and trying to access auth routes, redirect to dashboard
+  // If has session and trying to access auth routes, send to app entry (dashboard resolves onboarding)
   if (hasSession && authRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

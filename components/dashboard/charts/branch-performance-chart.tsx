@@ -66,7 +66,7 @@ export function BranchPerformanceChart({
     }).format(value);
 
   return (
-    <Card className="glass">
+    <Card className="chart-card rounded-xl">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>

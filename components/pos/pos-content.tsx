@@ -30,9 +30,6 @@ import {
   Loader2,
   X,
   Store,
-  UtensilsCrossed,
-  Package,
-  Truck,
   Clock,
   ChevronUp,
   ChevronDown,
@@ -81,7 +78,20 @@ import {
   validateOptionSelections,
 } from "@/lib/menu-option-client";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+import {
+  posBranchIconClass,
+  posBranchSelectTriggerClass,
+  posBranchSelectorWrapperClass,
+  posCategoryChipClass,
+  posOrderTypeButtonClass,
+  posOrderTypeTabListClass,
+  posOrderTypes,
+  posPanelClass,
+  posPanelHeaderClass,
+  posSectionLabelClass,
+  posToolbarClass,
+} from "@/components/pos/pos-theme";
+import { PosProductCard } from "@/components/pos/pos-product-card";
 
 interface Branch {
   id: string;
@@ -137,12 +147,6 @@ interface CartLine {
   menuItemOptionIds: string[];
   configurationLabel: string;
 }
-
-const orderTypes = [
-  { value: "DINE_IN", label: "Dine-in", icon: UtensilsCrossed, color: "bg-emerald-500" },
-  { value: "TAKEOUT", label: "Takeout", icon: Package, color: "bg-amber-500" },
-  { value: "DELIVERY", label: "Delivery", icon: Truck, color: "bg-blue-500" },
-];
 
 export function PosContent({
   branches,
@@ -860,19 +864,18 @@ export function PosContent({
   const selectedBranch = liveBranches.find((b) => b.id === branchId);
 
   return (
-    <div className="flex h-[calc(100vh-100px)] flex-col gap-3">
+    <div className="flex h-[calc(100vh-72px)] flex-col gap-3">
       {!isOnline ? (
-        <Alert className="shrink-0 border-amber-500/50 bg-amber-500/5 py-2">
+        <Alert className="shrink-0 border-amber-500/40 bg-amber-500/8 py-2.5 rounded-xl">
           <WifiOff className="h-4 w-4 text-amber-700" />
           <AlertDescription className="text-sm text-amber-950 dark:text-amber-100">
             Offline mode: using the last saved menu and prices. Checkout is cash only; orders sync when you reconnect.
-            Kitchen and inventory update after sync.
           </AlertDescription>
         </Alert>
       ) : null}
-      <div className="flex min-h-0 flex-1 gap-4">
+      <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
       {/* Left Panel - Menu */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className={cn(posPanelClass, "flex-1 flex flex-col min-w-0")}>
         {showTablePanel && (
           <TableServicePanel
             branchId={branchId}
@@ -884,53 +887,62 @@ export function PosContent({
           />
         )}
         {/* Header Controls */}
-        <div className="flex flex-wrap items-center gap-3 pb-3 shrink-0">
-          {/* Branch Selector */}
-          <Select value={branchId} onValueChange={handleBranchChange}>
-            <SelectTrigger className="h-10 min-w-[240px] max-w-[320px] w-[min(320px,40vw)] bg-background">
-              <Store className="h-4 w-4 mr-2 shrink-0 text-muted-foreground" />
-              <SelectValue placeholder="Select Branch" className="truncate" />
-            </SelectTrigger>
-            <SelectContent>
-              {liveBranches.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Order Type Buttons + Kitchen Toggle on same row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex rounded-lg border bg-muted/50 p-1 gap-1">
-              {orderTypes.map((type) => {
-                const Icon = type.icon;
-                const isActive = orderType === type.value;
-                return (
-                  <Button
-                    key={type.value}
-                    variant={isActive ? "default" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "h-8 px-3 transition-all",
-                      isActive && type.color
-                    )}
-                    disabled={!isOnline && type.value === "DELIVERY"}
-                    onClick={() => setOrderType(type.value as OrderType)}
-                  >
-                    <Icon className="h-4 w-4 mr-2" />
-                    {type.label}
-                  </Button>
-                );
-              })}
+        <div className={posToolbarClass}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className={cn(posBranchSelectorWrapperClass, "w-full lg:max-w-[300px]")}>
+              <div className={posBranchIconClass}>
+                <Store className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground leading-none mb-0.5">
+                  Branch
+                </p>
+                <Select value={branchId} onValueChange={handleBranchChange}>
+                  <SelectTrigger className={posBranchSelectTriggerClass}>
+                    <SelectValue placeholder="Select branch" className="truncate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {liveBranches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+              <p className={cn(posSectionLabelClass, "hidden sm:block shrink-0")}>Order type</p>
+              <div className={posOrderTypeTabListClass}>
+                {posOrderTypes.map((type) => {
+                  const Icon = type.icon;
+                  const isActive = orderType === type.value;
+                  return (
+                    <Button
+                      key={type.value}
+                      variant="ghost"
+                      size="sm"
+                      className={posOrderTypeButtonClass(isActive)}
+                      disabled={!isOnline && type.value === "DELIVERY"}
+                      onClick={() => setOrderType(type.value as OrderType)}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="hidden sm:inline">{type.label}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 sm:ml-auto">
               {kitchenStations.length > 0 && (
                 <Button
                   variant={autoSendToKitchen ? "default" : "outline"}
                   size="sm"
-                  className={cn("h-8", autoSendToKitchen && "bg-orange-500 hover:bg-orange-600")}
+                  className={cn(
+                    "h-9 rounded-lg",
+                    autoSendToKitchen && "excelite-header-gradient text-white shadow-sm shadow-[#22C55E]/20",
+                  )}
                   onClick={() => setAutoSendToKitchen(!autoSendToKitchen)}
                   title="Toggle auto-send to kitchen"
                 >
@@ -940,7 +952,7 @@ export function PosContent({
               )}
               {kitchenStations.length > 0 && (
                 <Select value={selectedStation} onValueChange={setSelectedStation}>
-                  <SelectTrigger className="w-[130px] h-8 text-xs">
+                  <SelectTrigger className="w-[120px] h-9 text-xs rounded-lg">
                     <SelectValue placeholder="Station" />
                   </SelectTrigger>
                   <SelectContent>
@@ -952,18 +964,19 @@ export function PosContent({
                   </SelectContent>
                 </Select>
               )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Search */}
-        <div className="relative mb-3 shrink-0">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative px-3 md:px-4 pt-3 shrink-0">
+          <Search className="absolute left-7 md:left-8 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search menu items..."
+            placeholder="Search products..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-12 h-11 text-base bg-background"
+            className="pl-10 h-11 text-base bg-background rounded-xl border-border/80 focus-visible:ring-[#22C55E]/30"
           />
           {search && (
             <Button
@@ -978,30 +991,28 @@ export function PosContent({
         </div>
 
         {/* Category Tabs */}
-        <div className="flex gap-2 pb-3 shrink-0 overflow-x-auto">
-          <Button
-            variant={selectedCategory === "all" ? "default" : "outline"}
-            size="sm"
-            className="shrink-0 h-8"
+        <div className="flex gap-2 px-3 md:px-4 py-3 shrink-0 overflow-x-auto">
+          <button
+            type="button"
+            className={posCategoryChipClass(selectedCategory === "all")}
             onClick={() => setSelectedCategory("all")}
           >
             All ({branchVisibleMenu.length})
-          </Button>
+          </button>
           {categories.map((cat) => (
-            <Button
+            <button
               key={cat.name}
-              variant={selectedCategory === cat.name ? "default" : "outline"}
-              size="sm"
-              className="shrink-0 h-8"
+              type="button"
+              className={posCategoryChipClass(selectedCategory === cat.name)}
               onClick={() => setSelectedCategory(cat.name)}
             >
               {cat.name} ({cat.count})
-            </Button>
+            </button>
           ))}
         </div>
 
         {/* Menu Grid */}
-        <ScrollArea className="flex-1 min-h-0">
+        <ScrollArea className="flex-1 min-h-0 px-2 md:px-3">
           <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 p-1 pb-4">
             {filteredMenu.map((m) => {
               const qtyOnProduct = cart
@@ -1009,51 +1020,18 @@ export function PosContent({
                 .reduce((s, c) => s + c.quantity, 0);
               const outOfStock = stockBlocking && !isSellable(m.id);
               return (
-                <button
+                <PosProductCard
                   key={m.id}
-                  type="button"
-                  disabled={outOfStock}
-                  className={cn(
-                    "relative flex flex-col rounded-xl border bg-card p-3 text-left transition-all hover:shadow-md hover:border-primary/50 active:scale-[0.98]",
-                    qtyOnProduct > 0 && "ring-2 ring-primary border-primary",
-                    outOfStock && "cursor-not-allowed opacity-50 hover:shadow-none hover:border-border"
-                  )}
+                  id={m.id}
+                  name={m.name}
+                  category={m.category}
+                  price={m.price}
+                  imageUrl={m.imageUrl}
+                  quantityInCart={qtyOnProduct}
+                  outOfStock={outOfStock}
+                  formatCurrency={formatCurrency}
                   onClick={() => requestAddToCart(m)}
-                >
-                  {outOfStock && (
-                    <Badge
-                      className="absolute -top-2 -right-2 text-[10px] px-1.5 border-transparent bg-orange-500 text-white dark:bg-orange-600"
-                    >
-                      Out of stock
-                    </Badge>
-                  )}
-                  {qtyOnProduct > 0 && !outOfStock && (
-                    <Badge className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold">
-                      {qtyOnProduct}
-                    </Badge>
-                  )}
-                  <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-muted mb-3">
-                    {m.imageUrl ? (
-                      <Image
-                        src={m.imageUrl}
-                        alt={m.name}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <UtensilsCrossed className="h-8 w-8 text-muted-foreground/40" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-sm line-clamp-2 leading-tight">{m.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">{m.category}</p>
-                  </div>
-                  <p className="mt-2 text-base font-bold text-primary">
-                    {formatCurrency(m.price)}
-                  </p>
-                </button>
+                />
               );
             })}
           </div>
@@ -1068,21 +1046,21 @@ export function PosContent({
       </div>
 
       {/* Right Panel - Cart */}
-      <div className="w-[380px] flex flex-col bg-card rounded-2xl border shadow-sm overflow-hidden">
+      <div className={cn(posPanelClass, "w-[min(380px,100%)] flex flex-col shrink-0")}>
         {/* Cart Header */}
-        <div className="flex items-center justify-between p-4 border-b shrink-0">
+        <div className={cn(posPanelHeaderClass, "flex items-center justify-between px-4 py-3.5")}>
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <ShoppingCart className="h-6 w-6" />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+              <ShoppingCart className="h-5 w-5" />
               {cartItemCount > 0 && (
-                <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#22C55E] text-[10px] font-bold">
                   {cartItemCount}
-                </Badge>
+                </span>
               )}
             </div>
             <div>
-              <h2 className="font-semibold text-lg">Current Order</h2>
-              <p className="text-sm text-muted-foreground">{selectedBranch?.name || "Select branch"}</p>
+              <h2 className="font-semibold text-base leading-tight">Current sale</h2>
+              <p className="text-xs text-white/60">{selectedBranch?.name || "Select branch"}</p>
             </div>
           </div>
           {cart.length > 0 && (
@@ -1090,7 +1068,7 @@ export function PosContent({
               variant="ghost"
               size="sm"
               onClick={clearCart}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="text-white/70 hover:text-white hover:bg-white/10"
             >
               <Trash2 className="h-4 w-4 mr-1" />
               Clear
@@ -1102,13 +1080,13 @@ export function PosContent({
         <div className="flex-1 min-h-0 overflow-hidden">
           <ScrollArea className="h-full p-4">
           {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
-                <ShoppingCart className="h-10 w-10 text-muted-foreground/40" />
+            <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#22C55E]/10 flex items-center justify-center mb-4">
+                <ShoppingCart className="h-8 w-8 text-[#16A34A]/60" />
               </div>
-              <p className="font-medium text-muted-foreground">Cart is empty</p>
-              <p className="text-sm text-muted-foreground/70 mt-1">
-                Tap menu items to add
+              <p className="font-medium text-[#222831]">Cart is empty</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Tap products to add them
               </p>
             </div>
           ) : (
@@ -1116,7 +1094,7 @@ export function PosContent({
               {cart.map((l) => (
                 <div
                   key={l.lineKey}
-                  className="flex items-center gap-2 rounded-lg border bg-muted/30 p-2"
+                  className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/20 p-2.5"
                 >
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-xs leading-tight truncate">{l.name}</h4>
@@ -1129,7 +1107,7 @@ export function PosContent({
                       <span className="text-xs text-muted-foreground">
                         {formatCurrency(l.unitPrice)}
                       </span>
-                      <span className="text-xs font-semibold text-primary">
+                      <span className="text-xs font-semibold text-[#16A34A]">
                         {formatCurrency(l.unitPrice * l.quantity)}
                       </span>
                     </div>
@@ -1219,16 +1197,16 @@ export function PosContent({
                   </>
                 )}
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between text-lg font-bold text-[#222831]">
                   <span>Total</span>
-                  <span className="text-primary">{formatCurrency(total)}</span>
+                  <span className="text-[#16A34A]">{formatCurrency(total)}</span>
                 </div>
               </div>
 
               <Button
                 onClick={submitOrder}
                 disabled={isPending || cart.length === 0}
-                className="w-full h-14 text-lg font-semibold rounded-xl"
+                className="w-full h-14 text-lg font-semibold rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-lg shadow-[#22C55E]/20"
                 size="lg"
               >
                 {isPending ? (
@@ -1352,10 +1330,13 @@ export function PosContent({
           if (!open) setOptionPickerItem(null);
         }}
       >
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{optionPickerItem?.name ?? "Options"}</DialogTitle>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-2xl">
+          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white rounded-t-2xl border-b border-white/10">
+            <DialogTitle className="text-base font-semibold">
+              {optionPickerItem?.name ?? "Customize"}
+            </DialogTitle>
           </DialogHeader>
+          <div className="px-6 py-4">
           {optionPickerItem?.optionGroups?.map((g) => {
             const picked = pickerSelections[g.id] || [];
             const rangeHint = formatOptionGroupRangeHint(g);
@@ -1378,7 +1359,10 @@ export function PosContent({
                         type="button"
                         variant={active ? "default" : "outline"}
                         size="sm"
-                        className="h-auto min-h-9 whitespace-normal text-left"
+                        className={cn(
+                          "h-auto min-h-9 whitespace-normal text-left rounded-lg",
+                          active && "bg-[#22C55E] hover:bg-[#16A34A] text-white border-transparent",
+                        )}
                         onClick={() => togglePickerOption(g, o.id)}
                       >
                         {o.name}
@@ -1390,7 +1374,8 @@ export function PosContent({
               </div>
             );
           })}
-          <DialogFooter className="flex-col sm:flex-col gap-3 pt-2">
+          </div>
+          <DialogFooter className="flex-col sm:flex-col gap-3 px-6 py-4 border-t bg-muted/20">
             {optionPickerItem?.optionGroups?.length ? (
               <div className="flex justify-between text-sm w-full border-t pt-3">
                 <span className="text-muted-foreground">Line price</span>
@@ -1419,7 +1404,7 @@ export function PosContent({
               >
                 Cancel
               </Button>
-              <Button type="button" onClick={confirmOptionPicker}>
+              <Button type="button" onClick={confirmOptionPicker} className="bg-[#22C55E] hover:bg-[#16A34A]">
                 Add to order
               </Button>
             </div>

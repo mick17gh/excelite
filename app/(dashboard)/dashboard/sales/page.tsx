@@ -11,7 +11,7 @@ import {
 } from "@/lib/actions/transactions";
 
 export const metadata = {
-  title: "Sales Analytics | ServStack",
+  title: "Sales Analytics",
   description: "Detailed sales and revenue analytics across all branches",
 };
 

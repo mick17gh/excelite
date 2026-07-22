@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { ContentCard } from "@/components/dashboard/content-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +62,13 @@ import { ChangePinCard } from "@/components/account/change-pin-card";
 import { ActiveSessionsCard } from "@/components/settings/active-sessions-card";
 import type { Role } from "@/lib/generated/prisma/client";
 import { usePermissions } from "@/contexts/permissions-context";
+import {
+  dashboardPrimaryButtonClass,
+  dashboardSectionCardClass,
+  dashboardTabListClass,
+  roleBadgeClass,
+} from "@/components/dashboard/dashboard-theme";
+import { cn } from "@/lib/utils";
 
 interface UserData {
   id: string;
@@ -83,12 +91,13 @@ export function SettingsContent() {
   const canPurgeData = hasPermission("transactions:purge");
   const canManagePlatform = hasPermission("subscriptions:manage");
   const canViewOrganization = hasPermission("organization:view");
-  const canViewSubscription = hasPermission("subscriptions:view");
-  const canEditStaff = hasPermission("staff:edit");
+  const canViewSubscription = false; // Excelite lite — no subscription tiers
+  const canEditStaff = false; // Excelite lite — no staff module
 
   // User data
   const [user, setUser] = useState<UserData | null>(null);
-  const canViewRolePermissions = user?.role === "SUPER_ADMIN";
+  const canManageTeamPermissions =
+    hasPermission("users:edit") || user?.role === "SUPER_ADMIN";
   const [isLoading, setIsLoading] = useState(true);
   const [organizationTier, setOrganizationTier] = useState<"FREE" | "PRO" | "ENTERPRISE">("FREE");
   
@@ -240,24 +249,7 @@ export function SettingsContent() {
       .slice(0, 2);
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case "SUPER_ADMIN":
-        return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
-      case "EXECUTIVE":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-      case "OPERATIONS_MANAGER":
-        return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400";
-      case "BRANCH_MANAGER":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-      case "AUDITOR":
-        return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-      case "DEVELOPER":
-        return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400";
-      default:
-        return "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400";
-    }
-  };
+  const getRoleBadgeColor = (role: string) => roleBadgeClass(role);
 
   const formatRole = (role: string) => {
     return role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
@@ -273,72 +265,34 @@ export function SettingsContent() {
 
   return (
     <Tabs defaultValue={initialTab} className="w-full">
-      <TabsList className="mb-6 h-9">
-        <TabsTrigger value="profile" className="text-xs">
-          <User className="mr-1.5 h-3.5 w-3.5" />
+      <TabsList className={cn(dashboardTabListClass, "mb-6 h-11 flex-wrap w-full sm:w-auto inline-flex")}>
+        <TabsTrigger value="profile" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <User className="mr-1.5 h-4 w-4" />
           Profile
         </TabsTrigger>
-        <TabsTrigger value="notifications" className="text-xs">
-          <Bell className="mr-1.5 h-3.5 w-3.5" />
-          Notifications
-        </TabsTrigger>
-        <TabsTrigger value="security" className="text-xs">
-          <Shield className="mr-1.5 h-3.5 w-3.5" />
+        <TabsTrigger value="security" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <Shield className="mr-1.5 h-4 w-4" />
           Security
         </TabsTrigger>
-        <TabsTrigger value="appearance" className="text-xs">
-          <Palette className="mr-1.5 h-3.5 w-3.5" />
-          Appearance
-        </TabsTrigger>
-        <TabsTrigger value="tax" className="text-xs">
-          <Calculator className="mr-1.5 h-3.5 w-3.5" />
-          Tax Config
+        <TabsTrigger value="tax" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <Calculator className="mr-1.5 h-4 w-4" />
+          Tax
         </TabsTrigger>
         {canViewOrganization && (
-          <TabsTrigger value="organization" className="text-xs">
-            <Building2 className="mr-1.5 h-3.5 w-3.5" />
-            Organization
+          <TabsTrigger value="organization" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+            <Building2 className="mr-1.5 h-4 w-4" />
+            Business
           </TabsTrigger>
         )}
-        <TabsTrigger value="kitchen" className="text-xs">
-          <ChefHat className="mr-1.5 h-3.5 w-3.5" />
-          Kitchen
-        </TabsTrigger>
-        {canEditStaff && (
-          <TabsTrigger value="job-roles" className="text-xs">
-            <Briefcase className="mr-1.5 h-3.5 w-3.5" />
-            Job Roles
-          </TabsTrigger>
-        )}
-        {canViewSubscription && (
-          <TabsTrigger value="subscription" className="text-xs">
-            <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-            Subscription
-          </TabsTrigger>
-        )}
-        <TabsTrigger value="online-store" className="text-xs">
-          <Building2 className="mr-1.5 h-3.5 w-3.5" />
-          Online Store
-        </TabsTrigger>
-        <TabsTrigger value="dine-in-tables" className="text-xs">
-          <ChefHat className="mr-1.5 h-3.5 w-3.5" />
-          Dine-in
-        </TabsTrigger>
-        {canViewRolePermissions && (
-          <TabsTrigger value="role-permissions" className="text-xs">
-            <Key className="mr-1.5 h-3.5 w-3.5" />
-            Permissions
-          </TabsTrigger>
-        )}
-        {canPurgeData && (
-          <TabsTrigger value="data-management" className="text-xs">
-            <Shield className="mr-1.5 h-3.5 w-3.5" />
-            Data
+        {canManageTeamPermissions && (
+          <TabsTrigger value="role-permissions" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+            <Key className="mr-1.5 h-4 w-4" />
+            Team Permissions
           </TabsTrigger>
         )}
         {canManagePlatform && (
-          <TabsTrigger value="platform-admin" className="text-xs">
-            <Shield className="mr-1.5 h-3.5 w-3.5" />
+          <TabsTrigger value="platform-admin" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+            <Shield className="mr-1.5 h-4 w-4" />
             Platform Admin
           </TabsTrigger>
         )}
@@ -346,18 +300,16 @@ export function SettingsContent() {
 
       <TabsContent value="profile">
         <div className="space-y-4">
-          <Card className="chart-card rounded-xl">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-base">Profile Information</CardTitle>
-              <CardDescription className="text-xs">
-                Update your personal information
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0 space-y-4">
+          <ContentCard padding="none">
+            <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
+              <h3 className="text-base font-semibold text-[#222831]">Profile Information</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Update your personal information</p>
+            </div>
+            <CardContent className="px-4 pb-4 pt-4 space-y-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
+                <Avatar className="h-16 w-16 ring-2 ring-[#22C55E]/25">
                   <AvatarImage src={user?.image || ""} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                  <AvatarFallback className="bg-[#22C55E]/10 text-[#16A34A] text-lg">
                     {user ? getInitials(user.name) : "?"}
                   </AvatarFallback>
                 </Avatar>
@@ -376,7 +328,7 @@ export function SettingsContent() {
                     id="name"
                     value={profileForm.name}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                    className="h-9"
+                    className="h-10 rounded-xl"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -386,7 +338,7 @@ export function SettingsContent() {
                     type="email"
                     value={profileForm.email}
                     onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                    className="h-9"
+                    className="h-10 rounded-xl"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -396,13 +348,13 @@ export function SettingsContent() {
                     type="tel"
                     value={profileForm.phoneNumber}
                     onChange={(e) => setProfileForm({ ...profileForm, phoneNumber: e.target.value })}
-                    className="h-9"
+                    className="h-10 rounded-xl"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Role</Label>
-                  <div className="flex items-center gap-2 h-9">
-                    <Badge className={getRoleBadgeColor(user?.role || "")}>
+                  <div className="flex items-center gap-2 h-10">
+                    <Badge variant="outline" className={getRoleBadgeColor(user?.role || "")}>
                       {formatRole(user?.role || "")}
                     </Badge>
                   </div>
@@ -410,26 +362,24 @@ export function SettingsContent() {
               </div>
 
               <div className="flex justify-end">
-                <Button size="sm" onClick={handleSaveProfile} disabled={isPending}>
+                <Button className={dashboardPrimaryButtonClass} onClick={handleSaveProfile} disabled={isPending}>
                   {isPending ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                   ) : (
-                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                    <Save className="mr-1.5 h-4 w-4" />
                   )}
                   Save Changes
                 </Button>
               </div>
             </CardContent>
-          </Card>
+          </ContentCard>
 
-          <Card className="chart-card rounded-xl">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Building2 className="h-4 w-4" />
-                Branch Assignment
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0">
+          <ContentCard padding="none">
+            <div className="px-4 py-3 border-b border-border/60 bg-muted/20 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-[#16A34A]" />
+              <h3 className="text-base font-semibold text-[#222831]">Branch Assignment</h3>
+            </div>
+            <CardContent className="px-4 pb-4 pt-4">
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">
                   {user?.branchName || "All Branches"}
@@ -441,7 +391,7 @@ export function SettingsContent() {
                 </span>
               </div>
             </CardContent>
-          </Card>
+          </ContentCard>
         </div>
       </TabsContent>
 
@@ -483,7 +433,7 @@ export function SettingsContent() {
             ))}
 
             <div className="flex justify-end pt-2">
-              <Button size="sm" onClick={handleSaveNotifications} disabled={isPending}>
+              <Button className={dashboardPrimaryButtonClass} onClick={handleSaveNotifications} disabled={isPending}>
                 {isPending ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
@@ -512,7 +462,7 @@ export function SettingsContent() {
               Appearance Settings
             </CardTitle>
             <CardDescription className="text-xs">
-              Customize how ServStack looks on your device
+              Customize how Excelite POS looks on your device
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0 space-y-3">
@@ -548,7 +498,7 @@ export function SettingsContent() {
       </TabsContent>
 
       <TabsContent value="tax">
-        <Card className="chart-card rounded-xl">
+        <ContentCard>
           <CardHeader className="py-3 px-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <Calculator className="h-4 w-4" />
@@ -678,7 +628,7 @@ export function SettingsContent() {
             </div>
 
             <div className="flex justify-end">
-              <Button size="sm" onClick={handleSaveTaxSettings} disabled={isPending || !selectedBranch}>
+                <Button className={dashboardPrimaryButtonClass} onClick={handleSaveTaxSettings} disabled={isPending || !selectedBranch}>
                 {isPending ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
@@ -688,17 +638,12 @@ export function SettingsContent() {
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </ContentCard>
       </TabsContent>
 
       {canViewOrganization && (
         <TabsContent value="organization">
-          <div className="space-y-4">
-            <OrganizationTab organizationId={user?.organizationId ?? undefined} />
-            {user?.organizationId ? (
-              <PosPoliciesTab organizationId={user.organizationId} />
-            ) : null}
-          </div>
+          <OrganizationTab organizationId={user?.organizationId ?? undefined} />
         </TabsContent>
       )}
 
@@ -742,7 +687,7 @@ export function SettingsContent() {
         )}
       </TabsContent>
 
-      {canViewRolePermissions && user && (
+      {canManageTeamPermissions && user && (
         <TabsContent value="role-permissions">
           <RolePermissionsTab actorRole={user.role as Role} />
         </TabsContent>

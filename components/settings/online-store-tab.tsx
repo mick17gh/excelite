@@ -55,7 +55,7 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
     () => (process.env.NEXT_PUBLIC_SERVSTACK_API_URL || "").replace(/\/$/, ""),
     []
   );
-  const endpointBase = apiBaseUrl || "https://your-servstack-domain.com";
+  const endpointBase = apiBaseUrl || "https://your-excelite-domain.com";
   const publicEndpoints = useMemo(
     () => ({
       config: `${endpointBase}/api/public/store/${organizationId}/config`,

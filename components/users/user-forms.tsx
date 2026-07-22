@@ -26,6 +26,12 @@ import { createUser, updateUser, resetUserPassword } from "@/lib/actions/users";
 import { Role } from "@/lib/generated/prisma/client";
 import { authClient } from "@/lib/auth-client";
 import { getRoleFormLabel, getUserAssignableRoles } from "@/lib/permissions/labels";
+import {
+  dashboardModalHeaderClass,
+  dashboardPrimaryButtonClass,
+  dashboardSectionCardClass,
+} from "@/components/dashboard/dashboard-theme";
+import { cn } from "@/lib/utils";
 
 interface Branch {
   id: string;
@@ -157,15 +163,15 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Add New User</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
+          <DialogTitle className="text-white">Add New User</DialogTitle>
+          <DialogDescription className="text-white/80">
             Create a new user account with role-based access
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
+          <div className={cn("grid gap-4 m-6", dashboardSectionCardClass)}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Full Name</Label>
@@ -183,7 +189,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
                 <Input
                   id="email"
                   type="email"
-                  placeholder="kwame.asante@servstack.com"
+                  placeholder="kwame.asante@excelite.app"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
@@ -319,10 +325,10 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" className={dashboardPrimaryButtonClass} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create User
             </Button>
@@ -455,15 +461,15 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
+        <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
+          <DialogTitle className="text-white">Edit User</DialogTitle>
+          <DialogDescription className="text-white/80">
             Update user details for {user.name}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
+          <div className={cn("grid gap-4 m-6", dashboardSectionCardClass)}>
             <div className="grid gap-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
@@ -602,10 +608,10 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" className={dashboardPrimaryButtonClass} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update User
             </Button>
@@ -672,15 +678,15 @@ export function ResetPasswordDialog({ open, onOpenChange, user }: ResetPasswordD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Reset Password</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden">
+        <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
+          <DialogTitle className="text-white">Reset Password</DialogTitle>
+          <DialogDescription className="text-white/80">
             Set a new password for {user.name}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
+          <div className={cn("grid gap-4 m-6", dashboardSectionCardClass)}>
             <div className="grid gap-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
@@ -711,10 +717,10 @@ export function ResetPasswordDialog({ open, onOpenChange, user }: ResetPasswordD
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" className={dashboardPrimaryButtonClass} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Reset Password
             </Button>

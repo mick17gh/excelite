@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { SubscriptionTier } from "@/lib/generated/prisma/client";
 import { seedOrgRolePermissions } from "@/lib/permissions/seed";
+import { serializeBranchScalarsForClient } from "@/lib/branches/serialize-client";
 
 interface OnboardingInput {
   organization: {
@@ -87,10 +88,7 @@ export async function completeOnboarding(input: OnboardingInput) {
       success: true,
       data: {
         organization: result.organization,
-        branch: {
-          ...result.branch,
-          taxRate: Number(result.branch.taxRate),
-        },
+        branch: serializeBranchScalarsForClient(result.branch),
       },
     };
   } catch (error) {

@@ -1,22 +1,19 @@
 import { Suspense } from "react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { SettingsContent } from "@/components/settings/settings-content";
 
 export const metadata = {
-  title: "Settings | ServStack",
-  description: "Configure your ServStack platform settings",
+  title: "Settings",
+  description: "Configure your Excelite POS platform settings",
 };
 
 export default async function SettingsPage() {
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Settings
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Manage your account and platform preferences
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Manage your account and platform preferences"
+      />
 
       <Suspense fallback={<SettingsLoadingSkeleton />}>
         <SettingsContent />

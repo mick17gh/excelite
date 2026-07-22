@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { headers } from "next/headers";
 import { CategoriesHubContent } from "@/components/categories/categories-hub-content";
 import { getCategories } from "@/lib/actions/categories";
@@ -9,7 +10,7 @@ import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/
 import type { Role } from "@/lib/generated/prisma/client";
 
 export const metadata = {
-  title: "Category Management | ServStack",
+  title: "Category Management",
   description: "Manage menu and inventory categories",
 };
 
@@ -40,15 +41,10 @@ export default async function CategoriesPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Categories
-        </h1>
-        <p className="text-muted-foreground">
-          Manage menu categories and organization-wide inventory category master
-          data
-        </p>
-      </div>
+      <PageHeader
+        title="Categories"
+        description="Manage menu categories and organization-wide inventory category master data"
+      />
 
       <Suspense fallback={<CategoriesLoadingSkeleton />}>
         <CategoriesHubContent

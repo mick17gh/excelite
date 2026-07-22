@@ -1,4 +1,8 @@
+import Link from "next/link";
 import { Suspense } from "react";
+import { Monitor } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { Button } from "@/components/ui/button";
 import { OrdersContent } from "@/components/orders/orders-content";
 import { getOrders, getOrderStats } from "@/lib/actions/orders";
 import { getBranches } from "@/lib/actions/branches";
@@ -9,7 +13,7 @@ import { db } from "@/lib/db";
 import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 
 export const metadata = {
-  title: "Orders | ServStack",
+  title: "Orders",
   description: "Manage and track all orders across branches",
 };
 
@@ -56,12 +60,18 @@ export default async function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">Orders</h1>
-        <p className="text-muted-foreground">
-          Manage and track all orders from every channel
-        </p>
-      </div>
+      <PageHeader
+        title="Orders"
+        description="Manage and track all orders from every channel"
+        actions={
+          <Button asChild className="bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm">
+            <Link href="/pos">
+              <Monitor className="mr-2 h-4 w-4" />
+              Open POS
+            </Link>
+          </Button>
+        }
+      />
 
       <Suspense fallback={<OrdersLoadingSkeleton />}>
         <OrdersContent
@@ -82,13 +92,13 @@ export default async function OrdersPage() {
 
 function OrdersLoadingSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-2xl bg-muted" />
+          <div key={i} className="h-24 animate-pulse rounded-xl bg-muted border" />
         ))}
       </div>
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
+      <div className="h-96 animate-pulse rounded-xl bg-muted border" />
     </div>
   );
 }

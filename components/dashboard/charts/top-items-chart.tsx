@@ -102,7 +102,7 @@ export function TopItemsChart({
     <Card className="chart-card rounded-xl">
       <CardHeader className="py-3 px-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <div className="icon-blue rounded-lg p-1.5">
+          <div className="icon-accent rounded-lg p-1.5">
             <Utensils className="h-4 w-4" />
           </div>
           Menu Performance

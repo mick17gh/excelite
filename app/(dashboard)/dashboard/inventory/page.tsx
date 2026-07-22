@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { InventoryContent } from "@/components/inventory/inventory-content";
 import { getInventoryItems, getSuppliers, getOutboundRecords, getTransferRecords } from "@/lib/actions/inventory";
 import { getWarehouseTransfers } from "@/lib/actions/warehouse";
@@ -8,7 +9,7 @@ import { getBranchWarehouseTransfers } from "@/lib/actions/stock-transfers";
 import { listInventoryCategories } from "@/lib/actions/inventory-categories";
 
 export const metadata = {
-  title: "Inventory Management | ServStack",
+  title: "Inventory Management",
   description: "Track and manage inventory across all restaurant branches",
 };
 
@@ -145,14 +146,10 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Inventory Management
-        </h1>
-        <p className="text-muted-foreground">
-          Track stock levels, transfers, and movements across all branches
-        </p>
-      </div>
+      <PageHeader
+        title="Inventory Management"
+        description="Track stock levels, transfers, and movements across all branches"
+      />
 
       <Suspense fallback={<InventoryLoadingSkeleton />}>
         <InventoryContent 

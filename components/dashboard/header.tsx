@@ -1,6 +1,8 @@
 "use client";
 
 import { Search, Menu } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,11 +19,11 @@ import {
   NotificationBell,
   type DashboardNotification,
 } from "@/components/dashboard/notification-bell";
+import { EXCELITE_BRAND } from "@/lib/excelite-config";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import Link from "next/link";
 import { usePermissionsOptional } from "@/contexts/permissions-context";
 
 interface HeaderProps {
@@ -72,16 +74,29 @@ export function Header({
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-xl supports-backdrop-filter:bg-background/60 md:px-6 shadow-sm">
+    <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border/60 bg-background/90 px-4 backdrop-blur-xl md:px-6">
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden"
+        className="md:hidden shrink-0"
         onClick={onMenuClick}
       >
         <Menu className="h-5 w-5" />
         <span className="sr-only">Toggle menu</span>
       </Button>
+
+      <Link href="/dashboard" className="flex items-center gap-2 md:hidden shrink-0">
+        <Image
+          src={EXCELITE_BRAND.logo}
+          alt={EXCELITE_BRAND.name}
+          width={28}
+          height={28}
+          className="h-7 w-7 object-contain"
+        />
+        <span className="text-sm font-bold text-foreground">
+          Excelite <span className="text-primary">POS</span>
+        </span>
+      </Link>
 
       <div className="flex-1">
         <form className="hidden">

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata = {
-  title: "Branch Tables | ServStack",
+  title: "Branch Tables",
 };
 
 export default async function BranchTablesPage({

@@ -47,7 +47,7 @@ export function RevenueChart({
     <Card className="chart-card rounded-xl h-full">
       <CardHeader className="py-3 px-4">
         <CardTitle className="flex items-center gap-2 text-base">
-          <div className="icon-blue rounded-lg p-1.5">
+          <div className="icon-accent rounded-lg p-1.5">
             <TrendingUp className="h-4 w-4" />
           </div>
           {title}
@@ -62,18 +62,18 @@ export function RevenueChart({
             >
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity={0.4} />
-                  <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#22C55E" stopOpacity={0.4} />
+                  <stop offset="50%" stopColor="#4ADE80" stopOpacity={0.2} />
+                  <stop offset="100%" stopColor="#86EFAC" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorTarget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#16A34A" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#16A34A" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="strokeRevenue" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#2563eb" />
-                  <stop offset="50%" stopColor="#3b82f6" />
-                  <stop offset="100%" stopColor="#60a5fa" />
+                  <stop offset="0%" stopColor="#16A34A" />
+                  <stop offset="50%" stopColor="#22C55E" />
+                  <stop offset="100%" stopColor="#4ADE80" />
                 </linearGradient>
               </defs>
               <CartesianGrid

@@ -9,7 +9,7 @@ import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/
 import { Role } from "@/lib/generated/prisma/client";
 
 export const metadata = {
-  title: "Floor Board | ServStack",
+  title: "Floor Board",
   description: "Live table status and covers on the floor",
 };
 

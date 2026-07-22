@@ -1,8 +1,9 @@
+import { PageHeader } from "@/components/dashboard/page-header";
 import { AccountContent } from "@/components/account/account-content";
 import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 
 export const metadata = {
-  title: "My Account | ServStack",
+  title: "My Account",
   description: "Update your password and view account details",
 };
 
@@ -11,12 +12,10 @@ export default async function AccountPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">My Account</h1>
-        <p className="text-muted-foreground text-sm">
-          Manage your password and view your profile
-        </p>
-      </div>
+      <PageHeader
+        title="My Account"
+        description="Manage your password and view your profile"
+      />
       <AccountContent />
     </div>
   );
