@@ -7,6 +7,10 @@ export const EXCELITE_BRAND = {
   logo: "/excelite_logo.png",
   themeColor: "#22C55E",
   supportEmail: process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app",
+  /** Primary contact phone (WhatsApp / call) */
+  supportPhone: "+233554510864",
+  supportPhoneTel: "tel:+233554510864",
+  supportPhoneDisplay: "+233 55 451 0864",
 } as const;
 
 /** Paths not available in Excelite lite (SUPER_ADMIN may still access for support) */

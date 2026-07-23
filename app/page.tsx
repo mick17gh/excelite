@@ -15,17 +15,8 @@ import {
   Zap,
 } from "lucide-react";
 
-const SALES_EMAIL =
-  process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app";
-
-function buildMailto(subject: string, body: string): string {
-  return `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-const CONTACT_MAILTO = buildMailto(
-  "Excelite POS inquiry",
-  "Hi,\n\nI'd like to learn more about Excelite POS for my business.\n\n",
-);
+const CONTACT_TEL = EXCELITE_BRAND.supportPhoneTel;
+const CONTACT_PHONE_LABEL = EXCELITE_BRAND.supportPhoneDisplay;
 
 const benefits = [
   {
@@ -186,7 +177,7 @@ export default function Home() {
                 className="h-13 px-8 excelite-glass border-[#222831]/10 hover:bg-white/80 w-full sm:w-auto transition-all duration-300 hover:scale-[1.02] cursor-pointer"
                 asChild
               >
-                <a href={CONTACT_MAILTO}>Contact us</a>
+                <a href={CONTACT_TEL}>Call {CONTACT_PHONE_LABEL}</a>
               </Button>
             </div>
 
@@ -363,11 +354,10 @@ export default function Home() {
                   </Link>
                   <Button
                     size="lg"
-                    variant="outline"
-                    className="h-12 px-8 border-white/25 text-white hover:bg-white/10 w-full sm:w-auto backdrop-blur-sm cursor-pointer"
+                    className="h-12 px-8 bg-white text-[#222831] hover:bg-white/90 font-medium w-full sm:w-auto shadow-sm cursor-pointer"
                     asChild
                   >
-                    <a href={CONTACT_MAILTO}>Email {SALES_EMAIL}</a>
+                    <a href={CONTACT_TEL}>Call {CONTACT_PHONE_LABEL}</a>
                   </Button>
                 </div>
               </div>
@@ -384,7 +374,7 @@ export default function Home() {
           <Link href="/login" className="hover:text-[#22C55E] transition-colors cursor-pointer">
             Login
           </Link>
-          <a href={CONTACT_MAILTO} className="hover:text-[#22C55E] transition-colors cursor-pointer">
+          <a href={CONTACT_TEL} className="hover:text-[#22C55E] transition-colors cursor-pointer">
             Contact
           </a>
           <span>© {new Date().getFullYear()} Excelite POS</span>

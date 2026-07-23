@@ -10,17 +10,8 @@ import {
 } from "@/components/ui/accordion";
 import { EXCELITE_BRAND } from "@/lib/excelite-config";
 
-const SALES_EMAIL =
-  process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app";
-
-function buildMailto(subject: string, body: string): string {
-  return `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-const SUPPORT_MAILTO = buildMailto(
-  "Excelite POS support",
-  "Hi,\n\nI have a question about Excelite POS.\n\n",
-);
+const CONTACT_TEL = EXCELITE_BRAND.supportPhoneTel;
+const CONTACT_PHONE_LABEL = EXCELITE_BRAND.supportPhoneDisplay;
 
 const faqs: Array<{ question: string; answer: string }> = [
   {
@@ -189,7 +180,7 @@ export default function FaqPage() {
                 variant="ghost"
                 className="text-[#222831]/70 w-full sm:w-auto"
               >
-                <a href={SUPPORT_MAILTO}>Email support</a>
+                <a href={CONTACT_TEL}>Call {CONTACT_PHONE_LABEL}</a>
               </Button>
             </div>
           </div>
@@ -217,7 +208,7 @@ export default function FaqPage() {
                 Login
               </Link>
               <a
-                href={SUPPORT_MAILTO}
+                href={CONTACT_TEL}
                 className="hover:text-[#222831] transition-colors"
               >
                 Contact

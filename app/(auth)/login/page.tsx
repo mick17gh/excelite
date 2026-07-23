@@ -112,12 +112,12 @@ export default async function LoginPage() {
 
               <p className="text-center text-sm text-white/45 mt-6">
                 Need an account?{" "}
-                <Link
-                  href={`mailto:${process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app"}`}
+                <a
+                  href={EXCELITE_BRAND.supportPhoneTel}
                   className="text-[#4ADE80] hover:text-[#22C55E] font-medium transition-colors cursor-pointer"
                 >
-                  Contact us to get started
-                </Link>
+                  Call {EXCELITE_BRAND.supportPhoneDisplay} to get started
+                </a>
               </p>
             </div>
 
