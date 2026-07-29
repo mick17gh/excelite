@@ -29,6 +29,8 @@ export type BranchScalarsForClient = {
   taxEnabled: boolean;
   taxInclusive: boolean;
   showTaxOnReceipt: boolean;
+  taxNumber: string | null;
+  showTaxNumberOnReceipt: boolean;
   blockSalesWhenOutOfStock: boolean | null;
   tableServiceEnabled: boolean;
   paystackSubaccountCode: string | null;
@@ -163,6 +165,8 @@ export function serializeBranchScalarsForClient(branch: Branch): BranchScalarsFo
     taxEnabled: branch.taxEnabled,
     taxInclusive: branch.taxInclusive,
     showTaxOnReceipt: branch.showTaxOnReceipt,
+    taxNumber: branch.taxNumber,
+    showTaxNumberOnReceipt: branch.showTaxNumberOnReceipt,
     blockSalesWhenOutOfStock: branch.blockSalesWhenOutOfStock,
     tableServiceEnabled: branch.tableServiceEnabled,
     paystackSubaccountCode: branch.paystackSubaccountCode,

@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import {
   receiptLineAmount,
   receiptTaxLabel,
+  receiptTaxNumberLine,
   shouldShowInclusiveFootnote,
   shouldShowTaxBreakdown,
   type ReceiptDisplayOrder,
@@ -25,9 +26,11 @@ export type PrintableReceiptOrder = ReceiptDisplayOrder & {
   paymentMethod?: string;
   payments?: ReceiptPaymentLine[];
   type?: string;
-  branch?: { name?: string; code?: string };
+  branch?: { name?: string; code?: string; taxNumber?: string | null; showTaxNumberOnReceipt?: boolean };
   branchName?: string;
   branchCode?: string;
+  taxNumber?: string | null;
+  showTaxNumberOnReceipt?: boolean;
   items?: PrintableReceiptItem[];
 };
 
@@ -131,6 +134,7 @@ export function buildReceiptPrintHtml(
   <div class="header">
     <h2>${branchTitle(order)}</h2>
     ${branchCode(order) ? `<p>${branchCode(order)}</p>` : ""}
+    ${receiptTaxNumberLine(order) ? `<p>${receiptTaxNumberLine(order)}</p>` : ""}
     <p>Order #${order.orderNumber ?? "—"}</p>
     <p>${order.createdAt ? format(new Date(String(order.createdAt)), "MMM dd, yyyy HH:mm") : "—"}</p>
     ${order.customerName ? `<p>${order.customerName}</p>` : ""}

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { ApiKeysContent } from "@/components/api-keys/api-keys-content";
 import { getApiKeys } from "@/lib/actions/api-keys";
 import { getBranches } from "@/lib/actions/branches";
@@ -8,7 +9,26 @@ export const metadata = {
   description: "Manage API keys for external integrations",
 };
 
-export default async function ApiKeysPage() {
+export default function ApiKeysPage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+          API Key Management
+        </h1>
+        <p className="text-muted-foreground">
+          Create and manage API keys for third-party integrations and external access
+        </p>
+      </div>
+
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={0} />}>
+        <ApiKeysPageData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ApiKeysPageData() {
   const [apiKeysResult, branchesResult] = await Promise.all([
     getApiKeys(),
     getBranches(),
@@ -23,28 +43,5 @@ export default async function ApiKeysPage() {
     };
   });
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          API Key Management
-        </h1>
-        <p className="text-muted-foreground">
-          Create and manage API keys for third-party integrations and external access
-        </p>
-      </div>
-
-      <Suspense fallback={<ApiKeysLoadingSkeleton />}>
-        <ApiKeysContent apiKeys={apiKeys} branches={branches} />
-      </Suspense>
-    </div>
-  );
-}
-
-function ApiKeysLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
-  );
+  return <ApiKeysContent apiKeys={apiKeys} branches={branches} />;
 }

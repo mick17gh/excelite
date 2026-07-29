@@ -13,13 +13,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface DateRangePickerProps {
   date: DateRange | undefined;
@@ -27,52 +20,30 @@ interface DateRangePickerProps {
   className?: string;
 }
 
-const presets = [
-  { label: "Today", days: 0 },
-  { label: "Yesterday", days: 1 },
-  { label: "Last 7 days", days: 7 },
-  { label: "Last 14 days", days: 14 },
-  { label: "Last 30 days", days: 30 },
-  { label: "Last 90 days", days: 90 },
-  { label: "This month", days: -1 },
-  { label: "Last month", days: -2 },
-];
+/** Inclusive calendar-day bounds: from 00:00:00.000 → to 23:59:59.999 */
+export function normalizeInclusiveDateRange(
+  range: DateRange | undefined,
+): DateRange | undefined {
+  if (!range?.from) return range;
+  const from = new Date(range.from);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(range.to ?? range.from);
+  to.setHours(23, 59, 59, 999);
+  return { from, to };
+}
 
 export function DateRangePicker({
   date,
   onDateChange,
   className,
 }: DateRangePickerProps) {
-  const handlePresetChange = (value: string) => {
-    const days = parseInt(value);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    if (days === 0) {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      onDateChange({ from: start, to: today });
-    } else if (days === 1) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-      const yesterdayEnd = new Date(yesterday);
-      yesterdayEnd.setHours(23, 59, 59, 999);
-      onDateChange({ from: yesterday, to: yesterdayEnd });
-    } else if (days === -1) {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      onDateChange({ from: start, to: today });
-    } else if (days === -2) {
-      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const end = new Date(today.getFullYear(), today.getMonth(), 0);
-      end.setHours(23, 59, 59, 999);
-      onDateChange({ from: start, to: end });
-    } else {
-      const start = new Date();
-      start.setDate(start.getDate() - days);
-      start.setHours(0, 0, 0, 0);
-      onDateChange({ from: start, to: today });
+  const handleSelect = (next: DateRange | undefined) => {
+    if (!next?.from) {
+      onDateChange(next);
+      return;
     }
+    // Same-day pick (5th → 5th) becomes that full calendar day.
+    onDateChange(normalizeInclusiveDateRange(next));
   };
 
   return (
@@ -83,12 +54,12 @@ export function DateRangePicker({
             variant="outline"
             className={cn(
               "justify-start text-left font-normal",
-              !date && "text-muted-foreground"
+              !date && "text-muted-foreground",
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (
-              date.to ? (
+              date.to && date.from.toDateString() !== date.to.toDateString() ? (
                 <>
                   {format(date.from, "LLL dd, y")} -{" "}
                   {format(date.to, "LLL dd, y")}
@@ -107,7 +78,7 @@ export function DateRangePicker({
             mode="range"
             defaultMonth={date?.from}
             selected={date}
-            onSelect={onDateChange}
+            onSelect={handleSelect}
             numberOfMonths={2}
           />
         </PopoverContent>

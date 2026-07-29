@@ -1,13 +1,11 @@
 import { Suspense } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { headers } from "next/headers";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { CategoriesHubContent } from "@/components/categories/categories-hub-content";
 import { getCategories } from "@/lib/actions/categories";
 import { listInventoryCategories } from "@/lib/actions/inventory-categories";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions/resolver";
-import type { Role } from "@/lib/generated/prisma/client";
+import { requireSessionAccess } from "@/lib/permissions/load-session-access";
+import { hasPermissionInList } from "@/lib/permissions/resolver";
 
 export const metadata = {
   title: "Category Management",
@@ -20,13 +18,29 @@ export default async function CategoriesPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { tab } = await searchParams;
-  const session = await auth.api.getSession({ headers: await headers() });
-  const role = (session?.user?.role as Role) || "STAFF";
-  const org = await db.organization.findFirst({ select: { id: true } });
-  const permissions = org
-    ? await getEffectivePermissions(org.id, role)
-    : [];
-  const showInventoryTab = hasPermissionInList(permissions, "categories:manage");
+  const defaultTab: "menu" | "inventory" =
+    tab === "inventory" ? "inventory" : "menu";
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Categories"
+        description="Manage menu categories and organization-wide inventory category master data"
+      />
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={0} />}>
+        <CategoriesPageData defaultTab={defaultTab} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function CategoriesPageData({
+  defaultTab,
+}: {
+  defaultTab: "menu" | "inventory";
+}) {
+  const access = await requireSessionAccess();
+  const showInventoryTab = hasPermissionInList(access.permissions, "categories:manage");
 
   const [categoriesResult, inventoryResult] = await Promise.all([
     getCategories(),
@@ -37,31 +51,12 @@ export default async function CategoriesPage({
   const inventoryCategories =
     inventoryResult?.success && inventoryResult.data ? inventoryResult.data : [];
 
-  const defaultTab = tab === "inventory" ? "inventory" : "menu";
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Categories"
-        description="Manage menu categories and organization-wide inventory category master data"
-      />
-
-      <Suspense fallback={<CategoriesLoadingSkeleton />}>
-        <CategoriesHubContent
-          menuCategories={menuCategories}
-          inventoryCategories={inventoryCategories}
-          showInventoryTab={showInventoryTab}
-          defaultTab={defaultTab}
-        />
-      </Suspense>
-    </div>
-  );
-}
-
-function CategoriesLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
+    <CategoriesHubContent
+      menuCategories={menuCategories}
+      inventoryCategories={inventoryCategories}
+      showInventoryTab={showInventoryTab}
+      defaultTab={defaultTab}
+    />
   );
 }

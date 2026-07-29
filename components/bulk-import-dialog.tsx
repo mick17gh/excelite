@@ -22,13 +22,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Upload,
   FileSpreadsheet,
   Download,
@@ -62,6 +55,7 @@ import {
   getStaffCSVTemplate,
   menuVisibilityPreviewLabel,
   resolveStaffRoleCode,
+  resolveInventoryUnit,
 } from "@/lib/utils/bulk-import";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
@@ -69,6 +63,8 @@ import { cn } from "@/lib/utils";
 import { staffJobRoleComboboxOptions } from "@/lib/staff/job-role-defaults";
 import type { StaffJobRoleCategory } from "@/lib/generated/prisma/client";
 import { resolveBranchRefsFromList } from "@/lib/menu/branch-availability";
+import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
+import type { UnitType } from "@/lib/generated/prisma/client";
 
 type ImportType = "menu" | "menu-options" | "inventory" | "category" | "supplier" | "staff";
 
@@ -79,12 +75,19 @@ export interface StaffJobRoleImportOption {
   category: StaffJobRoleCategory | null;
 }
 
+export interface InventoryCategoryImportOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface BulkImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   type: ImportType;
   branches?: Array<{ id: string; name: string; code?: string }>;
   jobRoles?: StaffJobRoleImportOption[];
+  inventoryCategories?: InventoryCategoryImportOption[];
   onSuccess?: () => void;
 }
 
@@ -100,6 +103,7 @@ export function BulkImportDialog({
   type,
   branches = [],
   jobRoles = [],
+  inventoryCategories = [],
   onSuccess,
 }: BulkImportDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -256,15 +260,37 @@ export function BulkImportDialog({
         }
         break;
       }
-      case "inventory":
+      case "inventory": {
         if (!row.name && !row.Name) errors.push("Name is required");
         const unitCost = parseFloat(
           row.unitCost || row["Unit Cost"] || row.cost || "0",
         );
         if (isNaN(unitCost) || unitCost < 0)
           errors.push("Valid unit cost is required");
-        if (!row.unit && !row.Unit) errors.push("Unit is required");
+
+        const unitRaw = String(row.unit || row.Unit || "").trim();
+        if (!unitRaw) {
+          errors.push("Unit is required");
+        } else if (!resolveInventoryUnit(unitRaw)) {
+          errors.push("Select a valid unit");
+        }
+
+        const categoryRaw = String(row.category || row.Category || "").trim();
+        if (!categoryRaw) {
+          errors.push("Category is required");
+        } else if (inventoryCategories.length > 0) {
+          const key = categoryRaw.toLowerCase();
+          const matched = inventoryCategories.some(
+            (c) =>
+              c.name.trim().toLowerCase() === key ||
+              c.code.trim().toLowerCase() === key,
+          );
+          if (!matched) {
+            errors.push("Select a valid inventory category");
+          }
+        }
         break;
+      }
       case "category":
         if (!row.name && !row.Name) errors.push("Name is required");
         break;
@@ -323,7 +349,9 @@ export function BulkImportDialog({
       const normalizedRows =
         type === "staff"
           ? rows.map((row) => normalizeStaffRow(row))
-          : rows;
+          : type === "inventory"
+            ? rows.map((row) => normalizeInventoryRow(row))
+            : rows;
       const validated = normalizedRows.map((row, index) => validateRow(row, index));
       setParsedData(validated);
       setStep("preview");
@@ -333,6 +361,43 @@ export function BulkImportDialog({
 
   const removeRow = (index: number) => {
     setParsedData((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const normalizeInventoryRow = (row: Record<string, string>): Record<string, string> => {
+    const normalized = { ...row };
+    if (!normalized.name && normalized.Name) normalized.name = normalized.Name;
+    if (!normalized.sku && normalized.SKU) normalized.sku = normalized.SKU;
+    if (!normalized.category && normalized.Category) {
+      normalized.category = normalized.Category;
+    }
+    if (!normalized.unit && normalized.Unit) normalized.unit = normalized.Unit;
+    if (!normalized.unitCost && (normalized["Unit Cost"] || normalized.cost)) {
+      normalized.unitCost = normalized["Unit Cost"] || normalized.cost;
+    }
+    if (!normalized.currentStock && normalized["Current Stock"]) {
+      normalized.currentStock = normalized["Current Stock"];
+    }
+
+    const unitResolved = resolveInventoryUnit(String(normalized.unit || ""));
+    if (unitResolved) {
+      normalized.unit = unitResolved;
+      normalized.Unit = unitResolved;
+    }
+
+    const categoryRaw = String(normalized.category || "").trim();
+    if (categoryRaw && inventoryCategories.length > 0) {
+      const key = categoryRaw.toLowerCase();
+      const match = inventoryCategories.find(
+        (c) =>
+          c.name.trim().toLowerCase() === key ||
+          c.code.trim().toLowerCase() === key,
+      );
+      if (match) {
+        normalized.category = match.name;
+        normalized.Category = match.name;
+      }
+    }
+    return normalized;
   };
 
   const normalizeStaffRow = (row: Record<string, string>): Record<string, string> => {
@@ -371,6 +436,47 @@ export function BulkImportDialog({
       return updated;
     });
   };
+
+  const updateInventoryRowField = (
+    index: number,
+    field: "name" | "sku" | "category" | "unit" | "unitCost" | "currentStock",
+    value: string,
+  ) => {
+    setParsedData((prev) => {
+      const updated = [...prev];
+      const row = { ...(updated[index].data as Record<string, string>) };
+      row[field] = value;
+      if (field === "name") row.Name = value;
+      if (field === "sku") row.SKU = value;
+      if (field === "category") row.Category = value;
+      if (field === "unit") row.Unit = value;
+      if (field === "unitCost") {
+        row["Unit Cost"] = value;
+        row.cost = value;
+      }
+      if (field === "currentStock") row["Current Stock"] = value;
+      updated[index] = validateRow(row, index);
+      return updated;
+    });
+  };
+
+  const inventoryCategoryOptions = useMemo(
+    () =>
+      inventoryCategories.map((c) => ({
+        value: c.name,
+        label: c.code ? `${c.name} (${c.code})` : c.name,
+      })),
+    [inventoryCategories],
+  );
+
+  const inventoryUnitOptions = useMemo(
+    () =>
+      UNIT_TYPES.map((u) => ({
+        value: u,
+        label: UNIT_LABELS[u as UnitType] || u,
+      })),
+    [],
+  );
 
   const jobRoleComboboxOptions = useMemo(
     () => staffJobRoleComboboxOptions(jobRoles, "code"),
@@ -458,7 +564,7 @@ export function BulkImportDialog({
       <DialogContent
         className={cn(
           "max-h-[85vh] flex flex-col overflow-hidden",
-          type === "staff" ? "max-w-5xl" : "max-w-3xl",
+          type === "staff" || type === "inventory" ? "max-w-6xl" : "max-w-3xl",
         )}
       >
         <DialogHeader>
@@ -554,10 +660,12 @@ export function BulkImportDialog({
                 )}
                 {type === "inventory" && (
                   <>
-                    Required: <code>name</code>, <code>unit</code>,{" "}
-                    <code>unitCost</code>. Optional: <code>sku</code>,{" "}
-                    <code>category</code>, <code>currentStock</code>,{" "}
-                    <code>minStock</code>, <code>maxStock</code>
+                    Required: <code>name</code>, <code>category</code> (must
+                    match an inventory category name or code), <code>unit</code>
+                    , <code>unitCost</code>. Optional: <code>sku</code>,{" "}
+                    <code>currentStock</code>, <code>minStock</code>,{" "}
+                    <code>maxStock</code>. Fix category and unit inline in the
+                    preview step before importing.
                   </>
                 )}
                 {type === "category" && (
@@ -606,21 +714,18 @@ export function BulkImportDialog({
               {(type === "inventory" || type === "staff") && (
                 <div className="flex items-center gap-2">
                   <Label className="text-sm">Branch:</Label>
-                  <Select
+                  <Combobox
+                    options={branches.map((branch) => ({
+                      value: branch.id,
+                      label: branch.name,
+                    }))}
                     value={selectedBranch}
                     onValueChange={setSelectedBranch}
-                  >
-                    <SelectTrigger className="w-40 h-8">
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select branch..."
+                    searchPlaceholder="Search branches..."
+                    emptyText="No branches found."
+                    className="h-8 min-h-8 w-48 text-xs"
+                  />
                 </div>
               )}
             </div>
@@ -656,6 +761,7 @@ export function BulkImportDialog({
                     )}
                     {type === "inventory" && (
                       <>
+                        <TableHead>Category</TableHead>
                         <TableHead>Unit</TableHead>
                         <TableHead>Unit Cost</TableHead>
                       </>
@@ -710,6 +816,15 @@ export function BulkImportDialog({
                               }
                             />
                           </div>
+                        ) : type === "inventory" ? (
+                          <Input
+                            className="h-8 text-xs min-w-[140px]"
+                            value={String(row.data.name || row.data.Name || "")}
+                            placeholder="Item name"
+                            onChange={(e) =>
+                              updateInventoryRowField(index, "name", e.target.value)
+                            }
+                          />
                         ) : type === "menu-options"
                             ? String(
                                 row.data.menuItemSku ||
@@ -756,15 +871,63 @@ export function BulkImportDialog({
                       {type === "inventory" && (
                         <>
                           <TableCell>
-                            {String(row.data.unit || row.data.Unit || "-")}
+                            <Combobox
+                              options={inventoryCategoryOptions}
+                              value={String(
+                                row.data.category || row.data.Category || "",
+                              )}
+                              onValueChange={(value) =>
+                                updateInventoryRowField(index, "category", value)
+                              }
+                              placeholder="Select category..."
+                              searchPlaceholder="Search categories..."
+                              emptyText="No categories found."
+                              className={cn(
+                                "h-8 min-h-8 min-w-[160px] text-xs",
+                                row.errors.some((e) =>
+                                  e.toLowerCase().includes("category"),
+                                ) && "border-destructive",
+                              )}
+                            />
                           </TableCell>
                           <TableCell>
-                            {String(
-                              row.data.unitCost ||
-                                row.data["Unit Cost"] ||
-                                row.data.cost ||
-                                "-",
-                            )}
+                            <Combobox
+                              options={inventoryUnitOptions}
+                              value={String(row.data.unit || row.data.Unit || "")}
+                              onValueChange={(value) =>
+                                updateInventoryRowField(index, "unit", value)
+                              }
+                              placeholder="Select unit..."
+                              searchPlaceholder="Search units..."
+                              emptyText="No units found."
+                              className={cn(
+                                "h-8 min-h-8 min-w-[140px] text-xs",
+                                row.errors.some((e) =>
+                                  e.toLowerCase().includes("unit"),
+                                ) && "border-destructive",
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              className="h-8 text-xs w-24"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={String(
+                                row.data.unitCost ||
+                                  row.data["Unit Cost"] ||
+                                  row.data.cost ||
+                                  "",
+                              )}
+                              onChange={(e) =>
+                                updateInventoryRowField(
+                                  index,
+                                  "unitCost",
+                                  e.target.value,
+                                )
+                              }
+                            />
                           </TableCell>
                         </>
                       )}

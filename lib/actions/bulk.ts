@@ -12,6 +12,7 @@ import type {
   BulkStaffInput,
   BulkMenuOptionRow,
 } from "@/lib/utils/bulk-import";
+import { resolveInventoryUnit } from "@/lib/utils/bulk-import";
 import { updateMenuItem } from "@/lib/actions/menu";
 import type { MenuItemOptionGroupInput } from "@/lib/actions/menu";
 import { getSessionOrganizationId } from "@/lib/actions/organization";
@@ -416,35 +417,11 @@ export async function bulkUpdateMenuPrices(
 
 // Map human-readable unit names to UnitType enum values
 function mapToUnitType(unit: string): UnitType {
-  const unitMap: Record<string, UnitType> = {
-    kg: UnitType.KG,
-    kilogram: UnitType.KG,
-    kilograms: UnitType.KG,
-    gram: UnitType.GRAM,
-    grams: UnitType.GRAM,
-    g: UnitType.GRAM,
-    liter: UnitType.LITER,
-    litre: UnitType.LITER,
-    liters: UnitType.LITER,
-    litres: UnitType.LITER,
-    l: UnitType.LITER,
-    ml: UnitType.ML,
-    milliliter: UnitType.ML,
-    milliliters: UnitType.ML,
-    piece: UnitType.PIECE,
-    pieces: UnitType.PIECE,
-    pcs: UnitType.PIECE,
-    box: UnitType.BOX,
-    boxes: UnitType.BOX,
-    case: UnitType.CASE,
-    cases: UnitType.CASE,
-    pack: UnitType.PACK,
-    packs: UnitType.PACK,
-    roll: UnitType.PIECE,
-    rolls: UnitType.PIECE,
-  };
-  const normalized = unit.toLowerCase().trim();
-  return unitMap[normalized] || UnitType.PIECE;
+  const resolved = resolveInventoryUnit(unit);
+  if (resolved && (Object.values(UnitType) as string[]).includes(resolved)) {
+    return resolved as UnitType;
+  }
+  return UnitType.PIECE;
 }
 
 export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) {
@@ -528,8 +505,10 @@ export async function bulkCreateInventoryItems(items: BulkInventoryItemInput[]) 
           sku = `${sku}-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
         }
 
+        const { category: _categoryName, ...itemFields } = item;
+
         return {
-          ...item,
+          ...itemFields,
           sku,
           categoryId: categoryByOrg
             .get(branchOrg.get(item.branchId) || "")

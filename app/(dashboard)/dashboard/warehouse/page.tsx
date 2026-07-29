@@ -1,7 +1,16 @@
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import { WarehouseContent } from "@/components/warehouse/warehouse-content";
-import { getWarehouses, getWarehouseInventory, getWarehouseTransfers, getWarehouseStats, getWarehouseInboundRecords, getWarehouseWasteLogs, getWarehouseOutboundLogs } from "@/lib/actions/warehouse";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
+import {
+  getWarehouses,
+  getWarehouseInventory,
+  getWarehouseTransfers,
+  getWarehouseStats,
+  getWarehouseInboundRecords,
+  getWarehouseWasteLogs,
+  getWarehouseOutboundLogs,
+} from "@/lib/actions/warehouse";
 import {
   getBranchWarehouseTransfers,
   getWarehouseTransfers as getWarehouseMaterialTransfers,
@@ -23,7 +32,23 @@ const EMPTY_STATS = {
   pendingTransfers: 0,
 };
 
-export default async function WarehousePage() {
+export default function WarehousePage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">Warehouse</h1>
+        <p className="text-muted-foreground">
+          Manage warehouse inventory and transfers to branches
+        </p>
+      </div>
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={3} />}>
+        <WarehousePageData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function WarehousePageData() {
   const session = await auth.api.getSession({ headers: await headers() });
   const dbUser = session?.user?.id
     ? await db.user.findUnique({
@@ -34,7 +59,18 @@ export default async function WarehousePage() {
   const userRole = (dbUser?.role as Role) ?? "STAFF";
   const assignedWarehouseId = dbUser?.assignedWarehouseId ?? null;
 
-  const [warehousesResult, transfersResult, materialTransfersResult, statsResult, branchesResult, inboundResult, wastageResult, outboundResult, branchReturnsResult, categoriesResult] = await Promise.all([
+  const [
+    warehousesResult,
+    transfersResult,
+    materialTransfersResult,
+    statsResult,
+    branchesResult,
+    inboundResult,
+    wastageResult,
+    outboundResult,
+    branchReturnsResult,
+    categoriesResult,
+  ] = await Promise.all([
     getWarehouses(),
     getWarehouseTransfers(),
     getWarehouseMaterialTransfers(),
@@ -69,57 +105,34 @@ export default async function WarehousePage() {
   const outboundRecords = outboundResult.data || [];
   const branchReturns = branchReturnsResult.data || [];
   const categories = categoriesResult.success ? categoriesResult.data : [];
-  const branches = (branchesResult.data || []).map((b: { id: string; name: string; code: string }) => ({
-    id: b.id,
-    name: b.name,
-    code: b.code,
-  }));
-
-  const allItems = [];
-  for (const wh of warehouses) {
-    const inv = await getWarehouseInventory(wh.id);
-    allItems.push(...(inv.data || []));
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">Warehouse</h1>
-        <p className="text-muted-foreground">
-          Manage warehouse inventory and transfers to branches
-        </p>
-      </div>
-
-      <Suspense fallback={<WarehouseLoadingSkeleton />}>
-        <WarehouseContent
-          warehouses={warehouses}
-          items={allItems}
-          transfers={transfers}
-          materialTransfers={materialTransfers}
-          branchReturns={branchReturns}
-          branches={branches}
-          stats={stats}
-          inboundRecords={inboundRecords}
-          wastageRecords={wastageRecords}
-          outboundRecords={outboundRecords}
-          userRole={userRole}
-          assignedWarehouseId={assignedWarehouseId}
-          categories={categories}
-        />
-      </Suspense>
-    </div>
+  const branches = (branchesResult.data || []).map(
+    (b: { id: string; name: string; code: string }) => ({
+      id: b.id,
+      name: b.name,
+      code: b.code,
+    }),
   );
-}
 
-function WarehouseLoadingSkeleton() {
+  const inventoryResults = await Promise.all(
+    warehouses.map((wh) => getWarehouseInventory(wh.id)),
+  );
+  const allItems = inventoryResults.flatMap((inv) => inv.data || []);
+
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-2xl bg-muted" />
-        ))}
-      </div>
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
+    <WarehouseContent
+      warehouses={warehouses}
+      items={allItems}
+      transfers={transfers}
+      materialTransfers={materialTransfers}
+      branchReturns={branchReturns}
+      branches={branches}
+      stats={stats}
+      inboundRecords={inboundRecords}
+      wastageRecords={wastageRecords}
+      outboundRecords={outboundRecords}
+      userRole={userRole}
+      assignedWarehouseId={assignedWarehouseId}
+      categories={categories}
+    />
   );
 }

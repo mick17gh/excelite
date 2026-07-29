@@ -1,8 +1,9 @@
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { hasFeature } from "@/lib/tier-config";
 import type { SubscriptionTier } from "@/lib/generated/prisma/client";
 
-export async function getOrganizationTableSettings(organizationId: string) {
+export const getOrganizationTableSettings = cache(async (organizationId: string) => {
   const org = await db.organization.findUnique({
     where: { id: organizationId },
     select: { tableManagementEnabled: true, tier: true },
@@ -15,7 +16,7 @@ export async function getOrganizationTableSettings(organizationId: string) {
     tableManagementEnabled: org.tableManagementEnabled,
     tier: org.tier as SubscriptionTier,
   };
-}
+});
 
 export async function isTableManagementEnabled(organizationId: string): Promise<boolean> {
   const s = await getOrganizationTableSettings(organizationId);

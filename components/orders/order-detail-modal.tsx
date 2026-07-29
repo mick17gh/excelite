@@ -64,6 +64,8 @@ interface Order {
   branchCode: string;
   taxInclusive?: boolean;
   showTaxOnReceipt?: boolean;
+  taxNumber?: string | null;
+  showTaxNumberOnReceipt?: boolean;
   taxName?: string;
   taxRate?: number;
   taxEnabled?: boolean;
@@ -372,6 +374,7 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
                 orderNumber={order.orderNumber}
                 orderTotal={order.total}
                 paymentStatus={order.paymentStatus}
+                orderStatus={order.status}
                 paystackEnabled={order.paystackEnabled}
                 customerPhone={order.customerPhone}
                 customerEmail={null}
@@ -401,6 +404,8 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
                 receipt={order.receipt || null}
                 taxInclusive={order.taxInclusive}
                 showTaxOnReceipt={order.showTaxOnReceipt}
+                taxNumber={order.taxNumber}
+                showTaxNumberOnReceipt={order.showTaxNumberOnReceipt}
                 taxName={order.taxName}
                 taxRate={order.taxRate}
               />

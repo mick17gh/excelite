@@ -206,7 +206,7 @@ export function TableServicePanel({
 
       <Dialog open={seatOpen} onOpenChange={setSeatOpen}>
         <DialogContent className="max-w-sm rounded-2xl p-0 gap-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white rounded-t-2xl border-b border-white/10">
+          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white border-b border-white/10">
             <DialogTitle className="text-base font-semibold">Seat guests</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-4 space-y-2">

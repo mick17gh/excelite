@@ -36,8 +36,13 @@ export async function generateReportData(input: GenerateReportInput): Promise<Re
 
     const branchId = assertBranchAccess(authResult.viewer, input.branchId);
 
+    const startDate = new Date(input.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(input.endDate);
+    endDate.setHours(23, 59, 59, 999);
+
     const data = await buildReportData(
-      { ...input, branchId },
+      { ...input, branchId, startDate, endDate },
       authResult.viewer
     );
 

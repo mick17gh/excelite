@@ -12,6 +12,26 @@ export interface TaxConfigInput {
   appliesTo?: string;
 }
 
+export type BranchTaxSettings = {
+  rate: number;
+  name: string;
+  enabled: boolean;
+  inclusive: boolean;
+  showTaxOnReceipt: boolean;
+  taxNumber: string | null;
+  showTaxNumberOnReceipt: boolean;
+};
+
+const DEFAULT_TAX_SETTINGS: BranchTaxSettings = {
+  rate: 12.5,
+  name: "VAT",
+  enabled: true,
+  inclusive: false,
+  showTaxOnReceipt: true,
+  taxNumber: null,
+  showTaxNumberOnReceipt: false,
+};
+
 export async function getTaxConfigs(branchId?: string) {
   try {
     const configs = await db.taxConfig.findMany({
@@ -131,15 +151,7 @@ export async function deleteTaxConfig(id: string) {
   }
 }
 
-export async function getBranchTaxRate(
-  branchId: string,
-): Promise<{
-  rate: number;
-  name: string;
-  enabled: boolean;
-  inclusive: boolean;
-  showTaxOnReceipt: boolean;
-}> {
+export async function getBranchTaxRate(branchId: string): Promise<BranchTaxSettings> {
   try {
     const branch = await db.branch.findUnique({
       where: { id: branchId },
@@ -149,11 +161,13 @@ export async function getBranchTaxRate(
         taxEnabled: true,
         taxInclusive: true,
         showTaxOnReceipt: true,
+        taxNumber: true,
+        showTaxNumberOnReceipt: true,
       },
     });
 
     if (!branch) {
-      return { rate: 12.5, name: "VAT", enabled: true, inclusive: false, showTaxOnReceipt: true };
+      return { ...DEFAULT_TAX_SETTINGS };
     }
 
     return {
@@ -162,10 +176,12 @@ export async function getBranchTaxRate(
       enabled: branch.taxEnabled,
       inclusive: branch.taxInclusive,
       showTaxOnReceipt: branch.showTaxOnReceipt,
+      taxNumber: branch.taxNumber,
+      showTaxNumberOnReceipt: branch.showTaxNumberOnReceipt,
     };
   } catch (error) {
     console.error("[getBranchTaxRate] Error:", error);
-    return { rate: 12.5, name: "VAT", enabled: true, inclusive: false, showTaxOnReceipt: true };
+    return { ...DEFAULT_TAX_SETTINGS };
   }
 }
 
@@ -177,9 +193,16 @@ export async function updateBranchTaxSettings(
     taxEnabled?: boolean;
     taxInclusive?: boolean;
     showTaxOnReceipt?: boolean;
+    taxNumber?: string | null;
+    showTaxNumberOnReceipt?: boolean;
   },
 ) {
   try {
+    const normalizedTaxNumber =
+      settings.taxNumber !== undefined
+        ? settings.taxNumber?.trim() || null
+        : undefined;
+
     const branch = await db.branch.update({
       where: { id: branchId },
       data: {
@@ -189,6 +212,14 @@ export async function updateBranchTaxSettings(
         ...(settings.taxInclusive !== undefined && { taxInclusive: settings.taxInclusive }),
         ...(settings.showTaxOnReceipt !== undefined && {
           showTaxOnReceipt: settings.showTaxOnReceipt,
+        }),
+        ...(normalizedTaxNumber !== undefined && { taxNumber: normalizedTaxNumber }),
+        ...(settings.showTaxNumberOnReceipt !== undefined && {
+          // Force off when clearing the tax number
+          showTaxNumberOnReceipt:
+            normalizedTaxNumber === null || normalizedTaxNumber === ""
+              ? false
+              : settings.showTaxNumberOnReceipt,
         }),
       },
     });
@@ -205,6 +236,8 @@ export async function updateBranchTaxSettings(
         taxEnabled: branch.taxEnabled,
         taxInclusive: branch.taxInclusive,
         showTaxOnReceipt: branch.showTaxOnReceipt,
+        taxNumber: branch.taxNumber,
+        showTaxNumberOnReceipt: branch.showTaxNumberOnReceipt,
       },
     };
   } catch (error) {

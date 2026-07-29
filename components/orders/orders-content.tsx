@@ -50,6 +50,16 @@ import { CreateOrderDialog } from "./order-forms";
 import { OrderDetailModal } from "./order-detail-modal";
 import { useCurrency } from "@/contexts/currency-context";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   orderStatusBadgeClass,
   ordersToolbarClass,
   paymentStatusBadgeClass,
@@ -204,6 +214,8 @@ export function OrdersContent({
   const [branchFilter, setBranchFilter] = useState("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const { formatCurrency } = useCurrency();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -252,12 +264,20 @@ export function OrdersContent({
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    const result = await cancelOrder(orderId);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success("Order cancelled");
+  const handleCancelOrder = async () => {
+    if (!orderToCancel) return;
+    setIsCancelling(true);
+    try {
+      const result = await cancelOrder(orderToCancel.id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Order cancelled");
+        setOrderToCancel(null);
+        await fetchOrders(false);
+      }
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -344,8 +364,8 @@ export function OrdersContent({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard title="Total Orders" value={stats.totalOrders} icon={ShoppingCart} />
-        <KPICard title="Pending" value={stats.pendingOrders} icon={Clock} />
+        <KPICard title="Today's Orders" value={stats.totalOrders} icon={ShoppingCart} />
+        <KPICard title="Pending Today" value={stats.pendingOrders} icon={Clock} />
         <KPICard title="Completed Today" value={stats.completedToday} icon={CheckCircle2} />
         <KPICard
           title="Today's Revenue"
@@ -525,7 +545,10 @@ export function OrdersContent({
                             {order.status !== "COMPLETED" && order.status !== "CANCELLED" && (
                               <DropdownMenuItem
                                 className="text-red-600"
-                                onClick={(e) => { e.stopPropagation(); handleCancelOrder(order.id); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOrderToCancel(order);
+                                }}
                               >
                                 <XCircle className="mr-2 h-4 w-4" />
                                 Cancel Order
@@ -608,6 +631,37 @@ export function OrdersContent({
         customers={customers}
         onOrderCreated={handleOrderCreated}
       />
+
+      <AlertDialog
+        open={!!orderToCancel}
+        onOpenChange={(open) => {
+          if (!open && !isCancelling) setOrderToCancel(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {orderToCancel
+                ? `This will cancel order ${orderToCancel.orderNumber}. Kitchen tickets for this order will also be cancelled. This action cannot be undone.`
+                : "This will cancel the order. This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>Keep order</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={isCancelling}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleCancelOrder();
+              }}
+            >
+              {isCancelling ? "Cancelling..." : "Cancel order"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedOrder && (
         <OrderDetailModal

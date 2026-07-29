@@ -32,6 +32,7 @@ interface PaymentPanelProps {
   orderNumber: string;
   orderTotal: number;
   paymentStatus: string;
+  orderStatus?: string;
   paystackEnabled?: boolean;
   customerPhone?: string | null;
   customerEmail?: string | null;
@@ -45,6 +46,7 @@ export function PaymentPanel({
   orderNumber,
   orderTotal,
   paymentStatus,
+  orderStatus,
   paystackEnabled = false,
   customerPhone,
   customerEmail,
@@ -60,6 +62,7 @@ export function PaymentPanel({
     payments.filter((p) => p.status === "PAID").reduce((sum, p) => sum + p.amount, 0) * 100
   ) / 100;
   const remaining = Math.round((orderTotal - totalPaid) * 100) / 100;
+  const canRecordPayment = orderStatus !== "CANCELLED" && remaining > 0;
 
   const handleRecordSplitPayment = async (tenders: PaymentTender[]) => {
     setIsSubmitting(true);
@@ -128,7 +131,7 @@ export function PaymentPanel({
             {paymentStatus}
           </Badge>
         </div>
-        {remaining > 0 && (
+        {canRecordPayment && (
           <div className="flex items-center gap-2">
             {paystackEnabled && (
               <Button
@@ -152,12 +155,12 @@ export function PaymentPanel({
       <div className="flex gap-4 text-xs text-muted-foreground">
         <span>Total: <strong className="text-[#222831]">{formatCurrency(orderTotal)}</strong></span>
         <span>Paid: <strong className="text-[#16A34A]">{formatCurrency(totalPaid)}</strong></span>
-        {remaining > 0 && (
+        {remaining > 0 && orderStatus !== "CANCELLED" && (
           <span>Remaining: <strong className="text-amber-600">{formatCurrency(remaining)}</strong></span>
         )}
       </div>
 
-      {showForm && (
+      {showForm && canRecordPayment && (
         <div className={orderSectionCardClass}>
           <SplitPaymentForm
             total={remaining}

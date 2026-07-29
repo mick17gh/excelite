@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { DashboardWrapper } from "@/components/dashboard/dashboard-wrapper";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { getRevenueData, getTopMenuItems, getKPIData } from "@/lib/actions/transactions";
 import { getOrders } from "@/lib/actions/orders";
 import { db } from "@/lib/db";
@@ -10,7 +12,15 @@ export const metadata = {
   description: "Your daily sales overview",
 };
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardPageSkeleton kpiCount={4} />}>
+      <DashboardPageData />
+    </Suspense>
+  );
+}
+
+async function DashboardPageData() {
   const access = await loadSessionAccess();
   const organizationId = access?.organizationId;
   const todayStart = startOfDay(new Date());

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -16,19 +17,19 @@ export type PermissionContext = {
   permissions: Permission[];
 };
 
-export async function resolveOrganizationIdForSession(
-  userId: string,
-): Promise<string | null> {
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { organizationId: true },
-  });
-  if (user?.organizationId) return user.organizationId;
-  const org = await db.organization.findFirst({ select: { id: true } });
-  return org?.id ?? null;
-}
+export const resolveOrganizationIdForSession = cache(
+  async (userId: string): Promise<string | null> => {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true },
+    });
+    if (user?.organizationId) return user.organizationId;
+    const org = await db.organization.findFirst({ select: { id: true } });
+    return org?.id ?? null;
+  },
+);
 
-export async function getPermissionContext(): Promise<PermissionContext | null> {
+export const getPermissionContext = cache(async (): Promise<PermissionContext | null> => {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) return null;
 
@@ -46,7 +47,7 @@ export async function getPermissionContext(): Promise<PermissionContext | null> 
     organizationId,
     permissions,
   };
-}
+});
 
 export async function requirePermission(
   permission: Permission,

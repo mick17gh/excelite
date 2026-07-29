@@ -438,6 +438,8 @@ model Branch {
   taxEnabled     Boolean   @default(true)
   taxInclusive      Boolean   @default(false)
   showTaxOnReceipt  Boolean   @default(true)
+  taxNumber               String?
+  showTaxNumberOnReceipt  Boolean   @default(false)
   blockSalesWhenOutOfStock Boolean?
   tableServiceEnabled   Boolean   @default(false)
   paystackSubaccountCode     String?

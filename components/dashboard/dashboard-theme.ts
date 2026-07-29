@@ -9,8 +9,16 @@ export const EXCELITE_CHARCOAL = "#222831";
 export const dashboardToolbarClass =
   "flex flex-col gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 md:px-5 md:py-4";
 
+/**
+ * Pair with dashboardModalHeaderClass. overflow-hidden + matching radius
+ * clips the gradient flush to corners (avoids white crescent gaps).
+ */
+export const dashboardModalContentClass =
+  "overflow-hidden p-0 gap-0 sm:rounded-2xl max-h-[min(90vh,900px)] flex flex-col [&>button]:text-white [&>button]:opacity-90 [&>button]:hover:opacity-100 [&>button]:hover:bg-white/15 [&>button]:ring-offset-0";
+
+/** Gradient header — no own radius; parent DialogContent clips corners. */
 export const dashboardModalHeaderClass =
-  "px-6 py-4 excelite-header-gradient rounded-t-2xl shrink-0 border-b border-white/10";
+  "px-6 py-4 excelite-header-gradient shrink-0 border-b border-white/10 text-white";
 
 export const dashboardTabListClass =
   "w-full h-10 p-1 bg-muted/50 rounded-xl border border-border/60";

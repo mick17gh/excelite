@@ -127,6 +127,8 @@ export function SettingsContent() {
     taxEnabled: true,
     taxInclusive: false,
     showTaxOnReceipt: true,
+    taxNumber: "",
+    showTaxNumberOnReceipt: false,
   });
 
   // Load user data on mount
@@ -185,6 +187,8 @@ export function SettingsContent() {
         taxEnabled: settings.enabled,
         taxInclusive: settings.inclusive,
         showTaxOnReceipt: settings.showTaxOnReceipt,
+        taxNumber: settings.taxNumber ?? "",
+        showTaxNumberOnReceipt: settings.showTaxNumberOnReceipt,
       });
     } catch (error) {
       console.error("Failed to load tax settings:", error);
@@ -602,6 +606,45 @@ export function SettingsContent() {
                 checked={taxSettings.showTaxOnReceipt}
                 onCheckedChange={(checked) =>
                   setTaxSettings({ ...taxSettings, showTaxOnReceipt: checked })
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tax-number" className="text-xs">Tax number (TIN / VAT ID)</Label>
+              <Input
+                id="tax-number"
+                value={taxSettings.taxNumber}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setTaxSettings({
+                    ...taxSettings,
+                    taxNumber: next,
+                    showTaxNumberOnReceipt: next.trim()
+                      ? taxSettings.showTaxNumberOnReceipt
+                      : false,
+                  });
+                }}
+                placeholder="e.g. C0001234567"
+                className="h-10 rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional. Shown on receipts only when the toggle below is on.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Show tax number on receipt</Label>
+                <p className="text-xs text-muted-foreground">
+                  Print TIN / VAT ID under the branch name on on-screen and printed receipts. Off by default.
+                </p>
+              </div>
+              <Switch
+                checked={taxSettings.showTaxNumberOnReceipt}
+                disabled={!taxSettings.taxNumber.trim()}
+                onCheckedChange={(checked) =>
+                  setTaxSettings({ ...taxSettings, showTaxNumberOnReceipt: checked })
                 }
               />
             </div>

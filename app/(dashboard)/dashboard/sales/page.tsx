@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { SalesContent } from "@/components/sales/sales-content";
 import { getBranches } from "@/lib/actions/branches";
 import {
@@ -15,7 +16,26 @@ export const metadata = {
   description: "Detailed sales and revenue analytics across all branches",
 };
 
-export default async function SalesPage() {
+export default function SalesPage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+          Sales & Revenue Analytics
+        </h1>
+        <p className="text-muted-foreground">
+          Comprehensive sales data and revenue insights
+        </p>
+      </div>
+
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={4} />}>
+        <SalesPageData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function SalesPageData() {
   const [
     branchesResult,
     revenueResult,
@@ -52,42 +72,16 @@ export default async function SalesPage() {
   const dineInBySection = analyticsResult.data?.dineInBySection || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Sales & Revenue Analytics
-        </h1>
-        <p className="text-muted-foreground">
-          Comprehensive sales data and revenue insights
-        </p>
-      </div>
-
-      <Suspense fallback={<SalesLoadingSkeleton />}>
-        <SalesContent
-          revenueData={revenueData}
-          salesByChannel={salesByChannel}
-          salesByDaypart={salesByDaypart}
-          topItems={topMenuItems}
-          worstItems={worstMenuItems}
-          branches={branches}
-          hourlyData={hourlyData}
-          revenuePerCover={revenuePerCover}
-          dineInBySection={dineInBySection}
-        />
-      </Suspense>
-    </div>
-  );
-}
-
-function SalesLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />
-        ))}
-      </div>
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
+    <SalesContent
+      revenueData={revenueData}
+      salesByChannel={salesByChannel}
+      salesByDaypart={salesByDaypart}
+      topItems={topMenuItems}
+      worstItems={worstMenuItems}
+      branches={branches}
+      hourlyData={hourlyData}
+      revenuePerCover={revenuePerCover}
+      dineInBySection={dineInBySection}
+    />
   );
 }

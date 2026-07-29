@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { MenuContent } from "@/components/menu/menu-content";
 import { getMenuItems, getMenuCategories } from "@/lib/actions/menu";
 import { getBranches } from "@/lib/actions/branches";
@@ -9,9 +10,23 @@ export const metadata = {
   description: "Manage your restaurant menu items and products",
 };
 
-export default async function MenuPage() {
+export default function MenuPage() {
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Products"
+        description="Create and manage your restaurant menu items and products"
+      />
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={4} />}>
+        <MenuPageData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function MenuPageData() {
   const [itemsResult, categoriesResult, branchesResult] = await Promise.all([
-    getMenuItems(undefined, true), // Include inactive items to debug
+    getMenuItems(undefined, true),
     getMenuCategories(),
     getBranches(),
   ]);
@@ -22,29 +37,5 @@ export default async function MenuPage() {
     .filter((b) => b.isActive)
     .map((b) => ({ id: b.id, name: b.name, code: b.code }));
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Products"
-        description="Create and manage your restaurant menu items and products"
-      />
-
-      <Suspense fallback={<MenuLoadingSkeleton />}>
-        <MenuContent items={items} categories={categories} branches={branches} />
-      </Suspense>
-    </div>
-  );
-}
-
-function MenuLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />
-        ))}
-      </div>
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
-  );
+  return <MenuContent items={items} categories={categories} branches={branches} />;
 }

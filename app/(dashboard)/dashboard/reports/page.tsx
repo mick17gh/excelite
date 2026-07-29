@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { ReportsContent } from "@/components/reports/reports-content";
 import { getBranches } from "@/lib/actions/branches";
 import { isTableManagementEnabled } from "@/lib/features/table-management";
@@ -9,7 +10,26 @@ export const metadata = {
   description: "Generate and export comprehensive business reports",
 };
 
-export default async function ReportsPage() {
+export default function ReportsPage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+          Reports
+        </h1>
+        <p className="text-muted-foreground">
+          Sales, transactions, and orders reports for your business
+        </p>
+      </div>
+
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={0} />}>
+        <ReportsPageData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ReportsPageData() {
   const [branchesResult, org] = await Promise.all([
     getBranches(),
     db.organization.findFirst({ select: { id: true } }),
@@ -26,34 +46,9 @@ export default async function ReportsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Reports
-        </h1>
-        <p className="text-muted-foreground">
-          Generate executive summaries and export detailed reports
-        </p>
-      </div>
-
-      <Suspense fallback={<ReportsLoadingSkeleton />}>
-        <ReportsContent
-          branches={branchList}
-          tableManagementEnabled={tableManagementEnabled}
-        />
-      </Suspense>
-    </div>
-  );
-}
-
-function ReportsLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-48 animate-pulse rounded-2xl bg-muted" />
-        ))}
-      </div>
-    </div>
+    <ReportsContent
+      branches={branchList}
+      tableManagementEnabled={tableManagementEnabled}
+    />
   );
 }

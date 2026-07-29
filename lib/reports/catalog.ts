@@ -41,6 +41,18 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     category: "Sales",
   },
   {
+    id: "cash-transactions",
+    name: "Transactions Report",
+    description: "Payments by method, references, and success/fail status",
+    category: "Finance",
+  },
+  {
+    id: "orders-overview",
+    name: "Orders Report",
+    description: "Orders by status, source, channel type, and branch with line-level export",
+    category: "Orders",
+  },
+  {
     id: "manual-entries",
     name: "Manual Entries Report",
     description: "Summary of all manual POS entries including revenue by channel and branch",
@@ -85,12 +97,6 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     category: "HR",
   },
   {
-    id: "orders-overview",
-    name: "Orders Overview",
-    description: "Unified orders by status, source, channel type, and branch with line-level export",
-    category: "Orders",
-  },
-  {
     id: "dine-in-service",
     name: "Dine-In & Table Service",
     description: "Closed table sessions: covers, revenue per cover, and turn times",
@@ -123,12 +129,13 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     description: "In-venue POS tickets, channels, and top menu items",
     category: "POS",
   },
-  {
-    id: "cash-transactions",
-    name: "POS Terminal Report",
-    description: "Terminal payments by method, MoMo references, and success/fail status",
-    category: "Finance",
-  },
+];
+
+/** Reports shown on the Excelite Reports page. */
+export const PRIMARY_REPORT_IDS: ReportId[] = [
+  "sales-report",
+  "cash-transactions",
+  "orders-overview",
 ];
 
 export const REPORT_IDS = REPORT_CATALOG.map((r) => r.id) as ReportId[];

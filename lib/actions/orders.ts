@@ -15,6 +15,7 @@ import { computeOrderTaxAmounts } from "@/lib/services/tax-calculation";
 import { resolveOrderPlacedByName } from "@/lib/orders/placed-by";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { startOfDay } from "date-fns";
 
 // Helper to serialize Decimal fields from raw Prisma order objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,10 +127,14 @@ export async function getOrders(filters?: {
   customerId?: string;
   page?: number;
   pageSize?: number;
+  /** When true (default), show today's orders plus open/unpaid carryover from prior days. */
+  activeDayView?: boolean;
 }) {
   try {
     const page = filters?.page || 1;
     const pageSize = filters?.pageSize || 50;
+    const activeDayView = filters?.activeDayView !== false;
+    const hasExplicitDateRange = Boolean(filters?.startDate || filters?.endDate);
 
     const where: Record<string, unknown> = {};
 
@@ -138,11 +143,22 @@ export async function getOrders(filters?: {
     if (filters?.source) where.source = filters.source;
     if (filters?.customerId) where.customerId = filters.customerId;
 
-    if (filters?.startDate || filters?.endDate) {
+    if (hasExplicitDateRange) {
       const createdAt: Record<string, Date> = {};
       if (filters?.startDate) createdAt.gte = new Date(filters.startDate);
       if (filters?.endDate) createdAt.lte = new Date(filters.endDate);
       where.createdAt = createdAt;
+    } else if (activeDayView) {
+      // Today’s orders, plus prior-day work still open or still awaiting payment
+      const todayStart = startOfDay(new Date());
+      where.OR = [
+        { createdAt: { gte: todayStart } },
+        { status: { in: [OrderStatus.NEW, OrderStatus.IN_PROGRESS, OrderStatus.READY] } },
+        {
+          paymentStatus: PaymentStatus.PENDING,
+          status: { not: OrderStatus.CANCELLED },
+        },
+      ];
     }
 
     const [orders, total] = await Promise.all([
@@ -157,6 +173,8 @@ export async function getOrders(filters?: {
               code: true,
               taxInclusive: true,
               showTaxOnReceipt: true,
+              taxNumber: true,
+              showTaxNumberOnReceipt: true,
               taxName: true,
               taxRate: true,
               taxEnabled: true,
@@ -210,6 +228,8 @@ export async function getOrders(filters?: {
         branchCode: order.branch?.code || "",
         taxInclusive: order.branch?.taxInclusive ?? false,
         showTaxOnReceipt: order.branch?.showTaxOnReceipt ?? true,
+        taxNumber: order.branch?.taxNumber ?? null,
+        showTaxNumberOnReceipt: order.branch?.showTaxNumberOnReceipt ?? false,
         taxName: order.branch?.taxName || "VAT",
         taxRate: order.branch?.taxRate != null ? Number(order.branch.taxRate) : 0,
         taxEnabled: order.branch?.taxEnabled ?? true,
@@ -313,6 +333,8 @@ export async function getOrderById(id: string) {
             code: true,
             taxInclusive: true,
             showTaxOnReceipt: true,
+            taxNumber: true,
+            showTaxNumberOnReceipt: true,
             taxName: true,
             taxRate: true,
             taxEnabled: true,
@@ -812,15 +834,22 @@ export async function getOrderStats(branchId?: string) {
     const where: Record<string, unknown> = {};
     if (branchId) where.branchId = branchId;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStart = startOfDay(new Date());
+    const todayWhere = { ...where, createdAt: { gte: todayStart } };
 
     const [totalOrders, pendingOrders, completedToday, todayRevenue] = await Promise.all([
-      db.order.count({ where }),
-      db.order.count({ where: { ...where, status: { in: ["NEW", "IN_PROGRESS", "READY"] } } }),
-      db.order.count({ where: { ...where, status: "COMPLETED", updatedAt: { gte: today } } }),
+      db.order.count({ where: todayWhere }),
+      db.order.count({
+        where: {
+          ...todayWhere,
+          status: { in: [OrderStatus.NEW, OrderStatus.IN_PROGRESS, OrderStatus.READY] },
+        },
+      }),
+      db.order.count({
+        where: { ...where, status: OrderStatus.COMPLETED, updatedAt: { gte: todayStart } },
+      }),
       db.order.aggregate({
-        where: { ...where, status: "COMPLETED", updatedAt: { gte: today } },
+        where: { ...where, status: OrderStatus.COMPLETED, updatedAt: { gte: todayStart } },
         _sum: { total: true },
       }),
     ]);

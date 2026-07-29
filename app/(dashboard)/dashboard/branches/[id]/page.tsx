@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { serializeBranchScalarsForClient } from "@/lib/branches/serialize-client";
 import { getTransactions, getSales } from "@/lib/actions/transactions";
 import { getInventoryItems } from "@/lib/actions/inventory";
@@ -16,7 +17,21 @@ export const metadata = {
   description: "Comprehensive branch information and analytics",
 };
 
-export default async function BranchDetailsPage({
+export default function BranchDetailsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <div className="space-y-6">
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={0} />}>
+        <BranchDetailsPageData params={params} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function BranchDetailsPageData({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -50,7 +65,7 @@ export default async function BranchDetailsPage({
   const rawSales = salesResult.data || [];
   const rawInventory = inventoryResult.data || [];
   const targetsData = targetsResult.data || [];
-  
+
   // Convert Decimal fields to numbers
   const transactions = rawTransactions.map((t: any) => ({
     id: t.id,
@@ -59,7 +74,7 @@ export default async function BranchDetailsPage({
     paymentMethod: t.paymentMethod,
     transactionDate: t.transactionDate,
   }));
-  
+
   // Convert sales data (includes manual POS entries)
   const sales = rawSales.map((s: any) => ({
     id: s.id,
@@ -71,7 +86,7 @@ export default async function BranchDetailsPage({
     dayPart: s.dayPart,
     saleDate: s.saleDate,
   }));
-  
+
   const inventory = rawInventory.map((item: any) => ({
     id: item.id,
     name: item.name,
@@ -79,7 +94,7 @@ export default async function BranchDetailsPage({
     unitCost: Number(item.unitCost),
     status: item.status,
   }));
-  
+
   const staff = (staffResult.data ?? []).map((s) => ({
     id: s.id,
     firstName: s.firstName,
@@ -115,44 +130,34 @@ export default async function BranchDetailsPage({
         ? target.periodEnd.toISOString()
         : String(target.periodEnd),
   }));
-  const orgTableManagementEnabled = branch.organizationId
-    ? await isTableManagementEnabled(branch.organizationId)
-    : false;
-  const tableManagementEnabled = await isTableManagementEnabledForBranch(id);
 
-  let paystackEnabled = false;
-  if (branch.organizationId) {
-    const org = await db.organization.findUnique({
-      where: { id: branch.organizationId },
-      select: { paystackEnabled: true, paystackDashboardEnabled: true, features: true },
-    });
-    if (org) paystackEnabled = isPaystackAnyChannelEnabledForOrg(org);
-  }
+  const [orgTableManagementEnabled, tableManagementEnabled, org] = await Promise.all([
+    branch.organizationId
+      ? isTableManagementEnabled(branch.organizationId)
+      : Promise.resolve(false),
+    isTableManagementEnabledForBranch(id),
+    branch.organizationId
+      ? db.organization.findUnique({
+          where: { id: branch.organizationId },
+          select: { paystackEnabled: true, paystackDashboardEnabled: true, features: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const paystackEnabled = org ? isPaystackAnyChannelEnabledForOrg(org) : false;
 
   return (
-    <div className="space-y-6">
-      <Suspense fallback={<BranchDetailsLoadingSkeleton />}>
-        <BranchDetailsContent
-          branch={branch}
-          transactions={transactions}
-          sales={sales}
-          inventory={inventory}
-          staff={staff}
-          users={users}
-          targets={targets}
-          tableManagementEnabled={tableManagementEnabled}
-          orgTableManagementEnabled={orgTableManagementEnabled}
-          paystackEnabled={paystackEnabled}
-        />
-      </Suspense>
-    </div>
-  );
-}
-
-function BranchDetailsLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
+    <BranchDetailsContent
+      branch={branch}
+      transactions={transactions}
+      sales={sales}
+      inventory={inventory}
+      staff={staff}
+      users={users}
+      targets={targets}
+      tableManagementEnabled={tableManagementEnabled}
+      orgTableManagementEnabled={orgTableManagementEnabled}
+      paystackEnabled={paystackEnabled}
+    />
   );
 }

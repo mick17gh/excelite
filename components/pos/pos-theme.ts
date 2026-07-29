@@ -80,7 +80,10 @@ export function posProductCardClass(options: { active: boolean; disabled: boolea
 }
 
 export const posModalHeaderClass =
-  "border-b border-white/10 excelite-header-gradient text-white px-6 py-4 rounded-t-2xl";
+  "border-b border-white/10 excelite-header-gradient text-white px-6 py-4";
+
+export const posModalContentClass =
+  "overflow-hidden p-0 gap-0 sm:rounded-2xl [&>button]:text-white [&>button]:opacity-90 [&>button]:hover:opacity-100 [&>button]:hover:bg-white/15 [&>button]:ring-offset-0";
 
 export const posPanelHeaderClass =
   "excelite-header-gradient text-white shrink-0 border-b border-white/10";

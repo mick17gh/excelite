@@ -15,29 +15,32 @@ export type SaleDeductionLine = {
 export async function deductInventoryForSale(
   items: SaleDeductionLine[],
   branchId: string,
-  reference: string
+  reference: string,
+  options?: { skipStockCheck?: boolean },
 ) {
   try {
     if (!items.length || !branchId) return;
 
-    const { assertCartStockAvailable } = await import(
-      "@/lib/services/menu-stock-availability"
-    );
-    const stockGuard = await assertCartStockAvailable(
-      branchId,
-      items.map((item) => ({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        menuItemOptionIds: item.menuItemOptionIds,
-      }))
-    );
-    if (!stockGuard.ok) {
-      console.warn(
-        "[deductInventoryForSale] Blocked — insufficient stock:",
-        stockGuard.error,
-        reference
+    if (!options?.skipStockCheck) {
+      const { assertCartStockAvailable } = await import(
+        "@/lib/services/menu-stock-availability"
       );
-      return;
+      const stockGuard = await assertCartStockAvailable(
+        branchId,
+        items.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          menuItemOptionIds: item.menuItemOptionIds,
+        })),
+      );
+      if (!stockGuard.ok) {
+        console.warn(
+          "[deductInventoryForSale] Blocked — insufficient stock:",
+          stockGuard.error,
+          reference,
+        );
+        return;
+      }
     }
 
     const menuItemIds = [...new Set(items.map((i) => i.menuItemId))];
@@ -125,38 +128,51 @@ export async function deductInventoryForSale(
 
     const branchItemMap = new Map(branchItems.map((bi) => [bi.sku, bi]));
 
-    const lowStockAlerts: Array<{ itemId: string; itemName: string; currentStock: number; reorderPoint: number }> = [];
+    const lowStockAlerts: Array<{
+      itemId: string;
+      itemName: string;
+      currentStock: number;
+      reorderPoint: number;
+    }> = [];
 
-    for (const [sku, { totalQty }] of deductions) {
-      const branchItem = branchItemMap.get(sku);
-      if (!branchItem) continue;
+    const deductionEntries = [...deductions.entries()]
+      .map(([sku, { totalQty }]) => {
+        const branchItem = branchItemMap.get(sku);
+        if (!branchItem) return null;
+        return { branchItem, totalQty };
+      })
+      .filter((e): e is NonNullable<typeof e> => e != null);
 
-      await db.inventoryItem.update({
-        where: { id: branchItem.id },
-        data: { currentStock: { decrement: totalQty } },
-      });
+    await Promise.all(
+      deductionEntries.map(async ({ branchItem, totalQty }) => {
+        await Promise.all([
+          db.inventoryItem.update({
+            where: { id: branchItem.id },
+            data: { currentStock: { decrement: totalQty } },
+          }),
+          db.outboundStock.create({
+            data: {
+              branchId,
+              itemId: branchItem.id,
+              quantity: totalQty,
+              movementType: "OUTBOUND_SALE",
+              reason: "Auto-deducted from sale",
+              reference,
+            },
+          }),
+        ]);
 
-      await db.outboundStock.create({
-        data: {
-          branchId,
-          itemId: branchItem.id,
-          quantity: totalQty,
-          movementType: "OUTBOUND_SALE",
-          reason: "Auto-deducted from sale",
-          reference,
-        },
-      });
-
-      const newStock = Number(branchItem.currentStock) - totalQty;
-      if (newStock <= Number(branchItem.reorderPoint)) {
-        lowStockAlerts.push({
-          itemId: branchItem.id,
-          itemName: branchItem.name,
-          currentStock: newStock,
-          reorderPoint: Number(branchItem.reorderPoint),
-        });
-      }
-    }
+        const newStock = Number(branchItem.currentStock) - totalQty;
+        if (newStock <= Number(branchItem.reorderPoint)) {
+          lowStockAlerts.push({
+            itemId: branchItem.id,
+            itemName: branchItem.name,
+            currentStock: newStock,
+            reorderPoint: Number(branchItem.reorderPoint),
+          });
+        }
+      }),
+    );
 
     if (lowStockAlerts.length > 0) {
       await createLowStockAlerts(branchId, lowStockAlerts);

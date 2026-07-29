@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { StaffContent } from "@/components/staff/staff-content";
 import { getStaff, getStaffSummary, getSchedules } from "@/lib/actions/staff";
 import { getBranches } from "@/lib/actions/branches";
@@ -8,7 +9,26 @@ export const metadata = {
   description: "Track staff availability and scheduling across all branches",
 };
 
-export default async function StaffPage() {
+export default function StaffPage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+          Staff Availability
+        </h1>
+        <p className="text-muted-foreground">
+          Monitor staff scheduling and availability across all branches
+        </p>
+      </div>
+
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={4} />}>
+        <StaffPageData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function StaffPageData() {
   const today = new Date();
   const [branchesResult, staffResult, , schedulesResult] = await Promise.all([
     getBranches(),
@@ -26,7 +46,7 @@ export default async function StaffPage() {
   });
   const rawStaffData = staffResult.data || [];
   const todaySchedules = schedulesResult.data || [];
-  
+
   // Convert Decimal fields to numbers for client component compatibility
   const rawStaff = rawStaffData.map((staff: {
     id: string;
@@ -53,13 +73,13 @@ export default async function StaffPage() {
     hourlyRate: Number(staff.hourlyRate),
     defaultShiftTemplate: staff.jobRole?.defaultShiftTemplate ?? null,
   }));
-  
+
   // Create a map of staff schedules for today
   const scheduleMap = new Map<string, { staffId: string; shiftStart: Date; shiftEnd: Date }>();
   todaySchedules.forEach((schedule: { staffId: string; shiftStart: Date; shiftEnd: Date }) => {
     scheduleMap.set(schedule.staffId, schedule);
   });
-  
+
   const schedule = rawStaff.map((staff) => {
     const todaySchedule = scheduleMap.get(staff.id);
     return {
@@ -79,7 +99,7 @@ export default async function StaffPage() {
     const onDutyCount = branchStaff.filter((staff: { dutyStatus: string }) => staff.dutyStatus === "ON_DUTY").length;
     const required = branch.requiredStaff || 5;
     const status = onDutyCount >= required ? "adequate" : onDutyCount >= required * 0.8 ? "warning" : "understaffed";
-    
+
     return {
       branchId: branch.id,
       branchName: branch.name,
@@ -91,37 +111,11 @@ export default async function StaffPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Staff Availability
-        </h1>
-        <p className="text-muted-foreground">
-          Monitor staff scheduling and availability across all branches
-        </p>
-      </div>
-
-      <Suspense fallback={<StaffLoadingSkeleton />}>
-        <StaffContent
-          summary={summary}
-          schedule={schedule}
-          branches={branchList}
-          allStaff={rawStaff}
-        />
-      </Suspense>
-    </div>
-  );
-}
-
-function StaffLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />
-        ))}
-      </div>
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
+    <StaffContent
+      summary={summary}
+      schedule={schedule}
+      branches={branchList}
+      allStaff={rawStaff}
+    />
   );
 }

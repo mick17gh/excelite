@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import {
   dashboardModalHeaderClass,
+  dashboardModalContentClass,
   dashboardPrimaryButtonClass,
 } from "@/components/dashboard/dashboard-theme";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ import {
 import { createBranchToWarehouseTransfer } from "@/lib/actions/stock-transfers";
 import { StockMovementType, UnitType } from "@/lib/generated/prisma/client";
 import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
+import { Combobox } from "@/components/ui/combobox";
 
 interface InventoryCategoryOption {
   id: string;
@@ -120,7 +122,7 @@ export function OutboundStockForm({ open, onOpenChange, branches, items }: Outbo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+      <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[500px]")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
           <DialogTitle className="text-white">Record Outbound Stock</DialogTitle>
           <DialogDescription className="text-white/80">
@@ -131,40 +133,32 @@ export function OutboundStockForm({ open, onOpenChange, branches, items }: Outbo
           <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
             <div className="grid gap-2">
               <Label htmlFor="branch">Branch</Label>
-              <Select
+              <Combobox
+                options={branches.map((branch) => ({
+                  value: branch.id,
+                  label: branch.name,
+                }))}
                 value={formData.branchId}
                 onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select branch..."
+                searchPlaceholder="Search branches..."
+                emptyText="No branches found."
+              />
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="item">Item</Label>
-              <Select
+              <Combobox
+                options={items.map((item) => ({
+                  value: item.id,
+                  label: `${item.name} - ${item.currentStock} ${item.unit} available`,
+                }))}
                 value={formData.itemId}
                 onValueChange={(value) => setFormData({ ...formData, itemId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {items.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} - {item.currentStock} {item.unit} available
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select item..."
+                searchPlaceholder="Search items..."
+                emptyText="No items found."
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -279,7 +273,7 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+      <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[500px]")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
           <DialogTitle className="text-white">Record Loss</DialogTitle>
           <DialogDescription className="text-white/80">
@@ -290,40 +284,32 @@ export function WasteLogForm({ open, onOpenChange, branches, items }: WasteFormP
           <div className="grid flex-1 gap-4 overflow-y-auto px-6 py-4">
             <div className="grid gap-2">
               <Label htmlFor="branch">Branch</Label>
-              <Select
+              <Combobox
+                options={branches.map((branch) => ({
+                  value: branch.id,
+                  label: branch.name,
+                }))}
                 value={formData.branchId}
                 onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select branch..."
+                searchPlaceholder="Search branches..."
+                emptyText="No branches found."
+              />
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="item">Item</Label>
-              <Select
+              <Combobox
+                options={items.map((item) => ({
+                  value: item.id,
+                  label: `${item.name} (${item.sku})`,
+                }))}
                 value={formData.itemId}
                 onValueChange={(value) => setFormData({ ...formData, itemId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {items.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} ({item.sku})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select item..."
+                searchPlaceholder="Search items..."
+                emptyText="No items found."
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -468,7 +454,7 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+      <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[500px]")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
           <DialogTitle className="text-white">Transfer Stock Between Branches</DialogTitle>
           <DialogDescription className="text-white/80">
@@ -480,65 +466,64 @@ export function TransferForm({ open, onOpenChange, branches, items }: TransferFo
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="fromBranch">From Branch</Label>
-                <Select
+                <Combobox
+                  options={branches.map((branch) => ({
+                    value: branch.id,
+                    label: branch.name,
+                  }))}
                   value={formData.fromBranchId}
-                  onValueChange={(value) => setFormData({ ...formData, fromBranchId: value, itemId: "", quantity: "" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      fromBranchId: value,
+                      itemId: "",
+                      quantity: "",
+                    })
+                  }
+                  placeholder="Source..."
+                  searchPlaceholder="Search branches..."
+                  emptyText="No branches found."
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="toBranch">To Branch</Label>
-                <Select
+                <Combobox
+                  options={destBranches.map((branch) => ({
+                    value: branch.id,
+                    label: branch.name,
+                  }))}
                   value={formData.toBranchId}
-                  onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, toBranchId: value })
+                  }
+                  placeholder="Destination..."
+                  searchPlaceholder="Search branches..."
+                  emptyText="No branches found."
                   disabled={!formData.fromBranchId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Destination" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {destBranches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </div>
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="item">Item to Transfer</Label>
-              <Select
+              <Combobox
+                options={branchItems.map((item) => ({
+                  value: item.id,
+                  label: `${item.name} (${item.sku}) — ${item.currentStock} ${item.unit}`,
+                }))}
                 value={formData.itemId}
-                onValueChange={(value) => setFormData({ ...formData, itemId: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, itemId: value })
+                }
+                placeholder={
+                  formData.fromBranchId
+                    ? "Select item..."
+                    : "Select source branch first"
+                }
+                searchPlaceholder="Search items..."
+                emptyText="No items with stock at this branch"
                 disabled={!formData.fromBranchId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={formData.fromBranchId ? "Select item" : "Select source branch first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {branchItems.length === 0 ? (
-                    <SelectItem value="__none" disabled>No items with stock at this branch</SelectItem>
-                  ) : (
-                    branchItems.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.sku}) — {item.currentStock} {item.unit}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="grid gap-2">
@@ -649,7 +634,7 @@ export function AddInventoryItemForm({ open, onOpenChange, branches, categories 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+      <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[600px]")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
           <DialogTitle className="text-white">Add Inventory Item</DialogTitle>
           <DialogDescription className="text-white/80">
@@ -684,39 +669,37 @@ export function AddInventoryItemForm({ open, onOpenChange, branches, categories 
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="category">Category</Label>
-                <Select
+                <Combobox
+                  options={categories.map((category) => ({
+                    value: category.id,
+                    label: category.code
+                      ? `${category.name} (${category.code})`
+                      : category.name,
+                  }))}
                   value={formData.categoryId}
-                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, categoryId: value })
+                  }
+                  placeholder="Select category..."
+                  searchPlaceholder="Search categories..."
+                  emptyText="No categories found."
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="unit">Unit</Label>
-                <Select
+                <Combobox
+                  options={UNIT_TYPES.map((unitType) => ({
+                    value: unitType,
+                    label: UNIT_LABELS[unitType],
+                  }))}
                   value={formData.unit}
-                  onValueChange={(value) => setFormData({ ...formData, unit: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {UNIT_TYPES.map((unitType) => (
-                      <SelectItem key={unitType} value={unitType}>
-                        {UNIT_LABELS[unitType]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, unit: value })
+                  }
+                  placeholder="Select unit..."
+                  searchPlaceholder="Search units..."
+                  emptyText="No units found."
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="unitCost">Unit Cost (GH₵)</Label>
@@ -784,28 +767,26 @@ export function AddInventoryItemForm({ open, onOpenChange, branches, categories 
 
             <div className="grid gap-2">
               <Label htmlFor="branch">Branch</Label>
-              <Select
+              <Combobox
+                options={branches.map((branch) => ({
+                  value: branch.id,
+                  label: branch.name,
+                }))}
                 value={formData.branchId}
-                onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(value) =>
+                  setFormData({ ...formData, branchId: value })
+                }
+                placeholder="Select branch..."
+                searchPlaceholder="Search branches..."
+                emptyText="No branches found."
+              />
             </div>
           </div>
           <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} className={dashboardPrimaryButtonClass}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Item
             </Button>
@@ -882,7 +863,7 @@ export function BranchReturnToWarehouseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[min(90vh,900px)] flex flex-col overflow-hidden p-0">
+      <DialogContent className={cn(dashboardModalContentClass, "max-w-md")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "shrink-0 text-left")}>
           <DialogTitle className="text-white">Return stock to warehouse</DialogTitle>
           <DialogDescription className="text-white/80">
@@ -892,48 +873,39 @@ export function BranchReturnToWarehouseDialog({
         <div className="grid flex-1 gap-3 overflow-y-auto px-6 py-4">
           <div className="grid gap-2">
             <Label>From branch</Label>
-            <Select value={fromBranchId} onValueChange={setFromBranchId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={branches.map((b) => ({ value: b.id, label: b.name }))}
+              value={fromBranchId}
+              onValueChange={setFromBranchId}
+              placeholder="Select branch..."
+              searchPlaceholder="Search branches..."
+              emptyText="No branches found."
+            />
           </div>
           <div className="grid gap-2">
             <Label>To warehouse</Label>
-            <Select value={toWarehouseId} onValueChange={setToWarehouseId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select warehouse" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+              value={toWarehouseId}
+              onValueChange={setToWarehouseId}
+              placeholder="Select warehouse..."
+              searchPlaceholder="Search warehouses..."
+              emptyText="No warehouses found."
+            />
           </div>
           <div className="grid gap-2">
             <Label>Item</Label>
-            <Select value={branchItemId} onValueChange={setBranchItemId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select item" />
-              </SelectTrigger>
-              <SelectContent>
-                {branchItems.map((i) => (
-                  <SelectItem key={i.id} value={i.id}>
-                    {i.name} ({i.currentStock} {i.unit})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={branchItems.map((i) => ({
+                value: i.id,
+                label: `${i.name} (${i.currentStock} ${i.unit})`,
+              }))}
+              value={branchItemId}
+              onValueChange={setBranchItemId}
+              placeholder="Select item..."
+              searchPlaceholder="Search items..."
+              emptyText="No items found."
+            />
           </div>
           <div className="grid gap-2">
             <Label>Quantity</Label>

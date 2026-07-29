@@ -40,6 +40,7 @@ import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { TablePagination } from "@/components/ui/table-pagination";
 import {
   dashboardModalHeaderClass,
+  dashboardModalContentClass,
   dashboardPrimaryButtonClass,
   dashboardToolbarClass,
 } from "@/components/dashboard/dashboard-theme";
@@ -302,7 +303,7 @@ export function CategoriesContent({ categories: initialCategories, hideStats }: 
       </ContentCard>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
+        <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[500px]")}>
           <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
             <DialogTitle className="text-white">Create Category</DialogTitle>
             <DialogDescription className="text-white/80">
@@ -345,7 +346,7 @@ export function CategoriesContent({ categories: initialCategories, hideStats }: 
       </Dialog>
 
       <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>
-        <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
+        <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[500px]")}>
           <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
             <DialogTitle className="text-white">Edit Category</DialogTitle>
             <DialogDescription className="text-white/80">

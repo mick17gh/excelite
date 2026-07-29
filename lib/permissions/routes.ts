@@ -8,6 +8,7 @@ import {
   Tag,
   ShoppingCart,
   Monitor,
+  FileBarChart,
 } from "lucide-react";
 import type { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { hasFeature, isSuperAdmin, type TierFeatures } from "@/lib/tier-config";
@@ -52,6 +53,7 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
     permission: "inventory:view",
     featureKey: "inventory",
   },
+  { name: "Reports", href: "/dashboard/reports", icon: FileBarChart, permission: "reports:view" },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings:view" },
 ];
 
@@ -89,6 +91,10 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   {
     match: (p) => p === "/dashboard/categories" || p.startsWith("/dashboard/categories/"),
     permissions: ["categories:view"],
+  },
+  {
+    match: (p) => p === "/dashboard/reports" || p.startsWith("/dashboard/reports/"),
+    permissions: ["reports:view"],
   },
   { match: (p) => p === "/dashboard/users" || p.startsWith("/dashboard/users/"), permissions: ["users:view"] },
   {

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { TargetsContent } from "@/components/targets/targets-content";
 import { getTargets } from "@/lib/actions/targets";
 import { getBranches } from "@/lib/actions/branches";
@@ -8,7 +9,26 @@ export const metadata = {
   description: "Set and manage performance targets for branches",
 };
 
-export default async function TargetsPage() {
+export default function TargetsPage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+          Branch Targets & KPIs
+        </h1>
+        <p className="text-muted-foreground">
+          Set performance targets and KPIs for branches to track and compare performance
+        </p>
+      </div>
+
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={0} />}>
+        <TargetsPageData />
+      </Suspense>
+    </div>
+  );
+}
+
+async function TargetsPageData() {
   const [targetsResult, branchesResult] = await Promise.all([
     getTargets(),
     getBranches(),
@@ -23,28 +43,5 @@ export default async function TargetsPage() {
     };
   });
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          Branch Targets & KPIs
-        </h1>
-        <p className="text-muted-foreground">
-          Set performance targets and KPIs for branches to track and compare performance
-        </p>
-      </div>
-
-      <Suspense fallback={<TargetsLoadingSkeleton />}>
-        <TargetsContent targets={targets} branches={branches} />
-      </Suspense>
-    </div>
-  );
-}
-
-function TargetsLoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="h-96 animate-pulse rounded-2xl bg-muted" />
-    </div>
-  );
+  return <TargetsContent targets={targets} branches={branches} />;
 }

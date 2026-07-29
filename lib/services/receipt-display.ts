@@ -10,6 +10,8 @@ export type ReceiptDisplayOrder = {
   tax?: number;
   taxName?: string;
   taxRate?: number;
+  taxNumber?: string | null;
+  showTaxNumberOnReceipt?: boolean;
   subtotal?: number;
   discount?: number;
   deliveryFee?: number;
@@ -20,6 +22,19 @@ export type ReceiptDisplayOrder = {
 /** When false, hide net subtotal and tax lines; line items use menu (gross) prices. */
 export function shouldShowTaxBreakdown(order: ReceiptDisplayOrder): boolean {
   return order.showTaxOnReceipt !== false;
+}
+
+/** Show TIN / VAT ID under branch name when toggle is on and a number is set. */
+export function receiptTaxNumberLine(order: {
+  taxNumber?: string | null;
+  showTaxNumberOnReceipt?: boolean;
+  branch?: { taxNumber?: string | null; showTaxNumberOnReceipt?: boolean } | null;
+}): string | null {
+  const show =
+    order.showTaxNumberOnReceipt ?? order.branch?.showTaxNumberOnReceipt ?? false;
+  const number = (order.taxNumber ?? order.branch?.taxNumber ?? "").trim();
+  if (!show || !number) return null;
+  return `TIN: ${number}`;
 }
 
 export function receiptLineAmount(item: ReceiptLineItem): number {

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { getSuppliersForManagement } from "@/lib/actions/inventory";
 import { SuppliersContent } from "@/components/suppliers/suppliers-content";
 
@@ -7,10 +8,7 @@ export const metadata = {
   description: "Manage supplier reliability, terms, and spend history",
 };
 
-export default async function SuppliersPage() {
-  const suppliersResult = await getSuppliersForManagement();
-  const suppliers = suppliersResult.data || [];
-
+export default function SuppliersPage() {
   return (
     <div className="space-y-6">
       <div>
@@ -19,9 +17,16 @@ export default async function SuppliersPage() {
           Manage supplier profiles, tags, and lifetime payments
         </p>
       </div>
-      <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-muted" />}>
-        <SuppliersContent suppliers={suppliers} />
+      <Suspense fallback={<DashboardPageSkeleton kpiCount={0} />}>
+        <SuppliersPageData />
       </Suspense>
     </div>
   );
+}
+
+async function SuppliersPageData() {
+  const suppliersResult = await getSuppliersForManagement();
+  const suppliers = suppliersResult.data || [];
+
+  return <SuppliersContent suppliers={suppliers} />;
 }

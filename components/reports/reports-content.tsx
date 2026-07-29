@@ -51,7 +51,7 @@ import { toast } from "sonner";
 import { generateReportData, type ReportId } from "@/lib/actions/reports";
 import { downloadReportCSV, downloadReportXLSX } from "@/lib/utils/report-export";
 import { useCurrency } from "@/contexts/currency-context";
-import { REPORT_CATALOG } from "@/lib/reports/catalog";
+import { REPORT_CATALOG, PRIMARY_REPORT_IDS } from "@/lib/reports/catalog";
 import { usePermissions } from "@/contexts/permissions-context";
 import { canAccessReport, canExportReports } from "@/lib/reports/permissions";
 
@@ -120,11 +120,14 @@ const REPORT_FREQUENCY: Partial<Record<ReportId, string>> = {
   "cash-transactions": "Daily",
 };
 
-const reportTypes: ReportType[] = REPORT_CATALOG.map((entry) => ({
-  ...entry,
-  icon: REPORT_ICONS[entry.id],
-  frequency: REPORT_FREQUENCY[entry.id] ?? "Weekly",
-}));
+const reportTypes: ReportType[] = PRIMARY_REPORT_IDS.map((id) => {
+  const entry = REPORT_CATALOG.find((r) => r.id === id)!;
+  return {
+    ...entry,
+    icon: REPORT_ICONS[entry.id],
+    frequency: REPORT_FREQUENCY[entry.id] ?? "Daily",
+  };
+});
 
 export function ReportsContent({
   branches,
@@ -151,10 +154,15 @@ export function ReportsContent({
   } | null>(null);
 
   const handleGenerateReport = (reportId: ReportId, exportFormat?: "csv" | "excel") => {
-    if (!dateRange?.from || !dateRange?.to) {
+    if (!dateRange?.from) {
       toast.error("Please select a date range");
       return;
     }
+
+    const from = new Date(dateRange.from);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(dateRange.to ?? dateRange.from);
+    to.setHours(23, 59, 59, 999);
 
     setGeneratingReport(reportId);
     startTransition(async () => {
@@ -162,8 +170,8 @@ export function ReportsContent({
         const result = await generateReportData({
           reportId,
           branchId: selectedBranch === "all" ? undefined : selectedBranch,
-          startDate: dateRange.from!,
-          endDate: dateRange.to!,
+          startDate: from,
+          endDate: to,
         });
 
         if (result.success && result.data) {
@@ -444,11 +452,18 @@ export function ReportsContent({
               </Select>
             </div>
           </div>
-          {dateRange?.from && dateRange?.to && (
+          {dateRange?.from && (
             <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
               <span>
-                Report period: {format(dateRange.from, "MMM dd, yyyy")} - {format(dateRange.to, "MMM dd, yyyy")}
+                {(() => {
+                  const end = dateRange.to ?? dateRange.from;
+                  const sameDay =
+                    dateRange.from.toDateString() === end.toDateString();
+                  return sameDay
+                    ? `Report period: ${format(dateRange.from, "MMM dd, yyyy")} (full day)`
+                    : `Report period: ${format(dateRange.from, "MMM dd, yyyy")} - ${format(end, "MMM dd, yyyy")}`;
+                })()}
               </span>
             </div>
           )}

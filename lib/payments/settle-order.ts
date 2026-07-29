@@ -115,24 +115,6 @@ export async function settleOrderWithTenders(
     const orderTotal = roundMoney(Number(order.total));
     const expectedTotal = roundMoney(orderTotal + tip);
 
-    if (order.status !== "COMPLETED" && order.paymentStatus !== "PAID") {
-      const { assertCartStockAvailable } = await import(
-        "@/lib/services/menu-stock-availability"
-      );
-      const stockCheck = await assertCartStockAvailable(
-        order.branchId,
-        order.items.map((item) => ({
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-          menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
-          menuItemName: item.menuItem?.name,
-        })),
-      );
-      if (!stockCheck.ok) {
-        return { success: false, error: stockCheck.error };
-      }
-    }
-
     const validation = validateTenders(expectedTotal, input.tenders);
     if (!validation.ok) {
       return { success: false, error: validation.error };
@@ -164,136 +146,178 @@ export async function settleOrderWithTenders(
 
     const orderStatus = input.skipStatusComplete ? "IN_PROGRESS" : "COMPLETED";
     const provider = input.paymentProvider ?? "pos";
-    const transactionStaffId = await resolveTransactionStaffId(
-      order.cashierId,
-      order.branchId,
+
+    const allOptionIds = [
+      ...new Set(
+        order.items.flatMap((i) => i.selections?.map((s) => s.menuItemOptionId) || []),
+      ),
+    ];
+
+    // Prefetch outside the interactive transaction to keep it short (avoids Prisma
+    // "Transaction not found" / timeout on slow remote DB connections).
+    const [stockCheck, transactionStaffId, optionRows] = await Promise.all([
+      (async () => {
+        const { assertCartStockAvailable } = await import(
+          "@/lib/services/menu-stock-availability"
+        );
+        return assertCartStockAvailable(
+          order.branchId,
+          order.items.map((item) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) || [],
+            menuItemName: item.menuItem?.name,
+          })),
+        );
+      })(),
+      resolveTransactionStaffId(order.cashierId, order.branchId),
+      allOptionIds.length
+        ? db.menuItemOption.findMany({
+            where: { id: { in: allOptionIds } },
+            select: { id: true, costDelta: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    if (!stockCheck.ok) {
+      return { success: false, error: stockCheck.error };
+    }
+
+    const optCostDelta = new Map(
+      optionRows.map((o) => [o.id, o.costDelta != null ? Number(o.costDelta) : 0]),
     );
 
     let saleId: string | null = null;
     let firstTransactionId: string | null = null;
 
-    await db.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          status: orderStatus,
-          paymentMethod,
-          paymentStatus: "PAID",
-          ...(orderStatus === "COMPLETED" ? { closedAt: new Date() } : {}),
-        },
-      });
-
-      for (const tender of input.tenders) {
-        await tx.payment.create({
+    await db.$transaction(
+      async (tx) => {
+        await tx.order.update({
+          where: { id: order.id },
           data: {
-            orderId: order.id,
-            reference: generatePaymentRef(),
-            amount: tender.amount,
-            status: "PAID",
-            provider,
-            paymentMethod: tender.method,
-            providerRef: tender.reference?.trim() || null,
-            paidAt: new Date(),
+            status: orderStatus,
+            paymentMethod,
+            paymentStatus: "PAID",
+            ...(orderStatus === "COMPLETED" ? { closedAt: new Date() } : {}),
           },
         });
 
-        const transaction = await tx.transaction.create({
-          data: {
-            transactionRef: generateTransactionRef(),
-            branchId: order.branchId,
-            staffId: transactionStaffId,
-            paymentMethod: tender.method,
-            amount: tender.amount,
-            tip: 0,
-            transactionDate: new Date(),
-          },
-        });
-        if (!firstTransactionId) firstTransactionId = transaction.id;
-      }
+        for (const tender of input.tenders) {
+          const [, transaction] = await Promise.all([
+            tx.payment.create({
+              data: {
+                orderId: order.id,
+                reference: generatePaymentRef(),
+                amount: tender.amount,
+                status: "PAID",
+                provider,
+                paymentMethod: tender.method,
+                providerRef: tender.reference?.trim() || null,
+                paidAt: new Date(),
+              },
+            }),
+            tx.transaction.create({
+              data: {
+                transactionRef: generateTransactionRef(),
+                branchId: order.branchId,
+                staffId: transactionStaffId,
+                paymentMethod: tender.method,
+                amount: tender.amount,
+                tip: 0,
+                transactionDate: new Date(),
+              },
+            }),
+          ]);
+          if (!firstTransactionId) firstTransactionId = transaction.id;
+        }
 
-      if (input.createSale !== false && firstTransactionId) {
-        const channelMap: Record<string, SalesChannel> = {
-          DINE_IN: "DINE_IN",
-          TAKEOUT: "TAKEOUT",
-          DELIVERY: "DELIVERY",
-          APP: "APP",
-        };
-        const channel = channelMap[order.type] || "DINE_IN";
+        if (input.createSale !== false && firstTransactionId) {
+          const channelMap: Record<string, SalesChannel> = {
+            DINE_IN: "DINE_IN",
+            TAKEOUT: "TAKEOUT",
+            DELIVERY: "DELIVERY",
+            APP: "APP",
+          };
+          const channel = channelMap[order.type] || "DINE_IN";
 
-        const allOptionIds = order.items.flatMap(
-          (i) => i.selections?.map((s) => s.menuItemOptionId) || [],
-        );
-        const optionRows = allOptionIds.length
-          ? await tx.menuItemOption.findMany({
-              where: { id: { in: allOptionIds } },
-              select: { id: true, costDelta: true },
-            })
-          : [];
-        const optCostDelta = new Map(
-          optionRows.map((o) => [o.id, o.costDelta != null ? Number(o.costDelta) : 0]),
-        );
-
-        const sale = await tx.sale.create({
-          data: {
-            saleNumber: generateSaleNumber(),
-            branchId: order.branchId,
-            transactionId: firstTransactionId,
-            subtotal: order.subtotal,
-            tax: order.tax,
-            total: order.total,
-            channel,
-            dayPart: resolveDayPart(),
-            customerCount: 1,
-            saleDate: new Date(),
-            items: {
-              create: order.items.map((item) => {
-                const oids = item.selections?.map((s) => s.menuItemOptionId) || [];
-                const optionCostSum = oids.reduce(
-                  (s, id) => s + (optCostDelta.get(id) || 0),
-                  0,
-                );
-                const unitCost =
-                  Math.round(
-                    ((item.menuItem?.cost ? Number(item.menuItem.cost) : 0) + optionCostSum) *
-                      100,
-                  ) / 100;
-                return {
-                  menuItemId: item.menuItemId,
-                  quantity: item.quantity,
-                  unitPrice: item.unitPrice,
-                  unitCost,
-                  total: item.lineTotal,
-                  discount: 0,
-                  configurationLabel: item.configurationLabel,
-                  configurationKey: item.configurationKey,
-                  selections:
-                    oids.length > 0
-                      ? { create: oids.map((menuItemOptionId) => ({ menuItemOptionId })) }
-                      : undefined,
-                };
-              }),
+          const sale = await tx.sale.create({
+            data: {
+              saleNumber: generateSaleNumber(),
+              branchId: order.branchId,
+              transactionId: firstTransactionId,
+              subtotal: order.subtotal,
+              tax: order.tax,
+              total: order.total,
+              channel,
+              dayPart: resolveDayPart(),
+              customerCount: 1,
+              saleDate: new Date(),
+              items: {
+                create: order.items.map((item) => {
+                  const oids = item.selections?.map((s) => s.menuItemOptionId) || [];
+                  const optionCostSum = oids.reduce(
+                    (s, id) => s + (optCostDelta.get(id) || 0),
+                    0,
+                  );
+                  const unitCost =
+                    Math.round(
+                      ((item.menuItem?.cost ? Number(item.menuItem.cost) : 0) +
+                        optionCostSum) *
+                        100,
+                    ) / 100;
+                  return {
+                    menuItemId: item.menuItemId,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    unitCost,
+                    total: item.lineTotal,
+                    discount: 0,
+                    configurationLabel: item.configurationLabel,
+                    configurationKey: item.configurationKey,
+                    selections:
+                      oids.length > 0
+                        ? {
+                            create: oids.map((menuItemOptionId) => ({
+                              menuItemOptionId,
+                            })),
+                          }
+                        : undefined,
+                  };
+                }),
+              },
             },
-          },
-        });
-        saleId = sale.id;
-      }
-    });
+          });
+          saleId = sale.id;
+        }
+      },
+      {
+        maxWait: 10_000,
+        timeout: 20_000,
+      },
+    );
+
+    const postWork: Promise<unknown>[] = [];
 
     if (order.tableSessionId) {
-      await closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId);
+      postWork.push(
+        closeTableSessionIfAllOrdersPaid(order.tableSessionId, order.branchId),
+      );
     }
 
     if (saleId) {
-      await logCreate("Sale", saleId, {
-        saleNumber: saleId,
-        orderId: order.id,
-        branchId: order.branchId,
-        total: orderTotal,
-        paymentMethod,
-      });
-
-      try {
-        await deductInventoryForSale(
+      postWork.push(
+        logCreate("Sale", saleId, {
+          saleNumber: saleId,
+          orderId: order.id,
+          branchId: order.branchId,
+          total: orderTotal,
+          paymentMethod,
+        }).catch((err) =>
+          console.warn("[settleOrderWithTenders] Audit log failed:", err),
+        ),
+      );
+      postWork.push(
+        deductInventoryForSale(
           order.items.map((item) => ({
             menuItemId: item.menuItemId,
             quantity: item.quantity,
@@ -301,31 +325,34 @@ export async function settleOrderWithTenders(
           })),
           order.branchId,
           order.id,
-        );
-      } catch (err) {
-        console.warn("[settleOrderWithTenders] Inventory deduction failed:", err);
-      }
+          { skipStockCheck: true },
+        ).catch((err) =>
+          console.warn("[settleOrderWithTenders] Inventory deduction failed:", err),
+        ),
+      );
     }
 
-    try {
-      await sendPaymentReceiptSMS(order.id);
-    } catch (err) {
-      console.warn("[settleOrderWithTenders] Failed to send payment receipt SMS:", err);
-    }
+    await Promise.all(postWork);
+
+    // Do not block the cashier on SMS / delivery provisioning.
+    void sendPaymentReceiptSMS(order.id).catch((err) =>
+      console.warn("[settleOrderWithTenders] Failed to send payment receipt SMS:", err),
+    );
 
     if (order.type === "DELIVERY") {
-      try {
-        await createDeliveryRequest({
-          orderId: order.id,
-          deliveryAddress: order.deliveryAddress || undefined,
-          deliveryPhone: order.deliveryPhone || undefined,
-          customerName: order.customerName || undefined,
-          fee: Number(order.deliveryFee) || 0,
-          notes: order.deliveryNotes || undefined,
-        });
-      } catch (err) {
-        console.warn("[settleOrderWithTenders] Failed to create delivery request:", err);
-      }
+      void createDeliveryRequest({
+        orderId: order.id,
+        deliveryAddress: order.deliveryAddress || undefined,
+        deliveryPhone: order.deliveryPhone || undefined,
+        customerName: order.customerName || undefined,
+        fee: Number(order.deliveryFee) || 0,
+        notes: order.deliveryNotes || undefined,
+      }).catch((err) =>
+        console.warn(
+          "[settleOrderWithTenders] Failed to create delivery request:",
+          err,
+        ),
+      );
     }
 
     return {

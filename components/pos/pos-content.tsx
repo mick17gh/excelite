@@ -567,7 +567,17 @@ export function PosContent({
     enabled: boolean;
     inclusive: boolean;
     showTaxOnReceipt: boolean;
-  }>({ rate: 12.5, name: "VAT", enabled: true, inclusive: false, showTaxOnReceipt: true });
+    taxNumber: string | null;
+    showTaxNumberOnReceipt: boolean;
+  }>({
+    rate: 12.5,
+    name: "VAT",
+    enabled: true,
+    inclusive: false,
+    showTaxOnReceipt: true,
+    taxNumber: null,
+    showTaxNumberOnReceipt: false,
+  });
 
   const taxAmounts = computeOrderTaxAmounts({
     lineTotal: cartSubtotal,
@@ -717,6 +727,8 @@ export function PosContent({
         tax,
         taxInclusive: taxSettings.inclusive,
         showTaxOnReceipt: taxSettings.showTaxOnReceipt,
+        taxNumber: taxSettings.taxNumber,
+        showTaxNumberOnReceipt: taxSettings.showTaxNumberOnReceipt,
         taxName: taxSettings.name,
         taxRate: taxSettings.rate,
         branch: branch
@@ -725,6 +737,8 @@ export function PosContent({
               code: branch.code,
               taxInclusive: taxSettings.inclusive,
               showTaxOnReceipt: taxSettings.showTaxOnReceipt,
+              taxNumber: taxSettings.taxNumber,
+              showTaxNumberOnReceipt: taxSettings.showTaxNumberOnReceipt,
               taxName: taxSettings.name,
               taxRate: taxSettings.rate,
             }
@@ -1321,6 +1335,18 @@ export function PosContent({
         onOrderTypeChange={(t) => setOrderType(t as OrderType)}
         offlineRestricted={!isOnline}
         allowComplimentary={allowComplimentary}
+        onCustomerCreated={(customer) => {
+          setLiveCustomers((prev) => {
+            const next = [customer, ...prev.filter((c) => c.id !== customer.id)];
+            void savePosSnapshot({
+              branches: liveBranches,
+              menuItems: liveMenuItems,
+              recentOrders: liveRecentOrders,
+              customers: next,
+            });
+            return next;
+          });
+        }}
       />
 
       <Dialog
@@ -1331,7 +1357,7 @@ export function PosContent({
         }}
       >
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-2xl">
-          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white rounded-t-2xl border-b border-white/10">
+          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white border-b border-white/10">
             <DialogTitle className="text-base font-semibold">
               {optionPickerItem?.name ?? "Customize"}
             </DialogTitle>

@@ -59,6 +59,7 @@ export function MobileNav({
             <Link
               key={item.name}
               href={item.href}
+              prefetch
               className={cn(
                 "flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium transition-colors cursor-pointer",
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
@@ -98,6 +99,7 @@ export function MobileNav({
                   <Link
                     key={item.name}
                     href={item.href}
+                    prefetch
                     onClick={() => setMoreOpen(false)}
                     className={cn(
                       "flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors cursor-pointer",

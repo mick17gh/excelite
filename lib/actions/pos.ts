@@ -42,6 +42,8 @@ function serializePosOrder(order: Record<string, any>) {
     deliveryLng: order.deliveryLng ? Number(order.deliveryLng) : null,
     taxInclusive: order.branch?.taxInclusive ?? false,
     showTaxOnReceipt: order.branch?.showTaxOnReceipt ?? true,
+    taxNumber: order.branch?.taxNumber ?? null,
+    showTaxNumberOnReceipt: order.branch?.showTaxNumberOnReceipt ?? false,
     taxName: order.branch?.taxName ?? "VAT",
     taxRate: order.branch?.taxRate != null ? Number(order.branch.taxRate) : undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,6 +64,8 @@ function serializePosOrder(order: Record<string, any>) {
       taxRate: Number(order.branch.taxRate),
       taxInclusive: order.branch.taxInclusive ?? false,
       showTaxOnReceipt: order.branch.showTaxOnReceipt ?? true,
+      taxNumber: order.branch.taxNumber ?? null,
+      showTaxNumberOnReceipt: order.branch.showTaxNumberOnReceipt ?? false,
       taxName: order.branch.taxName,
       taxEnabled: order.branch.taxEnabled ?? true,
       latitude: order.branch.latitude ? Number(order.branch.latitude) : null,
@@ -221,6 +225,8 @@ export async function createPosOrder(input: CreatePosOrderInput) {
         taxEnabled: true,
         taxInclusive: true,
         showTaxOnReceipt: true,
+        taxNumber: true,
+        showTaxNumberOnReceipt: true,
       },
     });
 

@@ -17,6 +17,7 @@ import QRCode from "qrcode";
 import {
   receiptLineAmount,
   receiptTaxLabel,
+  receiptTaxNumberLine,
   shouldShowInclusiveFootnote,
   shouldShowTaxBreakdown,
   type ReceiptDisplayOrder,
@@ -32,7 +33,12 @@ type ReceiptOrderShape = Record<string, unknown> & ReceiptDisplayOrder & {
   payments?: Array<{ paymentMethod?: string | null; amount: number }>;
   customerName?: string;
   createdAt?: string;
-  branch?: { name?: string; code?: string };
+  branch?: {
+    name?: string;
+    code?: string;
+    taxNumber?: string | null;
+    showTaxNumberOnReceipt?: boolean;
+  };
   items?: (ReceiptLineItem & {
     configurationLabel?: string | null;
     menuItem?: { name?: string };
@@ -148,8 +154,13 @@ export function ReceiptModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[500px] rounded-2xl">
-        <DialogHeader className="shrink-0 px-6 py-4 excelite-header-gradient text-white rounded-t-2xl border-b border-white/10">
+      <DialogContent
+        className="flex max-h-[min(90vh,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[500px] rounded-2xl"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
+        <DialogHeader className="shrink-0 px-6 py-4 excelite-header-gradient text-white border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#22C55E]/20">
               {order.syncPending ? (
@@ -185,6 +196,9 @@ export function ReceiptModal({
               <p className="text-xs text-muted-foreground">
                 {order.branch?.code || ""}
               </p>
+              {receiptTaxNumberLine(order) ? (
+                <p className="text-xs text-muted-foreground">{receiptTaxNumberLine(order)}</p>
+              ) : null}
             </div>
 
             <div className="space-y-1 text-xs">
@@ -312,6 +326,7 @@ function generateReceiptText(
     "=".repeat(40),
     `  ${order.branch?.name || "Restaurant"}`,
     `  ${order.branch?.code || ""}`,
+    ...(receiptTaxNumberLine(order) ? [`  ${receiptTaxNumberLine(order)}`] : []),
     "=".repeat(40),
     `Order #: ${order.orderNumber}`,
     order.createdAt

@@ -27,7 +27,6 @@ export const LITE_BLOCKED_PATH_MATCHERS: ((pathname: string) => boolean)[] = [
   (p) => p === "/dashboard/targets" || p.startsWith("/dashboard/targets/"),
   (p) => p === "/dashboard/staff" || p.startsWith("/dashboard/staff/"),
   (p) => p === "/dashboard/alerts" || p.startsWith("/dashboard/alerts/"),
-  (p) => p === "/dashboard/reports" || p.startsWith("/dashboard/reports/"),
   (p) => p === "/dashboard/api-keys" || p.startsWith("/dashboard/api-keys/"),
 ];
 
@@ -50,6 +49,7 @@ export const LITE_PERMISSION_GROUP_KEYS = [
   "operations",
   "menu",
   "inventory",
+  "reports",
   "settings",
   "users",
 ] as const;

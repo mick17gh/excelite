@@ -73,6 +73,8 @@ interface Branch {
   taxName: string;
   taxInclusive?: boolean;
   showTaxOnReceipt?: boolean;
+  taxNumber?: string | null;
+  showTaxNumberOnReceipt?: boolean;
 }
 
 interface MenuItem {

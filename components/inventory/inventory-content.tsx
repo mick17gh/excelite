@@ -8,7 +8,6 @@ import { ContentCard } from "@/components/dashboard/content-card";
 import {
   dashboardTabListClass,
   dashboardToolbarClass,
-  dashboardPrimaryButtonClass,
   stockStatusBadgeClass,
   transferStatusBadgeClass,
 } from "@/components/dashboard/dashboard-theme";
@@ -41,7 +40,6 @@ import {
   Plus,
   ArrowDownToLine,
   ArrowUpFromLine,
-  RefreshCw,
   Trash2,
   Download,
   MoreHorizontal,
@@ -61,8 +59,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   OutboundStockForm,
   WasteLogForm,
-  TransferForm,
-  BranchReturnToWarehouseDialog,
+  AddInventoryItemForm,
 } from "@/components/inventory/inventory-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { updateBranchTransferStatus } from "@/lib/actions/inventory";
@@ -259,9 +256,8 @@ export function InventoryContent({
   // Form states
   const [isOutboundOpen, setIsOutboundOpen] = useState(false);
   const [isWasteOpen, setIsWasteOpen] = useState(false);
-  const [isTransferOpen, setIsTransferOpen] = useState(false);
-  const [isBranchReturnOpen, setIsBranchReturnOpen] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
   const [reconcileSubmittedToday, setReconcileSubmittedToday] = useState(false);
 
@@ -555,49 +551,11 @@ export function InventoryContent({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <TabsList className={cn(dashboardTabListClass, "h-11 w-full sm:w-auto inline-flex flex-wrap")}>
             <TabsTrigger value="all" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">All Items</TabsTrigger>
-            <TabsTrigger value="warehouse" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">From Warehouse</TabsTrigger>
             <TabsTrigger value="outbound" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Outbound</TabsTrigger>
-            <TabsTrigger value="transfers" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Branch Transfers</TabsTrigger>
-            <TabsTrigger value="to-warehouse" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">To Warehouse</TabsTrigger>
             <TabsTrigger value="reconciliations" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Reconciliations</TabsTrigger>
           </TabsList>
 
           <div className="flex flex-wrap gap-2">
-            {canReconcile && reconcileBranchId && (
-              <Button
-                className={cn("h-10 rounded-xl", reconcileSubmittedToday ? "" : dashboardPrimaryButtonClass)}
-                variant={reconcileSubmittedToday ? "outline" : "default"}
-                onClick={() => setIsReconcileOpen(true)}
-              >
-                <ClipboardCheck className="mr-1.5 h-4 w-4" />
-                {reconcileSubmittedToday ? "View reconciliation" : "Reconcile stock"}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="h-10 rounded-xl"
-              onClick={() => {
-                const exportData = filteredItems.map((i) => ({
-                  Name: i.name,
-                  SKU: i.sku,
-                  Category: i.category,
-                  Branch: i.branchName,
-                  "Current Stock": i.currentStock,
-                  Unit: i.unit,
-                  "Unit Cost": i.unitCost,
-                  "Total Value": i.currentStock * i.unitCost,
-                  Status: i.status,
-                }));
-                downloadCSV(exportData, `inventory-${formatDateForFilename()}`);
-              }}
-            >
-              <Download className="mr-1.5 h-4 w-4" />
-              Export
-            </Button>
-            <Button variant="outline" className="h-10 rounded-xl" onClick={() => setIsBulkImportOpen(true)}>
-              <Upload className="mr-1.5 h-4 w-4" />
-              Import CSV
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-10 rounded-xl">
@@ -605,7 +563,42 @@ export function InventoryContent({
                   <MoreHorizontal className="ml-1.5 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => setIsAddItemOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add inventory item
+                </DropdownMenuItem>
+                {canReconcile && reconcileBranchId && (
+                  <DropdownMenuItem onClick={() => setIsReconcileOpen(true)}>
+                    <ClipboardCheck className="mr-2 h-4 w-4" />
+                    {reconcileSubmittedToday ? "View reconciliation" : "Reconcile stock"}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    const exportData = filteredItems.map((i) => ({
+                      Name: i.name,
+                      SKU: i.sku,
+                      Category: i.category,
+                      Branch: i.branchName,
+                      "Current Stock": i.currentStock,
+                      Unit: i.unit,
+                      "Unit Cost": i.unitCost,
+                      "Total Value": i.currentStock * i.unitCost,
+                      Status: i.status,
+                    }));
+                    downloadCSV(exportData, `inventory-${formatDateForFilename()}`);
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsBulkImportOpen(true)}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import CSV
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setIsOutboundOpen(true)}>
                   <ArrowUpFromLine className="mr-2 h-4 w-4" />
                   Record Outbound
@@ -613,15 +606,6 @@ export function InventoryContent({
                 <DropdownMenuItem onClick={() => setIsWasteOpen(true)}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   Record Loss
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setIsTransferOpen(true)}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Transfer to Branch
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsBranchReturnOpen(true)}>
-                  <ArrowUpFromLine className="mr-2 h-4 w-4" />
-                  Return to Warehouse
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1336,19 +1320,12 @@ export function InventoryContent({
         branches={branches}
         items={items}
       />
-      <TransferForm
-        open={isTransferOpen}
-        onOpenChange={setIsTransferOpen}
+
+      <AddInventoryItemForm
+        open={isAddItemOpen}
+        onOpenChange={setIsAddItemOpen}
         branches={branches}
-        items={items}
-      />
-      <BranchReturnToWarehouseDialog
-        open={isBranchReturnOpen}
-        onOpenChange={setIsBranchReturnOpen}
-        branches={branches}
-        warehouses={warehouses}
-        items={items}
-        onCreated={() => router.refresh()}
+        categories={categories}
       />
 
       {/* Bulk Import Dialog */}
@@ -1357,6 +1334,7 @@ export function InventoryContent({
         onOpenChange={setIsBulkImportOpen}
         type="inventory"
         branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+        inventoryCategories={categories}
         onSuccess={() => window.location.reload()}
       />
     </div>

@@ -28,6 +28,7 @@ import { authClient } from "@/lib/auth-client";
 import { getRoleFormLabel, getUserAssignableRoles } from "@/lib/permissions/labels";
 import {
   dashboardModalHeaderClass,
+  dashboardModalContentClass,
   dashboardPrimaryButtonClass,
   dashboardSectionCardClass,
 } from "@/components/dashboard/dashboard-theme";
@@ -163,7 +164,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-y-auto p-0 gap-0">
+      <DialogContent className={cn(dashboardModalContentClass, "w-[95vw] max-w-[600px] max-h-[90vh]")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
           <DialogTitle className="text-white">Add New User</DialogTitle>
           <DialogDescription className="text-white/80">
@@ -461,7 +462,7 @@ export function EditUserForm({ open, onOpenChange, user, branches, warehouses }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden">
+      <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[500px]")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
           <DialogTitle className="text-white">Edit User</DialogTitle>
           <DialogDescription className="text-white/80">
@@ -678,7 +679,7 @@ export function ResetPasswordDialog({ open, onOpenChange, user }: ResetPasswordD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden">
+      <DialogContent className={cn(dashboardModalContentClass, "sm:max-w-[425px]")}>
         <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
           <DialogTitle className="text-white">Reset Password</DialogTitle>
           <DialogDescription className="text-white/80">

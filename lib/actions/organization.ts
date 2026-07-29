@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { SubscriptionTier, SubscriptionStatus, Role } from "@/lib/generated/prisma/client";
@@ -65,7 +66,7 @@ export interface UpdateOrganizationInput {
 }
 
 /** Resolves org from user.organizationId, else branch/warehouse; may backfill user.organizationId. */
-export async function getSessionOrganizationId(): Promise<string | null> {
+export const getSessionOrganizationId = cache(async (): Promise<string | null> => {
   let session;
   try {
     session = await auth.api.getSession({ headers: await headers() });
@@ -118,7 +119,7 @@ export async function getSessionOrganizationId(): Promise<string | null> {
   }
 
   return resolved;
-}
+});
 
 export async function getOrganization(id?: string) {
   try {

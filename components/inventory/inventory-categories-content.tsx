@@ -43,6 +43,7 @@ import {
 } from "@/lib/actions/inventory-categories";
 import {
   dashboardModalHeaderClass,
+  dashboardModalContentClass,
   dashboardPrimaryButtonClass,
   dashboardToolbarClass,
   stockStatusBadgeClass,
@@ -325,7 +326,7 @@ export function InventoryCategoriesContent({
           if (!open) resetForm();
         }}
       >
-        <DialogContent className="p-0 gap-0 overflow-hidden">
+        <DialogContent className={cn(dashboardModalContentClass)}>
           <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
             <DialogTitle className="text-white">Create inventory category</DialogTitle>
             <DialogDescription className="text-white/80">
@@ -381,7 +382,7 @@ export function InventoryCategoriesContent({
           }
         }}
       >
-        <DialogContent className="p-0 gap-0 overflow-hidden">
+        <DialogContent className={cn(dashboardModalContentClass)}>
           <DialogHeader className={cn(dashboardModalHeaderClass, "text-left")}>
             <DialogTitle className="text-white">Edit inventory category</DialogTitle>
           </DialogHeader>

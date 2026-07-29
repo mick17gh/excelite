@@ -31,16 +31,48 @@ export interface UpdateCustomerInput {
   isActive?: boolean;
 }
 
+export type PosCustomerCacheItem = {
+  id: string;
+  name: string;
+  phone: string;
+};
+
+/** Slim active-customer list for POS seed / offline IndexedDB cache. */
+export async function getPosCustomerCache() {
+  try {
+    const customers = await db.customer.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, phone: true },
+      orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+    });
+    return {
+      data: customers.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+      })) satisfies PosCustomerCacheItem[],
+    };
+  } catch (error) {
+    console.error("[getPosCustomerCache] Error:", error);
+    return { data: [] as PosCustomerCacheItem[] };
+  }
+}
+
 export async function getCustomers(filters?: {
   search?: string;
   page?: number;
   pageSize?: number;
+  activeOnly?: boolean;
 }) {
   try {
     const page = filters?.page || 1;
     const pageSize = filters?.pageSize || 100;
 
     const where: Record<string, unknown> = {};
+
+    if (filters?.activeOnly) {
+      where.isActive = true;
+    }
 
     if (filters?.search) {
       where.OR = [
@@ -183,6 +215,7 @@ export async function createCustomer(input: CreateCustomerInput) {
 
     revalidatePath("/dashboard/customers");
     revalidatePath("/dashboard/orders");
+    revalidatePath("/pos");
     return { data: customer };
   } catch (error) {
     console.error("[createCustomer] Error:", error);

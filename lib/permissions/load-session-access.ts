@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -26,7 +27,8 @@ export type SessionAccessResult =
   | { kind: "onboarding" }
   | { kind: "ready"; access: SessionAccess };
 
-export async function resolveSessionAccess(): Promise<SessionAccessResult> {
+/** Request-memoized — layout + pages share one session resolve per render. */
+export const resolveSessionAccess = cache(async (): Promise<SessionAccessResult> => {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) return { kind: "unauthenticated" };
 
@@ -65,7 +67,7 @@ export async function resolveSessionAccess(): Promise<SessionAccessResult> {
       },
     },
   };
-}
+});
 
 export async function loadSessionAccess(): Promise<SessionAccess | null> {
   const result = await resolveSessionAccess();

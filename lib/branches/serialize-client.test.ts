@@ -37,6 +37,8 @@ function mockBranch(overrides: Record<string, unknown> = {}) {
     taxEnabled: true,
     taxInclusive: false,
     showTaxOnReceipt: true,
+    taxNumber: null,
+    showTaxNumberOnReceipt: false,
     blockSalesWhenOutOfStock: null,
     tableServiceEnabled: false,
     paystackSubaccountCode: "ACCT_test",

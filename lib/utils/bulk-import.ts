@@ -223,12 +223,84 @@ export interface BulkInventoryItemInput {
   branchId: string;
 }
 
+/** Resolve CSV unit aliases to Prisma UnitType string, or null if unknown. */
+export function resolveInventoryUnit(unit: string): string | null {
+  const raw = unit.trim();
+  if (!raw) return null;
+  const upper = raw.toUpperCase().replace(/\s+/g, "_");
+  const aliases: Record<string, string> = {
+    kg: "KG",
+    kilogram: "KG",
+    kilograms: "KG",
+    g: "GRAM",
+    gram: "GRAM",
+    grams: "GRAM",
+    mg: "MG",
+    milligram: "MG",
+    milligrams: "MG",
+    ton: "TON",
+    l: "LITER",
+    liter: "LITER",
+    litre: "LITER",
+    liters: "LITER",
+    litres: "LITER",
+    ml: "ML",
+    milliliter: "ML",
+    millilitre: "ML",
+    milliliters: "ML",
+    millilitres: "ML",
+    cl: "CL",
+    gallon: "GALLON",
+    piece: "PIECE",
+    pieces: "PIECE",
+    pcs: "PIECE",
+    unit: "UNIT",
+    item: "ITEM",
+    box: "BOX",
+    boxes: "BOX",
+    carton: "CARTON",
+    case: "CASE",
+    cases: "CASE",
+    pack: "PACK",
+    packs: "PACK",
+    bag: "BAG",
+    sack: "SACK",
+    crate: "CRATE",
+    tray: "TRAY",
+    bottle: "BOTTLE",
+    can: "CAN",
+    jar: "JAR",
+    cup: "CUP",
+    tablespoon: "TABLESPOON",
+    teaspoon: "TEASPOON",
+    slice: "SLICE",
+    portion: "PORTION",
+    serving: "SERVING",
+    plate: "PLATE",
+    dozen: "DOZEN",
+    half_dozen: "HALF_DOZEN",
+    "half dozen": "HALF_DOZEN",
+    bunch: "BUNCH",
+    block: "BLOCK",
+  };
+  const fromAlias = aliases[raw.toLowerCase()] ?? aliases[upper.toLowerCase()];
+  if (fromAlias) return fromAlias;
+  // Accept exact enum values
+  const known = [
+    "KG", "GRAM", "MG", "TON", "LITER", "ML", "CL", "GALLON", "PIECE", "UNIT",
+    "ITEM", "BOX", "CARTON", "CASE", "PACK", "BAG", "SACK", "CRATE", "TRAY",
+    "BOTTLE", "CAN", "JAR", "CUP", "TABLESPOON", "TEASPOON", "SLICE", "PORTION",
+    "SERVING", "PLATE", "DOZEN", "HALF_DOZEN", "BUNCH", "BLOCK",
+  ];
+  return known.includes(upper) ? upper : null;
+}
+
 export function parseInventoryCSV(rows: ParsedCSVRow[], defaultBranchId: string): BulkInventoryItemInput[] {
   return rows.map((row) => ({
     name: row.name || row.Name || "",
     sku: row.sku || row.SKU || undefined,
-    category: row.category || row.Category || "FOOD",
-    unit: row.unit || row.Unit || "UNIT",
+    category: row.category || row.Category || "",
+    unit: row.unit || row.Unit || "",
     unitCost: parseFloat(row.unitCost || row["Unit Cost"] || row.cost || "0"),
     currentStock: row.currentStock || row["Current Stock"]
       ? parseFloat(row.currentStock || row["Current Stock"])
@@ -248,8 +320,12 @@ export function parseInventoryCSV(rows: ParsedCSVRow[], defaultBranchId: string)
 
 export function getInventoryCSVTemplate(): string {
   const headers = ["name", "sku", "category", "unit", "unitCost", "currentStock", "minStock", "maxStock", "reorderPoint"];
-  const example = ["Chicken Breast", "CB-001", "FOOD", "KG", "8.50", "50", "10", "100", "20"];
-  return [headers.join(","), example.join(",")].join("\n");
+  const example = ["Chicken Breast", "CB-001", "Produce", "KG", "8.50", "50", "10", "100", "20"];
+  return [
+    "# category must match an existing Inventory category name or code (Settings → Categories → Inventory)",
+    headers.join(","),
+    example.join(","),
+  ].join("\n");
 }
 
 // =====================================

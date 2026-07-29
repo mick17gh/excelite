@@ -10,6 +10,7 @@ import { generateReceipt } from "@/lib/actions/receipts";
 import { useCurrency } from "@/contexts/currency-context";
 import {
   receiptTaxLabel,
+  receiptTaxNumberLine,
   shouldShowInclusiveFootnote,
   shouldShowTaxBreakdown,
   type ReceiptDisplayOrder,
@@ -47,6 +48,8 @@ interface ReceiptPanelProps {
   receipt: ReceiptData | null;
   taxInclusive?: boolean;
   showTaxOnReceipt?: boolean;
+  taxNumber?: string | null;
+  showTaxNumberOnReceipt?: boolean;
   taxName?: string;
   taxRate?: number;
 }
@@ -63,6 +66,8 @@ export function ReceiptPanel({
   receipt,
   taxInclusive = false,
   showTaxOnReceipt = true,
+  taxNumber = null,
+  showTaxNumberOnReceipt = false,
   taxName = "VAT",
   taxRate,
 }: ReceiptPanelProps) {
@@ -79,6 +84,8 @@ export function ReceiptPanel({
     taxInclusive,
     taxName,
     taxRate,
+    taxNumber,
+    showTaxNumberOnReceipt,
     subtotal: currentReceipt?.subtotal,
     tax: currentReceipt?.tax,
     discount: currentReceipt?.discount,
@@ -86,6 +93,7 @@ export function ReceiptPanel({
     total: currentReceipt?.total,
   };
   const showBreakdown = shouldShowTaxBreakdown(displayOrder);
+  const taxNumberLine = receiptTaxNumberLine(displayOrder);
 
   const handlePrint = () => {
     if (!currentReceipt) return;
@@ -94,6 +102,8 @@ export function ReceiptPanel({
         orderNumber,
         branchName,
         branchCode,
+        taxNumber,
+        showTaxNumberOnReceipt,
         createdAt: currentReceipt.createdAt,
         customerName: currentReceipt.customerName,
         paymentMethod: currentReceipt.paymentMethod,
@@ -168,6 +178,12 @@ export function ReceiptPanel({
           </div>
 
           <Separator />
+
+          <div className="space-y-0.5 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">{branchName}</p>
+            {branchCode ? <p>{branchCode}</p> : null}
+            {taxNumberLine ? <p>{taxNumberLine}</p> : null}
+          </div>
 
           <div className="space-y-1">
             <p className="font-medium">{currentReceipt.customerName}</p>
