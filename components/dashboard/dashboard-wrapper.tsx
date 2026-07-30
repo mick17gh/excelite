@@ -27,6 +27,11 @@ interface DashboardWrapperProps {
   worstMenuItems: MenuItem[];
   lowStockItems: LowStockItem[];
   recentOrders: RecentOrder[];
+  selectedDateRange: {
+    from: string;
+    to: string;
+  };
+  dateRangeLabel: string;
   kpiData: {
     totalRevenue: number;
     revenueGrowth: number;
@@ -43,6 +48,8 @@ export function DashboardWrapper({
   worstMenuItems,
   lowStockItems,
   recentOrders,
+  selectedDateRange,
+  dateRangeLabel,
   kpiData,
 }: DashboardWrapperProps) {
   return (
@@ -52,6 +59,8 @@ export function DashboardWrapper({
       worstMenuItems={worstMenuItems}
       lowStockItems={lowStockItems}
       recentOrders={recentOrders}
+      selectedDateRange={selectedDateRange}
+      dateRangeLabel={dateRangeLabel}
       kpiData={kpiData}
     />
   );
