@@ -1,9 +1,13 @@
 /** Excelite POS product configuration — lite standalone brand */
 
+const SUPPORT_PHONE_E164 = "233554510864";
+const WHATSAPP_INTRO_MESSAGE =
+  "Hi Excelite, I'd like to learn more about Excelite POS.";
+
 export const EXCELITE_BRAND = {
   name: "Excelite POS",
   shortName: "Excelite",
-  tagline: "POS software built for small businesses",
+  tagline: "Run Your Business. Know Your Numbers.",
   logo: "/excelite_logo.png",
   themeColor: "#22C55E",
   supportEmail: process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app",
@@ -11,6 +15,8 @@ export const EXCELITE_BRAND = {
   supportPhone: "+233554510864",
   supportPhoneTel: "tel:+233554510864",
   supportPhoneDisplay: "+233 55 451 0864",
+  /** WhatsApp chat with prefilled intro message */
+  supportWhatsAppUrl: `https://wa.me/${SUPPORT_PHONE_E164}?text=${encodeURIComponent(WHATSAPP_INTRO_MESSAGE)}`,
 } as const;
 
 /** Paths not available in Excelite lite (SUPER_ADMIN may still access for support) */

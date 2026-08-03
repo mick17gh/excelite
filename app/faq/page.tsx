@@ -10,79 +10,58 @@ import {
 } from "@/components/ui/accordion";
 import { EXCELITE_BRAND } from "@/lib/excelite-config";
 
-const CONTACT_TEL = EXCELITE_BRAND.supportPhoneTel;
-const CONTACT_PHONE_LABEL = EXCELITE_BRAND.supportPhoneDisplay;
+const WHATSAPP_URL = EXCELITE_BRAND.supportWhatsAppUrl;
 
 const faqs: Array<{ question: string; answer: string }> = [
   {
-    question: "What is Excelite POS?",
+    question: "What is Excelite?",
     answer:
-      "Excelite POS is point-of-sale software for small shops and local businesses. It helps you ring up sales, track inventory, and review daily performance from one dashboard.",
+      "Excelite is a simple business management and POS system built for small and growing food and retail businesses. It helps you take sales, manage orders, keep track of stock and see how your business is doing—all in one place.",
   },
   {
-    question: "Who is Excelite POS for?",
+    question: "Why should I choose Excelite instead of another POS?",
     answer:
-      "It is built for small business owners—retail shops, cafés, kiosks, and single-location stores that want a straightforward POS without enterprise complexity.",
+      "Excelite is built with the needs of Ghanaian businesses in mind. While many POS systems are designed for a broad international market, Excelite focuses on the way businesses here actually operate. You get the essential tools you need to run your business without paying for complicated features you may never use. Excelite is simple to learn, easy to use and affordable, while giving you the information you need to stay in control.",
   },
   {
-    question: "Do I need technical skills to use it?",
+    question: "Can I still sell if my internet goes off?",
     answer:
-      "No. Excelite is designed for shop owners and cashiers. If you can use a smartphone or tablet, you can use Excelite POS.",
+      "Yes. Excelite's offline mode allows you to continue taking sales even when your internet connection is down. Once your connection comes back, your sales sync automatically. Your business doesn't have to stop because the internet does.",
   },
   {
-    question: "How long does setup take?",
+    question: "Will my staff find Excelite difficult to use?",
     answer:
-      "Most businesses add their products and start selling within a day. Our team can walk you through setup if you prefer guided help.",
+      "No. Excelite is designed to be easy to learn and easy to use. No IT background or technical skill required. The system keeps the features and processes straightforward, so staff can quickly understand how to take orders, complete sales and carry out their daily tasks to help your business grow.",
   },
   {
-    question: "What devices do I need?",
+    question: "Can Excelite help me keep track of my orders and payments?",
     answer:
-      "Excelite runs in your web browser on a tablet, laptop, or desktop. A receipt printer is optional but recommended for customer receipts.",
+      "Yes. Excelite gives you a clear view of your orders, including dine-in, takeout and delivery orders. You can also see how customers paid (Cash, MoMo, Card), helping you keep better track of your sales and payments. This gives you a clearer picture of what is happening across your business throughout the day.",
   },
   {
-    question: "Can I accept cash and mobile money?",
+    question: "Can Excelite help me keep track of my stock?",
     answer:
-      "Yes. Record cash, mobile money, and card payments at checkout. Every payment type is tracked in your sales reports.",
+      "Yes. Excelite helps you keep track of your stock, see what is selling and get alerts when important items are running low. This helps you avoid unnecessary shortages and reduce waste.",
   },
   {
-    question: "Does inventory update automatically?",
+    question: "Can Excelite help me prove how my business is performing?",
     answer:
-      "Yes. When you sell an item, stock levels decrease automatically so you always know what is left on the shelf.",
+      "Yes. The reports in Excelite give you a clear record of your business performance, including sales and other important business information. These reports can help you make better decisions about your business and provide useful records when you need to demonstrate your business activity—for example, when applying for bank loans or government credit.",
   },
   {
-    question: "Can I see my daily sales?",
+    question: "Is Excelite only for restaurants?",
     answer:
-      "Yes. Your dashboard shows today's revenue, transaction count, and payment breakdown—updated as you sell throughout the day.",
+      "No. Excelite is built for single-branch food and retail businesses. It can be useful for Fast Food Outlets, Local Eateries, Cafés, Provisions & Grocery Stores, Cold store, Hardware Stores, Boutiques & Beauty Shops, Electronics Stores, Chemist Shops, Household Item Stores and other small businesses that need a simple way to manage sales, orders and stock. Contact us if you have multiple branches and need a reliable alternative.",
   },
   {
-    question: "Can multiple staff use the system?",
+    question: "Is Excelite difficult to set up and learn?",
     answer:
-      "Yes. Add team members with their own login. Owners and managers can control who has access to the POS and settings.",
+      "Not at all. Excelite is designed to get your business up and running quickly. The setup is straightforward, and the system focuses on simple, practical features that your business needs every day. All you need is an internet capable tablet or POS device. Your team can learn the basics quickly, and reliable customer support is available whenever you need help.",
   },
   {
-    question: "Can I switch from my current POS?",
+    question: "How do I get started with Excelite?",
     answer:
-      "Yes. We help you move product lists and get your team comfortable with Excelite so the transition is smooth.",
-  },
-  {
-    question: "Will I lose my data when switching?",
-    answer:
-      "We work with you to import product and stock data where possible so you do not start from scratch.",
-  },
-  {
-    question: "Is my business data safe?",
-    answer:
-      "Yes. Your sales and inventory data is stored securely. Only people you authorize can access your account.",
-  },
-  {
-    question: "What if I need help after setup?",
-    answer:
-      "Reach out anytime by email. We are here to answer questions and keep your shop running smoothly.",
-  },
-  {
-    question: "How do I get started?",
-    answer:
-      "Create an account, add your products, and open the POS screen. You can sign up from the Get started button on our homepage.",
+      "Getting started is simple. You can Book a demo to see how Excelite works and discuss what your business needs, or Get Started to start your account creation. Ready to run your business with less stress? Contact us today via WhatsApp.",
   },
 ];
 
@@ -107,11 +86,6 @@ export default function FaqPage() {
             </Link>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <Link href="/login" className="hidden sm:block">
-                <Button variant="ghost" size="sm" className="font-medium">
-                  Sign in
-                </Button>
-              </Link>
               <Link href="/login">
                 <Button
                   size="sm"
@@ -130,11 +104,11 @@ export default function FaqPage() {
           <div className="mb-10 text-center md:text-left">
             <p className="text-sm font-medium text-[#22C55E] mb-2">FAQ</p>
             <h1 className="text-3xl md:text-4xl font-bold mb-3">
-              Questions from small business owners
+              Simple Answers. Clear Choices.
             </h1>
             <p className="text-[#222831]/70 max-w-2xl">
-              Setup, daily operations, payments, and support—everything you need
-              to know about Excelite POS.
+              Everything you need to know about Excelite—setup, sales, stock,
+              and support.
             </p>
           </div>
 
@@ -156,10 +130,12 @@ export default function FaqPage() {
           </Card>
 
           <div className="mt-10 rounded-xl bg-[#222831]/[0.03] border border-[#222831]/10 p-6 md:p-8 text-center">
-            <h2 className="font-semibold text-lg mb-2">Still have questions?</h2>
+            <h2 className="font-semibold text-lg mb-2">
+              Ready to run your business with less stress?
+            </h2>
             <p className="text-sm text-[#222831]/70 mb-6">
-              Our team is happy to help you decide if Excelite POS is right for
-              your shop.
+              Contact us today via WhatsApp, book a demo, or get started with
+              your account.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -173,14 +149,16 @@ export default function FaqPage() {
                 asChild
                 className="bg-[#22C55E] hover:bg-[#16A34A] text-white w-full sm:w-auto"
               >
-                <Link href="/login">Get started</Link>
+                <Link href="/login">Get Started</Link>
               </Button>
               <Button
                 asChild
                 variant="ghost"
                 className="text-[#222831]/70 w-full sm:w-auto"
               >
-                <a href={CONTACT_TEL}>Call {CONTACT_PHONE_LABEL}</a>
+                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
+                  Chat on WhatsApp
+                </a>
               </Button>
             </div>
           </div>
@@ -204,11 +182,10 @@ export default function FaqPage() {
               <Link href="/" className="hover:text-[#222831] transition-colors">
                 Home
               </Link>
-              <Link href="/login" className="hover:text-[#222831] transition-colors">
-                Login
-              </Link>
               <a
-                href={CONTACT_TEL}
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="hover:text-[#222831] transition-colors"
               >
                 Contact

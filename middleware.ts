@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { REQUEST_PATHNAME_COOKIE } from "@/lib/permissions/constants";
 
-const publicRoutes = ["/","/login", "/forgot-password", "/reset-password", "/auth/reset-password", "/api/auth", "/api/v1"];
+const publicRoutes = ["/", "/demo", "/faq", "/login", "/forgot-password", "/reset-password", "/auth/reset-password", "/api/auth", "/api/v1"];
 const authRoutes = ["/login", "/forgot-password", "/reset-password"];
 
 /** better-auth session cookies (incl. secure prefix on HTTPS). */
