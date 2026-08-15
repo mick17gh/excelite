@@ -66,7 +66,7 @@ const featuredFaqs = [
   {
     question: "What is Excelite?",
     answer:
-      "Excelite is a simple business management and POS system built for small and growing food and retail businesses. It helps you take sales, manage orders, keep track of stock and see how your business is doing—all in one place.",
+      "Excelite is a simple business management and POS system built for small and growing food and retail businesses. It helps you take sales, manage orders, keep track of stock and see how your business is doing—all in one place.\n\nAnd you don't have to be at the shop to stay in control. All you need is an internet-connected device. From anywhere, you can monitor your shop in real time - tracking sales, orders, and activity as they happen, without being physically present.\n\nWhen you're ready to sell beyond your physical shop, you can also add an online store, giving your customers another easy way to browse your products and place orders online.\n\nOne system to run your shop, stay in control and grow your business.",
   },
   {
     question: "Can I still sell if my internet goes off?",
@@ -124,7 +124,7 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <Link href="/login" className="cursor-pointer">
+              <Link href="/demo" className="cursor-pointer">
                 <Button
                   size="sm"
                   className="bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium shadow-md shadow-[#22C55E]/20 transition-all duration-200 hover:shadow-lg hover:shadow-[#22C55E]/30"
@@ -283,7 +283,7 @@ export default function Home() {
               <RevealOnScroll key={item.question} delay={i * 60}>
                 <div className="excelite-glass rounded-xl p-5 transition-all duration-300 hover:shadow-md hover:shadow-[#22C55E]/5">
                   <h3 className="font-medium mb-2">{item.question}</h3>
-                  <p className="text-sm text-[#222831]/70 leading-relaxed">
+                  <p className="text-sm text-[#222831]/70 leading-relaxed whitespace-pre-line">
                     {item.answer}
                   </p>
                 </div>
@@ -325,7 +325,7 @@ export default function Home() {
                   protect your profit.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link href="/login" className="cursor-pointer">
+                  <Link href="/demo" className="cursor-pointer">
                     <Button
                       size="lg"
                       className="h-12 px-8 bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium w-full sm:w-auto shadow-lg shadow-[#22C55E]/30 transition-all duration-300 hover:scale-[1.02]"

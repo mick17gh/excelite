@@ -16,7 +16,7 @@ const faqs: Array<{ question: string; answer: string }> = [
   {
     question: "What is Excelite?",
     answer:
-      "Excelite is a simple business management and POS system built for small and growing food and retail businesses. It helps you take sales, manage orders, keep track of stock and see how your business is doing—all in one place.",
+      "Excelite is a simple business management and POS system built for small and growing food and retail businesses. It helps you take sales, manage orders, keep track of stock and see how your business is doing—all in one place.\n\nAnd you don't have to be at the shop to stay in control. All you need is an internet-connected device. From anywhere, you can monitor your shop in real time - tracking sales, orders, and activity as they happen, without being physically present.\n\nWhen you're ready to sell beyond your physical shop, you can also add an online store, giving your customers another easy way to browse your products and place orders online.\n\nOne system to run your shop, stay in control and grow your business.",
   },
   {
     question: "Why should I choose Excelite instead of another POS?",
@@ -120,7 +120,7 @@ export default function FaqPage() {
                     <AccordionTrigger className="text-base font-medium text-left">
                       {item.question}
                     </AccordionTrigger>
-                    <AccordionContent className="text-[#222831]/70 leading-relaxed">
+                    <AccordionContent className="text-[#222831]/70 leading-relaxed whitespace-pre-line">
                       {item.answer}
                     </AccordionContent>
                   </AccordionItem>
