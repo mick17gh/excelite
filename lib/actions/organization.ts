@@ -214,6 +214,7 @@ export async function getOrganization(id?: string) {
         enforceCommissaryRouting: org.enforceCommissaryRouting,
         tableManagementEnabled: org.tableManagementEnabled,
         blockSalesWhenOutOfStock: org.blockSalesWhenOutOfStock,
+        posBarcodeEnabled: org.posBarcodeEnabled,
         createdAt: org.createdAt.toISOString(),
       },
     };
@@ -330,6 +331,7 @@ export async function updateOrganizationPosPolicies(input: {
   complimentaryApproverRoles: Role[];
   enforceCommissaryRouting?: boolean;
   blockSalesWhenOutOfStock?: boolean;
+  posBarcodeEnabled?: boolean;
 }) {
   try {
     const auth = await requirePermission("organization:edit");
@@ -350,11 +352,15 @@ export async function updateOrganizationPosPolicies(input: {
         ...(input.blockSalesWhenOutOfStock !== undefined && {
           blockSalesWhenOutOfStock: input.blockSalesWhenOutOfStock,
         }),
+        ...(input.posBarcodeEnabled !== undefined && {
+          posBarcodeEnabled: input.posBarcodeEnabled,
+        }),
       },
     });
 
     revalidatePath("/dashboard/settings");
     revalidatePath("/pos");
+    revalidatePath("/dashboard/menu");
     return { success: true };
   } catch (error) {
     console.error("[updateOrganizationPosPolicies]", error);
@@ -676,11 +682,17 @@ export async function getAllOrganizations() {
   }
 }
 
-export async function getPosStorefrontQrContext() {
+export async function getPosOrgContext() {
   try {
     const organizationId = await getSessionOrganizationId();
     if (!organizationId) {
-      return { data: { showQr: false, storefrontUrl: null as string | null } };
+      return {
+        data: {
+          showQr: false,
+          storefrontUrl: null as string | null,
+          posBarcodeEnabled: false,
+        },
+      };
     }
 
     const org = await db.organization.findUnique({
@@ -689,10 +701,17 @@ export async function getPosStorefrontQrContext() {
         tier: true,
         onlineOrderingEnabled: true,
         storefrontUrl: true,
+        posBarcodeEnabled: true,
       },
     });
     if (!org) {
-      return { data: { showQr: false, storefrontUrl: null as string | null } };
+      return {
+        data: {
+          showQr: false,
+          storefrontUrl: null as string | null,
+          posBarcodeEnabled: false,
+        },
+      };
     }
 
     const storefrontUrl = normalizeStorefrontUrl(org.storefrontUrl);
@@ -705,10 +724,28 @@ export async function getPosStorefrontQrContext() {
       data: {
         showQr,
         storefrontUrl: showQr ? storefrontUrl : null,
+        posBarcodeEnabled: org.posBarcodeEnabled,
       },
     };
   } catch (error) {
-    console.error("[getPosStorefrontQrContext] Error:", error);
-    return { data: { showQr: false, storefrontUrl: null as string | null } };
+    console.error("[getPosOrgContext] Error:", error);
+    return {
+      data: {
+        showQr: false,
+        storefrontUrl: null as string | null,
+        posBarcodeEnabled: false,
+      },
+    };
   }
+}
+
+/** @deprecated Use getPosOrgContext */
+export async function getPosStorefrontQrContext() {
+  const result = await getPosOrgContext();
+  return {
+    data: {
+      showQr: result.data.showQr,
+      storefrontUrl: result.data.storefrontUrl,
+    },
+  };
 }

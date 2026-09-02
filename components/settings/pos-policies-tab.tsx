@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getOrganization, updateOrganizationPosPolicies } from "@/lib/actions/organization";
+import type { OrganizationPosPoliciesBundle } from "@/lib/actions/organization-pos-policies-bundle";
 import { roleDisplayNames } from "@/lib/permissions/labels";
 import type { Role } from "@/lib/generated/prisma/client";
 
@@ -23,26 +24,42 @@ const APPROVER_OPTIONS: Role[] = [
 
 interface PosPoliciesTabProps {
   organizationId: string;
+  initialData?: OrganizationPosPoliciesBundle;
 }
 
-export function PosPoliciesTab({ organizationId }: PosPoliciesTabProps) {
-  const [loading, setLoading] = useState(true);
+function seedFromBundle(data: OrganizationPosPoliciesBundle) {
+  return {
+    roles: data.complimentaryApproverRoles,
+    enforceRouting: data.enforceCommissaryRouting,
+    blockSalesWhenOutOfStock: data.blockSalesWhenOutOfStock,
+    posBarcodeEnabled: data.posBarcodeEnabled,
+  };
+}
+
+export function PosPoliciesTab({ organizationId, initialData }: PosPoliciesTabProps) {
+  const seeded = initialData ? seedFromBundle(initialData) : null;
+  const [loading, setLoading] = useState(!initialData);
   const [saving, setSaving] = useState(false);
-  const [roles, setRoles] = useState<Role[]>(["EXECUTIVE", "ADMIN", "SUPER_ADMIN"]);
-  const [enforceRouting, setEnforceRouting] = useState(false);
-  const [blockSalesWhenOutOfStock, setBlockSalesWhenOutOfStock] = useState(false);
+  const [roles, setRoles] = useState<Role[]>(seeded?.roles ?? ["EXECUTIVE", "ADMIN", "SUPER_ADMIN"]);
+  const [enforceRouting, setEnforceRouting] = useState(seeded?.enforceRouting ?? false);
+  const [blockSalesWhenOutOfStock, setBlockSalesWhenOutOfStock] = useState(
+    seeded?.blockSalesWhenOutOfStock ?? false,
+  );
+  const [posBarcodeEnabled, setPosBarcodeEnabled] = useState(seeded?.posBarcodeEnabled ?? false);
 
   useEffect(() => {
+    if (initialData) return;
     (async () => {
       const res = await getOrganization(organizationId);
       if (res.data) {
         setRoles((res.data.complimentaryApproverRoles as Role[]) || []);
         setEnforceRouting(res.data.enforceCommissaryRouting ?? false);
         setBlockSalesWhenOutOfStock(res.data.blockSalesWhenOutOfStock ?? false);
+        setPosBarcodeEnabled(res.data.posBarcodeEnabled ?? false);
       }
       setLoading(false);
     })();
-  }, [organizationId]);
+  }, [organizationId, initialData]);
 
   const toggleRole = (role: Role) => {
     setRoles((prev) =>
@@ -61,6 +78,7 @@ export function PosPoliciesTab({ organizationId }: PosPoliciesTabProps) {
       complimentaryApproverRoles: roles,
       enforceCommissaryRouting: enforceRouting,
       blockSalesWhenOutOfStock,
+      posBarcodeEnabled,
     });
     setSaving(false);
     if (res.error) toast.error(res.error);
@@ -77,6 +95,20 @@ export function PosPoliciesTab({ organizationId }: PosPoliciesTabProps) {
 
   return (
     <div className="space-y-4">
+      <Card className="chart-card rounded-xl">
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-base">Barcode scanning (POS)</CardTitle>
+          <CardDescription className="text-xs">
+            Enable barcode mode on POS for USB wedge scanners (keyboard input). Menu items
+            must have a SKU set — the SKU is encoded as the barcode.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 flex items-center justify-between">
+          <Label className="text-sm">Barcode scanning (POS)</Label>
+          <Switch checked={posBarcodeEnabled} onCheckedChange={setPosBarcodeEnabled} />
+        </CardContent>
+      </Card>
+
       <Card className="chart-card rounded-xl">
         <CardHeader className="py-3 px-4">
           <CardTitle className="text-base">Complimentary meals</CardTitle>

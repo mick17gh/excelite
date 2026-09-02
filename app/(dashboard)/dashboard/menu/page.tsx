@@ -4,6 +4,7 @@ import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skele
 import { MenuContent } from "@/components/menu/menu-content";
 import { getMenuItems, getMenuCategories } from "@/lib/actions/menu";
 import { getBranches } from "@/lib/actions/branches";
+import { getMenuPosBarcodeEnabled } from "@/lib/actions/organization-pos-policies-bundle";
 
 export const metadata = {
   title: "Products",
@@ -25,10 +26,11 @@ export default function MenuPage() {
 }
 
 async function MenuPageData() {
-  const [itemsResult, categoriesResult, branchesResult] = await Promise.all([
+  const [itemsResult, categoriesResult, branchesResult, barcodeResult] = await Promise.all([
     getMenuItems(undefined, true),
     getMenuCategories(),
     getBranches(),
+    getMenuPosBarcodeEnabled(),
   ]);
 
   const items = itemsResult.data || [];
@@ -37,5 +39,12 @@ async function MenuPageData() {
     .filter((b) => b.isActive)
     .map((b) => ({ id: b.id, name: b.name, code: b.code }));
 
-  return <MenuContent items={items} categories={categories} branches={branches} />;
+  return (
+    <MenuContent
+      items={items}
+      categories={categories}
+      branches={branches}
+      posBarcodeEnabled={barcodeResult.data ?? false}
+    />
+  );
 }

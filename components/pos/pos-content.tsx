@@ -36,6 +36,7 @@ import {
   ChefHat,
   Send,
   WifiOff,
+  ScanBarcode,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -92,6 +93,8 @@ import {
   posToolbarClass,
 } from "@/components/pos/pos-theme";
 import { PosProductCard } from "@/components/pos/pos-product-card";
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
+import { buildSkuLookup, resolveBarcodeScan } from "@/lib/pos/barcode-lookup";
 
 interface Branch {
   id: string;
@@ -103,6 +106,7 @@ interface Branch {
 interface MenuItem {
   id: string;
   name: string;
+  sku?: string;
   category: string;
   price: number;
   imageUrl?: string | null;
@@ -136,6 +140,7 @@ interface PosContentProps {
   storefrontQr?: StorefrontQrProp;
   allowComplimentary?: boolean;
   userRole?: Role;
+  posBarcodeEnabled?: boolean;
 }
 
 interface CartLine {
@@ -156,6 +161,7 @@ export function PosContent({
   storefrontQr = null,
   allowComplimentary = false,
   userRole: userRoleProp = "STAFF",
+  posBarcodeEnabled = false,
 }: PosContentProps) {
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, userRole: sessionRole, isLoading: authLoading } =
@@ -240,15 +246,39 @@ export function PosContent({
 
   const [branchId, setBranchId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [barcodeMode, setBarcodeMode] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [orderType, setOrderType] = useState<OrderType>("DINE_IN");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [isPending, startTransition] = useTransition();
   const [optionPickerOpen, setOptionPickerOpen] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [optionPickerItem, setOptionPickerItem] = useState<MenuItem | null>(null);
   const [pickerSelections, setPickerSelections] = useState<Record<string, string[]>>({});
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(false);
   const [branchTableServiceEnabled, setBranchTableServiceEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!posBarcodeEnabled) {
+      setBarcodeMode(false);
+      return;
+    }
+    try {
+      setBarcodeMode(sessionStorage.getItem("pos-barcode-mode") === "1");
+    } catch {
+      setBarcodeMode(false);
+    }
+  }, [posBarcodeEnabled]);
+
+  const setBarcodeModePersisted = useCallback((next: boolean) => {
+    setBarcodeMode(next);
+    try {
+      sessionStorage.setItem("pos-barcode-mode", next ? "1" : "0");
+    } catch {
+      // ignore storage errors
+    }
+    if (next) setSearch("");
+  }, []);
 
   const showTablePanel =
     branchTableServiceEnabled && orderType === "DINE_IN" && Boolean(branchId);
@@ -323,6 +353,7 @@ export function PosContent({
       key: "f",
       ctrl: true,
       action: () => {
+        if (barcodeMode) return;
         document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
       },
       description: "Focus search",
@@ -379,7 +410,10 @@ export function PosContent({
     const q = search.trim().toLowerCase();
     if (q) {
       filtered = filtered.filter(
-        (m) => m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q)
+        (m) =>
+          m.name.toLowerCase().includes(q) ||
+          m.category.toLowerCase().includes(q) ||
+          m.sku?.toLowerCase().includes(q),
       );
     }
     if (selectedCategory !== "all") {
@@ -504,6 +538,89 @@ export function PosContent({
     void commitCartLine(item, []);
   };
 
+  const skuLookup = useMemo(
+    () => buildSkuLookup(branchVisibleMenu),
+    [branchVisibleMenu],
+  );
+
+  const incrementCartLine = useCallback(
+    async (lineKey: string, item: MenuItem) => {
+      const line = cart.find((entry) => entry.lineKey === lineKey);
+      if (!line) return false;
+
+      if (stockBlocking && !isSellable(item.id)) {
+        toast.error(`${item.name} is out of stock at this branch`);
+        return false;
+      }
+
+      if (branchId && stockBlocking) {
+        const stockResult = await validateMenuItemStockForSale(
+          branchId,
+          item.id,
+          line.quantity + 1,
+          line.menuItemOptionIds,
+        );
+        if (!stockResult.success) {
+          toast.error(stockResult.error || "Item is out of stock");
+          return false;
+        }
+      }
+
+      setCart((prev) => {
+        const idx = prev.findIndex((entry) => entry.lineKey === lineKey);
+        if (idx < 0) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
+        return next;
+      });
+      toast.success(`${item.name} added`, { duration: 1500 });
+      return true;
+    },
+    [branchId, cart, isSellable, stockBlocking],
+  );
+
+  const handleBarcodeScan = useCallback(
+    (raw: string) => {
+      if (!posBarcodeEnabled || !barcodeMode) return;
+
+      const result = resolveBarcodeScan(raw, cart, skuLookup);
+      if (result.action === "not_found") {
+        toast.error("No product found for this barcode");
+        return;
+      }
+
+      if (result.action === "add") {
+        void commitCartLine(result.item, []);
+        return;
+      }
+
+      if (result.action === "picker") {
+        requestAddToCart(result.item);
+        return;
+      }
+
+      void incrementCartLine(result.lineKey, result.item);
+    },
+    [
+      barcodeMode,
+      cart,
+      commitCartLine,
+      incrementCartLine,
+      posBarcodeEnabled,
+      requestAddToCart,
+      skuLookup,
+    ],
+  );
+
+  useBarcodeScanner({
+    enabled:
+      posBarcodeEnabled &&
+      barcodeMode &&
+      !optionPickerOpen &&
+      !isPaymentOpen,
+    onScan: handleBarcodeScan,
+  });
+
   const togglePickerOption = (g: ClientMenuOptionGroup, optionId: string) => {
     setPickerSelections((prev) => {
       const cur = prev[g.id] || [];
@@ -549,7 +666,6 @@ export function PosContent({
     setCart([]);
   };
 
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mixes serialized Order and offline queue receipt
   const [completedOrder, setCompletedOrder] = useState<any>(null);
@@ -985,23 +1101,50 @@ export function PosContent({
 
         {/* Search */}
         <div className="relative px-3 md:px-4 pt-3 shrink-0">
-          <Search className="absolute left-7 md:left-8 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 h-11 text-base bg-background rounded-xl border-border/80 focus-visible:ring-[#22C55E]/30"
-          />
-          {search && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-              onClick={() => setSearch("")}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={barcodeMode ? "Scan barcode…" : "Search products..."}
+                value={search}
+                onChange={(e) => {
+                  if (!barcodeMode) setSearch(e.target.value);
+                }}
+                readOnly={barcodeMode}
+                data-barcode-capture={barcodeMode ? "true" : undefined}
+                className={cn(
+                  "pl-10 h-11 text-base bg-background rounded-xl border-border/80 focus-visible:ring-[#22C55E]/30",
+                  barcodeMode && "border-[#22C55E] ring-1 ring-[#22C55E]/30",
+                )}
+              />
+              {search && !barcodeMode ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                  onClick={() => setSearch("")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : null}
+            </div>
+            {posBarcodeEnabled ? (
+              <Button
+                type="button"
+                variant={barcodeMode ? "default" : "outline"}
+                className={cn(
+                  "h-11 rounded-xl shrink-0",
+                  barcodeMode && "bg-[#22C55E] hover:bg-[#16A34A] text-white",
+                )}
+                onClick={() => setBarcodeModePersisted(!barcodeMode)}
+              >
+                <ScanBarcode className="h-4 w-4" />
+                <span className="ml-2 hidden sm:inline">
+                  {barcodeMode ? "Scanning" : "Barcode"}
+                </span>
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {/* Category Tabs */}

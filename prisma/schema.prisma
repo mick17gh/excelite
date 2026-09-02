@@ -1486,6 +1486,7 @@ model Organization {
   enforceCommissaryRouting    Boolean            @default(false)
   tableManagementEnabled      Boolean            @default(false)
   blockSalesWhenOutOfStock    Boolean            @default(false)
+  posBarcodeEnabled           Boolean            @default(false)
   trialEndsAt                 DateTime?
   subscriptionEndsAt DateTime?
   createdAt          DateTime           @default(now())

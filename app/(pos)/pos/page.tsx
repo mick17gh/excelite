@@ -5,7 +5,7 @@ import { getPosCustomerCache } from "@/lib/actions/customers";
 import { PosContent } from "@/components/pos/pos-content";
 import { PosPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { listPosOrders, canAuthorizeComplimentary } from "@/lib/actions/pos";
-import { getPosStorefrontQrContext } from "@/lib/actions/organization";
+import { getPosOrgContext } from "@/lib/actions/organization";
 import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 import { requireSessionAccess } from "@/lib/permissions/load-session-access";
 
@@ -42,7 +42,7 @@ async function PosPageData() {
     getMenuItems(),
     listPosOrders(),
     getPosCustomerCache(),
-    getPosStorefrontQrContext(),
+    getPosOrgContext(),
     canAuthorizeComplimentary(access.role, access.organizationId),
   ]);
 
@@ -50,12 +50,16 @@ async function PosPageData() {
     const { taxRate, ...rest } = branch;
     return { ...rest, taxRate: taxRate ? Number(taxRate) : 0 };
   });
-  const menuItems = menuItemsResult.data || [];
+  const menuItems = (menuItemsResult.data || []).map((item) => ({
+    ...item,
+    sku: item.sku,
+  }));
   const orders = ordersResult.data || [];
   const customers = customersResult.data || [];
+  const orgContext = qrContextResult.data;
   const storefrontQr =
-    qrContextResult.data?.showQr && qrContextResult.data.storefrontUrl
-      ? { url: qrContextResult.data.storefrontUrl }
+    orgContext?.showQr && orgContext.storefrontUrl
+      ? { url: orgContext.storefrontUrl }
       : null;
 
   return (
@@ -67,6 +71,7 @@ async function PosPageData() {
       storefrontQr={storefrontQr}
       allowComplimentary={allowComplimentary}
       userRole={access.role}
+      posBarcodeEnabled={orgContext?.posBarcodeEnabled ?? false}
     />
   );
 }

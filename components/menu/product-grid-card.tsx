@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Image as ImageIcon, Trash2 } from "lucide-react";
+import { Edit, Image as ImageIcon, Trash2, Barcode } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ProductGridItem {
@@ -31,6 +31,7 @@ interface ProductGridCardProps {
   formatCurrency: (amount: number) => string;
   onEdit: () => void;
   onDelete: () => void;
+  onPrintBarcode?: () => void;
 }
 
 function visibilityLabel(item: ProductGridItem, branches: BranchOption[]) {
@@ -51,6 +52,7 @@ export function ProductGridCard({
   formatCurrency,
   onEdit,
   onDelete,
+  onPrintBarcode,
 }: ProductGridCardProps) {
   const margin =
     item.price > 0 ? (((item.price - item.cost) / item.price) * 100).toFixed(1) : "0.0";
@@ -92,6 +94,18 @@ export function ProductGridCard({
         )}
 
         <div className="absolute top-3 right-3 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          {onPrintBarcode ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8 rounded-lg bg-white/95 shadow-sm hover:bg-white"
+              onClick={onPrintBarcode}
+              aria-label={`Print barcode for ${item.name}`}
+            >
+              <Barcode className="h-3.5 w-3.5 text-[#222831]" />
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="icon"

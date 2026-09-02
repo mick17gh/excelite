@@ -30,6 +30,7 @@ import {
   Save,
   Loader2,
   Calculator,
+  ScanBarcode,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -64,6 +65,14 @@ function TabPanelSkeleton() {
     </div>
   );
 }
+
+const PosPoliciesSettingsPanel = dynamic(
+  () =>
+    import("./pos-policies-settings-panel").then(
+      (module) => module.PosPoliciesSettingsPanel,
+    ),
+  { loading: () => <TabPanelSkeleton /> },
+);
 
 const OrganizationSettingsPanel = dynamic(
   () =>
@@ -287,6 +296,12 @@ export function SettingsContent({
           <TabsTrigger value="organization" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
             <Building2 className="mr-1.5 h-4 w-4" />
             Business
+          </TabsTrigger>
+        )}
+        {canViewOrganization && (
+          <TabsTrigger value="pos-policies" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+            <ScanBarcode className="mr-1.5 h-4 w-4" />
+            POS Policies
           </TabsTrigger>
         )}
         {canManageTeamPermissions && (
@@ -684,6 +699,14 @@ export function SettingsContent({
           </CardContent>
         </ContentCard>
       </TabsContent>
+
+      {canViewOrganization && (
+        <TabsContent value="pos-policies">
+          {activeTab === "pos-policies" && user?.organizationId ? (
+            <PosPoliciesSettingsPanel organizationId={user.organizationId} />
+          ) : null}
+        </TabsContent>
+      )}
 
       {canViewOrganization && (
         <TabsContent value="organization">

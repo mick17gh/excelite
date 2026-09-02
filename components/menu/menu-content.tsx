@@ -32,6 +32,7 @@ import {
   DollarSign,
   TrendingUp,
   Upload,
+  Barcode,
 } from "lucide-react";
 import { useCurrency } from "@/contexts/currency-context";
 import {
@@ -42,6 +43,7 @@ import {
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
 import { ProductGridCard } from "@/components/menu/product-grid-card";
 import { deleteMenuItem } from "@/lib/actions/menu";
+import { printMenuBarcodeLabel } from "@/components/menu/menu-barcode-label";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -73,6 +75,7 @@ interface MenuContentProps {
   items: MenuItem[];
   categories: CategoryOption[];
   branches?: BranchOption[];
+  posBarcodeEnabled?: boolean;
 }
 
 function visibilityBadge(
@@ -96,6 +99,7 @@ export function MenuContent({
   items,
   categories,
   branches = [],
+  posBarcodeEnabled = false,
 }: MenuContentProps) {
   const { formatCurrency } = useCurrency();
   const router = useRouter();
@@ -110,6 +114,18 @@ export function MenuContent({
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const handlePrintBarcode = (item: MenuItem) => {
+    if (!item.sku?.trim()) {
+      toast.error("SKU required for barcode labels");
+      return;
+    }
+    printMenuBarcodeLabel({
+      sku: item.sku,
+      productName: item.name,
+      price: formatCurrency(item.price),
+    });
+  };
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -280,6 +296,11 @@ export function MenuContent({
                 formatCurrency={formatCurrency}
                 onEdit={() => setEditingItem(item)}
                 onDelete={() => handleDelete(item.id, item.name)}
+                onPrintBarcode={
+                  posBarcodeEnabled && item.sku?.trim()
+                    ? () => handlePrintBarcode(item)
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -403,6 +424,16 @@ export function MenuContent({
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {posBarcodeEnabled && item.sku?.trim() ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePrintBarcode(item)}
+                              title="Print barcode"
+                            >
+                              <Barcode className="h-4 w-4" />
+                            </Button>
+                          ) : null}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -489,6 +520,7 @@ export function MenuContent({
         onOpenChange={setIsAddOpen}
         categories={categories}
         branches={branches}
+        posBarcodeEnabled={posBarcodeEnabled}
       />
       {editingItem && (
         <EditMenuItemForm
@@ -497,6 +529,7 @@ export function MenuContent({
           item={editingItem}
           categories={categories}
           branches={branches}
+          posBarcodeEnabled={posBarcodeEnabled}
         />
       )}
 

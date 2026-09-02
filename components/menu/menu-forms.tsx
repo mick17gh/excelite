@@ -53,6 +53,7 @@ import {
   localFromServerOptionGroups,
   type LocalMenuOptionGroupRow,
 } from "@/components/menu/menu-option-groups-form";
+import { MenuBarcodeLabel } from "@/components/menu/menu-barcode-label";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { UnitType } from "@/lib/generated/prisma/client";
@@ -60,6 +61,7 @@ import { UNIT_TYPES, UNIT_LABELS } from "@/lib/constants/units";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { validateMenuItemBranchScope } from "@/lib/menu/branch-availability";
+import { useCurrency } from "@/contexts/currency-context";
 
 export interface BranchOption {
   id: string;
@@ -179,6 +181,7 @@ interface MenuFormProps {
   item?: MenuItem | null;
   categories?: CategoryOption[];
   branches?: BranchOption[];
+  posBarcodeEnabled?: boolean;
 }
 
 interface InventoryItemOption {
@@ -211,8 +214,10 @@ export function AddMenuItemForm({
   onOpenChange,
   categories = [],
   branches = [],
+  posBarcodeEnabled = false,
 }: Omit<MenuFormProps, "item">) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -515,6 +520,27 @@ export function AddMenuItemForm({
                   required
                 />
               </div>
+              {posBarcodeEnabled ? (
+                <div className="col-span-2">
+                  {formData.sku.trim() ? (
+                    <MenuBarcodeLabel
+                      sku={formData.sku}
+                      productName={formData.name || "New product"}
+                      price={
+                        formData.price
+                          ? formatCurrency(Number(formData.price))
+                          : undefined
+                      }
+                      showPrintButton
+                      className="mx-auto max-w-sm rounded-lg border bg-muted/30 p-4"
+                    />
+                  ) : (
+                    <p className="text-center text-xs text-muted-foreground">
+                      SKU required for barcode labels.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -814,8 +840,10 @@ export function EditMenuItemForm({
   item,
   categories = [],
   branches = [],
+  posBarcodeEnabled = false,
 }: MenuFormProps) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: item?.name || "",
@@ -1175,6 +1203,27 @@ export function EditMenuItemForm({
                   required
                 />
               </div>
+              {posBarcodeEnabled ? (
+                <div className="col-span-2">
+                  {formData.sku.trim() ? (
+                    <MenuBarcodeLabel
+                      sku={formData.sku}
+                      productName={formData.name || item?.name || "Product"}
+                      price={
+                        formData.price
+                          ? formatCurrency(Number(formData.price))
+                          : undefined
+                      }
+                      showPrintButton
+                      className="mx-auto max-w-sm rounded-lg border bg-muted/30 p-4"
+                    />
+                  ) : (
+                    <p className="text-center text-xs text-muted-foreground">
+                      SKU required for barcode labels.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
