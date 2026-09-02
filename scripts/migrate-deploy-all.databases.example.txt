@@ -1,0 +1,5 @@
+# One database URL per line. Optional label prefix: label|postgresql://...
+# Copy to migrate-deploy-all.databases.txt (gitignored) and edit URLs.
+#
+# production|postgresql://user:pass@direct-host:5432/prod?sslmode=require
+# staging|postgresql://user:pass@direct-host:5432/staging?sslmode=require

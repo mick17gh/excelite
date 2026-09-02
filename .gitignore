@@ -50,3 +50,5 @@ next-env.d.ts
 
 # Local-only ops scripts (destructive DB cleanup)
 scripts/clear-training-data.ts
+scripts/migrate-deploy-all.databases.txt
+tmp/*.dump
