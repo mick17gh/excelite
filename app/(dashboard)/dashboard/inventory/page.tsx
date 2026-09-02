@@ -2,11 +2,9 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DashboardPageSkeleton } from "@/components/dashboard/page-loading-skeleton";
 import { InventoryContent } from "@/components/inventory/inventory-content";
-import { getInventoryItems, getOutboundRecords, getTransferRecords } from "@/lib/actions/inventory";
-import { getWarehouseTransfers } from "@/lib/actions/warehouse";
+import { getInventoryItems } from "@/lib/actions/inventory";
 import { getBranches } from "@/lib/actions/branches";
 import { getWarehouses } from "@/lib/actions/warehouse";
-import { getBranchWarehouseTransfers } from "@/lib/actions/stock-transfers";
 import { listInventoryCategories } from "@/lib/actions/inventory-categories";
 
 export const metadata = {
@@ -91,25 +89,13 @@ async function InventoryPageData() {
     createdAt: string;
   };
 
-  const [
-    branchesResult,
-    inventoryResult,
-    outboundResult,
-    transferResult,
-    warehouseTransfersResult,
-    warehousesResult,
-    branchReturnsResult,
-    categoriesResult,
-  ] = await Promise.all([
-    getBranches(),
-    getInventoryItems(undefined, { page: 1, pageSize: 1000 }),
-    getOutboundRecords(),
-    getTransferRecords(),
-    getWarehouseTransfers(),
-    getWarehouses(),
-    getBranchWarehouseTransfers({ limit: 200 }),
-    listInventoryCategories({ activeOnly: true }),
-  ]);
+  const [branchesResult, inventoryResult, warehousesResult, categoriesResult] =
+    await Promise.all([
+      getBranches(),
+      getInventoryItems(undefined, { page: 1, pageSize: 25 }),
+      getWarehouses(),
+      listInventoryCategories({ activeOnly: true }),
+    ]);
   const warehouseList = (warehousesResult.data || []).map((w) => ({
     id: w.id,
     name: w.name,
@@ -130,10 +116,6 @@ async function InventoryPageData() {
     };
   });
   const rawItems = (inventoryResult.data || []) as RawInventoryItem[];
-  const outboundRecords = (outboundResult.data || []) as OutboundRecord[];
-  const transferRecords = (transferResult.data || []) as TransferRecord[];
-  const warehouseTransfers = (warehouseTransfersResult.data || []) as WarehouseTransfer[];
-  const branchReturns = branchReturnsResult.data || [];
   const items = rawItems.map((item) => {
     const currentStock =
       typeof item.currentStock === "object" && item.currentStock.toNumber
@@ -183,10 +165,7 @@ async function InventoryPageData() {
       branches={branchList}
       categories={categories}
       warehouses={warehouseList}
-      outboundRecords={outboundRecords}
-      transferRecords={transferRecords}
-      warehouseTransfers={warehouseTransfers}
-      branchReturns={branchReturns}
+      initialItemsTotal={inventoryResult.pagination?.totalItems || items.length}
     />
   );
 }

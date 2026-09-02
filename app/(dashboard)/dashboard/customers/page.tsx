@@ -27,12 +27,21 @@ export default function CustomersPage() {
 
 async function CustomersPageData() {
   const [customersResult, statsResult] = await Promise.all([
-    getCustomers({ pageSize: 500 }),
+    getCustomers({ page: 1, pageSize: 25 }),
     getCustomerStats(),
   ]);
 
   const customers = customersResult.data || [];
   const stats = statsResult.data;
+  const total = customersResult.total || 0;
 
-  return <CustomersContent customers={customers} stats={stats} />;
+  return (
+    <CustomersContent
+      customers={customers}
+      stats={stats}
+      initialTotal={total}
+      initialPage={1}
+      initialPageSize={25}
+    />
+  );
 }

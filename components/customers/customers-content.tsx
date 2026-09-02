@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -31,9 +31,10 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
-import { deleteCustomer } from "@/lib/actions/customers";
+import { deleteCustomer, getCustomers } from "@/lib/actions/customers";
 import { CreateCustomerDialog, EditCustomerDialog } from "./customer-forms";
 import { CustomerDetailModal } from "./customer-detail-modal";
+import { TablePagination } from "@/components/ui/table-pagination";
 
 interface Customer {
   id: string;
@@ -49,7 +50,6 @@ interface Customer {
   longitude: number | null;
   isActive: boolean;
   orderCount: number;
-  lifetimeValue?: number;
   createdAt: string;
 }
 
@@ -62,26 +62,63 @@ interface CustomerStats {
 interface CustomersContentProps {
   customers: Customer[];
   stats: CustomerStats;
+  initialTotal?: number;
+  initialPage?: number;
+  initialPageSize?: number;
 }
 
-export function CustomersContent({ customers, stats }: CustomersContentProps) {
+export function CustomersContent({
+  customers: initialCustomers,
+  stats,
+  initialTotal = 0,
+  initialPage = 1,
+  initialPageSize = 25,
+}: CustomersContentProps) {
+  const skipInitialFetch = useRef(true);
+  const [customers, setCustomers] = useState(initialCustomers);
+  const [total, setTotal] = useState(initialTotal);
+  const [page, setPage] = useState(initialPage);
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const filteredCustomers = useMemo(() => {
-    return customers.filter((c) => {
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        (c.location || c.city)?.toLowerCase().includes(q)
-      );
-    });
-  }, [customers, searchQuery]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchCustomers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await getCustomers({
+        page,
+        pageSize,
+        search: debouncedSearch || undefined,
+      });
+      setCustomers((result.data || []) as Customer[]);
+      setTotal(result.total || 0);
+    } catch {
+      toast.error("Failed to load customers");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, pageSize, debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
+    void fetchCustomers();
+  }, [page, pageSize, debouncedSearch, fetchCustomers]);
 
   const handleDelete = async (id: string) => {
     const result = await deleteCustomer(id);
@@ -89,12 +126,14 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
       toast.error(result.error);
     } else {
       toast.success("Customer deactivated");
+      void fetchCustomers();
     }
   };
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
       <div className="grid gap-2 sm:gap-3 grid-cols-3">
         <Card className="kpi-card rounded-xl">
           <CardContent className="p-3">
@@ -139,7 +178,6 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
         </Card>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -156,7 +194,6 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
         </Button>
       </div>
 
-      {/* Customers Table */}
       <Card className="rounded-xl">
         <CardContent className="p-0">
           <Table>
@@ -167,7 +204,6 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
                 <TableHead>Email</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Vibe</TableHead>
-                <TableHead className="text-right">Lifetime Value</TableHead>
                 <TableHead className="text-center">Orders</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
@@ -175,14 +211,14 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCustomers.length === 0 ? (
+              {customers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                    No customers found
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    {isLoading ? "Loading customers..." : "No customers found"}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomers.map((customer) => (
+                customers.map((customer) => (
                   <TableRow key={customer.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedCustomer(customer)}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell className="font-mono text-sm">{customer.phone}</TableCell>
@@ -192,9 +228,6 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
                       {customer.customerVibe ? (
                         <Badge variant="outline">{customer.customerVibe.replace("_", " ")}</Badge>
                       ) : "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {(customer.lifetimeValue || 0).toLocaleString(undefined, { style: "currency", currency: "GHS" })}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary">{customer.orderCount}</Badge>
@@ -221,7 +254,7 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditCustomer(customer); }}>
                             <Edit className="mr-2 h-4 w-4" />Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleDelete(customer.id); }}>
+                          <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); void handleDelete(customer.id); }}>
                             <Trash2 className="mr-2 h-4 w-4" />Deactivate
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -232,15 +265,38 @@ export function CustomersContent({ customers, stats }: CustomersContentProps) {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={total}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
         </CardContent>
       </Card>
 
-      <CreateCustomerDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
+      <CreateCustomerDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+      />
       {editCustomer && (
-        <EditCustomerDialog customer={editCustomer} open={!!editCustomer} onOpenChange={(open) => !open && setEditCustomer(null)} />
+        <EditCustomerDialog
+          customer={editCustomer}
+          open={!!editCustomer}
+          onOpenChange={(open) => !open && setEditCustomer(null)}
+        />
       )}
       {selectedCustomer && (
-        <CustomerDetailModal customer={selectedCustomer} open={!!selectedCustomer} onOpenChange={(open) => !open && setSelectedCustomer(null)} />
+        <CustomerDetailModal
+          customer={selectedCustomer}
+          open={!!selectedCustomer}
+          onOpenChange={(open) => !open && setSelectedCustomer(null)}
+        />
       )}
     </div>
   );

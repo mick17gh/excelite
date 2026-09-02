@@ -12,27 +12,16 @@ import { Building2, Users, GitBranch, Warehouse, Save, Loader2, Upload, Image as
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { getOrganization, updateOrganization } from "@/lib/actions/organization";
+import type { OrganizationSettingsData } from "@/lib/actions/organization-settings-bundle";
 import { getTierLimits, TIER_DISPLAY_NAMES } from "@/lib/tier-config";
 import { SubscriptionTier } from "@/lib/generated/prisma/client";
 import Image from "next/image";
 
-interface OrgData {
-  id: string;
-  name: string;
-  storeLogoUrl?: string | null;
-  tier: string;
-  status: string;
-  maxBranches: number;
-  maxUsers: number;
-  maxMenuItems: number | null;
-  features: Record<string, boolean> | null;
-  trialEndsAt: string | null;
-  subscriptionEndsAt: string | null;
-  userCount: number;
-  branchCount: number;
-  warehouseCount: number;
-  createdAt: string;
-  paystackDashboardEnabled?: boolean;
+interface OrgData extends OrganizationSettingsData {}
+
+interface OrganizationTabProps {
+  organizationId?: string;
+  initialData?: OrganizationSettingsData;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -41,24 +30,34 @@ const TIER_COLORS: Record<string, string> = {
   ENTERPRISE: "bg-amber-100 text-amber-700",
 };
 
-interface OrganizationTabProps {
-  organizationId?: string;
+function seedFromOrgData(data: OrganizationSettingsData) {
+  return {
+    org: data as OrgData,
+    name: data.name,
+    storeLogoUrl: data.storeLogoUrl || "",
+    logoPreview: data.storeLogoUrl || null,
+    paystackDashboardEnabled: Boolean(data.paystackDashboardEnabled),
+  };
 }
 
-export function OrganizationTab({ organizationId }: OrganizationTabProps) {
-  const [org, setOrg] = useState<OrgData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function OrganizationTab({ organizationId, initialData }: OrganizationTabProps) {
+  const seeded = initialData ? seedFromOrgData(initialData) : null;
+  const [org, setOrg] = useState<OrgData | null>(seeded?.org ?? null);
+  const [isLoading, setIsLoading] = useState(!initialData);
   const [isSaving, setIsSaving] = useState(false);
-  const [name, setName] = useState("");
-  const [storeLogoUrl, setStoreLogoUrl] = useState("");
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [name, setName] = useState(seeded?.name ?? "");
+  const [storeLogoUrl, setStoreLogoUrl] = useState(seeded?.storeLogoUrl ?? "");
+  const [logoPreview, setLogoPreview] = useState<string | null>(seeded?.logoPreview ?? null);
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
-  const [paystackDashboardEnabled, setPaystackDashboardEnabled] = useState(false);
+  const [paystackDashboardEnabled, setPaystackDashboardEnabled] = useState(
+    seeded?.paystackDashboardEnabled ?? false,
+  );
   const [isSavingPayments, setIsSavingPayments] = useState(false);
 
   useEffect(() => {
+    if (initialData) return;
     loadOrg();
-  }, [organizationId]);
+  }, [organizationId, initialData]);
 
   const loadOrg = async () => {
     setIsLoading(true);

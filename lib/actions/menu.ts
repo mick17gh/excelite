@@ -936,6 +936,72 @@ export async function getMenuItems(
   }
 }
 
+/** Lightweight menu search for order-create picker. */
+export async function searchMenuForPicker({
+  q,
+  branchId,
+  limit = 50,
+}: {
+  q?: string;
+  branchId: string;
+  limit?: number;
+}) {
+  try {
+    const term = q?.trim();
+    const items = await db.menuItem.findMany({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        ...menuItemVisibilityWhere(branchId),
+        ...(term
+          ? {
+              OR: [
+                { name: { contains: term, mode: "insensitive" } },
+                { sku: { contains: term, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        category: { select: { name: true } },
+        branchAvailability: { select: { branchId: true } },
+        optionGroups: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+          include: {
+            options: {
+              where: { isActive: true },
+              orderBy: { sortOrder: "asc" },
+            },
+          },
+        },
+      },
+      orderBy: [{ name: "asc" }],
+      take: limit,
+    });
+
+    return {
+      data: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        categoryId: item.categoryId,
+        category: item.category?.name || "",
+        price: Number(item.price),
+        cost: Number(item.cost),
+        isActive: item.isActive,
+        description: item.description,
+        imageUrl: item.imageUrl,
+        optionGroups: mapOptionGroupsForClient(item.optionGroups),
+        ...mapMenuItemBranchFields(item),
+      })),
+    };
+  } catch (error) {
+    console.error("[searchMenuForPicker] Error:", error);
+    return { data: [] };
+  }
+}
+
 export async function getMenuItemById(id: string) {
   try {
     const item = await db.menuItem.findUnique({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ContentCard } from "@/components/dashboard/content-card";
@@ -29,38 +30,24 @@ import {
   Save,
   Loader2,
   Calculator,
-  CreditCard,
-  ChefHat,
-  Briefcase,
 } from "lucide-react";
-import { OrganizationTab } from "./organization-tab";
-import { SubscriptionTab } from "./subscription-tab";
-import { KitchenStationsTab } from "./kitchen-stations-tab";
-import { JobRolesTab } from "./job-roles-tab";
-import { PlatformAdminTab } from "./platform-admin-tab";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import {
-  getCurrentUser,
   updateProfile,
   updateNotificationPreferences,
   type NotificationPreferences,
+  type SettingsBootstrapBranch,
+  type SettingsBootstrapUser,
 } from "@/lib/actions/settings";
 import {
   getBranchTaxRate,
   updateBranchTaxSettings,
 } from "@/lib/actions/tax";
-import { getBranches } from "@/lib/actions/branches";
-import { getOrganization } from "@/lib/actions/organization";
-import { OnlineStoreTab } from "./online-store-tab";
-import { DataManagementTab } from "./data-management-tab";
-import { RolePermissionsTab } from "./role-permissions-tab";
-import { PosPoliciesTab } from "./pos-policies-tab";
-import { DineInTablesTab } from "./dine-in-tables-tab";
 import { ChangePasswordCard } from "@/components/account/change-password-card";
 import { ChangePinCard } from "@/components/account/change-pin-card";
 import { ActiveSessionsCard } from "@/components/settings/active-sessions-card";
-import type { Role } from "@/lib/generated/prisma/client";
+import type { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { usePermissions } from "@/contexts/permissions-context";
 import {
   dashboardPrimaryButtonClass,
@@ -70,21 +57,73 @@ import {
 } from "@/components/dashboard/dashboard-theme";
 import { cn } from "@/lib/utils";
 
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  phoneNumber: string | null;
-  role: string;
-  image: string | null;
-  branchId: string | null;
-  branchName: string | null;
-  organizationId?: string | null;
+function TabPanelSkeleton() {
+  return (
+    <div className="flex h-40 items-center justify-center rounded-xl border border-dashed">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 }
 
-export function SettingsContent() {
+const OrganizationSettingsPanel = dynamic(
+  () =>
+    import("./organization-settings-panel").then((module) => module.OrganizationSettingsPanel),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const RolePermissionsTab = dynamic(
+  () => import("./role-permissions-tab").then((module) => module.RolePermissionsTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const PlatformAdminTab = dynamic(
+  () => import("./platform-admin-tab").then((module) => module.PlatformAdminTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const DataManagementTab = dynamic(
+  () => import("./data-management-tab").then((module) => module.DataManagementTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const KitchenStationsTab = dynamic(
+  () => import("./kitchen-stations-tab").then((module) => module.KitchenStationsTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const JobRolesTab = dynamic(
+  () => import("./job-roles-tab").then((module) => module.JobRolesTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const SubscriptionTab = dynamic(
+  () => import("./subscription-tab").then((module) => module.SubscriptionTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const OnlineStoreTab = dynamic(
+  () => import("./online-store-tab").then((module) => module.OnlineStoreTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+const DineInTablesTab = dynamic(
+  () => import("./dine-in-tables-tab").then((module) => module.DineInTablesTab),
+  { loading: () => <TabPanelSkeleton /> },
+);
+
+interface SettingsContentProps {
+  initialUser: SettingsBootstrapUser | null;
+  initialBranches: SettingsBootstrapBranch[];
+  initialOrganizationTier: SubscriptionTier;
+}
+
+export function SettingsContent({
+  initialUser,
+  initialBranches,
+  initialOrganizationTier,
+}: SettingsContentProps) {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") || "profile";
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
   const { hasPermission } = usePermissions();
@@ -94,18 +133,16 @@ export function SettingsContent() {
   const canViewSubscription = false; // Excelite lite — no subscription tiers
   const canEditStaff = false; // Excelite lite — no staff module
 
-  // User data
-  const [user, setUser] = useState<UserData | null>(null);
+  const [user, setUser] = useState<SettingsBootstrapUser | null>(initialUser);
   const canManageTeamPermissions =
     hasPermission("users:edit") || user?.role === "SUPER_ADMIN";
-  const [isLoading, setIsLoading] = useState(true);
-  const [organizationTier, setOrganizationTier] = useState<"FREE" | "PRO" | "ENTERPRISE">("FREE");
-  
-  // Profile form
+
+  const organizationTier = initialOrganizationTier;
+
   const [profileForm, setProfileForm] = useState({
-    name: "",
-    email: "",
-    phoneNumber: "",
+    name: initialUser?.name ?? "",
+    email: initialUser?.email ?? "",
+    phoneNumber: initialUser?.phoneNumber ?? "",
   });
   
   // Notification preferences
@@ -118,9 +155,11 @@ export function SettingsContent() {
     staffShortageAlerts: true,
   });
 
-  // Tax configuration
-  const [branches, setBranches] = useState<Array<{ id: string; name: string; code: string }>>([]);
-  const [selectedBranch, setSelectedBranch] = useState<string>("");
+  const branches = initialBranches;
+  const [selectedBranch, setSelectedBranch] = useState<string>(
+    initialBranches[0]?.id ?? "",
+  );
+  const [taxLoadedForBranch, setTaxLoadedForBranch] = useState<string | null>(null);
   const [taxSettings, setTaxSettings] = useState({
     taxRate: 12.5,
     taxName: "VAT",
@@ -131,56 +170,21 @@ export function SettingsContent() {
     showTaxNumberOnReceipt: false,
   });
 
-  // Load user data on mount
   useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const [userResult, branchesResult, orgResult] = await Promise.all([
-          getCurrentUser(),
-          getBranches(),
-          getOrganization(),
-        ]);
-        
-        if (userResult.success && userResult.data) {
-          setUser(userResult.data);
-          setProfileForm({
-            name: userResult.data.name,
-            email: userResult.data.email,
-            phoneNumber: userResult.data.phoneNumber || "",
-          });
-        }
-        
-        if (branchesResult.success && branchesResult.data) {
-          setBranches(branchesResult.data);
-          if (branchesResult.data.length > 0) {
-            setSelectedBranch(branchesResult.data[0].id);
-          }
-        }
-        if (orgResult.data?.tier) {
-          setOrganizationTier(orgResult.data.tier);
-        }
-      } catch (error) {
-        console.error("Failed to load settings data:", error);
-        toast.error("Failed to load settings");
-      } finally {
-        setIsLoading(false);
-      }
+    const tab = searchParams.get("tab");
+    if (tab) {
+      setActiveTab(tab);
     }
-    
-    loadData();
-  }, []);
+  }, [searchParams]);
 
-  // Load tax settings when branch changes
   useEffect(() => {
-    if (selectedBranch) {
-      loadTaxSettings(selectedBranch);
-    }
-  }, [selectedBranch]);
+    if (activeTab !== "tax" || !selectedBranch) return;
+    if (taxLoadedForBranch === selectedBranch) return;
 
-  const loadTaxSettings = async (branchId: string) => {
-    try {
-      const settings = await getBranchTaxRate(branchId);
+    let cancelled = false;
+
+    void getBranchTaxRate(selectedBranch).then((settings) => {
+      if (cancelled) return;
       setTaxSettings({
         taxRate: settings.rate,
         taxName: settings.name,
@@ -190,10 +194,15 @@ export function SettingsContent() {
         taxNumber: settings.taxNumber ?? "",
         showTaxNumberOnReceipt: settings.showTaxNumberOnReceipt,
       });
-    } catch (error) {
+      setTaxLoadedForBranch(selectedBranch);
+    }).catch((error) => {
       console.error("Failed to load tax settings:", error);
-    }
-  };
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, selectedBranch, taxLoadedForBranch]);
 
   const handleSaveProfile = () => {
     startTransition(async () => {
@@ -259,16 +268,8 @@ export function SettingsContent() {
     return role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   return (
-    <Tabs defaultValue={initialTab} className="w-full">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className={cn(dashboardTabListClass, "mb-6 h-11 flex-wrap w-full sm:w-auto inline-flex")}>
         <TabsTrigger value="profile" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
           <User className="mr-1.5 h-4 w-4" />
@@ -686,65 +687,69 @@ export function SettingsContent() {
 
       {canViewOrganization && (
         <TabsContent value="organization">
-          <OrganizationTab organizationId={user?.organizationId ?? undefined} />
+          {activeTab === "organization" && user?.organizationId ? (
+            <OrganizationSettingsPanel organizationId={user.organizationId} />
+          ) : null}
         </TabsContent>
       )}
 
       <TabsContent value="dine-in-tables">
-        {user?.organizationId ? (
+        {activeTab === "dine-in-tables" && user?.organizationId ? (
           <DineInTablesTab organizationId={user.organizationId} tier={organizationTier} />
-        ) : (
+        ) : activeTab === "dine-in-tables" ? (
           <Card className="chart-card rounded-xl">
             <CardContent className="px-4 py-6 text-sm text-muted-foreground">
               Organization context is required.
             </CardContent>
           </Card>
-        )}
+        ) : null}
       </TabsContent>
 
       <TabsContent value="kitchen">
-        <KitchenStationsTab />
+        {activeTab === "kitchen" ? <KitchenStationsTab /> : null}
       </TabsContent>
 
       {canEditStaff && (
         <TabsContent value="job-roles">
-          <JobRolesTab />
+          {activeTab === "job-roles" ? <JobRolesTab /> : null}
         </TabsContent>
       )}
 
       {canViewSubscription && (
         <TabsContent value="subscription">
-          <SubscriptionTab />
+          {activeTab === "subscription" ? <SubscriptionTab /> : null}
         </TabsContent>
       )}
 
       <TabsContent value="online-store">
-        {user?.organizationId ? (
+        {activeTab === "online-store" && user?.organizationId ? (
           <OnlineStoreTab organizationId={user.organizationId} tier={organizationTier} />
-        ) : (
+        ) : activeTab === "online-store" ? (
           <Card className="chart-card rounded-xl">
             <CardContent className="px-4 py-6 text-sm text-muted-foreground">
               Organization context is required to manage online store settings.
             </CardContent>
           </Card>
-        )}
+        ) : null}
       </TabsContent>
 
       {canManageTeamPermissions && user && (
         <TabsContent value="role-permissions">
-          <RolePermissionsTab actorRole={user.role as Role} />
+          {activeTab === "role-permissions" ? (
+            <RolePermissionsTab actorRole={user.role as Role} />
+          ) : null}
         </TabsContent>
       )}
 
       {canPurgeData && (
         <TabsContent value="data-management">
-          <DataManagementTab />
+          {activeTab === "data-management" ? <DataManagementTab /> : null}
         </TabsContent>
       )}
 
       {canManagePlatform && (
         <TabsContent value="platform-admin">
-          <PlatformAdminTab />
+          {activeTab === "platform-admin" ? <PlatformAdminTab /> : null}
         </TabsContent>
       )}
     </Tabs>

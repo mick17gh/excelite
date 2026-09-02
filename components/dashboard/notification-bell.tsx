@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useTransition, useCallback } from "react";
+import { useIntervalWhenVisible } from "@/hooks/use-interval-when-visible";
+import { useAdaptivePollInterval } from "@/hooks/use-adaptive-poll-interval";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -93,17 +95,16 @@ export function NotificationBell({
     }
   }, [session?.user?.id]);
 
+  const notificationPollMs = useAdaptivePollInterval({ baseMs: 60_000 });
+
   useEffect(() => {
     if (!sessionReady) return;
-
     void loadUnreadCount();
-
-    const interval = setInterval(() => {
-      void loadUnreadCount();
-    }, 30000);
-
-    return () => clearInterval(interval);
   }, [sessionReady, loadUnreadCount]);
+
+  useIntervalWhenVisible(() => {
+    void loadUnreadCount();
+  }, notificationPollMs, sessionReady);
 
   useEffect(() => {
     if (isOpen && sessionReady) {

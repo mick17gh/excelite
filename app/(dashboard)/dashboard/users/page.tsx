@@ -29,7 +29,7 @@ export default function UsersPage() {
 async function UsersPageData() {
   const [branchesResult, usersResult, orgResult, warehousesResult] = await Promise.all([
     getBranches(),
-    getUsers(),
+    getUsers({ page: 1, pageSize: 25 }),
     getOrganization(),
     getWarehouses(),
   ]);
@@ -77,6 +77,9 @@ async function UsersPageData() {
       warehouses={warehouseList}
       currentCount={orgResult.data?.userCount || 0}
       maxUsers={orgResult.data?.maxUsers || 2}
+      initialTotal={usersResult.pagination?.totalItems || 0}
+      initialPage={1}
+      initialPageSize={25}
     />
   );
 }

@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { OrdersContent } from "@/components/orders/orders-content";
 import { getOrders, getOrderStats } from "@/lib/actions/orders";
 import { getBranches } from "@/lib/actions/branches";
-import { getMenuItems } from "@/lib/actions/menu";
-import { getCustomers } from "@/lib/actions/customers";
+import { getRecentCustomersForPicker } from "@/lib/actions/customers";
 import { isTableManagementEnabled } from "@/lib/features/table-management";
 import { enforcePageRouteAccess } from "@/lib/permissions/enforce-page";
 import { requireSessionAccess } from "@/lib/permissions/load-session-access";
@@ -44,13 +43,12 @@ async function OrdersPageData() {
   await enforcePageRouteAccess("/dashboard/orders");
   const access = await requireSessionAccess();
 
-  const [ordersResult, statsResult, branchesResult, menuResult, customersResult, tableManagementEnabled] =
+  const [ordersResult, statsResult, branchesResult, recentCustomersResult, tableManagementEnabled] =
     await Promise.all([
       getOrders({ pageSize: 50, page: 1 }),
       getOrderStats(),
       getBranches(),
-      getMenuItems(),
-      getCustomers(),
+      getRecentCustomersForPicker(50),
       isTableManagementEnabled(access.organizationId),
     ]);
 
@@ -82,33 +80,12 @@ async function OrdersPageData() {
     taxNumber: b.taxNumber ?? null,
     showTaxNumberOnReceipt: b.showTaxNumberOnReceipt ?? false,
   }));
-  const menuItems = (menuResult.data || []).map((m: {
-    id: string;
-    name: string;
-    sku: string;
-    price: { toNumber?: () => number } | number;
-    categoryId: string;
-    optionGroups?: unknown[];
-  }) => ({
-    id: m.id,
-    name: m.name,
-    sku: m.sku,
-    price:
-      typeof m.price === "object" && m.price?.toNumber
-        ? m.price.toNumber()
-        : Number(m.price),
-    categoryId: m.categoryId,
-    optionGroups: m.optionGroups ?? [],
-  }));
-  const customers = customersResult.data || [];
-
   return (
     <OrdersContent
       orders={orders}
       branches={branches}
-      menuItems={menuItems}
-      customers={customers}
       stats={stats}
+      customers={recentCustomersResult.data ?? []}
       initialTotal={total}
       initialPage={page}
       initialPageSize={pageSize}

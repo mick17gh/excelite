@@ -38,12 +38,13 @@ export type PosCustomerCacheItem = {
 };
 
 /** Slim active-customer list for POS seed / offline IndexedDB cache. */
-export async function getPosCustomerCache() {
+export async function getPosCustomerCache(limit = 200) {
   try {
     const customers = await db.customer.findMany({
       where: { isActive: true },
       select: { id: true, name: true, phone: true },
-      orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ updatedAt: "desc" }, { name: "asc" }],
+      take: limit,
     });
     return {
       data: customers.map((c) => ({
@@ -54,6 +55,77 @@ export async function getPosCustomerCache() {
     };
   } catch (error) {
     console.error("[getPosCustomerCache] Error:", error);
+    return { data: [] as PosCustomerCacheItem[] };
+  }
+}
+
+/** Lightweight customer search for pickers (combobox / order create). */
+export async function searchCustomersForPicker({
+  q,
+  limit = 50,
+}: {
+  q?: string;
+  limit?: number;
+}) {
+  try {
+    const term = q?.trim();
+    if (!term) {
+      return { data: [] as PosCustomerCacheItem[] };
+    }
+
+    const customers = await db.customer.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { name: { contains: term, mode: "insensitive" } },
+          { phone: { contains: term } },
+        ],
+      },
+      select: { id: true, name: true, phone: true },
+      orderBy: [{ name: "asc" }],
+      take: limit,
+    });
+
+    return { data: customers satisfies PosCustomerCacheItem[] };
+  } catch (error) {
+    console.error("[searchCustomersForPicker] Error:", error);
+    return { data: [] as PosCustomerCacheItem[] };
+  }
+}
+
+/** Recent customers from orders — for picker default list. */
+export async function getRecentCustomersForPicker(limit = 50) {
+  try {
+    const recentOrders = await db.order.findMany({
+      where: { customerId: { not: null } },
+      select: { customerId: true },
+      distinct: ["customerId"],
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+
+    const ids = recentOrders
+      .map((row) => row.customerId)
+      .filter((id): id is string => Boolean(id));
+
+    if (ids.length === 0) {
+      return { data: [] as PosCustomerCacheItem[] };
+    }
+
+    const customers = await db.customer.findMany({
+      where: { id: { in: ids }, isActive: true },
+      select: { id: true, name: true, phone: true },
+    });
+
+    const byId = new Map(customers.map((customer) => [customer.id, customer]));
+
+    return {
+      data: ids
+        .map((id) => byId.get(id))
+        .filter((customer): customer is PosCustomerCacheItem => Boolean(customer)),
+    };
+  } catch (error) {
+    console.error("[getRecentCustomersForPicker] Error:", error);
     return { data: [] as PosCustomerCacheItem[] };
   }
 }
@@ -97,18 +169,6 @@ export async function getCustomers(filters?: {
       db.customer.count({ where }),
     ]);
 
-    const lifetimeValueRows = await db.order.groupBy({
-      by: ["customerId"],
-      where: {
-        customerId: { in: customers.map((c) => c.id) },
-        paymentStatus: "PAID",
-      },
-      _sum: { total: true },
-    });
-    const lifetimeValueMap = new Map(
-      lifetimeValueRows.map((row) => [row.customerId, Number(row._sum.total || 0)]),
-    );
-
     return {
       data: customers.map((c) => ({
         id: c.id,
@@ -124,7 +184,6 @@ export async function getCustomers(filters?: {
         longitude: c.longitude ? Number(c.longitude) : null,
         isActive: c.isActive,
         orderCount: c._count.orders,
-        lifetimeValue: lifetimeValueMap.get(c.id) || 0,
         createdAt: c.createdAt.toISOString(),
       })),
       total,

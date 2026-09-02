@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import type { SubscriptionTier } from "@/lib/generated/prisma/client";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import {
@@ -63,6 +64,74 @@ async function syncUserPinHash(userId: string, pinHash: string | null) {
       },
     });
   }
+}
+
+export type SettingsBootstrapUser = {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string | null;
+  role: string;
+  image: string | null;
+  branchId: string | null;
+  branchName: string | null;
+  organizationId: string | null;
+};
+
+export type SettingsBootstrapBranch = {
+  id: string;
+  name: string;
+  code: string;
+};
+
+export type SettingsBootstrap = {
+  user: SettingsBootstrapUser | null;
+  branches: SettingsBootstrapBranch[];
+  organizationTier: SubscriptionTier;
+};
+
+const emptySettingsBootstrap: SettingsBootstrap = {
+  user: null,
+  branches: [],
+  organizationTier: "FREE",
+};
+
+export async function getSettingsBootstrap(): Promise<SettingsBootstrap> {
+  const userResult = await getCurrentUser();
+  if (!userResult.success || !userResult.data) {
+    return emptySettingsBootstrap;
+  }
+
+  const orgId = userResult.data.organizationId;
+  const [branches, org] = await Promise.all([
+    db.branch.findMany({
+      where: { deletedAt: null },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: "asc" },
+    }),
+    orgId
+      ? db.organization.findUnique({
+          where: { id: orgId },
+          select: { tier: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    user: {
+      id: userResult.data.id,
+      name: userResult.data.name,
+      email: userResult.data.email,
+      phoneNumber: userResult.data.phoneNumber,
+      role: userResult.data.role,
+      image: userResult.data.image,
+      branchId: userResult.data.branchId,
+      branchName: userResult.data.branchName,
+      organizationId: userResult.data.organizationId ?? null,
+    },
+    branches,
+    organizationTier: org?.tier ?? "FREE",
+  };
 }
 
 export async function getCurrentUser() {

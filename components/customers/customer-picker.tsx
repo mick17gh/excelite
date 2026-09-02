@@ -23,13 +23,29 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   createCustomer,
-  getCustomers,
+  searchCustomersForPicker,
   type PosCustomerCacheItem,
 } from "@/lib/actions/customers";
 
 export type CustomerPickerOption = PosCustomerCacheItem;
 
 export const WALK_IN_CUSTOMER_VALUE = "walk-in";
+
+const PICKER_LIMIT = 50;
+
+function filterCustomersLocal(
+  customers: CustomerPickerOption[],
+  term: string,
+): CustomerPickerOption[] {
+  const q = term.trim().toLowerCase();
+  if (!q) return customers.slice(0, PICKER_LIMIT);
+  return customers
+    .filter(
+      (customer) =>
+        customer.name.toLowerCase().includes(q) || customer.phone.includes(q),
+    )
+    .slice(0, PICKER_LIMIT);
+}
 
 interface CustomerPickerProps {
   customers: CustomerPickerOption[];
@@ -38,8 +54,11 @@ interface CustomerPickerProps {
     value: string,
     customer: CustomerPickerOption | null,
   ) => void;
+  preferLocalCache?: boolean;
   offlineRestricted?: boolean;
+  allowWalkIn?: boolean;
   allowCreate?: boolean;
+  customersLoading?: boolean;
   onCustomerCreated?: (customer: CustomerPickerOption) => void;
   placeholder?: string;
   className?: string;
@@ -50,8 +69,11 @@ export function CustomerPicker({
   customers,
   value = WALK_IN_CUSTOMER_VALUE,
   onValueChange,
+  preferLocalCache = false,
   offlineRestricted = false,
+  allowWalkIn = true,
   allowCreate = true,
+  customersLoading = false,
   onCustomerCreated,
   placeholder = "Select customer...",
   className,
@@ -59,7 +81,9 @@ export function CustomerPicker({
 }: CustomerPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<CustomerPickerOption[]>(customers);
+  const [results, setResults] = useState<CustomerPickerOption[]>(() =>
+    customers.slice(0, PICKER_LIMIT),
+  );
   const [isSearching, setIsSearching] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustName, setNewCustName] = useState("");
@@ -67,6 +91,13 @@ export function CustomerPicker({
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
   const canCreate = allowCreate && !offlineRestricted;
+  const searchTerm = search.trim();
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setResults(customers.slice(0, PICKER_LIMIT));
+    }
+  }, [customers, searchTerm]);
 
   useEffect(() => {
     if (!open) {
@@ -74,37 +105,42 @@ export function CustomerPicker({
       setShowNewCustomer(false);
       setNewCustName("");
       setNewCustPhone("");
+      setResults(customers.slice(0, PICKER_LIMIT));
       return;
     }
-    if (offlineRestricted) {
-      setResults(customers);
-    }
-  }, [open, offlineRestricted, customers]);
 
-  useEffect(() => {
-    if (!open || offlineRestricted) return;
+    if (offlineRestricted) {
+      setResults(filterCustomersLocal(customers, search));
+      return;
+    }
+
+    if (!searchTerm) {
+      setResults(customers.slice(0, PICKER_LIMIT));
+      setIsSearching(false);
+      return;
+    }
+
+    if (preferLocalCache) {
+      setResults(filterCustomersLocal(customers, searchTerm));
+    }
 
     let cancelled = false;
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const response = await getCustomers({
-          search: search.trim() || undefined,
-          page: 1,
-          pageSize: 50,
-          activeOnly: true,
+        const response = await searchCustomersForPicker({
+          q: searchTerm,
+          limit: PICKER_LIMIT,
         });
         if (cancelled) return;
-        setResults(
-          (response.data || []).map((c) => ({
-            id: c.id,
-            name: c.name,
-            phone: c.phone,
-          })),
-        );
+        setResults((response.data ?? []).slice(0, PICKER_LIMIT));
       } catch {
         if (!cancelled) {
-          setResults(customers);
+          setResults(
+            preferLocalCache
+              ? filterCustomersLocal(customers, searchTerm)
+              : customers.slice(0, PICKER_LIMIT),
+          );
         }
       } finally {
         if (!cancelled) setIsSearching(false);
@@ -115,16 +151,26 @@ export function CustomerPicker({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [open, search, offlineRestricted, customers]);
+  }, [open, search, searchTerm, offlineRestricted, preferLocalCache, customers]);
 
   const selectedLabel = useMemo(() => {
-    if (value === WALK_IN_CUSTOMER_VALUE || !value) return "Walk-in Customer";
-    const fromResults = results.find((c) => c.id === value);
+    if (value === WALK_IN_CUSTOMER_VALUE || !value) {
+      return allowWalkIn ? "Walk-in Customer" : placeholder;
+    }
+    const fromResults = results.find((customer) => customer.id === value);
     if (fromResults) return `${fromResults.name} (${fromResults.phone})`;
-    const fromSeed = customers.find((c) => c.id === value);
+    const fromSeed = customers.find((customer) => customer.id === value);
     if (fromSeed) return `${fromSeed.name} (${fromSeed.phone})`;
     return placeholder;
-  }, [value, results, customers, placeholder]);
+  }, [value, results, customers, placeholder, allowWalkIn]);
+
+  const emptyMessage = useMemo(() => {
+    if (isSearching) return "Searching...";
+    if (!searchTerm && customers.length === 0) {
+      return "Type to search customers.";
+    }
+    return "No customer found.";
+  }, [isSearching, searchTerm, customers.length]);
 
   const selectCustomer = (
     nextValue: string,
@@ -163,7 +209,7 @@ export function CustomerPicker({
         };
         setResults((prev) => [
           created,
-          ...prev.filter((c) => c.id !== created.id),
+          ...prev.filter((customer) => customer.id !== created.id),
         ]);
         onCustomerCreated?.(created);
         selectCustomer(created.id, created);
@@ -183,28 +229,28 @@ export function CustomerPicker({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          disabled={disabled}
+          disabled={disabled || customersLoading}
           className={cn(
             "w-full justify-between h-11 font-normal rounded-xl",
             className,
           )}
         >
-          <span className="truncate">{selectedLabel}</span>
+          <span className="truncate">
+            {customersLoading ? "Loading customers..." : selectedLabel}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0 rounded-xl" align="start">
         {!showNewCustomer ? (
-          <Command shouldFilter={offlineRestricted}>
+          <Command shouldFilter={false}>
             <CommandInput
               placeholder="Search customers..."
               value={search}
               onValueChange={setSearch}
             />
             <CommandList>
-              <CommandEmpty>
-                {isSearching ? "Searching..." : "No customer found."}
-              </CommandEmpty>
+              <CommandEmpty>{emptyMessage}</CommandEmpty>
               {canCreate ? (
                 <>
                   <CommandGroup>
@@ -223,38 +269,40 @@ export function CustomerPicker({
                     Searching customers…
                   </div>
                 ) : null}
-                <CommandItem
-                  value="walk-in"
-                  onSelect={() =>
-                    selectCustomer(WALK_IN_CUSTOMER_VALUE, null)
-                  }
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === WALK_IN_CUSTOMER_VALUE
-                        ? "opacity-100"
-                        : "opacity-0",
-                    )}
-                  />
-                  Walk-in customer
-                </CommandItem>
-                {results.map((c) => (
+                {allowWalkIn ? (
                   <CommandItem
-                    key={c.id}
-                    value={`${c.name} ${c.phone}`}
-                    onSelect={() => selectCustomer(c.id, c)}
+                    value="walk-in"
+                    onSelect={() =>
+                      selectCustomer(WALK_IN_CUSTOMER_VALUE, null)
+                    }
                   >
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        value === c.id ? "opacity-100" : "opacity-0",
+                        value === WALK_IN_CUSTOMER_VALUE
+                          ? "opacity-100"
+                          : "opacity-0",
+                      )}
+                    />
+                    Walk-in customer
+                  </CommandItem>
+                ) : null}
+                {results.map((customer) => (
+                  <CommandItem
+                    key={customer.id}
+                    value={`${customer.name} ${customer.phone}`}
+                    onSelect={() => selectCustomer(customer.id, customer)}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === customer.id ? "opacity-100" : "opacity-0",
                       )}
                     />
                     <div className="flex flex-col">
-                      <span>{c.name}</span>
+                      <span>{customer.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {c.phone}
+                        {customer.phone}
                       </span>
                     </div>
                   </CommandItem>

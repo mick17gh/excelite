@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { KPICard } from "@/components/dashboard/kpi-card";
 import { ContentCard } from "@/components/dashboard/content-card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ import { formatDistanceToNow } from "date-fns";
 import { AddUserForm, EditUserForm, ResetPasswordDialog } from "@/components/users/user-forms";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { authClient } from "@/lib/auth-client";
+import { getUsers } from "@/lib/actions/users";
 import { Role } from "@/lib/generated/prisma/client";
 import { getRoleShortName, getUserAssignableRoles } from "@/lib/permissions/labels";
 import {
@@ -84,9 +85,24 @@ interface UsersContentProps {
   warehouses: WarehouseOption[];
   currentCount: number;
   maxUsers: number;
+  initialTotal?: number;
+  initialPage?: number;
+  initialPageSize?: number;
 }
 
-export function UsersContent({ users, branches, warehouses, currentCount, maxUsers }: UsersContentProps) {
+export function UsersContent({
+  users: initialUsers,
+  branches,
+  warehouses,
+  currentCount,
+  maxUsers,
+  initialTotal = 0,
+  initialPage = 1,
+  initialPageSize = 25,
+}: UsersContentProps) {
+  const skipInitialFetch = useRef(true);
+  const [users, setUsers] = useState(initialUsers);
+  const [total, setTotal] = useState(initialTotal);
   const { data: session } = authClient.useSession();
   const actorRole = ((session?.user as { role?: Role } | undefined)?.role ?? "STAFF") as Role;
   const filterableRoles = getUserAssignableRoles(actorRole);
@@ -97,34 +113,73 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [resettingPasswordUser, setResettingPasswordUser] = useState<User | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      const matchesSearch =
-        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesRole = roleFilter === "all" || user.role === roleFilter;
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" && user.isActive) ||
-        (statusFilter === "inactive" && !user.isActive);
-      return matchesSearch && matchesRole && matchesStatus;
-    });
-  }, [users, searchQuery, roleFilter, statusFilter]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await getUsers({
+        page: currentPage,
+        pageSize,
+        search: debouncedSearch || undefined,
+        role: roleFilter !== "all" ? roleFilter : undefined,
+        isActive:
+          statusFilter === "all"
+            ? undefined
+            : statusFilter === "active"
+              ? true
+              : false,
+      });
+      setUsers(
+        (result.data || []).map((user: {
+          id: string;
+          name: string;
+          email: string;
+          role: string;
+          branchName?: string | null;
+          isActive: boolean;
+          createdAt: Date;
+        }) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          branchName: user.branchName || null,
+          isActive: user.isActive,
+          lastLogin: user.createdAt,
+        })),
+      );
+      setTotal(result.pagination?.totalItems || 0);
+    } catch {
+      setUsers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, pageSize, debouncedSearch, roleFilter, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, statusFilter]);
+  }, [debouncedSearch, roleFilter, statusFilter]);
 
-  const totalPages = Math.ceil(filteredUsers.length / pageSize);
-  const paginatedUsers = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredUsers.slice(startIndex, startIndex + pageSize);
-  }, [filteredUsers, currentPage, pageSize]);
+  useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
+    void fetchUsers();
+  }, [currentPage, pageSize, debouncedSearch, roleFilter, statusFilter, fetchUsers]);
 
-  const totalUsers = users.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const totalUsers = total;
   const activeUsers = users.filter((u) => u.isActive).length;
   const adminUsers = users.filter((u) => u.role === "SUPER_ADMIN" || u.role === "ADMIN" || u.role === "EXECUTIVE").length;
   const branchManagers = users.filter((u) => u.role === "BRANCH_MANAGER").length;
@@ -214,7 +269,14 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedUsers.map((user) => (
+            {users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  {isLoading ? "Loading users..." : "No users found"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              users.map((user) => (
               <TableRow key={user.id} className="hover:bg-[#22C55E]/5">
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -293,22 +355,21 @@ export function UsersContent({ users, branches, warehouses, currentCount, maxUse
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
-        {filteredUsers.length > 0 && (
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredUsers.length}
-            pageSize={pageSize}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
-          />
-        )}
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
       </ContentCard>
 
       <AddUserForm

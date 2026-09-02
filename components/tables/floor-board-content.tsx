@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { useIntervalWhenVisible } from "@/hooks/use-interval-when-visible";
+import { useAdaptivePollInterval } from "@/hooks/use-adaptive-poll-interval";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,11 +132,15 @@ export function FloorBoardContent({
     });
   }, [branchId, canManageTables]);
 
+  const floorPollMs = useAdaptivePollInterval({ baseMs: 15_000 });
+
   useEffect(() => {
     load();
-    const id = setInterval(load, 15000);
-    return () => clearInterval(id);
   }, [load]);
+
+  useIntervalWhenVisible(() => {
+    load();
+  }, floorPollMs);
 
   return (
     <div className="space-y-6">

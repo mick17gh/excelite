@@ -62,7 +62,7 @@ import {
   AddInventoryItemForm,
 } from "@/components/inventory/inventory-forms";
 import { BulkImportDialog } from "@/components/bulk-import-dialog";
-import { updateBranchTransferStatus } from "@/lib/actions/inventory";
+import { updateBranchTransferStatus, getOutboundRecords } from "@/lib/actions/inventory";
 import { receiveWarehouseTransferAtBranch } from "@/lib/actions/warehouse";
 import { TransferStatus } from "@/lib/generated/prisma/client";
 import { toast } from "sonner";
@@ -187,6 +187,7 @@ interface InventoryContentProps {
   transferRecords?: TransferRecord[];
   warehouseTransfers?: WarehouseTransfer[];
   branchReturns?: BranchWarehouseReturn[];
+  initialItemsTotal?: number;
 }
 
 export function InventoryContent({ 
@@ -194,13 +195,36 @@ export function InventoryContent({
   branches,
   categories,
   warehouses = [],
-  outboundRecords = [], 
+  outboundRecords: seedOutboundRecords = [], 
   transferRecords = [],
   warehouseTransfers = [],
   branchReturns = [],
+  initialItemsTotal = 0,
 }: InventoryContentProps) {
+  const [activeTab, setActiveTab] = useState("all");
+  const [outboundRecords, setOutboundRecords] = useState(seedOutboundRecords);
+  const [outboundLoaded, setOutboundLoaded] = useState(seedOutboundRecords.length > 0);
+  const [outboundLoading, setOutboundLoading] = useState(false);
   const router = useRouter();
   const { formatCurrency } = useCurrency();
+
+  useEffect(() => {
+    if (activeTab !== "outbound" || outboundLoaded) return;
+
+    let cancelled = false;
+    setOutboundLoading(true);
+    void getOutboundRecords().then((result) => {
+      if (cancelled) return;
+      setOutboundRecords((result.data || []) as unknown as OutboundRecord[]);
+      setOutboundLoaded(true);
+      setOutboundLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, outboundLoaded]);
+
   const { canViewAllBranches, userBranchId, userRole, isLoading: authLoading } = useBranchRestrictions();
   const { hasPermission } = usePermissions();
   const canReconcile = hasPermission("inventory:reconcile");
@@ -547,7 +571,7 @@ export function InventoryContent({
       </div>
 
       {/* Tabs for different inventory views */}
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <TabsList className={cn(dashboardTabListClass, "h-11 w-full sm:w-auto inline-flex flex-wrap")}>
             <TabsTrigger value="all" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">All Items</TabsTrigger>

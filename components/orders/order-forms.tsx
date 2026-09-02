@@ -22,31 +22,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import {
   Plus,
   Minus,
   Trash2,
   Loader2,
-  ChevronsUpDown,
-  Check,
-  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder } from "@/lib/actions/orders";
-import { createCustomer } from "@/lib/actions/customers";
+import { searchMenuForPicker } from "@/lib/actions/menu";
+import {
+  CustomerPicker,
+  WALK_IN_CUSTOMER_VALUE,
+  type CustomerPickerOption,
+} from "@/components/customers/customer-picker";
 import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
 import {
@@ -88,12 +76,6 @@ interface MenuItem {
   branchIds?: string[];
 }
 
-interface Customer {
-  id: string;
-  name: string;
-  phone: string;
-}
-
 interface CartItem {
   lineKey: string;
   menuItemId: string;
@@ -109,8 +91,8 @@ interface CreateOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   branches: Branch[];
-  menuItems: MenuItem[];
-  customers: Customer[];
+  menuItems?: MenuItem[];
+  customers?: CustomerPickerOption[];
   /** Called after the order is created; await so the dialog can show loading until the detail view is ready */
   onOrderCreated?: (orderId: string) => void | Promise<void>;
 }
@@ -119,8 +101,8 @@ export function CreateOrderDialog({
   open,
   onOpenChange,
   branches,
-  menuItems,
-  customers,
+  menuItems: seedMenuItems = [],
+  customers: seedCustomers = [],
   onOrderCreated,
 }: CreateOrderDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,7 +110,7 @@ export function CreateOrderDialog({
   const [branchId, setBranchId] = useState("");
   const [source, setSource] = useState("CALL_CENTER");
   const [type, setType] = useState("TAKEOUT");
-  const [customerId, setCustomerId] = useState("walk-in");
+  const [customerId, setCustomerId] = useState(WALK_IN_CUSTOMER_VALUE);
   const [notes, setNotes] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchItem, setSearchItem] = useState("");
@@ -143,55 +125,34 @@ export function CreateOrderDialog({
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const { formatCurrency } = useCurrency();
 
-  // Customer combobox state
-  const [customerOpen, setCustomerOpen] = useState(false);
-  const [localCustomers, setLocalCustomers] = useState<Customer[]>(customers);
-  const [showNewCustomer, setShowNewCustomer] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(seedMenuItems);
+  const [localCustomers, setLocalCustomers] =
+    useState<CustomerPickerOption[]>(seedCustomers);
 
-  const selectedCustomerLabel = useMemo(() => {
-    if (customerId === "walk-in") return "Walk-in Customer";
-    const c = localCustomers.find((c) => c.id === customerId);
-    return c ? `${c.name} (${c.phone})` : "Walk-in Customer";
-  }, [customerId, localCustomers]);
+  useEffect(() => {
+    setLocalCustomers(seedCustomers);
+  }, [seedCustomers]);
 
-  const handleCreateCustomer = async () => {
-    if (!newName.trim() || !newPhone.trim()) {
-      toast.error("Name and phone are required");
-      return;
-    }
-    setIsCreatingCustomer(true);
-    try {
-      const result = await createCustomer({
-        name: newName.trim(),
-        phone: newPhone.trim(),
+  useEffect(() => {
+    if (!open || !branchId) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const result = await searchMenuForPicker({
+        q: searchItem.trim() || undefined,
+        branchId,
+        limit: 100,
       });
-      if (result.error) {
-        toast.error(result.error);
-        return;
+      if (!cancelled) {
+        setMenuItems((result.data || []) as MenuItem[]);
       }
-      if (result.data) {
-        const newCustomer = {
-          id: result.data.id,
-          name: result.data.name,
-          phone: result.data.phone,
-        };
-        setLocalCustomers((prev) => [newCustomer, ...prev]);
-        setCustomerId(result.data.id);
-        toast.success(`Customer "${result.data.name}" created`);
-        setShowNewCustomer(false);
-        setNewName("");
-        setNewPhone("");
-        setCustomerOpen(false);
-      }
-    } catch {
-      toast.error("Failed to create customer");
-    } finally {
-      setIsCreatingCustomer(false);
-    }
-  };
+    }, searchItem.trim() ? 300 : 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, branchId, searchItem]);
 
   const prevBranchIdRef = useRef<string | null>(null);
 
@@ -451,7 +412,9 @@ export function CreateOrderDialog({
           | "SOCIAL_MEDIA",
         type: type as "DINE_IN" | "TAKEOUT" | "DELIVERY",
         customerId:
-          customerId && customerId !== "walk-in" ? customerId : undefined,
+          customerId && customerId !== WALK_IN_CUSTOMER_VALUE
+            ? customerId
+            : undefined,
         items: cart.map((c) => ({
           menuItemId: c.menuItemId,
           quantity: c.quantity,
@@ -492,7 +455,7 @@ export function CreateOrderDialog({
     setBranchId("");
     setSource("CALL_CENTER");
     setType("TAKEOUT");
-    setCustomerId("walk-in");
+    setCustomerId(WALK_IN_CUSTOMER_VALUE);
     setNotes("");
     setCart([]);
     setSearchItem("");
@@ -502,9 +465,6 @@ export function CreateOrderDialog({
     setDeliveryNeighborhood("");
     setDeliveryPhone("");
     setDeliveryNotes("");
-    setShowNewCustomer(false);
-    setNewName("");
-    setNewPhone("");
   };
 
   return (
@@ -551,126 +511,18 @@ export function CreateOrderDialog({
             </div>
             <div className="grid gap-2">
               <Label>Customer</Label>
-              <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={customerOpen}
-                    className="justify-between font-normal"
-                  >
-                    <span className="truncate">{selectedCustomerLabel}</span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  {!showNewCustomer ? (
-                    <Command>
-                      <CommandInput placeholder="Search customers..." />
-                      <CommandList>
-                        <CommandEmpty>No customer found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            onSelect={() => setShowNewCustomer(true)}
-                          >
-                            <UserPlus className="mr-2 h-4 w-4" />
-                            Add New Customer
-                          </CommandItem>
-                        </CommandGroup>
-                        <CommandSeparator />
-                        <CommandGroup>
-                          <CommandItem
-                            value="walk-in"
-                            onSelect={() => {
-                              setCustomerId("walk-in");
-                              setCustomerOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                customerId === "walk-in"
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            Walk-in Customer
-                          </CommandItem>
-                          {localCustomers.map((c) => (
-                            <CommandItem
-                              key={c.id}
-                              value={`${c.name} ${c.phone}`}
-                              onSelect={() => {
-                                setCustomerId(c.id);
-                                setCustomerOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  customerId === c.id
-                                    ? "opacity-100"
-                                    : "opacity-0",
-                                )}
-                              />
-                              <div className="flex flex-col">
-                                <span>{c.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {c.phone}
-                                </span>
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  ) : (
-                    <div className="p-3 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">
-                          New Customer
-                        </Label>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs"
-                          onClick={() => setShowNewCustomer(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                      <Input
-                        placeholder="Customer name"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        autoFocus
-                      />
-                      <Input
-                        placeholder="Phone number"
-                        value={newPhone}
-                        onChange={(e) => setNewPhone(e.target.value)}
-                      />
-                      <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={handleCreateCustomer}
-                        disabled={
-                          isCreatingCustomer ||
-                          !newName.trim() ||
-                          !newPhone.trim()
-                        }
-                      >
-                        {isCreatingCustomer ? (
-                          <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                        ) : (
-                          <UserPlus className="mr-2 h-3 w-3" />
-                        )}
-                        {isCreatingCustomer ? "Creating..." : "Create & Select"}
-                      </Button>
-                    </div>
-                  )}
-                </PopoverContent>
-              </Popover>
+              <CustomerPicker
+                customers={localCustomers}
+                value={customerId}
+                onValueChange={(nextId) => setCustomerId(nextId)}
+                onCustomerCreated={(customer) => {
+                  setLocalCustomers((prev) => [
+                    customer,
+                    ...prev.filter((c) => c.id !== customer.id),
+                  ]);
+                }}
+                className="rounded-lg"
+              />
             </div>
           </div>
 

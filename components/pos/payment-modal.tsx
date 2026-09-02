@@ -324,6 +324,7 @@ export function PaymentModal({
                   setCustomerId(nextId);
                   setSelectedCustomer(customer);
                 }}
+                preferLocalCache
                 offlineRestricted={offlineRestricted}
                 onCustomerCreated={onCustomerCreated}
               />

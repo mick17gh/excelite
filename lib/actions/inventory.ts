@@ -1047,6 +1047,37 @@ export async function getTransferRecords(
   }
 }
 
+export async function getDashboardLowStockItems(organizationId: string, limit = 20) {
+  try {
+    const rows = await db.$queryRaw<
+      Array<{ name: string; currentStock: unknown; reorderPoint: unknown }>
+    >`
+      SELECT i.name, i."currentStock", i."reorderPoint"
+      FROM "InventoryItem" i
+      INNER JOIN "Branch" b ON b.id = i."branchId"
+      WHERE b."organizationId" = ${organizationId}
+        AND b."deletedAt" IS NULL
+        AND i."deletedAt" IS NULL
+        AND i."isActive" = true
+        AND i."currentStock" <= i."reorderPoint"
+      ORDER BY i."currentStock" ASC
+      LIMIT ${limit}
+    `;
+
+    return {
+      success: true,
+      data: rows.map((item) => ({
+        name: item.name,
+        quantity: Number(item.currentStock),
+        reorderLevel: Number(item.reorderPoint),
+      })),
+    };
+  } catch (error) {
+    console.error("[getDashboardLowStockItems] Error:", error);
+    return { success: false, data: [] };
+  }
+}
+
 export async function getLowStockItems() {
   try {
     const items = await db.inventoryItem.findMany({

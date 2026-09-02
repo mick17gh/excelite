@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition, useEffect, useCallback, useRef } from "react";
+import { useIntervalWhenVisible } from "@/hooks/use-interval-when-visible";
+import { useAdaptivePollInterval } from "@/hooks/use-adaptive-poll-interval";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -225,12 +227,15 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
     }
   }, [branchId, stationId, soundEnabled, soundUnlocked]);
 
-  useEffect(() => {
-    if (!autoRefresh) return;
-    
-    const interval = setInterval(refreshTickets, 10000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, refreshTickets]);
+  const kitchenPollMs = useAdaptivePollInterval({ baseMs: 15_000 });
+
+  useIntervalWhenVisible(
+    () => {
+      void refreshTickets();
+    },
+    kitchenPollMs,
+    autoRefresh,
+  );
 
   const filteredStations = useMemo(() => {
     if (branchId === "all") return stations;

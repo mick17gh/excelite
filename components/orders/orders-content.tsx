@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { KPICard } from "@/components/dashboard/kpi-card";
 import { ContentCard } from "@/components/dashboard/content-card";
@@ -39,16 +39,24 @@ import {
   Eye,
   XCircle,
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { updateOrderStatus, cancelOrder, getOrders } from "@/lib/actions/orders";
+import { updateOrderStatus, cancelOrder, getOrders, getOrderStats } from "@/lib/actions/orders";
 import { verifyPaystackOrderPayment } from "@/lib/actions/payments";
 import { CreateOrderDialog } from "./order-forms";
+import type { CustomerPickerOption } from "@/components/customers/customer-picker";
 import { OrderDetailModal } from "./order-detail-modal";
 import { useCurrency } from "@/contexts/currency-context";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { useIntervalWhenVisible } from "@/hooks/use-interval-when-visible";
+import { useAdaptivePollInterval } from "@/hooks/use-adaptive-poll-interval";
+import {
+  fetchOrderDetail,
+  prefetchOrderDetail,
+  invalidateOrderDetail,
+  type UiOrder,
+} from "@/lib/orders/order-detail-cache";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,46 +94,6 @@ interface PaymentItem {
   paidAt: string | null;
 }
 
-interface Order {
-  id: string;
-  orderNumber: string;
-  customerId: string | null;
-  customerName: string | null;
-  customerPhone: string | null;
-  branchId: string;
-  branchName: string;
-  branchCode: string;
-  assignedBy: string | null;
-  placedBy?: string | null;
-  tableLabel?: string | null;
-  tableSection?: string | null;
-  tableCovers?: number | null;
-  tableWaiter?: string | null;
-  source: string;
-  type: string;
-  status: string;
-  subtotal: number;
-  tax: number;
-  discount: number;
-  deliveryFee: number;
-  total: number;
-  paymentMethod: string | null;
-  paymentStatus: string;
-  paystackEnabled?: boolean;
-  notes: string | null;
-  deliveryAddress: string | null;
-  deliveryCity: string | null;
-  deliveryPhone: string | null;
-  deliveryNotes: string | null;
-  deliveryStatus: string | null;
-  items: OrderItem[];
-  payments: PaymentItem[];
-  notifications: any[];
-  receipt: any | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface Branch {
   id: string;
   name: string;
@@ -135,20 +103,6 @@ interface Branch {
   taxName: string;
 }
 
-interface MenuItem {
-  id: string;
-  name: string;
-  sku: string;
-  price: number;
-  categoryId: string | null;
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  phone: string;
-}
-
 interface OrderStats {
   totalOrders: number;
   pendingOrders: number;
@@ -156,12 +110,13 @@ interface OrderStats {
   todayRevenue: number;
 }
 
+interface Order extends UiOrder {}
+
 interface OrdersContentProps {
   orders: Order[];
   branches: Branch[];
-  menuItems: MenuItem[];
-  customers: Customer[];
   stats: OrderStats;
+  customers?: CustomerPickerOption[];
   initialTotal?: number;
   initialPage?: number;
   initialPageSize?: number;
@@ -195,20 +150,22 @@ const STATUS_LABELS: Record<string, string> = {
 export function OrdersContent({
   orders: initialOrders,
   branches,
-  menuItems,
-  customers,
-  stats,
+  stats: initialStats,
+  customers = [],
   initialTotal = 0,
   initialPage = 1,
   initialPageSize = 50,
   tableManagementEnabled = false,
 }: OrdersContentProps) {
-  const [orders, setOrders] = useState(initialOrders);
+  const skipInitialFetch = useRef(true);
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(initialPage);
   const [pageSize, setPageSize] = useState(initialPageSize);
+  const [stats, setStats] = useState(initialStats);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [branchFilter, setBranchFilter] = useState("all");
@@ -221,39 +178,33 @@ export function OrdersContent({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Handle new order creation - automatically open detail modal
-  const handleOrderCreated = async (orderId: string) => {
-    // Refresh orders to get the new order
-    await fetchOrders(false);
-    // Find and select the new order
-    const result = await getOrders({
-      page,
-      pageSize,
-      branchId: branchFilter !== "all" ? branchFilter : undefined,
-      status: statusFilter !== "all" ? (statusFilter as any) : undefined,
-      source: sourceFilter !== "all" ? (sourceFilter as any) : undefined,
-    });
-    if (result.data) {
-      const newOrder = result.data.find((o: any) => o.id === orderId);
-      if (newOrder) {
-        setSelectedOrder(newOrder);
-      }
-    }
-  };
+  const listPollMs = useAdaptivePollInterval({ baseMs: 30_000 });
+  const statsPollMs = useAdaptivePollInterval({ baseMs: 120_000 });
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesSearch =
-        !searchQuery ||
-        order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customerPhone?.includes(searchQuery);
-      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-      const matchesSource = sourceFilter === "all" || order.source === sourceFilter;
-      const matchesBranch = branchFilter === "all" || order.branchId === branchFilter;
-      return matchesSearch && matchesStatus && matchesSource && matchesBranch;
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSelectOrder = useCallback(async (order: Order) => {
+    setSelectedOrder({
+      ...order,
+      items: order.items ?? [],
+      payments: order.payments ?? [],
+      notifications: order.notifications ?? [],
+      receipt: order.receipt ?? null,
+      deliveryStatus: order.deliveryStatus ?? null,
     });
-  }, [orders, searchQuery, statusFilter, sourceFilter, branchFilter]);
+    const detail = await fetchOrderDetail(order.id);
+    if (detail) setSelectedOrder(detail);
+  }, []);
+
+  const handleOrderCreated = async (orderId: string) => {
+    await fetchOrders(false);
+    invalidateOrderDetail(orderId);
+    const detail = await fetchOrderDetail(orderId, true);
+    if (detail) setSelectedOrder(detail);
+  };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     const result = await updateOrderStatus({ id: orderId, status: newStatus as any });
@@ -290,19 +241,19 @@ export function OrdersContent({
     return flow[current] || null;
   };
 
-  // Fetch orders with current filters and pagination
   const fetchOrders = useCallback(async (showLoading = true) => {
     if (showLoading) setIsRefreshing(true);
     try {
       const result = await getOrders({
         page,
         pageSize,
+        search: debouncedSearch || undefined,
         branchId: branchFilter !== "all" ? branchFilter : undefined,
         status: statusFilter !== "all" ? (statusFilter as any) : undefined,
         source: sourceFilter !== "all" ? (sourceFilter as any) : undefined,
       });
       if (result.data) {
-        setOrders(result.data);
+        setOrders(result.data as Order[]);
         setTotal(result.total || 0);
       }
     } catch (error) {
@@ -310,25 +261,62 @@ export function OrdersContent({
     } finally {
       if (showLoading) setIsRefreshing(false);
     }
-  }, [page, pageSize, branchFilter, statusFilter, sourceFilter]);
+  }, [page, pageSize, debouncedSearch, branchFilter, statusFilter, sourceFilter]);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchOrders(false); // Silent refresh
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchOrders]);
+  const fetchStats = useCallback(async () => {
+    try {
+      const result = await getOrderStats(
+        branchFilter !== "all" ? branchFilter : undefined,
+      );
+      if (result.data) setStats(result.data);
+    } catch (error) {
+      console.error("Failed to fetch order stats:", error);
+    }
+  }, [branchFilter]);
 
-  // Reset paging when server filters change
+  useIntervalWhenVisible(() => {
+    void fetchOrders(false);
+  }, listPollMs);
+
+  useIntervalWhenVisible(() => {
+    void fetchStats();
+  }, statsPollMs);
+
   useEffect(() => {
     setPage(1);
-  }, [branchFilter, statusFilter, sourceFilter]);
+  }, [branchFilter, statusFilter, sourceFilter, debouncedSearch]);
 
-  // Fetch when pagination/filter changes
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchOrders();
-  }, [page, pageSize, branchFilter, statusFilter, sourceFilter, fetchOrders]);
+  }, [page, pageSize, branchFilter, statusFilter, sourceFilter, debouncedSearch, fetchOrders]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const refreshSelectedOrder = useCallback(async () => {
+    if (!selectedOrder) return;
+    invalidateOrderDetail(selectedOrder.id);
+    const detail = await fetchOrderDetail(selectedOrder.id, true);
+    if (detail) {
+      setSelectedOrder(detail);
+      setOrders((prev) =>
+        prev.map((row) =>
+          row.id === detail.id
+            ? {
+                ...row,
+                status: detail.status,
+                paymentStatus: detail.paymentStatus,
+                total: detail.total,
+                updatedAt: detail.updatedAt,
+              }
+            : row,
+        ),
+      );
+    }
+  }, [selectedOrder]);
 
   // Handle Paystack callback verification after redirect back from Paystack
   useEffect(() => {
@@ -459,7 +447,7 @@ export function OrdersContent({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredOrders.length === 0 ? (
+              {orders.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={tableManagementEnabled ? 12 : 11} className="text-center py-12">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -470,13 +458,14 @@ export function OrdersContent({
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredOrders.map((order) => {
+                orders.map((order) => {
                   const nextStatus = getNextStatus(order.status);
                   return (
                     <TableRow
                       key={order.id}
                       className="cursor-pointer hover:bg-[#22C55E]/5 transition-colors"
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => void handleSelectOrder(order)}
+                      onMouseEnter={() => prefetchOrderDetail(order.id)}
                     >
                       <TableCell className="font-mono text-sm font-semibold text-[#222831]">
                         {order.orderNumber}
@@ -532,7 +521,7 @@ export function OrdersContent({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); void handleSelectOrder(order); }}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
@@ -566,68 +555,34 @@ export function OrdersContent({
         </div>
       </ContentCard>
 
-      {/* Pagination */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border bg-card px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchOrders(true)}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredOrders.length} of {total} orders
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Rows per page:</span>
-            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-              <SelectTrigger className="w-20 h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-                <SelectItem value="200">200</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1 || isRefreshing}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => p + 1)}
-              disabled={page >= Math.ceil(total / pageSize) || isRefreshing}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchOrders(true)}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+        <TablePagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          pageSizeOptions={[25, 50, 100, 200]}
+        />
       </div>
 
       <CreateOrderDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         branches={branches}
-        menuItems={menuItems}
         customers={customers}
         onOrderCreated={handleOrderCreated}
       />
@@ -668,22 +623,7 @@ export function OrdersContent({
           order={selectedOrder}
           open={!!selectedOrder}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
-          onRefresh={async () => {
-            const result = await getOrders({
-              page,
-              pageSize,
-              branchId: branchFilter !== "all" ? branchFilter : undefined,
-              status: statusFilter !== "all" ? (statusFilter as any) : undefined,
-              source: sourceFilter !== "all" ? (sourceFilter as any) : undefined,
-            });
-            if (result.data) {
-              setOrders(result.data);
-              setTotal(result.total || 0);
-              // Update selectedOrder with fresh data
-              const updated = result.data.find((o: any) => o.id === selectedOrder.id);
-              if (updated) setSelectedOrder(updated);
-            }
-          }}
+          onRefresh={refreshSelectedOrder}
         />
       )}
     </div>

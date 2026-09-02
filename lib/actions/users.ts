@@ -235,7 +235,11 @@ export async function deleteUser(id: string) {
 }
 
 export async function getUsers(
-  pagination?: PaginationParams
+  pagination?: PaginationParams & {
+    search?: string;
+    role?: string;
+    isActive?: boolean;
+  }
 ): Promise<PaginatedResult<any>> {
   try {
     const auth = await requirePermission("users:view");
@@ -252,7 +256,21 @@ export async function getUsers(
     const pageSize = pagination?.pageSize || 20;
     const skip = (page - 1) * pageSize;
 
-    const where = { deletedAt: null };
+    const where: Record<string, unknown> = { deletedAt: null };
+
+    if (pagination?.search?.trim()) {
+      const term = pagination.search.trim();
+      where.OR = [
+        { name: { contains: term, mode: "insensitive" } },
+        { email: { contains: term, mode: "insensitive" } },
+      ];
+    }
+    if (pagination?.role) {
+      where.role = pagination.role;
+    }
+    if (pagination?.isActive !== undefined) {
+      where.isActive = pagination.isActive;
+    }
 
     const [users, totalItems] = await Promise.all([
       db.user.findMany({

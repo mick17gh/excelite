@@ -17,6 +17,21 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { startOfDay } from "date-fns";
 
+/** Slim include for order list / poll — detail fields come from getOrderById. */
+const orderListInclude = {
+  customer: { select: { id: true, name: true, phone: true } },
+  branch: { select: { id: true, name: true, code: true } },
+  assignedByUser: { select: { id: true, name: true } },
+  cashier: { select: { id: true, name: true } },
+  tableSession: {
+    select: {
+      guestCount: true,
+      table: { select: { label: true, section: { select: { name: true } } } },
+      opener: { select: { name: true } },
+    },
+  },
+} as const;
+
 // Helper to serialize Decimal fields from raw Prisma order objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function serializeOrderItem(item: Record<string, any>) {
@@ -127,6 +142,7 @@ export async function getOrders(filters?: {
   customerId?: string;
   page?: number;
   pageSize?: number;
+  search?: string;
   /** When true (default), show today's orders plus open/unpaid carryover from prior days. */
   activeDayView?: boolean;
 }) {
@@ -161,54 +177,28 @@ export async function getOrders(filters?: {
       ];
     }
 
+    const searchTerm = filters?.search?.trim();
+    if (searchTerm) {
+      const searchClause = {
+        OR: [
+          { orderNumber: { contains: searchTerm, mode: "insensitive" as const } },
+          { customerName: { contains: searchTerm, mode: "insensitive" as const } },
+          { customer: { name: { contains: searchTerm, mode: "insensitive" as const } } },
+          { customer: { phone: { contains: searchTerm } } },
+          { deliveryPhone: { contains: searchTerm } },
+        ],
+      };
+      if (where.AND) {
+        (where.AND as unknown[]).push(searchClause);
+      } else {
+        where.AND = [searchClause];
+      }
+    }
+
     const [orders, total] = await Promise.all([
       db.order.findMany({
         where,
-        include: {
-          customer: { select: { id: true, name: true, phone: true } },
-          branch: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-              taxInclusive: true,
-              showTaxOnReceipt: true,
-              taxNumber: true,
-              showTaxNumberOnReceipt: true,
-              taxName: true,
-              taxRate: true,
-              taxEnabled: true,
-              paystackSubaccountCode: true,
-              paystackSubaccountActive: true,
-              organization: {
-                select: {
-                  features: true,
-                  paystackEnabled: true,
-                  paystackDashboardEnabled: true,
-                },
-              },
-            },
-          },
-          items: {
-            include: {
-              menuItem: { select: { id: true, name: true, sku: true, price: true } },
-              selections: { select: { menuItemOptionId: true } },
-            },
-          },
-          delivery: true,
-          payments: true,
-          notifications: true,
-          receipt: true,
-          assignedByUser: { select: { id: true, name: true } },
-          cashier: { select: { id: true, name: true } },
-          tableSession: {
-            select: {
-              guestCount: true,
-              table: { select: { label: true, section: { select: { name: true } } } },
-              opener: { select: { name: true } },
-            },
-          },
-        },
+        include: orderListInclude,
         orderBy: { createdAt: "desc" },
         take: pageSize,
         skip: (page - 1) * pageSize,
@@ -226,13 +216,6 @@ export async function getOrders(filters?: {
         branchId: order.branchId,
         branchName: order.branch?.name || "",
         branchCode: order.branch?.code || "",
-        taxInclusive: order.branch?.taxInclusive ?? false,
-        showTaxOnReceipt: order.branch?.showTaxOnReceipt ?? true,
-        taxNumber: order.branch?.taxNumber ?? null,
-        showTaxNumberOnReceipt: order.branch?.showTaxNumberOnReceipt ?? false,
-        taxName: order.branch?.taxName || "VAT",
-        taxRate: order.branch?.taxRate != null ? Number(order.branch.taxRate) : 0,
-        taxEnabled: order.branch?.taxEnabled ?? true,
         assignedBy: order.assignedByUser?.name || null,
         placedBy: resolveOrderPlacedByName(order),
         tableLabel: order.tableSession?.table.label ?? null,
@@ -249,64 +232,17 @@ export async function getOrders(filters?: {
         total: Number(order.total),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
-        paystackEnabled:
-          order.branch?.organization && order.branch
-            ? isBranchPaystackCheckoutAvailable(order.branch.organization, order.branch, "dashboard")
-            : false,
         notes: order.notes,
-        deliveryAddress: order.deliveryAddress,
-        deliveryCity: order.deliveryCity,
-        deliveryNeighborhood: order.deliveryNeighborhood,
+        deliveryAddress: null,
+        deliveryCity: null,
+        deliveryNeighborhood: null,
         deliveryPhone: order.deliveryPhone,
-        deliveryNotes: order.deliveryNotes,
-        orderReceivedTime: order.orderReceivedTime?.toISOString() || null,
-        deliveryStatus: order.delivery?.status || null,
-        items: order.items.map((item) => ({
-          id: item.id,
-          menuItemId: item.menuItemId,
-          menuItemName: item.menuItem?.name || "",
-          menuItemSku: item.menuItem?.sku || "",
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-          lineTotal: Number(item.lineTotal),
-          notes: item.notes,
-          configurationLabel: item.configurationLabel,
-          configurationKey: item.configurationKey,
-          menuItemOptionIds: item.selections?.map((s) => s.menuItemOptionId) ?? [],
-        })),
-        payments: order.payments.map((p) => ({
-          id: p.id,
-          reference: p.reference,
-          amount: Number(p.amount),
-          currency: p.currency,
-          status: p.status,
-          provider: p.provider,
-          paymentMethod: p.paymentMethod,
-          paidAt: p.paidAt?.toISOString() || null,
-        })),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        notifications: (order as any).notifications?.map((n: any) => ({
-          id: n.id,
-          orderId: n.orderId,
-          type: n.type,
-          channel: n.channel,
-          recipient: n.recipient,
-          subject: n.subject,
-          message: n.message,
-          status: n.status,
-          sentAt: n.sentAt?.toISOString() || null,
-          error: n.error,
-          createdAt: n.createdAt.toISOString(),
-        })) || [],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        receipt: (() => { const r = (order as any).receipt; return r ? {
-          id: r.id, orderId: r.orderId, receiptNumber: r.receiptNumber,
-          customerName: r.customerName, customerPhone: r.customerPhone, customerEmail: r.customerEmail,
-          items: r.items, subtotal: Number(r.subtotal), tax: Number(r.tax),
-          discount: Number(r.discount), deliveryFee: Number(r.deliveryFee), total: Number(r.total),
-          paymentMethod: r.paymentMethod, pdfUrl: r.pdfUrl, sentVia: r.sentVia,
-          createdAt: r.createdAt.toISOString(),
-        } : null; })(),
+        deliveryNotes: null,
+        deliveryStatus: null,
+        items: [],
+        payments: [],
+        notifications: [],
+        receipt: null,
         createdAt: order.createdAt.toISOString(),
         updatedAt: order.updatedAt.toISOString(),
       })),

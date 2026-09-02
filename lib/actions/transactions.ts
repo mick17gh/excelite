@@ -1080,6 +1080,243 @@ export async function getSalesAnalyticsData(branchIds?: string[], startDate?: Da
   }
 }
 
+/** Single-pass sales snapshot for main dashboard (revenue chart, KPIs, top items). */
+export async function getSalesDashboardSnapshot(
+  branchId?: string,
+  startDate?: Date,
+  endDate?: Date,
+  topLimit = 5,
+) {
+  try {
+    const effectiveEndDate = endDate || new Date();
+    const effectiveStartDate =
+      startDate || new Date(new Date().setDate(new Date().getDate() - 30));
+
+    const periodLength = effectiveEndDate.getTime() - effectiveStartDate.getTime();
+    const prevEndDate = new Date(effectiveStartDate.getTime() - 1);
+    const prevStartDate = new Date(prevEndDate.getTime() - periodLength);
+
+    const branchFilter = branchId ? { branchId } : {};
+
+    const [currentSales, prevSalesAgg, prevSalesWithItems, targets, currentWaste, prevWasteAgg] =
+      await Promise.all([
+        db.sale.findMany({
+          where: {
+            deletedAt: null,
+            saleDate: { gte: effectiveStartDate, lte: effectiveEndDate },
+            ...branchFilter,
+          },
+          include: {
+            items: {
+              select: {
+                menuItemId: true,
+                quantity: true,
+                total: true,
+                unitCost: true,
+                configurationKey: true,
+                configurationLabel: true,
+                menuItem: { select: { name: true } },
+              },
+            },
+          },
+        }),
+        db.sale.aggregate({
+          where: {
+            deletedAt: null,
+            saleDate: { gte: prevStartDate, lte: prevEndDate },
+            ...branchFilter,
+          },
+          _sum: { total: true },
+          _count: true,
+        }),
+        db.sale.findMany({
+          where: {
+            deletedAt: null,
+            saleDate: { gte: prevStartDate, lte: prevEndDate },
+            ...branchFilter,
+          },
+          include: { items: { select: { quantity: true, unitCost: true } } },
+        }),
+        db.target.findMany({
+          where: {
+            isActive: true,
+            targetType: "REVENUE",
+            periodStart: { lte: effectiveEndDate },
+            periodEnd: { gte: effectiveStartDate },
+            ...branchFilter,
+          },
+        }),
+        db.wasteLog.aggregate({
+          where: {
+            wasteDate: { gte: effectiveStartDate, lte: effectiveEndDate },
+            ...branchFilter,
+          },
+          _sum: { totalCost: true },
+        }),
+        db.wasteLog.aggregate({
+          where: {
+            wasteDate: { gte: prevStartDate, lte: prevEndDate },
+            ...branchFilter,
+          },
+          _sum: { totalCost: true },
+        }),
+      ]);
+
+    const salesByDate: Record<string, number> = {};
+    const itemTotals: Record<string, { name: string; quantity: number; revenue: number }> = {};
+    let totalCogs = 0;
+
+    for (const sale of currentSales) {
+      const dateKey = sale.saleDate.toISOString().split("T")[0];
+      salesByDate[dateKey] = (salesByDate[dateKey] || 0) + Number(sale.total);
+
+      for (const item of sale.items) {
+        totalCogs += Number(item.unitCost) * item.quantity;
+        const cfg = item.configurationKey || "";
+        const key = `${item.menuItemId}__${cfg || "base"}`;
+        if (!itemTotals[key]) {
+          const label = item.configurationLabel?.trim();
+          itemTotals[key] = {
+            name: label
+              ? `${item.menuItem.name} (${label})`
+              : item.menuItem.name,
+            quantity: 0,
+            revenue: 0,
+          };
+        }
+        itemTotals[key].quantity += item.quantity;
+        itemTotals[key].revenue += Number(item.total);
+      }
+    }
+
+    const days =
+      Math.ceil(
+        (effectiveEndDate.getTime() - effectiveStartDate.getTime()) /
+          (1000 * 60 * 60 * 24),
+      ) + 1;
+
+    let dailyTarget = 0;
+    if (targets.length > 0) {
+      const totalTarget = targets.reduce((sum, t) => sum + Number(t.targetValue), 0);
+      const targetDays = targets.reduce((sum, t) => {
+        const start = new Date(
+          Math.max(t.periodStart.getTime(), effectiveStartDate.getTime()),
+        );
+        const end = new Date(Math.min(t.periodEnd.getTime(), effectiveEndDate.getTime()));
+        return (
+          sum + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+        );
+      }, 0);
+      dailyTarget = targetDays > 0 ? totalTarget / targetDays : 0;
+    }
+
+    const revenueData: Array<{ date: string; revenue: number; target: number }> = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(effectiveStartDate);
+      date.setDate(date.getDate() + i);
+      const dateKey = date.toISOString().split("T")[0];
+      const monthDay = date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+      });
+      revenueData.push({
+        date: monthDay,
+        revenue: salesByDate[dateKey] || 0,
+        target: dailyTarget,
+      });
+    }
+
+    const sortedItems = Object.values(itemTotals).sort((a, b) => b.revenue - a.revenue);
+    const topMenuItems = sortedItems.slice(0, topLimit);
+    const worstMenuItems = sortedItems.slice(-topLimit).reverse();
+
+    const totalRevenue = currentSales.reduce((sum, s) => sum + Number(s.total), 0);
+    const prevRevenue = Number(prevSalesAgg._sum.total || 0);
+    const transactionCount = currentSales.length;
+    const prevTransactionCount = prevSalesAgg._count;
+    const averageTicket = transactionCount > 0 ? totalRevenue / transactionCount : 0;
+    const prevAverageTicket =
+      prevTransactionCount > 0 ? prevRevenue / prevTransactionCount : 0;
+
+    let prevCogs = 0;
+    for (const sale of prevSalesWithItems) {
+      for (const item of sale.items) {
+        prevCogs += Number(item.unitCost) * item.quantity;
+      }
+    }
+
+    const revenueGrowth =
+      prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+    const transactionChange =
+      prevTransactionCount > 0
+        ? ((transactionCount - prevTransactionCount) / prevTransactionCount) * 100
+        : 0;
+    const averageTicketChange =
+      prevAverageTicket > 0
+        ? ((averageTicket - prevAverageTicket) / prevAverageTicket) * 100
+        : 0;
+
+    const cogsPercentage = totalRevenue > 0 ? (totalCogs / totalRevenue) * 100 : 0;
+    const prevCogsPercentage = prevRevenue > 0 ? (prevCogs / prevRevenue) * 100 : 0;
+    const profitMargin = totalRevenue > 0 ? ((totalRevenue - totalCogs) / totalRevenue) * 100 : 0;
+    const prevProfitMargin =
+      prevRevenue > 0 ? ((prevRevenue - prevCogs) / prevRevenue) * 100 : 0;
+
+    const wasteTotal = Number(currentWaste._sum.totalCost || 0);
+    const prevWasteTotal = Number(prevWasteAgg._sum.totalCost || 0);
+    const wasteChange =
+      prevWasteTotal > 0 ? ((wasteTotal - prevWasteTotal) / prevWasteTotal) * 100 : 0;
+
+    return {
+      success: true,
+      data: {
+        revenueData,
+        topMenuItems,
+        worstMenuItems,
+        kpiData: {
+          totalRevenue,
+          revenueGrowth,
+          cogsPercentage,
+          cogsChange: cogsPercentage - prevCogsPercentage,
+          profitMargin,
+          profitMarginChange: profitMargin - prevProfitMargin,
+          transactionCount,
+          transactionChange,
+          averageTicket,
+          averageTicketChange,
+          wasteTotal,
+          wasteChange,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("[getSalesDashboardSnapshot] Error:", error);
+    return {
+      success: false,
+      error: "Failed to fetch sales dashboard snapshot",
+      data: {
+        revenueData: [],
+        topMenuItems: [],
+        worstMenuItems: [],
+        kpiData: {
+          totalRevenue: 0,
+          revenueGrowth: 0,
+          cogsPercentage: 0,
+          cogsChange: 0,
+          profitMargin: 0,
+          profitMarginChange: 0,
+          transactionCount: 0,
+          transactionChange: 0,
+          averageTicket: 0,
+          averageTicketChange: 0,
+          wasteTotal: 0,
+          wasteChange: 0,
+        },
+      },
+    };
+  }
+}
+
 // Combined function to fetch all dashboard data with date range
 export async function getDashboardData(branchIds?: string[], startDate?: Date, endDate?: Date) {
   try {
