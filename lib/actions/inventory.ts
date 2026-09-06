@@ -1053,8 +1053,8 @@ export async function getDashboardLowStockItems(organizationId: string, limit = 
       Array<{ name: string; currentStock: unknown; reorderPoint: unknown }>
     >`
       SELECT i.name, i."currentStock", i."reorderPoint"
-      FROM "InventoryItem" i
-      INNER JOIN "Branch" b ON b.id = i."branchId"
+      FROM inventory_item i
+      INNER JOIN branch b ON b.id = i."branchId"
       WHERE b."organizationId" = ${organizationId}
         AND b."deletedAt" IS NULL
         AND i."deletedAt" IS NULL

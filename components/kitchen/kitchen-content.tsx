@@ -229,6 +229,8 @@ export function KitchenContent({ branches, stations, tickets: initialTickets }: 
 
   const kitchenPollMs = useAdaptivePollInterval({ baseMs: 15_000 });
 
+  // Live kitchen board: keep polling while the tab is visible (no idle pause).
+  // Hidden / offline still stop via useIntervalWhenVisible + adaptive interval.
   useIntervalWhenVisible(
     () => {
       void refreshTickets();

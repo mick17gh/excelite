@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { EXCELITE_BRAND } from "@/lib/excelite-config";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { SessionIdleGate } from "@/components/session/session-idle-gate";
 import { toast } from "sonner";
 
 interface PosShellProps {
@@ -68,6 +69,7 @@ export function PosShell({
   };
 
   return (
+    <SessionIdleGate>
     <div className="flex h-screen flex-col bg-[#F8FAF8] dark:bg-background">
       <header className="relative shrink-0 border-b border-[#222831]/10 bg-white dark:bg-card shadow-sm">
         <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-[#22C55E] to-transparent opacity-80" />
@@ -182,5 +184,6 @@ export function PosShell({
 
       <main className="flex-1 overflow-hidden p-3 md:p-4">{children}</main>
     </div>
+    </SessionIdleGate>
   );
 }

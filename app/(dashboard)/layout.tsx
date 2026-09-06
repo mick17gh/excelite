@@ -9,6 +9,7 @@ import { resolveSessionAccess } from "@/lib/permissions/load-session-access";
 import { enforceRouteAccess } from "@/lib/permissions/page-access";
 import { getRequestPathname } from "@/lib/permissions/request-pathname";
 import { PaystackSetupBanner } from "@/components/dashboard/paystack-setup-banner";
+import { SessionIdleGate } from "@/components/session/session-idle-gate";
 import { db } from "@/lib/db";
 import { isPaystackAnyChannelEnabledForOrg } from "@/lib/paystack/credentials";
 
@@ -71,33 +72,35 @@ export default async function DashboardLayout({
       role={userRole}
       organizationId={organizationId}
     >
-      <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar
-          className="hidden md:flex"
-          orgTier={orgTier}
-          tableManagementEnabled={tablesNavEnabled}
-        />
-        <div className="flex flex-1 flex-col overflow-hidden relative">
-          <div className="absolute inset-0 gradient-mesh pointer-events-none" />
-
-          <Header
-            initialNotifications={initialNotifications}
-            initialUnreadCount={initialUnreadCount}
+      <SessionIdleGate>
+        <div className="flex h-screen overflow-hidden bg-background">
+          <Sidebar
+            className="hidden md:flex"
+            orgTier={orgTier}
+            tableManagementEnabled={tablesNavEnabled}
           />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 relative z-10">
-            <div className="mx-auto w-full max-w-7xl space-y-4">
-            <PaystackSetupBanner
-              organizationId={organizationId}
-              paystackEnabled={paystackAnyEnabled}
-              firstBranch={firstBranch}
-            />
-            {children}
-            </div>
-          </main>
+          <div className="flex flex-1 flex-col overflow-hidden relative">
+            <div className="absolute inset-0 gradient-mesh pointer-events-none" />
 
-          <MobileNav orgTier={orgTier} tableManagementEnabled={tablesNavEnabled} />
+            <Header
+              initialNotifications={initialNotifications}
+              initialUnreadCount={initialUnreadCount}
+            />
+            <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 relative z-10">
+              <div className="mx-auto w-full max-w-7xl space-y-4">
+              <PaystackSetupBanner
+                organizationId={organizationId}
+                paystackEnabled={paystackAnyEnabled}
+                firstBranch={firstBranch}
+              />
+              {children}
+              </div>
+            </main>
+
+            <MobileNav orgTier={orgTier} tableManagementEnabled={tablesNavEnabled} />
+          </div>
         </div>
-      </div>
+      </SessionIdleGate>
     </PermissionsProvider>
   );
 }

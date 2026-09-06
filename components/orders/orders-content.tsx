@@ -51,6 +51,7 @@ import { useCurrency } from "@/contexts/currency-context";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { useIntervalWhenVisible } from "@/hooks/use-interval-when-visible";
 import { useAdaptivePollInterval } from "@/hooks/use-adaptive-poll-interval";
+import { usePollingEnabled } from "@/contexts/session-idle-context";
 import {
   fetchOrderDetail,
   prefetchOrderDetail,
@@ -180,6 +181,7 @@ export function OrdersContent({
 
   const listPollMs = useAdaptivePollInterval({ baseMs: 30_000 });
   const statsPollMs = useAdaptivePollInterval({ baseMs: 120_000 });
+  const pollingEnabled = usePollingEnabled();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
@@ -276,11 +278,11 @@ export function OrdersContent({
 
   useIntervalWhenVisible(() => {
     void fetchOrders(false);
-  }, listPollMs);
+  }, listPollMs, pollingEnabled);
 
   useIntervalWhenVisible(() => {
     void fetchStats();
-  }, statsPollMs);
+  }, statsPollMs, pollingEnabled);
 
   useEffect(() => {
     setPage(1);

@@ -170,7 +170,8 @@ export const auth = betterAuth({
         updateAge: 60 * 60 * 24, // 1 day
         cookieCache: {
             enabled: true,
-            maxAge: 60 // 1 minute cache
+            // Fewer session DB hits while the tab is open (idle logout still clears the cookie).
+            maxAge: 5 * 60,
         }
     },
     user: {

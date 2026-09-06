@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useIntervalWhenVisible } from "@/hooks/use-interval-when-visible";
 import { useAdaptivePollInterval } from "@/hooks/use-adaptive-poll-interval";
+import { usePollingEnabled } from "@/contexts/session-idle-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -133,6 +134,7 @@ export function FloorBoardContent({
   }, [branchId, canManageTables]);
 
   const floorPollMs = useAdaptivePollInterval({ baseMs: 15_000 });
+  const pollingEnabled = usePollingEnabled();
 
   useEffect(() => {
     load();
@@ -140,7 +142,7 @@ export function FloorBoardContent({
 
   useIntervalWhenVisible(() => {
     load();
-  }, floorPollMs);
+  }, floorPollMs, pollingEnabled);
 
   return (
     <div className="space-y-6">
