@@ -3,7 +3,13 @@
 import { cache } from "react";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { SubscriptionTier, SubscriptionStatus, Role } from "@/lib/generated/prisma/client";
+import {
+  BusinessMode,
+  SubscriptionTier,
+  SubscriptionStatus,
+  Role,
+} from "@/lib/generated/prisma/client";
+import { normalizeBusinessMode } from "@/lib/business-mode";
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions/require";
 import { hasFeature, TIER_CONFIG } from "@/lib/tier-config";
@@ -31,11 +37,15 @@ export interface UpdateOrganizationInput {
   id: string;
   name?: string;
   tier?: SubscriptionTier;
+  businessMode?: BusinessMode | string;
   maxBranches?: number;
   maxUsers?: number;
   maxMenuItems?: number | null;
   features?: Record<string, boolean>;
+  storefrontPlatformEnabled?: boolean;
   onlineOrderingEnabled?: boolean;
+  cashCheckoutEnabled?: boolean;
+  whatsappOrderingEnabled?: boolean;
   storefrontUrl?: string | null;
   storeSlug?: string | null;
   storeName?: string | null;
@@ -150,7 +160,10 @@ export async function getOrganization(id?: string) {
         maxUsers: org.maxUsers,
         maxMenuItems: org.maxMenuItems,
         features: org.features as Record<string, boolean> | null,
+      storefrontPlatformEnabled: org.storefrontPlatformEnabled,
       onlineOrderingEnabled: org.onlineOrderingEnabled,
+      cashCheckoutEnabled: org.cashCheckoutEnabled,
+      whatsappOrderingEnabled: org.whatsappOrderingEnabled,
       storefrontUrl: org.storefrontUrl,
       storeSlug: org.storeSlug,
       storeName: org.storeName,
@@ -372,7 +385,13 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
   try {
     const existingOrg = await db.organization.findUnique({
       where: { id: input.id },
-      select: { tier: true, features: true },
+      select: {
+        tier: true,
+        features: true,
+        storefrontPlatformEnabled: true,
+        storefrontUrl: true,
+        whatsappNumber: true,
+      },
     });
     if (!existingOrg) {
       return { error: "Organization not found" };
@@ -386,8 +405,28 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
       }
     }
 
+    if (input.storefrontPlatformEnabled !== undefined) {
+      const platformAuth = await requirePermission("subscriptions:manage");
+      if (!platformAuth.ok) {
+        return { error: "You don't have permission to enable storefront for organizations" };
+      }
+    }
+
+    if (input.businessMode !== undefined) {
+      const modeAuth = await requirePermission("subscriptions:manage");
+      if (!modeAuth.ok) {
+        return { error: "You don't have permission to change organization business mode" };
+      }
+    }
+
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name;
+    if (input.businessMode !== undefined) {
+      data.businessMode = normalizeBusinessMode(input.businessMode);
+      if (data.businessMode === "RETAIL") {
+        data.tableManagementEnabled = false;
+      }
+    }
     if (input.tier !== undefined) {
       data.tier = input.tier;
       // Automatically update limits when tier changes
@@ -400,10 +439,41 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
     if (input.maxUsers !== undefined) data.maxUsers = input.maxUsers;
     if (input.maxMenuItems !== undefined) data.maxMenuItems = input.maxMenuItems;
     if (input.features !== undefined) data.features = input.features;
-    if (input.onlineOrderingEnabled && !hasFeature(existingOrg.tier, "onlineOrdering")) {
-      return { error: "Current subscription tier does not support online ordering" };
+    if (input.storefrontPlatformEnabled !== undefined) {
+      data.storefrontPlatformEnabled = input.storefrontPlatformEnabled;
     }
-    if (input.onlineOrderingEnabled !== undefined) data.onlineOrderingEnabled = input.onlineOrderingEnabled;
+
+    const platformEnabled =
+      input.storefrontPlatformEnabled !== undefined
+        ? input.storefrontPlatformEnabled
+        : existingOrg.storefrontPlatformEnabled;
+
+    if (input.onlineOrderingEnabled) {
+      if (!platformEnabled) {
+        return { error: "Storefront is not enabled for this organization" };
+      }
+    }
+    if (input.onlineOrderingEnabled !== undefined) {
+      data.onlineOrderingEnabled = input.onlineOrderingEnabled;
+      // Prefill public storefront URL from deployment origin when empty on first publish.
+      if (
+        input.onlineOrderingEnabled &&
+        !existingOrg.storefrontUrl &&
+        input.storefrontUrl === undefined
+      ) {
+        const origin = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+        if (origin) data.storefrontUrl = origin;
+      }
+    }
+    if (input.cashCheckoutEnabled !== undefined) data.cashCheckoutEnabled = input.cashCheckoutEnabled;
+    if (input.whatsappOrderingEnabled !== undefined) {
+      const whatsapp =
+        input.whatsappNumber !== undefined ? input.whatsappNumber : existingOrg.whatsappNumber;
+      if (input.whatsappOrderingEnabled && !whatsapp?.trim()) {
+        return { error: "WhatsApp number is required to enable WhatsApp ordering" };
+      }
+      data.whatsappOrderingEnabled = input.whatsappOrderingEnabled;
+    }
     if (input.tableManagementEnabled && !hasFeature(existingOrg.tier, "tableManagement")) {
       return { error: "Current subscription tier does not support table management" };
     }
@@ -479,6 +549,7 @@ export async function updateOrganization(input: UpdateOrganizationInput) {
 
     revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/branches");
+    revalidatePath("/pos");
     return {
       data: {
         ...JSON.parse(JSON.stringify(org)),
@@ -501,7 +572,10 @@ export async function getOnlineStoreSettings(organizationId: string) {
 
   return {
     data: {
+      storefrontPlatformEnabled: org.storefrontPlatformEnabled,
       onlineOrderingEnabled: org.onlineOrderingEnabled,
+      cashCheckoutEnabled: org.cashCheckoutEnabled,
+      whatsappOrderingEnabled: org.whatsappOrderingEnabled,
       storefrontUrl: org.storefrontUrl,
       storeSlug: org.storeSlug,
       storeName: org.storeName,
@@ -660,7 +734,9 @@ export async function getAllOrganizations() {
         id: org.id,
         name: org.name,
         tier: org.tier,
+        businessMode: org.businessMode,
         status: org.status,
+        storefrontPlatformEnabled: org.storefrontPlatformEnabled,
         maxBranches: org.maxBranches,
         maxUsers: org.maxUsers,
         userCount: org._count.users,
@@ -691,6 +767,7 @@ export async function getPosOrgContext() {
           showQr: false,
           storefrontUrl: null as string | null,
           posBarcodeEnabled: false,
+          businessMode: "RESTAURANT" as const,
         },
       };
     }
@@ -698,10 +775,11 @@ export async function getPosOrgContext() {
     const org = await db.organization.findUnique({
       where: { id: organizationId },
       select: {
-        tier: true,
+        storefrontPlatformEnabled: true,
         onlineOrderingEnabled: true,
         storefrontUrl: true,
         posBarcodeEnabled: true,
+        businessMode: true,
       },
     });
     if (!org) {
@@ -710,13 +788,14 @@ export async function getPosOrgContext() {
           showQr: false,
           storefrontUrl: null as string | null,
           posBarcodeEnabled: false,
+          businessMode: "RESTAURANT" as const,
         },
       };
     }
 
     const storefrontUrl = normalizeStorefrontUrl(org.storefrontUrl);
     const showQr =
-      hasFeature(org.tier, "onlineOrdering") &&
+      org.storefrontPlatformEnabled &&
       org.onlineOrderingEnabled &&
       storefrontUrl != null;
 
@@ -725,6 +804,7 @@ export async function getPosOrgContext() {
         showQr,
         storefrontUrl: showQr ? storefrontUrl : null,
         posBarcodeEnabled: org.posBarcodeEnabled,
+        businessMode: normalizeBusinessMode(org.businessMode),
       },
     };
   } catch (error) {
@@ -734,6 +814,7 @@ export async function getPosOrgContext() {
         showQr: false,
         storefrontUrl: null as string | null,
         posBarcodeEnabled: false,
+        businessMode: "RESTAURANT" as const,
       },
     };
   }

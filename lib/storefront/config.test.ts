@@ -6,6 +6,7 @@ import {
   branchTaxRateDecimal,
   buildPublicStoreConfig,
   findPublicStoreBranch,
+  isStorefrontEnabledForOrg,
   toPublicStoreBranch,
   type PublicStoreConfig,
 } from "./config";
@@ -104,7 +105,10 @@ describe("buildPublicStoreConfig", () => {
       id: "org1",
       name: "Test Org",
       tier: "PRO",
+      storefrontPlatformEnabled: true,
       onlineOrderingEnabled: true,
+      cashCheckoutEnabled: true,
+      whatsappOrderingEnabled: false,
       storefrontTemplateId: "classic",
       storeName: null,
       storeSlug: "test",
@@ -180,5 +184,27 @@ describe("buildPublicStoreConfig", () => {
     ]);
     expect(config.checkout.taxRate).toBe(0.125);
     expect(config.checkout.taxInclusive).toBe(false);
+    expect(config.features.cashEnabled).toBe(true);
+    expect(config.features.whatsappOrderingEnabled).toBe(false);
+    expect(config.status.enabled).toBe(true);
+  });
+
+  it("requires platform entitlement to enable storefront", () => {
+    const disabled = {
+      storefrontPlatformEnabled: false,
+      onlineOrderingEnabled: true,
+    } as Parameters<typeof isStorefrontEnabledForOrg>[0];
+    const enabled = {
+      storefrontPlatformEnabled: true,
+      onlineOrderingEnabled: true,
+    } as Parameters<typeof isStorefrontEnabledForOrg>[0];
+    const unpublished = {
+      storefrontPlatformEnabled: true,
+      onlineOrderingEnabled: false,
+    } as Parameters<typeof isStorefrontEnabledForOrg>[0];
+
+    expect(isStorefrontEnabledForOrg(disabled)).toBe(false);
+    expect(isStorefrontEnabledForOrg(enabled)).toBe(true);
+    expect(isStorefrontEnabledForOrg(unpublished)).toBe(false);
   });
 });

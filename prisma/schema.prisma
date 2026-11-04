@@ -219,6 +219,11 @@ enum SubscriptionTier {
   ENTERPRISE
 }
 
+enum BusinessMode {
+  RETAIL
+  RESTAURANT
+}
+
 enum SubscriptionStatus {
   ACTIVE
   TRIAL
@@ -1448,12 +1453,16 @@ model Organization {
   id                 String             @id @default(cuid())
   name               String
   tier               SubscriptionTier   @default(FREE)
+  businessMode       BusinessMode       @default(RESTAURANT)
   status             SubscriptionStatus @default(ACTIVE)
   maxBranches        Int                @default(1)
   maxUsers           Int                @default(2)
   maxMenuItems       Int?
   features           Json?
+  storefrontPlatformEnabled Boolean     @default(false)
   onlineOrderingEnabled Boolean         @default(false)
+  cashCheckoutEnabled Boolean           @default(true)
+  whatsappOrderingEnabled Boolean       @default(false)
   storefrontUrl      String?
   storeSlug          String?            @unique
   storeName          String?

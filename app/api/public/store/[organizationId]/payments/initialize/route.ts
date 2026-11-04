@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getPaystackSecretForOrganization } from "@/lib/storefront/config";
+import {
+  buildPublicStoreConfig,
+  getOrganizationForStorefront,
+  getPaystackSecretForOrganization,
+} from "@/lib/storefront/config";
 import { buildPaystackInitializeBody } from "@/lib/paystack/initialize";
 import { resolveBranchSubaccountForCheckout } from "@/lib/paystack/order-settlement";
+import {
+  isAllowedPaystackCallbackUrl,
+  resolvePaystackCallbackFromRequest,
+} from "@/lib/storefront/paystack-callback";
 
 const payloadSchema = z.object({
   orderNumber: z.string().min(4),
@@ -72,6 +80,24 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
 
   const reference = buildPaystackReference(order.orderNumber);
 
+  const callbackUrl = resolvePaystackCallbackFromRequest(
+    req,
+    order.orderNumber,
+    parsed.data.callbackUrl,
+  );
+  if (callbackUrl) {
+    const orgRow = await getOrganizationForStorefront(organizationId);
+    const orgConfig = orgRow ? buildPublicStoreConfig(orgRow) : null;
+    if (
+      !isAllowedPaystackCallbackUrl(callbackUrl, {
+        requestOrigin: req.headers.get("origin"),
+        orgConfig,
+      })
+    ) {
+      return NextResponse.json({ error: "Invalid payment callback URL" }, { status: 400 });
+    }
+  }
+
   const initResponse = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
     headers: {
@@ -83,7 +109,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
         email: parsed.data.email,
         amount: Math.round(Number(order.total) * 100),
         reference,
-        callbackUrl: parsed.data.callbackUrl,
+        callbackUrl: callbackUrl || undefined,
         currency: order.branch.currency || "GHS",
         subaccountCode: settlement.subaccountCode,
         metadata: {

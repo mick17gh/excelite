@@ -2,13 +2,15 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { SubscriptionTier } from "@/lib/generated/prisma/client";
+import { BusinessMode, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { seedOrgRolePermissions } from "@/lib/permissions/seed";
 import { serializeBranchScalarsForClient } from "@/lib/branches/serialize-client";
+import { normalizeBusinessMode } from "@/lib/business-mode";
 
 interface OnboardingInput {
   organization: {
     name: string;
+    businessMode?: BusinessMode | string;
     tableManagementEnabled?: boolean;
     storeLogoUrl?: string;
   };
@@ -38,6 +40,12 @@ export async function completeOnboarding(input: OnboardingInput) {
       return { success: false, error: "Branch code already exists" };
     }
 
+    const businessMode = normalizeBusinessMode(input.organization.businessMode);
+    const tableManagementEnabled =
+      businessMode === "RESTAURANT"
+        ? (input.organization.tableManagementEnabled ?? false)
+        : false;
+
     // Create organization and first branch in a transaction
     const result = await db.$transaction(async (tx) => {
       // Create organization
@@ -46,10 +54,11 @@ export async function completeOnboarding(input: OnboardingInput) {
           name: input.organization.name,
           tier: "FREE" as SubscriptionTier,
           status: "ACTIVE",
+          businessMode,
           maxBranches: 1,
           maxUsers: 2,
           maxMenuItems: 50,
-          tableManagementEnabled: input.organization.tableManagementEnabled ?? false,
+          tableManagementEnabled,
           storeLogoUrl: input.organization.storeLogoUrl || null,
         },
       });
@@ -64,6 +73,7 @@ export async function completeOnboarding(input: OnboardingInput) {
           phone: input.branch.phone || null,
           email: input.branch.email || null,
           isActive: true,
+          tableServiceEnabled: false,
           taxRate: 12.5, // Default tax rate
           organizationId: organization.id, // Link to organization
         },

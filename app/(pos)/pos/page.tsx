@@ -72,6 +72,7 @@ async function PosPageData() {
       allowComplimentary={allowComplimentary}
       userRole={access.role}
       posBarcodeEnabled={orgContext?.posBarcodeEnabled ?? false}
+      businessMode={orgContext?.businessMode ?? "RESTAURANT"}
     />
   );
 }

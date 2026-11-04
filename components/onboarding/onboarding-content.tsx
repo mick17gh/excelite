@@ -147,6 +147,7 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
       const result = await completeOnboarding({
         organization: {
           name: orgName.trim(),
+          businessMode: industry === "RESTAURANT" ? "RESTAURANT" : "RETAIL",
           tableManagementEnabled: false,
           storeLogoUrl: uploadedLogoUrl || undefined,
         },

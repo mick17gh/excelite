@@ -1,6 +1,9 @@
-import type { LucideIcon } from "lucide-react";
-import { Package, Truck, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  RESTAURANT_POS_ORDER_TYPES,
+  type PosOrderTypeOption,
+  type PosOrderTypeValue,
+} from "@/lib/business-mode";
 
 export const POS_BRAND = {
   charcoal: "#222831",
@@ -9,33 +12,10 @@ export const POS_BRAND = {
   surface: "#F8FAF8",
 } as const;
 
-export type PosOrderTypeValue = "DINE_IN" | "TAKEOUT" | "DELIVERY";
+export type { PosOrderTypeValue, PosOrderTypeOption };
 
-export const posOrderTypes: {
-  value: PosOrderTypeValue;
-  label: string;
-  icon: LucideIcon;
-  chipClass: string;
-}[] = [
-  {
-    value: "DINE_IN",
-    label: "Dine-in",
-    icon: UtensilsCrossed,
-    chipClass: "border-[#22C55E]/30 bg-[#22C55E]/10 text-[#16A34A]",
-  },
-  {
-    value: "TAKEOUT",
-    label: "Takeout",
-    icon: Package,
-    chipClass: "border-[#222831]/20 bg-[#222831]/5 text-[#222831]",
-  },
-  {
-    value: "DELIVERY",
-    label: "Delivery",
-    icon: Truck,
-    chipClass: "border-[#16A34A]/30 bg-[#16A34A]/10 text-[#16A34A]",
-  },
-];
+/** @deprecated Prefer getPosOrderTypesForMode(businessMode) */
+export const posOrderTypes = RESTAURANT_POS_ORDER_TYPES;
 
 export const posToolbarClass =
   "flex flex-col gap-3 border-b border-border/60 bg-muted/20 px-3 py-3 md:px-4 md:py-3.5 shrink-0";

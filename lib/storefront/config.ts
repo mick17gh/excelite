@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { hasFeature, isSuperAdmin } from "@/lib/tier-config";
+import { isSuperAdmin } from "@/lib/tier-config";
 import { normalizeTemplateId, STOREFRONT_TEMPLATES, type StorefrontTemplateId } from "@/lib/storefront/templates";
 import { isPaystackStorefrontEnabledForOrg } from "@/lib/paystack/credentials";
 import { branchHasPaystackSettlement } from "@/lib/paystack/initialize";
@@ -53,6 +53,7 @@ export type PublicStoreConfig = {
     deliveryEnabled: boolean;
     pickupEnabled: boolean;
     cashEnabled: boolean;
+    whatsappOrderingEnabled: boolean;
     paystackEnabled: boolean;
   };
   operations: {
@@ -153,7 +154,8 @@ export function isStorefrontEnabledForOrg(
 ): boolean {
   if (!org) return false;
   if (isSuperAdmin(role as never)) return true;
-  if (!hasFeature(org.tier, "onlineOrdering")) return false;
+  // Platform admin entitlement replaces tier gate for serving.
+  if (!org.storefrontPlatformEnabled) return false;
   return org.onlineOrderingEnabled;
 }
 
@@ -198,11 +200,16 @@ export function buildPublicStoreConfig(
       available: STOREFRONT_TEMPLATES,
     },
     status: {
-      enabled: org.onlineOrderingEnabled,
+      enabled: Boolean(org.storefrontPlatformEnabled && org.onlineOrderingEnabled),
       isOpenNow: availability.isOpenNow,
-      closedReason: org.onlineOrderingEnabled
-        ? (availability.isOpenNow ? null : (availability.nextOpenAt ? `Opens ${availability.nextOpenAt}` : (org.closureMessage || "Temporarily closed")))
-        : (org.closureMessage || "Store temporarily closed"),
+      closedReason:
+        org.storefrontPlatformEnabled && org.onlineOrderingEnabled
+          ? availability.isOpenNow
+            ? null
+            : availability.nextOpenAt
+              ? `Opens ${availability.nextOpenAt}`
+              : org.closureMessage || "Temporarily closed"
+          : org.closureMessage || "Store temporarily closed",
     },
     checkout: {
       currency,
@@ -214,7 +221,8 @@ export function buildPublicStoreConfig(
     features: {
       deliveryEnabled: org.deliveryEnabled,
       pickupEnabled: org.pickupEnabled,
-      cashEnabled: true,
+      cashEnabled: org.cashCheckoutEnabled !== false,
+      whatsappOrderingEnabled: Boolean(org.whatsappOrderingEnabled && org.whatsappNumber?.trim()),
       paystackEnabled: isPaystackStorefrontEnabledForOrg(org),
     },
     operations: {

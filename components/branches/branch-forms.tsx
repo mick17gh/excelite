@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -372,6 +373,7 @@ export function EditBranchForm({
   orgTableManagementEnabled = false,
   branch,
 }: EditBranchFormProps) {
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showOnlineStoreToggle, setShowOnlineStoreToggle] = useState(false);
   const [formData, setFormData] = useState({
@@ -406,18 +408,20 @@ export function EditBranchForm({
       tableServiceEnabled: branch.tableServiceEnabled ?? false,
     });
     setStockPolicyOverride(stockPolicyFromBranch(branch.blockSalesWhenOutOfStock));
+    setShowOnlineStoreToggle(false);
 
+    let cancelled = false;
     void (async () => {
       const ctx = await getBranchOnlineStoreEditContext(branch.id);
+      if (cancelled) return;
+      // Only gate visibility — do not overwrite onlineStoreVisible after user toggles.
       setShowOnlineStoreToggle(Boolean(ctx.data?.showOnlineStoreToggle));
-      if (ctx.data?.onlineStoreVisible !== undefined) {
-        setFormData((prev) => ({
-          ...prev,
-          onlineStoreVisible: ctx.data!.onlineStoreVisible,
-        }));
-      }
     })();
-  }, [open, branch]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, branch?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -454,6 +458,7 @@ export function EditBranchForm({
             : "Branch updated successfully"
         );
         onOpenChange(false);
+        router.refresh();
       } else {
         toast.error(result.error || "Failed to update branch");
       }
@@ -591,7 +596,7 @@ export function EditBranchForm({
                   checked={formData.onlineStoreVisible}
                   disabled={!formData.isActive}
                   onCheckedChange={(checked) =>
-                    setFormData({ ...formData, onlineStoreVisible: checked })
+                    setFormData((prev) => ({ ...prev, onlineStoreVisible: checked }))
                   }
                 />
               </div>

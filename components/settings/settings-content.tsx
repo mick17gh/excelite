@@ -31,6 +31,7 @@ import {
   Loader2,
   Calculator,
   ScanBarcode,
+  Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -124,12 +125,14 @@ interface SettingsContentProps {
   initialUser: SettingsBootstrapUser | null;
   initialBranches: SettingsBootstrapBranch[];
   initialOrganizationTier: SubscriptionTier;
+  initialStorefrontPlatformEnabled?: boolean;
 }
 
 export function SettingsContent({
   initialUser,
   initialBranches,
   initialOrganizationTier,
+  initialStorefrontPlatformEnabled = false,
 }: SettingsContentProps) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
@@ -147,6 +150,7 @@ export function SettingsContent({
     hasPermission("users:edit") || user?.role === "SUPER_ADMIN";
 
   const organizationTier = initialOrganizationTier;
+  const storefrontPlatformEnabled = initialStorefrontPlatformEnabled;
 
   const [profileForm, setProfileForm] = useState({
     name: initialUser?.name ?? "",
@@ -302,6 +306,12 @@ export function SettingsContent({
           <TabsTrigger value="pos-policies" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
             <ScanBarcode className="mr-1.5 h-4 w-4" />
             POS Policies
+          </TabsTrigger>
+        )}
+        {canViewOrganization && storefrontPlatformEnabled && (
+          <TabsTrigger value="online-store" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+            <Store className="mr-1.5 h-4 w-4" />
+            Online Store
           </TabsTrigger>
         )}
         {canManageTeamPermissions && (
@@ -744,17 +754,19 @@ export function SettingsContent({
         </TabsContent>
       )}
 
-      <TabsContent value="online-store">
-        {activeTab === "online-store" && user?.organizationId ? (
-          <OnlineStoreTab organizationId={user.organizationId} tier={organizationTier} />
-        ) : activeTab === "online-store" ? (
-          <Card className="chart-card rounded-xl">
-            <CardContent className="px-4 py-6 text-sm text-muted-foreground">
-              Organization context is required to manage online store settings.
-            </CardContent>
-          </Card>
-        ) : null}
-      </TabsContent>
+      {storefrontPlatformEnabled && (
+        <TabsContent value="online-store">
+          {activeTab === "online-store" && user?.organizationId ? (
+            <OnlineStoreTab organizationId={user.organizationId} tier={organizationTier} />
+          ) : activeTab === "online-store" ? (
+            <Card className="chart-card rounded-xl">
+              <CardContent className="px-4 py-6 text-sm text-muted-foreground">
+                Organization context is required to manage online store settings.
+              </CardContent>
+            </Card>
+          ) : null}
+        </TabsContent>
+      )}
 
       {canManageTeamPermissions && user && (
         <TabsContent value="role-permissions">

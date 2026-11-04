@@ -21,16 +21,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Search, Building2, Users, Loader2, TrendingUp } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { getAllOrganizations, updateOrganization } from "@/lib/actions/organization";
-import { SubscriptionTier } from "@/lib/generated/prisma/client";
+import { BusinessMode, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { getTierLimits } from "@/lib/tier-config";
 
 interface Organization {
   id: string;
   name: string;
   tier: string;
+  businessMode: BusinessMode;
   status: string;
+  storefrontPlatformEnabled: boolean;
   maxBranches: number;
   maxUsers: number;
   userCount: number;
@@ -107,6 +110,46 @@ export function PlatformAdminTab() {
     } catch (error) {
       console.error("Failed to update tier:", error);
       toast.error("Failed to update tier");
+    } finally {
+      setUpdatingOrgId(null);
+    }
+  };
+
+  const handleStorefrontToggle = async (orgId: string, enabled: boolean) => {
+    setUpdatingOrgId(orgId);
+    try {
+      const result = await updateOrganization({
+        id: orgId,
+        storefrontPlatformEnabled: enabled,
+        ...(!enabled ? { onlineOrderingEnabled: false } : {}),
+      });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(enabled ? "Storefront enabled for organization" : "Storefront disabled");
+        await loadOrganizations();
+      }
+    } catch (error) {
+      console.error("Failed to update storefront flag:", error);
+      toast.error("Failed to update storefront");
+    } finally {
+      setUpdatingOrgId(null);
+    }
+  };
+
+  const handleBusinessModeChange = async (orgId: string, mode: BusinessMode) => {
+    setUpdatingOrgId(orgId);
+    try {
+      const result = await updateOrganization({ id: orgId, businessMode: mode });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(mode === "RETAIL" ? "Switched to retail mode" : "Switched to restaurant mode");
+        await loadOrganizations();
+      }
+    } catch (error) {
+      console.error("Failed to update business mode:", error);
+      toast.error("Failed to update business mode");
     } finally {
       setUpdatingOrgId(null);
     }
@@ -233,6 +276,8 @@ export function PlatformAdminTab() {
                 <TableHead>Status</TableHead>
                 <TableHead>Usage</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Storefront</TableHead>
                 <TableHead>Change Tier</TableHead>
               </TableRow>
             </TableHeader>
@@ -279,6 +324,35 @@ export function PlatformAdminTab() {
                       month: "short", 
                       day: "numeric" 
                     })}
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={org.businessMode || "RESTAURANT"}
+                      onValueChange={(value) =>
+                        handleBusinessModeChange(org.id, value as BusinessMode)
+                      }
+                      disabled={updatingOrgId === org.id}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="RETAIL">Retail</SelectItem>
+                        <SelectItem value="RESTAURANT">Restaurant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={org.storefrontPlatformEnabled}
+                        disabled={updatingOrgId === org.id}
+                        onCheckedChange={(checked) => handleStorefrontToggle(org.id, checked)}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {org.storefrontPlatformEnabled ? "On" : "Off"}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Select

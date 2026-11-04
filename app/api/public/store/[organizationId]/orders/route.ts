@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { createOrder } from "@/lib/actions/orders";
 import { sendOrderPlacedSMS } from "@/lib/services/sms-notifications";
 import { buildPublicStoreConfig, getOrganizationForStorefront, getStorefrontAvailability, isStorefrontEnabledForOrg, resolveAllowedStorefrontOrigins } from "@/lib/storefront/config";
+import { isPaystackStorefrontEnabledForOrg } from "@/lib/paystack/credentials";
 import { getIdempotentResponse, setIdempotentResponse } from "@/lib/storefront/idempotency";
 import { recordStorefrontMetric } from "@/lib/storefront/metrics";
 import { takeRateLimitToken } from "@/lib/storefront/rate-limit";
@@ -81,6 +82,21 @@ export async function POST(req: NextRequest, context: { params: Promise<{ organi
     }
 
     const data = parsed.data;
+
+    if (data.paymentMethod === "CASH" && !cfg.features.cashEnabled) {
+      return applyCors(
+        req,
+        NextResponse.json({ error: "Manual / cash checkout is disabled for this store" }, { status: 400 }),
+        allowedOrigins,
+      );
+    }
+    if (data.paymentMethod === "PAYSTACK" && !isPaystackStorefrontEnabledForOrg(org)) {
+      return applyCors(
+        req,
+        NextResponse.json({ error: "Paystack checkout is disabled for this store" }, { status: 400 }),
+        allowedOrigins,
+      );
+    }
 
     const branchAllowed = org.branches.some((b) => b.id === data.branchId);
     if (!branchAllowed) {

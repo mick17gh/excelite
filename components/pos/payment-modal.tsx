@@ -30,7 +30,11 @@ import {
 } from "@/components/customers/customer-picker";
 import { useCurrency } from "@/contexts/currency-context";
 import { cn } from "@/lib/utils";
-import { posOrderTypes } from "@/components/pos/pos-theme";
+import {
+  getDefaultPosOrderType,
+  getPosOrderTypesForMode,
+  type BusinessMode,
+} from "@/lib/business-mode";
 
 interface PaymentModalProps {
   open: boolean;
@@ -51,6 +55,7 @@ interface PaymentModalProps {
   offlineRestricted?: boolean;
   allowComplimentary?: boolean;
   onCustomerCreated?: (customer: CustomerPickerOption) => void;
+  businessMode?: BusinessMode;
 }
 
 export interface PaymentData {
@@ -83,15 +88,19 @@ export function PaymentModal({
   onComplete,
   isProcessing = false,
   customers = [],
-  orderType: initialOrderType = "DINE_IN",
+  orderType: initialOrderType,
   onOrderTypeChange,
   offlineRestricted = false,
   allowComplimentary = false,
   onCustomerCreated,
+  businessMode = "RESTAURANT",
 }: PaymentModalProps) {
   const { formatCurrency } = useCurrency();
+  const defaultOrderType = getDefaultPosOrderType(businessMode);
   const [paymentMethod, setPaymentMethod] = useState<string>("CASH");
-  const [localOrderType, setLocalOrderType] = useState(initialOrderType);
+  const [localOrderType, setLocalOrderType] = useState(
+    initialOrderType ?? defaultOrderType,
+  );
   const [notes, setNotes] = useState("");
   const [complimentaryReason, setComplimentaryReason] = useState("");
 
@@ -111,9 +120,10 @@ export function PaymentModal({
   const isDelivery = localOrderType === "DELIVERY" && !offlineRestricted;
   const total = Math.round((isDelivery ? totalProp + deliveryFee : totalProp) * 100) / 100;
 
+  const orderTypeOptions = getPosOrderTypesForMode(businessMode);
   const orderTypeOptionsFiltered = offlineRestricted
-    ? posOrderTypes.filter((o) => o.value !== "DELIVERY")
-    : posOrderTypes;
+    ? orderTypeOptions.filter((o) => o.value !== "DELIVERY")
+    : orderTypeOptions;
 
   const handleOrderTypeChange = (type: string) => {
     setLocalOrderType(type);
@@ -143,13 +153,16 @@ export function PaymentModal({
       setComplimentaryReason("");
     }
 
+    const fallback = getDefaultPosOrderType(businessMode);
     const nextType =
-      offlineRestricted && initialOrderType === "DELIVERY" ? "DINE_IN" : initialOrderType;
+      offlineRestricted && initialOrderType === "DELIVERY"
+        ? fallback
+        : (initialOrderType ?? fallback);
     setLocalOrderType(nextType);
     if (justOpened && offlineRestricted && initialOrderType === "DELIVERY") {
-      onOrderTypeChange?.("DINE_IN");
+      onOrderTypeChange?.(fallback);
     }
-  }, [open, offlineRestricted, initialOrderType, onOrderTypeChange]);
+  }, [open, offlineRestricted, initialOrderType, onOrderTypeChange, businessMode]);
 
   const isValidComplimentary =
     paymentMethod === "COMPLIMENTARY" && complimentaryReason.trim().length > 0;
@@ -214,13 +227,18 @@ export function PaymentModal({
               </Alert>
             ) : null}
 
-            <div className={cn("grid gap-2", offlineRestricted ? "grid-cols-2" : "grid-cols-3")}>
+            <div
+              className={cn(
+                "grid gap-2",
+                orderTypeOptionsFiltered.length <= 2 ? "grid-cols-2" : "grid-cols-3",
+              )}
+            >
               {orderTypeOptionsFiltered.map((opt) => {
                 const Icon = opt.icon;
                 const isActive = localOrderType === opt.value;
                 return (
                   <button
-                    key={opt.value}
+                    key={`${opt.value}-${opt.label}`}
                     type="button"
                     className={cn(
                       "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center",

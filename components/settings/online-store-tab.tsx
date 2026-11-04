@@ -22,16 +22,20 @@ type Props = {
   tier: "FREE" | "PRO" | "ENTERPRISE";
 };
 
-export function OnlineStoreTab({ organizationId, tier }: Props) {
+export function OnlineStoreTab({ organizationId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(true);
   const [banners, setBanners] = useState<StoreBanner[]>([]);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [form, setForm] = useState({
     onlineOrderingEnabled: false,
+    cashCheckoutEnabled: true,
+    whatsappOrderingEnabled: false,
     storefrontUrl: "",
     storeSlug: "",
     storeName: "",
     storeDescription: "",
+    storeLogoUrl: "",
     storeTimezone: "Africa/Accra",
     storefrontTemplateId: "classic",
     closureMessage: "Store temporarily closed. Please contact support.",
@@ -50,7 +54,6 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
     businessHoursJson: "",
   });
 
-  const hasOnlineOrderingByTier = useMemo(() => tier === "PRO" || tier === "ENTERPRISE", [tier]);
   const apiBaseUrl = useMemo(
     () => (process.env.NEXT_PUBLIC_SERVSTACK_API_URL || "").replace(/\/$/, ""),
     []
@@ -79,10 +82,13 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
       setBanners(result.data.storeBanners || []);
       setForm({
         onlineOrderingEnabled: result.data.onlineOrderingEnabled,
+        cashCheckoutEnabled: result.data.cashCheckoutEnabled !== false,
+        whatsappOrderingEnabled: Boolean(result.data.whatsappOrderingEnabled),
         storefrontUrl: result.data.storefrontUrl || "",
         storeSlug: result.data.storeSlug || "",
         storeName: result.data.storeName || "",
         storeDescription: result.data.storeDescription || "",
+        storeLogoUrl: result.data.storeLogoUrl || "",
         storeTimezone: result.data.storeTimezone || "Africa/Accra",
         storefrontTemplateId: result.data.storefrontTemplateId || "classic",
         closureMessage: result.data.closureMessage || "Store temporarily closed. Please contact support.",
@@ -118,9 +124,50 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
     loadSettings();
   }, [organizationId]);
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Invalid file type. Only JPEG, PNG, and WebP are allowed.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size exceeds 5MB limit.");
+      return;
+    }
+    setLogoUploading(true);
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      uploadFormData.append("folder", "store");
+      const uploadResponse = await fetch("/api/upload", { method: "POST", body: uploadFormData });
+      const uploadData = await uploadResponse.json();
+      if (!uploadResponse.ok || !uploadData.url) {
+        toast.error(uploadData.error || "Failed to upload logo");
+        return;
+      }
+      setForm((prev) => ({ ...prev, storeLogoUrl: uploadData.url as string }));
+      toast.success("Logo uploaded");
+    } catch {
+      toast.error("Failed to upload logo");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   const handleSave = () => {
-    if (!hasOnlineOrderingByTier && form.onlineOrderingEnabled) {
-      toast.error("Your subscription tier does not include online ordering");
+    if (
+      form.onlineOrderingEnabled &&
+      !form.cashCheckoutEnabled &&
+      !form.whatsappOrderingEnabled &&
+      !form.paystackEnabled
+    ) {
+      toast.error("Enable at least one checkout method before publishing");
+      return;
+    }
+    if (form.whatsappOrderingEnabled && !form.whatsappNumber.trim()) {
+      toast.error("WhatsApp number is required for WhatsApp ordering");
       return;
     }
 
@@ -138,10 +185,13 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
       const result = await updateOrganization({
         id: organizationId,
         onlineOrderingEnabled: form.onlineOrderingEnabled,
+        cashCheckoutEnabled: form.cashCheckoutEnabled,
+        whatsappOrderingEnabled: form.whatsappOrderingEnabled,
         storefrontUrl: form.storefrontUrl.trim() || null,
         storeSlug: form.storeSlug || null,
         storeName: form.storeName || null,
         storeDescription: form.storeDescription || null,
+        storeLogoUrl: form.storeLogoUrl.trim() || null,
         storeBanners: banners,
         storeTimezone: form.storeTimezone || "Africa/Accra",
         storefrontTemplateId: form.storefrontTemplateId,
@@ -224,19 +274,49 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
       <CardContent className="space-y-4 px-4 pb-4 pt-0">
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div>
-            <p className="text-sm font-medium">Enable online ordering</p>
+            <p className="text-sm font-medium">Publish online store</p>
             <p className="text-xs text-muted-foreground">When disabled, public storefront endpoints return maintenance status.</p>
           </div>
           <Switch
             checked={form.onlineOrderingEnabled}
-            disabled={!hasOnlineOrderingByTier}
             onCheckedChange={(checked) => setForm((prev) => ({ ...prev, onlineOrderingEnabled: checked }))}
           />
         </div>
 
-        {!hasOnlineOrderingByTier && (
-          <p className="text-xs text-amber-600">Upgrade to Pro or Enterprise to enable online ordering.</p>
-        )}
+        <div className="space-y-2 rounded-lg border p-3">
+          <p className="text-sm font-medium">Checkout methods</p>
+          <p className="text-xs text-muted-foreground">Customers only see methods you enable. Enable at least one when publishing.</p>
+          <div className="flex items-center justify-between rounded-md border p-2.5">
+            <div>
+              <p className="text-sm">Manual / pay at pickup or delivery</p>
+              <p className="text-xs text-muted-foreground">Creates an unpaid order in Excelite.</p>
+            </div>
+            <Switch
+              checked={form.cashCheckoutEnabled}
+              onCheckedChange={(checked) => setForm((prev) => ({ ...prev, cashCheckoutEnabled: checked }))}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border p-2.5">
+            <div>
+              <p className="text-sm">Order via WhatsApp</p>
+              <p className="text-xs text-muted-foreground">Sends the cart to WhatsApp — no Excelite order.</p>
+            </div>
+            <Switch
+              checked={form.whatsappOrderingEnabled}
+              onCheckedChange={(checked) => setForm((prev) => ({ ...prev, whatsappOrderingEnabled: checked }))}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border p-2.5">
+            <div>
+              <p className="text-sm">Paystack</p>
+              <p className="text-xs text-muted-foreground">Card checkout on the storefront.</p>
+            </div>
+            <Switch
+              checked={form.paystackEnabled}
+              onCheckedChange={(checked) => setForm((prev) => ({ ...prev, paystackEnabled: checked }))}
+            />
+          </div>
+        </div>
 
         {form.onlineOrderingEnabled && (
           <div className="space-y-1.5 sm:col-span-2">
@@ -301,6 +381,39 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
           <div className="space-y-1.5 sm:col-span-2">
             <Label className="text-xs">Store Description</Label>
             <Textarea value={form.storeDescription} onChange={(e) => setForm((prev) => ({ ...prev, storeDescription: e.target.value }))} />
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Store logo</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              {form.storeLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.storeLogoUrl} alt="Store logo" className="h-14 w-14 rounded-lg object-cover border" />
+              ) : (
+                <div className="h-14 w-14 rounded-lg border border-dashed flex items-center justify-center text-[10px] text-muted-foreground">
+                  No logo
+                </div>
+              )}
+              <div className="flex flex-col gap-2 min-w-[200px] flex-1">
+                <Input
+                  value={form.storeLogoUrl}
+                  onChange={(e) => setForm((prev) => ({ ...prev, storeLogoUrl: e.target.value }))}
+                  className="h-9"
+                  placeholder="https://… or upload"
+                />
+                <div className="flex gap-2">
+                  <Label className="inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-xs">
+                    {logoUploading ? "Uploading…" : "Upload"}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoUpload} disabled={logoUploading || isPending} />
+                  </Label>
+                  {form.storeLogoUrl ? (
+                    <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setForm((prev) => ({ ...prev, storeLogoUrl: "" }))}>
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="sm:col-span-2">
@@ -381,15 +494,9 @@ export function OnlineStoreTab({ organizationId, tier }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border p-3">
-          <div>
-            <span className="text-sm">Enable Paystack (Online Store)</span>
-            <p className="text-xs text-muted-foreground">
-              Enables Paystack checkout on your online store only. Keys are configured in PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY (server) and NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY (storefront).
-            </p>
-          </div>
-          <Switch checked={form.paystackEnabled} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, paystackEnabled: checked }))} />
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Paystack keys use PAYSTACK_PUBLIC_KEY / PAYSTACK_SECRET_KEY (server) and NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY (storefront).
+        </p>
 
         <div className="space-y-1.5">
           <Label className="text-xs">Closure Message</Label>

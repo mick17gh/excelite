@@ -23,6 +23,7 @@ export default async function SettingsPage() {
           initialUser={bootstrap.user}
           initialBranches={bootstrap.branches}
           initialOrganizationTier={bootstrap.organizationTier}
+          initialStorefrontPlatformEnabled={bootstrap.storefrontPlatformEnabled}
         />
       </Suspense>
     </div>

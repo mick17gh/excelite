@@ -88,12 +88,14 @@ export type SettingsBootstrap = {
   user: SettingsBootstrapUser | null;
   branches: SettingsBootstrapBranch[];
   organizationTier: SubscriptionTier;
+  storefrontPlatformEnabled: boolean;
 };
 
 const emptySettingsBootstrap: SettingsBootstrap = {
   user: null,
   branches: [],
   organizationTier: "FREE",
+  storefrontPlatformEnabled: false,
 };
 
 export async function getSettingsBootstrap(): Promise<SettingsBootstrap> {
@@ -112,7 +114,7 @@ export async function getSettingsBootstrap(): Promise<SettingsBootstrap> {
     orgId
       ? db.organization.findUnique({
           where: { id: orgId },
-          select: { tier: true },
+          select: { tier: true, storefrontPlatformEnabled: true },
         })
       : Promise.resolve(null),
   ]);
@@ -131,6 +133,7 @@ export async function getSettingsBootstrap(): Promise<SettingsBootstrap> {
     },
     branches,
     organizationTier: org?.tier ?? "FREE",
+    storefrontPlatformEnabled: org?.storefrontPlatformEnabled ?? false,
   };
 }
 

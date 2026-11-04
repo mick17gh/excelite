@@ -1,8 +1,27 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { REQUEST_PATHNAME_COOKIE } from "@/lib/permissions/constants";
+import {
+  isHideLandingPage,
+  isStorefrontOnlyPath,
+  isStorefrontSurface,
+} from "@/lib/storefront/surface";
 
-const publicRoutes = ["/", "/demo", "/faq", "/login", "/forgot-password", "/reset-password", "/auth/reset-password", "/api/auth", "/api/v1"];
+const publicRoutes = [
+  "/",
+  "/demo",
+  "/faq",
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/reset-password",
+  "/api/auth",
+  "/api/v1",
+  "/api/public",
+  "/checkout",
+  "/order",
+  "/track",
+];
 const authRoutes = ["/login", "/forgot-password", "/reset-password"];
 
 /** better-auth session cookies (incl. secure prefix on HTTPS). */
@@ -18,17 +37,13 @@ function hasSessionCookie(request: NextRequest): boolean {
   });
 }
 
-function isTruthyEnv(value: string | undefined): boolean {
-  if (!value) return false;
-  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Optional hosting mode: hide landing page and force sign-in.
   // When enabled, requesting "/" redirects to "/login" (or "/dashboard" if already signed in).
-  const hideLanding = isTruthyEnv(process.env.NEXT_PUBLIC_HIDE_LANDING_PAGE);
+  // Also blocks storefront-only paths (overrides APP_SURFACE=storefront).
+  const hideLanding = isHideLandingPage();
 
   if (hideLanding && pathname === "/") {
     if (hasSessionCookie(request)) {
@@ -39,8 +54,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (isStorefrontOnlyPath(pathname) && (hideLanding || !isStorefrontSurface())) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   // Allow public routes and API auth routes
-  if (publicRoutes.some((route) => pathname.startsWith(route))) {
+  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
     return NextResponse.next();
   }
 

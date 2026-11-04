@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   Monitor,
   FileBarChart,
+  Building2,
 } from "lucide-react";
 import type { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { hasFeature, isSuperAdmin, type TierFeatures } from "@/lib/tier-config";
@@ -46,6 +47,12 @@ export const DASHBOARD_NAVIGATION: NavItem[] = [
   },
   { name: "Products", href: "/dashboard/menu", icon: UtensilsCrossed, permission: "menu:view" },
   { name: "Categories", href: "/dashboard/categories", icon: Tag, permission: "categories:view" },
+  {
+    name: "Branches",
+    href: "/dashboard/branches",
+    icon: Building2,
+    permission: "branches:view",
+  },
   {
     name: "Inventory",
     href: "/dashboard/inventory",
@@ -91,6 +98,10 @@ export const ROUTE_ACCESS_RULES: RouteAccessRule[] = [
   {
     match: (p) => p === "/dashboard/categories" || p.startsWith("/dashboard/categories/"),
     permissions: ["categories:view"],
+  },
+  {
+    match: (p) => p === "/dashboard/branches" || p.startsWith("/dashboard/branches/"),
+    permissions: ["branches:view"],
   },
   {
     match: (p) => p === "/dashboard/reports" || p.startsWith("/dashboard/reports/"),
@@ -200,6 +211,12 @@ export const MOBILE_PRIMARY_NAV: NavItem[] = [
 export const MOBILE_MORE_NAV: NavItem[] = [
   { name: "Products", href: "/dashboard/menu", icon: UtensilsCrossed, permission: "menu:view" },
   { name: "Categories", href: "/dashboard/categories", icon: Tag, permission: "categories:view" },
+  {
+    name: "Branches",
+    href: "/dashboard/branches",
+    icon: Building2,
+    permission: "branches:view",
+  },
   {
     name: "Inventory",
     href: "/dashboard/inventory",

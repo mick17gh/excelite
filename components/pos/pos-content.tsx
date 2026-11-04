@@ -86,7 +86,6 @@ import {
   posCategoryChipClass,
   posOrderTypeButtonClass,
   posOrderTypeTabListClass,
-  posOrderTypes,
   posPanelClass,
   posPanelHeaderClass,
   posSectionLabelClass,
@@ -95,6 +94,12 @@ import {
 import { PosProductCard } from "@/components/pos/pos-product-card";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { buildSkuLookup, resolveBarcodeScan } from "@/lib/pos/barcode-lookup";
+import {
+  coercePosOrderType,
+  getDefaultPosOrderType,
+  getPosOrderTypesForMode,
+  type BusinessMode,
+} from "@/lib/business-mode";
 
 interface Branch {
   id: string;
@@ -141,6 +146,7 @@ interface PosContentProps {
   allowComplimentary?: boolean;
   userRole?: Role;
   posBarcodeEnabled?: boolean;
+  businessMode?: BusinessMode;
 }
 
 interface CartLine {
@@ -162,6 +168,7 @@ export function PosContent({
   allowComplimentary = false,
   userRole: userRoleProp = "STAFF",
   posBarcodeEnabled = false,
+  businessMode = "RESTAURANT",
 }: PosContentProps) {
   const { formatCurrency } = useCurrency();
   const { canViewAllBranches, userBranchId, userRole: sessionRole, isLoading: authLoading } =
@@ -170,6 +177,10 @@ export function PosContent({
   const [tableSessionId, setTableSessionId] = useState<string | null>(null);
   const [tableLabel, setTableLabel] = useState<string | null>(null);
   const [waiterOrderNote, setWaiterOrderNote] = useState("");
+  const orderTypeOptions = useMemo(
+    () => getPosOrderTypesForMode(businessMode),
+    [businessMode],
+  );
 
   /** Start true on server + first client paint to avoid hydration mismatch; sync from navigator in useEffect. */
   const [isOnline, setIsOnline] = useState(true);
@@ -248,7 +259,9 @@ export function PosContent({
   const [search, setSearch] = useState("");
   const [barcodeMode, setBarcodeMode] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [orderType, setOrderType] = useState<OrderType>("DINE_IN");
+  const [orderType, setOrderType] = useState<OrderType>(
+    () => getDefaultPosOrderType(businessMode) as OrderType,
+  );
   const [cart, setCart] = useState<CartLine[]>([]);
   const [isPending, startTransition] = useTransition();
   const [optionPickerOpen, setOptionPickerOpen] = useState(false);
@@ -281,11 +294,18 @@ export function PosContent({
   }, []);
 
   const showTablePanel =
-    branchTableServiceEnabled && orderType === "DINE_IN" && Boolean(branchId);
+    businessMode === "RESTAURANT" &&
+    branchTableServiceEnabled &&
+    orderType === "DINE_IN" &&
+    Boolean(branchId);
   const waiterTableMode = showTablePanel && userRole === "WAITER";
 
   useEffect(() => {
-    if (!branchId) {
+    setOrderType((prev) => coercePosOrderType(businessMode, prev) as OrderType);
+  }, [businessMode]);
+
+  useEffect(() => {
+    if (!branchId || businessMode !== "RESTAURANT") {
       setBranchTableServiceEnabled(false);
       return;
     }
@@ -298,7 +318,7 @@ export function PosContent({
     return () => {
       cancelled = true;
     };
-  }, [branchId]);
+  }, [branchId, businessMode]);
 
   useEffect(() => {
     if (!showTablePanel) {
@@ -310,9 +330,9 @@ export function PosContent({
 
   useEffect(() => {
     if (!isOnline && orderType === "DELIVERY") {
-      setOrderType("DINE_IN");
+      setOrderType(getDefaultPosOrderType(businessMode) as OrderType);
     }
-  }, [isOnline, orderType]);
+  }, [isOnline, orderType, businessMode]);
 
   // Auto-select user's branch if they're restricted, or first available branch
   useEffect(() => {
@@ -1043,14 +1063,16 @@ export function PosContent({
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
-              <p className={cn(posSectionLabelClass, "hidden sm:block shrink-0")}>Order type</p>
+              <p className={cn(posSectionLabelClass, "hidden sm:block shrink-0")}>
+                {businessMode === "RETAIL" ? "Sale type" : "Order type"}
+              </p>
               <div className={posOrderTypeTabListClass}>
-                {posOrderTypes.map((type) => {
+                {orderTypeOptions.map((type) => {
                   const Icon = type.icon;
                   const isActive = orderType === type.value;
                   return (
                     <Button
-                      key={type.value}
+                      key={`${type.value}-${type.label}`}
                       variant="ghost"
                       size="sm"
                       className={posOrderTypeButtonClass(isActive)}
@@ -1478,6 +1500,7 @@ export function PosContent({
         onOrderTypeChange={(t) => setOrderType(t as OrderType)}
         offlineRestricted={!isOnline}
         allowComplimentary={allowComplimentary}
+        businessMode={businessMode}
         onCustomerCreated={(customer) => {
           setLiveCustomers((prev) => {
             const next = [customer, ...prev.filter((c) => c.id !== customer.id)];

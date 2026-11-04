@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildPublicStoreConfig, getOrganizationForStorefront, getStorefrontAvailability, isStorefrontEnabledForOrg, resolveAllowedStorefrontOrigins } from "@/lib/storefront/config";
+import { buildPublicStoreConfig, getOrganizationForStorefront, isStorefrontEnabledForOrg, resolveAllowedStorefrontOrigins } from "@/lib/storefront/config";
 import { getPublicStoreMenu } from "@/lib/storefront/menu";
 import { recordStorefrontMetric } from "@/lib/storefront/metrics";
 import { takeRateLimitToken } from "@/lib/storefront/rate-limit";
@@ -29,23 +29,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ organiz
 
   const cfg = buildPublicStoreConfig(org);
   const allowedOrigins = resolveAllowedStorefrontOrigins(cfg);
-  const availability = getStorefrontAvailability(org);
 
   if (!isStorefrontEnabledForOrg(org)) {
     recordStorefrontMetric("storefront.menu.requests", { organizationId, status: 503 });
     return applyCors(req, NextResponse.json({ error: "Store temporarily closed" }, { status: 503 }), allowedOrigins);
   }
-  if (!availability.isOpenNow) {
-    recordStorefrontMetric("storefront.menu.requests", { organizationId, status: 503, reason: "outside_business_hours" });
-    return applyCors(
-      req,
-      NextResponse.json({
-        error: "Store temporarily closed",
-        nextOpenAt: availability.nextOpenAt,
-      }, { status: 503 }),
-      allowedOrigins
-    );
-  }
+  // Outside hours: still return menu so customers can browse; checkout is blocked on orders/UI.
 
   const { searchParams } = new URL(req.url);
   const categoryId = searchParams.get("categoryId");

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { hasFeature, isSuperAdmin, isWithinLimit } from "@/lib/tier-config";
+import { isSuperAdmin, isWithinLimit } from "@/lib/tier-config";
 import type { Role } from "@/lib/generated/prisma/client";
 import {
   serializeBranchForClient,
@@ -499,14 +499,18 @@ export async function getBranchOnlineStoreEditContext(branchId: string) {
 
     const org = await db.organization.findUnique({
       where: { id: organizationId },
-      select: { tier: true, onlineOrderingEnabled: true },
+      select: {
+        storefrontPlatformEnabled: true,
+        onlineOrderingEnabled: true,
+      },
     });
     if (!org) {
       return { data: { showOnlineStoreToggle: false, onlineStoreVisible: false } };
     }
 
+    // Match storefront enablement: platform entitlement + merchant online ordering.
     const showOnlineStoreToggle =
-      hasFeature(org.tier, "onlineOrdering") && org.onlineOrderingEnabled;
+      org.storefrontPlatformEnabled && org.onlineOrderingEnabled;
 
     return {
       data: {
