@@ -1093,7 +1093,7 @@ export function PosContent({
                   size="sm"
                   className={cn(
                     "h-9 rounded-lg",
-                    autoSendToKitchen && "excelite-header-gradient text-white shadow-sm shadow-[#22C55E]/20",
+                    autoSendToKitchen && "servgo-header-gradient text-white shadow-sm shadow-[#0066FF]/20",
                   )}
                   onClick={() => setAutoSendToKitchen(!autoSendToKitchen)}
                   title="Toggle auto-send to kitchen"
@@ -1135,8 +1135,8 @@ export function PosContent({
                 readOnly={barcodeMode}
                 data-barcode-capture={barcodeMode ? "true" : undefined}
                 className={cn(
-                  "pl-10 h-11 text-base bg-background rounded-xl border-border/80 focus-visible:ring-[#22C55E]/30",
-                  barcodeMode && "border-[#22C55E] ring-1 ring-[#22C55E]/30",
+                  "pl-10 h-11 text-base bg-background rounded-xl border-border/80 focus-visible:ring-[#0066FF]/30",
+                  barcodeMode && "border-[#0066FF] ring-1 ring-[#0066FF]/30",
                 )}
               />
               {search && !barcodeMode ? (
@@ -1156,7 +1156,7 @@ export function PosContent({
                 variant={barcodeMode ? "default" : "outline"}
                 className={cn(
                   "h-11 rounded-xl shrink-0",
-                  barcodeMode && "bg-[#22C55E] hover:bg-[#16A34A] text-white",
+                  barcodeMode && "bg-[#0066FF] hover:bg-[#0052CC] text-white",
                 )}
                 onClick={() => setBarcodeModePersisted(!barcodeMode)}
               >
@@ -1232,7 +1232,7 @@ export function PosContent({
             <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
               <ShoppingCart className="h-5 w-5" />
               {cartItemCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#22C55E] text-[10px] font-bold">
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#0066FF] text-[10px] font-bold">
                   {cartItemCount}
                 </span>
               )}
@@ -1260,10 +1260,10 @@ export function PosContent({
           <ScrollArea className="h-full p-4">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#22C55E]/10 flex items-center justify-center mb-4">
-                <ShoppingCart className="h-8 w-8 text-[#16A34A]/60" />
+              <div className="w-16 h-16 rounded-2xl bg-[#0066FF]/10 flex items-center justify-center mb-4">
+                <ShoppingCart className="h-8 w-8 text-[#0052CC]/60" />
               </div>
-              <p className="font-medium text-[#222831]">Cart is empty</p>
+              <p className="font-medium text-[#001F5C]">Cart is empty</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Tap products to add them
               </p>
@@ -1286,7 +1286,7 @@ export function PosContent({
                       <span className="text-xs text-muted-foreground">
                         {formatCurrency(l.unitPrice)}
                       </span>
-                      <span className="text-xs font-semibold text-[#16A34A]">
+                      <span className="text-xs font-semibold text-[#0052CC]">
                         {formatCurrency(l.unitPrice * l.quantity)}
                       </span>
                     </div>
@@ -1376,16 +1376,16 @@ export function PosContent({
                   </>
                 )}
                 <Separator />
-                <div className="flex justify-between text-lg font-bold text-[#222831]">
+                <div className="flex justify-between text-lg font-bold text-[#001F5C]">
                   <span>Total</span>
-                  <span className="text-[#16A34A]">{formatCurrency(total)}</span>
+                  <span className="text-[#0052CC]">{formatCurrency(total)}</span>
                 </div>
               </div>
 
               <Button
                 onClick={submitOrder}
                 disabled={isPending || cart.length === 0}
-                className="w-full h-14 text-lg font-semibold rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-lg shadow-[#22C55E]/20"
+                className="w-full h-14 text-lg font-semibold rounded-xl bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-lg shadow-[#0066FF]/20"
                 size="lg"
               >
                 {isPending ? (
@@ -1523,7 +1523,7 @@ export function PosContent({
         }}
       >
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-2xl">
-          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white border-b border-white/10">
+          <DialogHeader className="px-6 py-4 servgo-header-gradient text-white border-b border-white/10">
             <DialogTitle className="text-base font-semibold">
               {optionPickerItem?.name ?? "Customize"}
             </DialogTitle>
@@ -1553,7 +1553,7 @@ export function PosContent({
                         size="sm"
                         className={cn(
                           "h-auto min-h-9 whitespace-normal text-left rounded-lg",
-                          active && "bg-[#22C55E] hover:bg-[#16A34A] text-white border-transparent",
+                          active && "bg-[#0066FF] hover:bg-[#0052CC] text-white border-transparent",
                         )}
                         onClick={() => togglePickerOption(g, o.id)}
                       >
@@ -1596,7 +1596,7 @@ export function PosContent({
               >
                 Cancel
               </Button>
-              <Button type="button" onClick={confirmOptionPicker} className="bg-[#22C55E] hover:bg-[#16A34A]">
+              <Button type="button" onClick={confirmOptionPicker} className="bg-[#0066FF] hover:bg-[#0052CC]">
                 Add to order
               </Button>
             </div>

@@ -15,7 +15,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { SessionIdleGate } from "@/components/session/session-idle-gate";
@@ -71,15 +71,15 @@ export function PosShell({
   return (
     <SessionIdleGate>
     <div className="flex h-screen flex-col bg-[#F8FAF8] dark:bg-background">
-      <header className="relative shrink-0 border-b border-[#222831]/10 bg-white dark:bg-card shadow-sm">
-        <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-[#22C55E] to-transparent opacity-80" />
+      <header className="relative shrink-0 border-b border-[#001F5C]/10 bg-white dark:bg-card shadow-sm">
+        <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-[#0066FF] to-transparent opacity-80" />
         <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-3 min-w-0">
             <Link href={backHref}>
               <Button
                 variant="ghost"
                 size="sm"
-                className="gap-2 shrink-0 text-[#222831] hover:bg-[#22C55E]/10 hover:text-[#16A34A]"
+                className="gap-2 shrink-0 text-[#001F5C] hover:bg-[#0066FF]/10 hover:text-[#0052CC]"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span className="hidden sm:inline">Back</span>
@@ -87,21 +87,21 @@ export function PosShell({
             </Link>
             <div className="h-6 w-px bg-border shrink-0" />
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#22C55E]/10 shrink-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0066FF]/10 shrink-0">
                 <Image
-                  src={EXCELITE_BRAND.logo}
-                  alt={`${EXCELITE_BRAND.name} logo`}
+                  src={SERVGO_BRAND.logo}
+                  alt={`${SERVGO_BRAND.name} logo`}
                   width={28}
                   height={28}
                   className="h-7 w-7 rounded-md"
                 />
               </div>
               <div className="min-w-0 hidden sm:block">
-                <p className="font-semibold text-[#222831] dark:text-foreground leading-tight truncate">
+                <p className="font-semibold text-[#001F5C] dark:text-foreground leading-tight truncate">
                   Point of Sale
                 </p>
                 <p className="text-[11px] text-muted-foreground truncate">
-                  {EXCELITE_BRAND.shortName}
+                  {SERVGO_BRAND.shortName}
                 </p>
               </div>
             </div>
@@ -111,7 +111,7 @@ export function PosShell({
             <Button
               variant="ghost"
               size="sm"
-              className="hidden md:flex gap-2 text-muted-foreground hover:text-[#16A34A]"
+              className="hidden md:flex gap-2 text-muted-foreground hover:text-[#0052CC]"
               asChild
             >
               <Link href={backHref}>
@@ -124,9 +124,9 @@ export function PosShell({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 gap-2 rounded-full px-2">
-                  <Avatar className="h-7 w-7 ring-2 ring-[#22C55E]/20">
+                  <Avatar className="h-7 w-7 ring-2 ring-[#0066FF]/20">
                     <AvatarImage src={user.image || undefined} alt={user.name} />
-                    <AvatarFallback className="bg-[#22C55E] text-white text-xs">
+                    <AvatarFallback className="bg-[#0066FF] text-white text-xs">
                       {user.name
                         .split(" ")
                         .map((n) => n[0])
@@ -135,7 +135,7 @@ export function PosShell({
                     </AvatarFallback>
                   </Avatar>
                   <div className="hidden flex-col items-start text-left sm:flex">
-                    <span className="text-sm font-medium max-w-[140px] truncate text-[#222831]">
+                    <span className="text-sm font-medium max-w-[140px] truncate text-[#001F5C]">
                       {user.name}
                     </span>
                     <span className="text-xs text-muted-foreground">{user.role}</span>

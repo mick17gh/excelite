@@ -5,11 +5,11 @@
  */
 
 import { Resend } from "resend";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = process.env.FROM_EMAIL || `${EXCELITE_BRAND.name} <noreply@excelite.app>`;
+const FROM_EMAIL = process.env.FROM_EMAIL || `${SERVGO_BRAND.name} <noreply@servgo.app>`;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export interface SendEmailOptions {
@@ -90,10 +90,10 @@ export async function sendTeamInvitationEmail(
                 Hi there,
               </p>
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                <strong>${inviterName}</strong> has invited you to join <strong>${businessName}</strong> on Excelite POS as a <strong>${role}</strong>.
+                <strong>${inviterName}</strong> has invited you to join <strong>${businessName}</strong> on ServGo as a <strong>${role}</strong>.
               </p>
               <p style="margin: 0 0 30px; color: #374151; font-size: 16px; line-height: 1.6;">
-                Excelite POS helps restaurants manage operations efficiently. Click the button below to accept your invitation and get started.
+                ServGo helps restaurants manage operations efficiently. Click the button below to accept your invitation and get started.
               </p>
               
               <!-- CTA Button -->
@@ -126,7 +126,7 @@ export async function sendTeamInvitationEmail(
           <tr>
             <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} Excelite POS. All rights reserved.
+                © ${new Date().getFullYear()} ServGo. All rights reserved.
               </p>
             </td>
           </tr>
@@ -141,7 +141,7 @@ export async function sendTeamInvitationEmail(
   const text = `
 You're Invited to Join ${businessName}!
 
-${inviterName} has invited you to join ${businessName} on Excelite POS as a ${role}.
+${inviterName} has invited you to join ${businessName} on ServGo as a ${role}.
 
 Accept your invitation here: ${inviteUrl}
 
@@ -152,7 +152,7 @@ If you didn't expect this invitation, you can safely ignore this email.
 
   return sendEmail({
     to: email,
-    subject: `You're invited to join ${businessName} on Excelite POS`,
+    subject: `You're invited to join ${businessName} on ServGo`,
     html,
     text,
   });
@@ -192,7 +192,7 @@ export async function sendPasswordResetEmail(
                 Hi ${name},
               </p>
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                We received a request to reset your password for your Excelite POS account. Click the button below to create a new password.
+                We received a request to reset your password for your ServGo account. Click the button below to create a new password.
               </p>
               
               <!-- CTA Button -->
@@ -225,7 +225,7 @@ export async function sendPasswordResetEmail(
           <tr>
             <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} Excelite POS. All rights reserved.
+                © ${new Date().getFullYear()} ServGo. All rights reserved.
               </p>
             </td>
           </tr>
@@ -242,7 +242,7 @@ Reset Your Password
 
 Hi ${name},
 
-We received a request to reset your password for your Excelite POS account.
+We received a request to reset your password for your ServGo account.
 
 Reset your password here: ${resetUrl}
 
@@ -253,7 +253,7 @@ If you didn't request a password reset, you can safely ignore this email.
 
   return sendEmail({
     to: email,
-    subject: "Reset your Excelite POS password",
+    subject: "Reset your ServGo password",
     html,
     text,
   });
@@ -295,7 +295,7 @@ export async function sendWelcomeEmail(
                 Hi ${name},
               </p>
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px; line-height: 1.6;">
-                You've successfully joined <strong>${businessName}</strong> on Excelite POS! You can now access the dashboard and start managing operations.
+                You've successfully joined <strong>${businessName}</strong> on ServGo! You can now access the dashboard and start managing operations.
               </p>
               
               <!-- CTA Button -->
@@ -315,7 +315,7 @@ export async function sendWelcomeEmail(
           <tr>
             <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} Excelite POS. All rights reserved.
+                © ${new Date().getFullYear()} ServGo. All rights reserved.
               </p>
             </td>
           </tr>
@@ -415,7 +415,7 @@ export async function sendAlertEmail(
           <tr>
             <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} Excelite POS. All rights reserved.
+                © ${new Date().getFullYear()} ServGo. All rights reserved.
               </p>
               <p style="margin: 8px 0 0; color: #9ca3af; font-size: 11px;">
                 You can manage your notification preferences in Settings.
@@ -540,7 +540,7 @@ export async function sendDailyDigestEmail(
           <tr>
             <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} Excelite POS. All rights reserved.
+                © ${new Date().getFullYear()} ServGo. All rights reserved.
               </p>
             </td>
           </tr>
@@ -629,7 +629,7 @@ export async function sendLowStockAlertEmail(
           <tr>
             <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} Excelite POS. All rights reserved.
+                © ${new Date().getFullYear()} ServGo. All rights reserved.
               </p>
             </td>
           </tr>

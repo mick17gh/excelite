@@ -66,23 +66,23 @@ export function AccountContent() {
       <ContentCard padding="none">
         <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
           <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-[#16A34A]" />
-            <h3 className="text-base font-semibold text-[#222831]">My Account</h3>
+            <User className="h-4 w-4 text-[#0052CC]" />
+            <h3 className="text-base font-semibold text-[#001F5C]">My Account</h3>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Your sign-in details. Contact an administrator to change your role or branch assignment.
           </p>
         </div>
         <div className="p-4">
-          <div className="flex items-center gap-4 rounded-xl bg-[#22C55E]/5 border border-[#22C55E]/15 p-4">
-            <Avatar className="h-16 w-16 ring-2 ring-[#22C55E]/30">
+          <div className="flex items-center gap-4 rounded-xl bg-[#0066FF]/5 border border-[#0066FF]/15 p-4">
+            <Avatar className="h-16 w-16 ring-2 ring-[#0066FF]/30">
               <AvatarImage src={user?.image || undefined} alt={user?.name} />
-              <AvatarFallback className="bg-[#22C55E]/15 text-[#16A34A] text-lg font-semibold">
+              <AvatarFallback className="bg-[#0066FF]/15 text-[#0052CC] text-lg font-semibold">
                 {user ? getInitials(user.name) : "?"}
               </AvatarFallback>
             </Avatar>
             <div className="space-y-1.5 min-w-0 flex-1">
-              <p className="font-semibold text-[#222831] truncate">{user?.name}</p>
+              <p className="font-semibold text-[#001F5C] truncate">{user?.name}</p>
               <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
               <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {user?.role ? (
@@ -93,7 +93,7 @@ export function AccountContent() {
                 {user?.branchName ? (
                   <Badge
                     variant="outline"
-                    className="border-[#22C55E]/25 bg-[#22C55E]/8 text-[#16A34A] text-[10px]"
+                    className="border-[#0066FF]/25 bg-[#0066FF]/8 text-[#0052CC] text-[10px]"
                   >
                     {user.branchName}
                   </Badge>
@@ -119,7 +119,7 @@ export function AccountContent() {
 
       <p className="text-xs text-muted-foreground">
         Forgot your password? Use{" "}
-        <Link href="/forgot-password" className="text-[#16A34A] underline-offset-4 hover:underline">
+        <Link href="/forgot-password" className="text-[#0052CC] underline-offset-4 hover:underline">
           reset password
         </Link>{" "}
         on the sign-in page.

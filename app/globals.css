@@ -58,13 +58,13 @@
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.723 0.191 142.495);
+  --primary: oklch(0.55 0.24 264);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.25 0.01 260);
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.45 0.01 260);
-  --accent: oklch(0.95 0.03 142);
+  --accent: oklch(0.95 0.04 264);
   --accent-foreground: oklch(0.25 0.01 260);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
@@ -74,20 +74,20 @@
   --warning-foreground: oklch(0.21 0.006 285.885);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.723 0.191 142.495);
-  --chart-1: oklch(0.723 0.191 142.495);
+  --ring: oklch(0.55 0.24 264);
+  --chart-1: oklch(0.55 0.24 264);
   --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.723 0.191 142.495);
+  --chart-3: oklch(0.62 0.18 230);
   --chart-4: oklch(0.769 0.188 70.08);
   --chart-5: oklch(0.627 0.265 303.9);
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.25 0.01 260);
-  --sidebar-primary: oklch(0.723 0.191 142.495);
+  --sidebar-primary: oklch(0.55 0.24 264);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.03 142);
+  --sidebar-accent: oklch(0.95 0.04 264);
   --sidebar-accent-foreground: oklch(0.25 0.01 260);
   --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.723 0.191 142.495);
+  --sidebar-ring: oklch(0.55 0.24 264);
 }
 
 .dark {
@@ -97,7 +97,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.21 0.006 285.885);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.65 0.17 142);
+  --primary: oklch(0.62 0.2 264);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
@@ -113,10 +113,10 @@
   --warning-foreground: oklch(0.141 0.005 285.823);
   --border: oklch(0.274 0.006 286.033);
   --input: oklch(0.274 0.006 286.033);
-  --ring: oklch(0.65 0.17 142);
-  --chart-1: oklch(0.65 0.17 142);
+  --ring: oklch(0.62 0.2 264);
+  --chart-1: oklch(0.62 0.2 264);
   --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.723 0.191 142.495);
+  --chart-3: oklch(0.62 0.18 230);
   --chart-4: oklch(0.769 0.188 70.08);
   --chart-5: oklch(0.627 0.265 303.9);
   --sidebar: oklch(0.21 0.006 285.885);
@@ -204,50 +204,50 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Excelite green gradient utilities */
+/* ServGo green gradient utilities */
 .gradient-primary {
-  background: linear-gradient(135deg, #16A34A 0%, #22C55E 50%, #4ADE80 100%);
+  background: linear-gradient(135deg, #0052CC 0%, #0066FF 50%, #00D2FF 100%);
 }
 
 /** Modal / panel headers — green gradient (replaces charcoal bars) */
-.excelite-header-gradient {
-  background: linear-gradient(135deg, #15803D 0%, #16A34A 35%, #22C55E 70%, #4ADE80 100%);
+.servgo-header-gradient {
+  background: linear-gradient(135deg, #001F5C 0%, #0052CC 35%, #0066FF 70%, #00D2FF 100%);
   color: #ffffff;
 }
 
-.excelite-header-gradient .text-muted-foreground,
-.excelite-header-gradient [class*="text-white/"] {
+.servgo-header-gradient .text-muted-foreground,
+.servgo-header-gradient [class*="text-white/"] {
   color: rgba(255, 255, 255, 0.75);
 }
 
 .gradient-blue {
-  background: linear-gradient(135deg, #15803D 0%, #22C55E 100%);
+  background: linear-gradient(135deg, #001F5C 0%, #0066FF 100%);
 }
 
 .gradient-blue-soft {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(74, 222, 128, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.1) 0%, rgba(0, 210, 255, 0.05) 100%);
 }
 
 .gradient-primary-subtle {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(22, 163, 74, 0.08) 50%, rgba(34, 197, 94, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.1) 0%, rgba(0, 82, 204, 0.08) 50%, rgba(0, 102, 255, 0.05) 100%);
 }
 
 .gradient-mesh {
   background: 
-    radial-gradient(at 40% 20%, rgba(34, 197, 94, 0.08) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, rgba(74, 222, 128, 0.06) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, rgba(34, 197, 94, 0.05) 0px, transparent 50%),
-    radial-gradient(at 80% 50%, rgba(22, 163, 74, 0.04) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(34, 197, 94, 0.06) 0px, transparent 50%);
+    radial-gradient(at 40% 20%, rgba(0, 102, 255, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(0, 210, 255, 0.06) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(0, 102, 255, 0.05) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(0, 82, 204, 0.04) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(0, 102, 255, 0.06) 0px, transparent 50%);
 }
 
 .dark .gradient-mesh {
   background: 
-    radial-gradient(at 40% 20%, rgba(34, 197, 94, 0.08) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, rgba(74, 222, 128, 0.06) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, rgba(34, 197, 94, 0.04) 0px, transparent 50%),
-    radial-gradient(at 80% 50%, rgba(22, 163, 74, 0.03) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(34, 197, 94, 0.05) 0px, transparent 50%);
+    radial-gradient(at 40% 20%, rgba(0, 102, 255, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(0, 210, 255, 0.06) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(0, 102, 255, 0.04) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(0, 82, 204, 0.03) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(0, 102, 255, 0.05) 0px, transparent 50%);
 }
 
 .gradient-card {
@@ -269,15 +269,15 @@
 
 .gradient-glow {
   box-shadow:
-    0 0 20px rgba(34, 197, 94, 0.12),
-    0 0 40px rgba(34, 197, 94, 0.08),
-    0 4px 24px rgba(34, 39, 49, 0.06);
+    0 0 20px rgba(0, 102, 255, 0.12),
+    0 0 40px rgba(0, 102, 255, 0.08),
+    0 4px 24px rgba(0, 31, 92, 0.06);
 }
 
 .dark .gradient-glow {
   box-shadow:
-    0 0 20px rgba(34, 197, 94, 0.1),
-    0 0 40px rgba(34, 197, 94, 0.06),
+    0 0 20px rgba(0, 102, 255, 0.1),
+    0 0 40px rgba(0, 102, 255, 0.06),
     0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
@@ -294,9 +294,9 @@
   100% { background-position: 0% 50%; }
 }
 
-/* Gradient text — Excelite green */
+/* Gradient text — ServGo green */
 .gradient-text {
-  background: linear-gradient(135deg, #16A34A 0%, #22C55E 50%, #222831 100%);
+  background: linear-gradient(135deg, #0052CC 0%, #0066FF 50%, #001F5C 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -349,7 +349,7 @@
     linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
 }
 
-/* Excelite flat KPI / stat cards */
+/* ServGo flat KPI / stat cards */
 .kpi-card {
   position: relative;
   overflow: hidden;
@@ -359,8 +359,8 @@
 }
 
 .kpi-card:hover {
-  border-color: rgba(34, 197, 94, 0.35);
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.08);
+  border-color: rgba(0, 102, 255, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.08);
 }
 
 .dark .kpi-card {
@@ -369,21 +369,21 @@
 }
 
 .dark .kpi-card:hover {
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: rgba(0, 102, 255, 0.4);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
 /* Green accent icon container */
 .icon-blue,
 .icon-accent {
-  background: rgba(34, 197, 94, 0.12);
-  color: #16A34A;
+  background: rgba(0, 102, 255, 0.12);
+  color: #0052CC;
 }
 
 .dark .icon-blue,
 .dark .icon-accent {
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ADE80;
+  background: rgba(0, 102, 255, 0.18);
+  color: #00D2FF;
 }
 
 /* Flat content / chart cards */
@@ -432,7 +432,7 @@
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
-/* Excelite flat sidebar */
+/* ServGo flat sidebar */
 .sidebar-blue,
 .sidebar-flat {
   background: #ffffff;
@@ -446,14 +446,14 @@
 }
 
 .nav-active {
-  background: linear-gradient(90deg, rgba(34, 197, 94, 0.12) 0%, rgba(34, 197, 94, 0.04) 100%);
-  border-left: 3px solid #22C55E;
-  color: #16A34A;
+  background: linear-gradient(90deg, rgba(0, 102, 255, 0.12) 0%, rgba(0, 102, 255, 0.04) 100%);
+  border-left: 3px solid #0066FF;
+  color: #0052CC;
 }
 
 .dark .nav-active {
-  background: linear-gradient(90deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.06) 100%);
-  color: #4ADE80;
+  background: linear-gradient(90deg, rgba(0, 102, 255, 0.15) 0%, rgba(0, 102, 255, 0.06) 100%);
+  color: #00D2FF;
 }
 
 /* Responsive utilities */
@@ -479,29 +479,29 @@
   100% { background-position: 200% 0; }
 }
 
-/* Excelite marketing — animations & glass */
-@keyframes excelite-float {
+/* ServGo marketing — animations & glass */
+@keyframes servgo-float {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-14px) scale(1.02); }
 }
 
-@keyframes excelite-float-slow {
+@keyframes servgo-float-slow {
   0%, 100% { transform: translate(0, 0); }
   33% { transform: translate(8px, -12px); }
   66% { transform: translate(-6px, 6px); }
 }
 
-@keyframes excelite-pulse-ring {
+@keyframes servgo-pulse-ring {
   0%, 100% { opacity: 0.35; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(1.08); }
 }
 
-@keyframes excelite-shimmer-green {
+@keyframes servgo-shimmer-cyan {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-@keyframes excelite-fade-up {
+@keyframes servgo-fade-up {
   from {
     opacity: 0;
     transform: translateY(28px);
@@ -512,7 +512,7 @@
   }
 }
 
-@keyframes excelite-scale-in {
+@keyframes servgo-scale-in {
   from {
     opacity: 0;
     transform: scale(0.92);
@@ -523,24 +523,47 @@
   }
 }
 
-.animate-excelite-float {
-  animation: excelite-float 5s ease-in-out infinite;
+@keyframes storefront-cart-shake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg) scale(1);
+  }
+  20% {
+    transform: translateX(-3px) rotate(-6deg) scale(1.08);
+  }
+  40% {
+    transform: translateX(3px) rotate(6deg) scale(1.08);
+  }
+  60% {
+    transform: translateX(-2px) rotate(-3deg) scale(1.04);
+  }
+  80% {
+    transform: translateX(2px) rotate(3deg) scale(1.04);
+  }
 }
 
-.animate-excelite-float-slow {
-  animation: excelite-float-slow 8s ease-in-out infinite;
+.animate-storefront-cart-shake {
+  animation: storefront-cart-shake 0.55s ease-in-out;
 }
 
-.animate-excelite-pulse-ring {
-  animation: excelite-pulse-ring 4s ease-in-out infinite;
+.animate-servgo-float {
+  animation: servgo-float 5s ease-in-out infinite;
 }
 
-.animate-excelite-fade-up {
-  animation: excelite-fade-up 0.8s ease-out forwards;
+.animate-servgo-float-slow {
+  animation: servgo-float-slow 8s ease-in-out infinite;
 }
 
-.animate-excelite-scale-in {
-  animation: excelite-scale-in 0.6s ease-out forwards;
+.animate-servgo-pulse-ring {
+  animation: servgo-pulse-ring 4s ease-in-out infinite;
+}
+
+.animate-servgo-fade-up {
+  animation: servgo-fade-up 0.8s ease-out forwards;
+}
+
+.animate-servgo-scale-in {
+  animation: servgo-scale-in 0.6s ease-out forwards;
 }
 
 .animation-delay-100 { animation-delay: 100ms; }
@@ -562,65 +585,65 @@
   transform: translateY(0);
 }
 
-.excelite-glass {
+.servgo-glass {
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow:
-    0 4px 24px rgba(34, 197, 94, 0.06),
-    0 1px 2px rgba(34, 39, 49, 0.04),
+    0 4px 24px rgba(0, 102, 255, 0.06),
+    0 1px 2px rgba(0, 31, 92, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-.excelite-glass-dark {
-  background: rgba(34, 39, 49, 0.75);
+.servgo-glass-dark {
+  background: rgba(0, 31, 92, 0.75);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
-.excelite-glass-green {
+.servgo-glass-blue {
   background: linear-gradient(
     135deg,
-    rgba(34, 197, 94, 0.12) 0%,
+    rgba(0, 102, 255, 0.12) 0%,
     rgba(255, 255, 255, 0.7) 100%
   );
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(0, 102, 255, 0.2);
 }
 
-.excelite-hero-bg {
+.servgo-hero-bg {
   background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(34, 197, 94, 0.18), transparent),
-    radial-gradient(ellipse 50% 40% at 90% 20%, rgba(74, 222, 128, 0.12), transparent),
-    radial-gradient(ellipse 40% 30% at 10% 60%, rgba(22, 163, 74, 0.08), transparent),
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0, 102, 255, 0.18), transparent),
+    radial-gradient(ellipse 50% 40% at 90% 20%, rgba(0, 210, 255, 0.12), transparent),
+    radial-gradient(ellipse 40% 30% at 10% 60%, rgba(0, 82, 204, 0.08), transparent),
     #ffffff;
 }
 
-.excelite-orb {
+.servgo-orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(60px);
   pointer-events: none;
 }
 
-.excelite-orb-green {
-  background: radial-gradient(circle, rgba(34, 197, 94, 0.35) 0%, transparent 70%);
+.servgo-orb-blue {
+  background: radial-gradient(circle, rgba(0, 102, 255, 0.35) 0%, transparent 70%);
 }
 
-.excelite-orb-charcoal {
-  background: radial-gradient(circle, rgba(34, 39, 49, 0.08) 0%, transparent 70%);
+.servgo-orb-navy {
+  background: radial-gradient(circle, rgba(0, 31, 92, 0.08) 0%, transparent 70%);
 }
 
-.excelite-shimmer-border {
+.servgo-shimmer-border {
   position: relative;
   overflow: hidden;
 }
 
-.excelite-shimmer-border::before {
+.servgo-shimmer-border::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -629,11 +652,11 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(34, 197, 94, 0.4),
+    rgba(0, 102, 255, 0.4),
     transparent
   );
   background-size: 200% 100%;
-  animation: excelite-shimmer-green 3s linear infinite;
+  animation: servgo-shimmer-cyan 3s linear infinite;
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
@@ -645,14 +668,14 @@
   pointer-events: none;
 }
 
-.excelite-login-bg {
+.servgo-login-bg {
   background:
-    radial-gradient(ellipse 70% 50% at 20% 40%, rgba(34, 197, 94, 0.25), transparent),
-    radial-gradient(ellipse 60% 50% at 80% 60%, rgba(22, 163, 74, 0.15), transparent),
-    linear-gradient(160deg, #222831 0%, #1a1f26 40%, #222831 100%);
+    radial-gradient(ellipse 70% 50% at 20% 40%, rgba(0, 102, 255, 0.25), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 60%, rgba(0, 82, 204, 0.15), transparent),
+    linear-gradient(160deg, #001F5C 0%, #001538 40%, #001F5C 100%);
 }
 
-.excelite-glass-login {
+.servgo-glass-login {
   background: rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
@@ -694,11 +717,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-excelite-float,
-  .animate-excelite-float-slow,
-  .animate-excelite-pulse-ring,
-  .animate-excelite-fade-up,
-  .animate-excelite-scale-in,
+  .animate-servgo-float,
+  .animate-servgo-float-slow,
+  .animate-servgo-pulse-ring,
+  .animate-servgo-fade-up,
+  .animate-servgo-scale-in,
+  .animate-storefront-cart-shake,
   .reveal-on-scroll {
     animation: none !important;
     transition: none !important;
@@ -711,7 +735,7 @@
     transform: none;
   }
 
-  .excelite-shimmer-border::before {
+  .servgo-shimmer-border::before {
     animation: none;
   }
 }

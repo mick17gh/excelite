@@ -40,15 +40,27 @@ export function resolveStoreBanners(
   return [];
 }
 
+function isValidBannerUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  // Absolute http(s) URLs
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return true;
+  } catch {
+    // fall through for relative paths
+  }
+  // Site-relative paths (local / CDN-proxied uploads)
+  return trimmed.startsWith("/");
+}
+
 export function validateStoreBannersForSave(banners: StoreBanner[]): string | null {
   if (banners.length > MAX_STORE_BANNERS) {
     return `A maximum of ${MAX_STORE_BANNERS} banners is allowed`;
   }
   for (const banner of banners) {
     if (!isStoreBanner(banner)) return "Invalid banner data";
-    try {
-      new URL(banner.url);
-    } catch {
+    if (!isValidBannerUrl(banner.url)) {
       return "Each banner must have a valid URL";
     }
   }

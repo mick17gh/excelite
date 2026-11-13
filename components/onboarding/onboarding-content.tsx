@@ -32,7 +32,7 @@ import { completeOnboarding } from "@/lib/actions/onboarding";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 import { cn } from "@/lib/utils";
 
 interface OnboardingContentProps {
@@ -176,19 +176,19 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <div className="w-full max-w-[560px] text-center motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500">
-          <div className="excelite-glass rounded-2xl border border-[#22C55E]/20 p-8 md:p-10 shadow-lg shadow-[#22C55E]/10">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#22C55E]/10">
-              <CheckCircle2 className="h-9 w-9 text-[#16A34A]" />
+          <div className="servgo-glass rounded-2xl border border-[#0066FF]/20 p-8 md:p-10 shadow-lg shadow-[#0066FF]/10">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[#0066FF]/10">
+              <CheckCircle2 className="h-9 w-9 text-[#0052CC]" />
             </div>
-            <h2 className="text-2xl font-bold text-[#222831] mb-2">You&apos;re ready to sell!</h2>
-            <p className="text-[#222831]/70 mb-8">
+            <h2 className="text-2xl font-bold text-[#001F5C] mb-2">You&apos;re ready to sell!</h2>
+            <p className="text-[#001F5C]/70 mb-8">
               {orgName} is set up. Add products, open the POS, or explore your dashboard.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button
                 asChild
                 size="lg"
-                className="bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-md shadow-[#22C55E]/20"
+                className="bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-md shadow-[#0066FF]/20"
               >
                 <Link href="/pos">
                   <Monitor className="mr-2 h-4 w-4" />
@@ -214,18 +214,18 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
         <div className="text-center mb-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Image
-              src={EXCELITE_BRAND.logo}
-              alt={`${EXCELITE_BRAND.name} logo`}
+              src={SERVGO_BRAND.logo}
+              alt={`${SERVGO_BRAND.name} logo`}
               width={44}
               height={44}
               className="rounded-xl shadow-md"
             />
-            <span className="text-2xl font-bold text-[#222831]">{EXCELITE_BRAND.shortName}</span>
+            <span className="text-2xl font-bold text-[#001F5C]">{SERVGO_BRAND.shortName}</span>
           </div>
-          <h1 className="text-xl font-semibold text-[#222831] mb-1">
+          <h1 className="text-xl font-semibold text-[#001F5C] mb-1">
             Welcome, {user.name.split(" ")[0]}!
           </h1>
-          <p className="text-sm text-[#222831]/60">
+          <p className="text-sm text-[#001F5C]/60">
             Set up your shop in three quick steps
           </p>
         </div>
@@ -243,7 +243,7 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
                 <div
                   className={cn(
                     "h-px w-8 sm:w-12 transition-colors",
-                    step > s.number ? "bg-[#22C55E]" : "bg-border",
+                    step > s.number ? "bg-[#0066FF]" : "bg-border",
                   )}
                 />
               )}
@@ -253,16 +253,16 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
 
         <div
           key={step}
-          className="excelite-glass rounded-2xl border border-white/60 shadow-lg motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-4 motion-safe:duration-300"
+          className="servgo-glass rounded-2xl border border-white/60 shadow-lg motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-4 motion-safe:duration-300"
         >
           {step === 1 && (
             <div className="p-6 md:p-8 space-y-5">
               <div>
-                <h2 className="text-lg font-semibold text-[#222831] flex items-center gap-2">
-                  <Store className="h-5 w-5 text-[#16A34A]" />
+                <h2 className="text-lg font-semibold text-[#001F5C] flex items-center gap-2">
+                  <Store className="h-5 w-5 text-[#0052CC]" />
                   Your business
                 </h2>
-                <p className="text-sm text-[#222831]/60 mt-1">
+                <p className="text-sm text-[#001F5C]/60 mt-1">
                   Tell us about your shop so we can personalize your setup
                 </p>
               </div>
@@ -354,11 +354,11 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
           {step === 2 && (
             <div className="p-6 md:p-8 space-y-5">
               <div>
-                <h2 className="text-lg font-semibold text-[#222831] flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-[#16A34A]" />
+                <h2 className="text-lg font-semibold text-[#001F5C] flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-[#0052CC]" />
                   First location
                 </h2>
-                <p className="text-sm text-[#222831]/60 mt-1">
+                <p className="text-sm text-[#001F5C]/60 mt-1">
                   Where will you be selling from? You can add more branches later.
                 </p>
               </div>
@@ -454,29 +454,29 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
           {step === 3 && (
             <div className="p-6 md:p-8 space-y-5">
               <div>
-                <h2 className="text-lg font-semibold text-[#222831] flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-[#16A34A]" />
+                <h2 className="text-lg font-semibold text-[#001F5C] flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-[#0052CC]" />
                   Ready to go
                 </h2>
-                <p className="text-sm text-[#222831]/60 mt-1">
+                <p className="text-sm text-[#001F5C]/60 mt-1">
                   Review your details, then start selling
                 </p>
               </div>
 
               <div className="rounded-xl border bg-background/60 divide-y text-sm">
                 <div className="flex items-start gap-3 p-4">
-                  <Building2 className="h-4 w-4 text-[#16A34A] mt-0.5 shrink-0" />
+                  <Building2 className="h-4 w-4 text-[#0052CC] mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-medium text-[#222831]">{orgName}</p>
+                    <p className="font-medium text-[#001F5C]">{orgName}</p>
                     <p className="text-muted-foreground capitalize">
                       {industry.toLowerCase().replace("_", " ")}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-4">
-                  <MapPin className="h-4 w-4 text-[#16A34A] mt-0.5 shrink-0" />
+                  <MapPin className="h-4 w-4 text-[#0052CC] mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-medium text-[#222831]">
+                    <p className="font-medium text-[#001F5C]">
                       {branchName}{" "}
                       <span className="text-muted-foreground font-normal">({branchCode})</span>
                     </p>
@@ -494,7 +494,7 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
                   (feature) => (
                     <span
                       key={feature}
-                      className="px-2.5 py-1 rounded-full bg-[#22C55E]/10 text-[#16A34A] text-xs font-medium"
+                      className="px-2.5 py-1 rounded-full bg-[#0066FF]/10 text-[#0052CC] text-xs font-medium"
                     >
                       {feature}
                     </span>
@@ -510,7 +510,7 @@ export function OnboardingContent({ user }: OnboardingContentProps) {
                 <Button
                   onClick={handleSubmit}
                   disabled={isPending}
-                  className="bg-[#22C55E] hover:bg-[#16A34A] text-white"
+                  className="bg-[#0066FF] hover:bg-[#0052CC] text-white"
                 >
                   {isPending ? (
                     <>
@@ -549,8 +549,8 @@ function StepIndicator({
       <div
         className={cn(
           "flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors",
-          completed && "border-[#22C55E] bg-[#22C55E] text-white",
-          active && !completed && "border-[#22C55E] bg-[#22C55E] text-white",
+          completed && "border-[#0066FF] bg-[#0066FF] text-white",
+          active && !completed && "border-[#0066FF] bg-[#0066FF] text-white",
           !active && !completed && "border-muted-foreground/30 text-muted-foreground",
         )}
       >
@@ -559,7 +559,7 @@ function StepIndicator({
       <span
         className={cn(
           "text-xs font-medium hidden sm:block",
-          active || completed ? "text-[#222831]" : "text-muted-foreground",
+          active || completed ? "text-[#001F5C]" : "text-muted-foreground",
         )}
       >
         {label}

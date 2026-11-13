@@ -33,7 +33,7 @@ export function StorefrontBannerCarousel({ banners, storeName, className }: Prop
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-3xl border border-[#222831]/8 bg-[#222831] shadow-lg",
+        "relative overflow-hidden rounded-3xl bg-[#001F5C] shadow-[0_18px_50px_-18px_rgba(0,31,92,0.45),0_8px_20px_-10px_rgba(0,102,255,0.25)]",
         className,
       )}
     >
@@ -55,7 +55,7 @@ export function StorefrontBannerCarousel({ banners, storeName, className }: Prop
               unoptimized
               sizes="(max-width: 1024px) 100vw, 1024px"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#222831]/55 via-[#222831]/10 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#001F5C]/55 via-[#001F5C]/10 to-transparent" />
           </div>
         ))}
       </div>
@@ -65,7 +65,7 @@ export function StorefrontBannerCarousel({ banners, storeName, className }: Prop
           <button
             type="button"
             onClick={() => go(-1)}
-            className="absolute left-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#222831] shadow-md backdrop-blur hover:bg-white"
+            className="absolute left-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#001F5C] shadow-md backdrop-blur hover:bg-white"
             aria-label="Previous banner"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -73,7 +73,7 @@ export function StorefrontBannerCarousel({ banners, storeName, className }: Prop
           <button
             type="button"
             onClick={() => go(1)}
-            className="absolute right-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#222831] shadow-md backdrop-blur hover:bg-white"
+            className="absolute right-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#001F5C] shadow-md backdrop-blur hover:bg-white"
             aria-label="Next banner"
           >
             <ChevronRight className="h-5 w-5" />
@@ -86,7 +86,7 @@ export function StorefrontBannerCarousel({ banners, storeName, className }: Prop
                 onClick={() => setIndex(i)}
                 className={cn(
                   "h-1.5 rounded-full transition-all",
-                  i === index ? "w-6 bg-[#22C55E]" : "w-1.5 bg-white/70 hover:bg-white",
+                  i === index ? "w-6 bg-[#0066FF]" : "w-1.5 bg-white/70 hover:bg-white",
                 )}
                 aria-label={`Go to banner ${i + 1}`}
               />

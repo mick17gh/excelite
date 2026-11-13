@@ -24,7 +24,7 @@ export default function OrdersPage() {
         title="Orders"
         description="Manage and track all orders from every channel"
         actions={
-          <Button asChild className="bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm">
+          <Button asChild className="bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-sm">
             <Link href="/pos">
               <Monitor className="mr-2 h-4 w-4" />
               Open POS

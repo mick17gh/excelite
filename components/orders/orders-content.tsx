@@ -375,7 +375,7 @@ export function OrdersContent({
                   placeholder="Search orders..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-10 rounded-xl bg-background border-border/80 focus-visible:ring-[#22C55E]/30"
+                  className="pl-9 h-10 rounded-xl bg-background border-border/80 focus-visible:ring-[#0066FF]/30"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -420,7 +420,7 @@ export function OrdersContent({
             <Button
               onClick={() => setShowCreateDialog(true)}
               size="sm"
-              className="h-10 rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm shrink-0"
+              className="h-10 rounded-xl bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-sm shrink-0"
             >
               <Plus className="mr-2 h-4 w-4" />
               New order
@@ -465,11 +465,11 @@ export function OrdersContent({
                   return (
                     <TableRow
                       key={order.id}
-                      className="cursor-pointer hover:bg-[#22C55E]/5 transition-colors"
+                      className="cursor-pointer hover:bg-[#0066FF]/5 transition-colors"
                       onClick={() => void handleSelectOrder(order)}
                       onMouseEnter={() => prefetchOrderDetail(order.id)}
                     >
-                      <TableCell className="font-mono text-sm font-semibold text-[#222831]">
+                      <TableCell className="font-mono text-sm font-semibold text-[#001F5C]">
                         {order.orderNumber}
                       </TableCell>
                       <TableCell>
@@ -509,7 +509,7 @@ export function OrdersContent({
                           {order.paymentStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-[#16A34A]">
+                      <TableCell className="text-right font-semibold text-[#0052CC]">
                         {formatCurrency(order.total)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">

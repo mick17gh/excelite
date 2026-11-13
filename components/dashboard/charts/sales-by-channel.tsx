@@ -16,7 +16,7 @@ interface SalesByChannelProps {
 }
 
 const COLORS = [
-  "#22C55E",
+  "#0066FF",
   "#8b5cf6",
   "#06b6d4",
   "#10b981",

@@ -14,16 +14,30 @@ export type StorefrontCartLine = {
   notes?: string;
 };
 
-const PREFIX = "excelite-storefront-cart:";
+const PREFIX = "servgo-storefront-cart:";
+const LEGACY_PREFIX = "excelite-storefront-cart:";
 
 function storageKey(organizationId: string): string {
   return `${PREFIX}${organizationId}`;
 }
 
+function legacyStorageKey(organizationId: string): string {
+  return `${LEGACY_PREFIX}${organizationId}`;
+}
+
 export function loadStorefrontCart(organizationId: string): StorefrontCartLine[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(storageKey(organizationId));
+    const key = storageKey(organizationId);
+    let raw = localStorage.getItem(key);
+    if (!raw) {
+      const legacy = localStorage.getItem(legacyStorageKey(organizationId));
+      if (legacy) {
+        raw = legacy;
+        localStorage.setItem(key, legacy);
+        localStorage.removeItem(legacyStorageKey(organizationId));
+      }
+    }
     if (!raw) return [];
     const parsed = JSON.parse(raw) as StorefrontCartLine[];
     return Array.isArray(parsed) ? parsed : [];
@@ -35,11 +49,13 @@ export function loadStorefrontCart(organizationId: string): StorefrontCartLine[]
 export function saveStorefrontCart(organizationId: string, lines: StorefrontCartLine[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(storageKey(organizationId), JSON.stringify(lines));
+  localStorage.removeItem(legacyStorageKey(organizationId));
 }
 
 export function clearStorefrontCart(organizationId: string): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(storageKey(organizationId));
+  localStorage.removeItem(legacyStorageKey(organizationId));
 }
 
 export function cartLineKey(menuItemId: string, optionIds: string[]): string {

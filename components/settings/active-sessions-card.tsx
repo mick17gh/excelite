@@ -75,7 +75,7 @@ export function ActiveSessionsCard() {
   return (
     <ContentCard padding="none">
       <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
-        <h3 className="text-base font-semibold text-[#222831]">Active Sessions</h3>
+        <h3 className="text-base font-semibold text-[#001F5C]">Active Sessions</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Manage your active login sessions
         </p>
@@ -93,7 +93,7 @@ export function ActiveSessionsCard() {
               {sessions.map((session) => (
                 <div
                   key={session.id}
-                  className="flex items-center justify-between p-2 rounded-lg border text-sm hover:bg-[#22C55E]/5 transition-colors"
+                  className="flex items-center justify-between p-2 rounded-lg border text-sm hover:bg-[#0066FF]/5 transition-colors"
                 >
                   <div>
                     <p className="font-medium text-xs">{parseUserAgent(session.userAgent)}</p>
@@ -103,7 +103,7 @@ export function ActiveSessionsCard() {
                     </p>
                   </div>
                   {session.isCurrent ? (
-                    <Badge variant="outline" className="border-[#22C55E]/30 bg-[#22C55E]/10 text-[#16A34A] text-[10px] h-5">
+                    <Badge variant="outline" className="border-[#0066FF]/30 bg-[#0066FF]/10 text-[#0052CC] text-[10px] h-5">
                       Current
                     </Badge>
                   ) : (

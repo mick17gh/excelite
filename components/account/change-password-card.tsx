@@ -52,8 +52,8 @@ export function ChangePasswordCard() {
     <ContentCard padding="none">
       <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
         <div className="flex items-center gap-2">
-          <Key className="h-4 w-4 text-[#16A34A]" />
-          <h3 className="text-base font-semibold text-[#222831]">Change Password</h3>
+          <Key className="h-4 w-4 text-[#0052CC]" />
+          <h3 className="text-base font-semibold text-[#001F5C]">Change Password</h3>
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           Update your password to keep your account secure

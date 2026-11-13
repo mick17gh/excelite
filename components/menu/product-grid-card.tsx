@@ -62,33 +62,33 @@ export function ProductGridCard({
     <article
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-200",
-        "hover:shadow-md hover:border-[#22C55E]/40 hover:-translate-y-0.5",
+        "hover:shadow-md hover:border-[#0066FF]/40 hover:-translate-y-0.5",
         !item.isActive && "opacity-75",
       )}
     >
-      <div className="relative aspect-[5/4] overflow-hidden bg-gradient-to-br from-[#22C55E]/8 via-muted/40 to-muted">
+      <div className="relative aspect-[5/4] overflow-hidden bg-gradient-to-br from-[#0066FF]/8 via-muted/40 to-muted">
         {item.imageUrl ? (
           <Image src={item.imageUrl} alt={item.name} fill className="object-cover transition-transform duration-300 group-hover:scale-105" />
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/60 border border-white/80 shadow-sm">
-              <ImageIcon className="h-7 w-7 text-[#16A34A]/40" />
+              <ImageIcon className="h-7 w-7 text-[#0052CC]/40" />
             </div>
           </div>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#222831]/70 via-[#222831]/25 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#001F5C]/70 via-[#001F5C]/25 to-transparent" />
 
         <span className="absolute bottom-3 left-3 text-lg font-bold tracking-tight text-white drop-shadow-sm">
           {formatCurrency(item.price)}
         </span>
 
-        <span className="absolute bottom-3 right-3 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-[#16A34A] shadow-sm">
+        <span className="absolute bottom-3 right-3 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-[#0052CC] shadow-sm">
           {margin}% margin
         </span>
 
         {!item.isActive && (
-          <Badge className="absolute top-3 left-3 bg-[#222831]/80 text-white border-0 text-[10px]">
+          <Badge className="absolute top-3 left-3 bg-[#001F5C]/80 text-white border-0 text-[10px]">
             Inactive
           </Badge>
         )}
@@ -103,7 +103,7 @@ export function ProductGridCard({
               onClick={onPrintBarcode}
               aria-label={`Print barcode for ${item.name}`}
             >
-              <Barcode className="h-3.5 w-3.5 text-[#222831]" />
+              <Barcode className="h-3.5 w-3.5 text-[#001F5C]" />
             </Button>
           ) : null}
           <Button
@@ -114,7 +114,7 @@ export function ProductGridCard({
             onClick={onEdit}
             aria-label={`Edit ${item.name}`}
           >
-            <Edit className="h-3.5 w-3.5 text-[#222831]" />
+            <Edit className="h-3.5 w-3.5 text-[#001F5C]" />
           </Button>
           <Button
             type="button"
@@ -131,7 +131,7 @@ export function ProductGridCard({
 
       <div className="flex flex-1 flex-col gap-2.5 p-3.5">
         <div className="min-w-0">
-          <h3 className="font-semibold text-[#222831] leading-snug line-clamp-1">{item.name}</h3>
+          <h3 className="font-semibold text-[#001F5C] leading-snug line-clamp-1">{item.name}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground truncate">
             <span className="font-mono">{item.sku}</span>
             <span className="mx-1.5 text-border">·</span>
@@ -142,7 +142,7 @@ export function ProductGridCard({
         <div className="flex flex-wrap gap-1.5">
           <Badge
             variant="outline"
-            className="rounded-full border-[#22C55E]/25 bg-[#22C55E]/8 text-[#16A34A] text-[10px] font-medium"
+            className="rounded-full border-[#0066FF]/25 bg-[#0066FF]/8 text-[#0052CC] text-[10px] font-medium"
           >
             {item.category}
           </Badge>
@@ -161,12 +161,12 @@ export function ProductGridCard({
 
         <div className="mt-auto flex items-center justify-between border-t border-border/50 pt-2.5 text-xs">
           <span className="text-muted-foreground">
-            Cost <span className="font-medium text-[#222831]">{formatCurrency(item.cost)}</span>
+            Cost <span className="font-medium text-[#001F5C]">{formatCurrency(item.cost)}</span>
           </span>
           <button
             type="button"
             onClick={onEdit}
-            className="font-medium text-[#16A34A] hover:text-[#15803D] transition-colors cursor-pointer"
+            className="font-medium text-[#0052CC] hover:text-[#001F5C] transition-colors cursor-pointer"
           >
             Edit product
           </button>

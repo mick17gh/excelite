@@ -181,7 +181,7 @@ export function isWithinLimit(
 }
 
 export const TIER_DISPLAY_NAMES: Record<SubscriptionTier, string> = {
-  FREE: "Excelite",
+  FREE: "ServGo",
   PRO: "Pro",
   ENTERPRISE: "Premium",
 };

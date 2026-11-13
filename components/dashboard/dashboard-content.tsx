@@ -59,9 +59,9 @@ function SectionHeader({ icon: Icon, title }: { icon: typeof Package; title: str
   return (
     <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60 bg-muted/20">
       <div className="icon-accent flex h-8 w-8 items-center justify-center rounded-lg">
-        <Icon className="h-4 w-4 text-[#16A34A]" />
+        <Icon className="h-4 w-4 text-[#0052CC]" />
       </div>
-      <h3 className="text-base font-semibold text-[#222831]">{title}</h3>
+      <h3 className="text-base font-semibold text-[#001F5C]">{title}</h3>
     </div>
   );
 }
@@ -194,7 +194,7 @@ export function DashboardContent({
                   return (
                     <div
                       key={item.name}
-                      className="flex items-center justify-between text-sm py-2 px-2 rounded-lg hover:bg-[#22C55E]/5 transition-colors"
+                      className="flex items-center justify-between text-sm py-2 px-2 rounded-lg hover:bg-[#0066FF]/5 transition-colors"
                     >
                       <span className="truncate pr-2">{item.name}</span>
                       <Badge variant="outline" className={stockStatusBadgeClass(status)}>
@@ -206,7 +206,7 @@ export function DashboardContent({
                 <Button
                   asChild
                   variant="link"
-                  className="px-2 h-auto text-[#16A34A] hover:text-[#15803D] cursor-pointer"
+                  className="px-2 h-auto text-[#0052CC] hover:text-[#001F5C] cursor-pointer"
                 >
                   <Link href="/dashboard/inventory">View inventory</Link>
                 </Button>
@@ -231,21 +231,21 @@ export function DashboardContent({
                 {recentOrders.slice(0, 6).map((order) => (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between text-sm py-2 px-2 rounded-lg hover:bg-[#22C55E]/5 transition-colors"
+                    className="flex items-center justify-between text-sm py-2 px-2 rounded-lg hover:bg-[#0066FF]/5 transition-colors"
                   >
                     <span className="font-medium">#{order.orderNumber}</span>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className={orderStatusBadgeClass(order.status)}>
                         {order.status.replace(/_/g, " ").toLowerCase()}
                       </Badge>
-                      <span className="font-medium text-[#222831]">{formatCurrency(order.total)}</span>
+                      <span className="font-medium text-[#001F5C]">{formatCurrency(order.total)}</span>
                     </div>
                   </div>
                 ))}
                 <Button
                   asChild
                   variant="link"
-                  className="px-2 h-auto text-[#16A34A] hover:text-[#15803D] cursor-pointer"
+                  className="px-2 h-auto text-[#0052CC] hover:text-[#001F5C] cursor-pointer"
                 >
                   <Link href="/dashboard/orders">View all orders</Link>
                 </Button>

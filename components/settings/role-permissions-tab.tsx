@@ -24,7 +24,7 @@ import {
 import { Loader2, RotateCcw, Save, Shield, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import type { Role } from "@/lib/generated/prisma/client";
-import { LITE_ASSIGNABLE_ROLES, LITE_PERMISSION_GROUP_KEYS } from "@/lib/excelite-config";
+import { LITE_ASSIGNABLE_ROLES, LITE_PERMISSION_GROUP_KEYS } from "@/lib/brand-config";
 import {
   EDITABLE_MATRIX_ROLES,
   PERMISSION_GROUPS,

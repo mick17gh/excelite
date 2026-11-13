@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Open_Sans, Poppins } from "next/font/google";
 import { Providers } from "@/components/providers";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -17,23 +17,23 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  applicationName: EXCELITE_BRAND.name,
+  applicationName: SERVGO_BRAND.name,
   title: {
-    default: `${EXCELITE_BRAND.name} — ${EXCELITE_BRAND.tagline}`,
-    template: `%s | ${EXCELITE_BRAND.name}`,
+    default: `${SERVGO_BRAND.name} — ${SERVGO_BRAND.tagline}`,
+    template: `%s | ${SERVGO_BRAND.name}`,
   },
   description:
     "Simple point-of-sale software for small businesses. Sell in minutes, track orders, manage products and inventory from one easy dashboard.",
   keywords: ["POS", "point of sale", "small business", "inventory", "retail", "restaurant POS"],
   icons: {
-    icon: "/excelite_logo.png",
-    shortcut: "/excelite_logo.png",
-    apple: "/excelite_logo.png",
+    icon: "/servgo.jpeg",
+    shortcut: "/servgo.jpeg",
+    apple: "/servgo.jpeg",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: EXCELITE_BRAND.shortName,
+    title: SERVGO_BRAND.shortName,
   },
   formatDetection: {
     telephone: false,
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: EXCELITE_BRAND.themeColor,
+  themeColor: SERVGO_BRAND.themeColor,
 };
 
 export default function RootLayout({

@@ -95,8 +95,8 @@ export function PaymentPanel({
     setIsPaystackInitializing(true);
     try {
       const fallbackEmail = customerPhone
-        ? `${customerPhone.replace(/\D/g, "") || "guest"}@excelite.app`
-        : `${orderNumber.toLowerCase().replace(/[^a-z0-9]/g, "") || "guest"}@excelite.app`;
+        ? `${customerPhone.replace(/\D/g, "") || "guest"}@servgo.app`
+        : `${orderNumber.toLowerCase().replace(/[^a-z0-9]/g, "") || "guest"}@servgo.app`;
       const email = customerEmail || fallbackEmail;
       const callback = new URL(window.location.href);
       callback.searchParams.set("paystackCallback", "1");
@@ -125,8 +125,8 @@ export function PaymentPanel({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CreditCard className="h-4 w-4 text-[#16A34A]" />
-          <span className="text-sm font-medium text-[#222831]">Payments</span>
+          <CreditCard className="h-4 w-4 text-[#0052CC]" />
+          <span className="text-sm font-medium text-[#001F5C]">Payments</span>
           <Badge variant="outline" className={paymentStatusBadgeClass(paymentStatus)}>
             {paymentStatus}
           </Badge>
@@ -138,7 +138,7 @@ export function PaymentPanel({
                 size="sm"
                 onClick={handlePaystackPayment}
                 disabled={isPaystackInitializing}
-                className="rounded-lg bg-[#22C55E] hover:bg-[#16A34A]"
+                className="rounded-lg bg-[#0066FF] hover:bg-[#0052CC]"
               >
                 {isPaystackInitializing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CreditCard className="mr-1 h-3 w-3" />}
                 Pay with Paystack
@@ -153,8 +153,8 @@ export function PaymentPanel({
 
       {/* Summary */}
       <div className="flex gap-4 text-xs text-muted-foreground">
-        <span>Total: <strong className="text-[#222831]">{formatCurrency(orderTotal)}</strong></span>
-        <span>Paid: <strong className="text-[#16A34A]">{formatCurrency(totalPaid)}</strong></span>
+        <span>Total: <strong className="text-[#001F5C]">{formatCurrency(orderTotal)}</strong></span>
+        <span>Paid: <strong className="text-[#0052CC]">{formatCurrency(totalPaid)}</strong></span>
         {remaining > 0 && orderStatus !== "CANCELLED" && (
           <span>Remaining: <strong className="text-amber-600">{formatCurrency(remaining)}</strong></span>
         )}

@@ -38,7 +38,7 @@ export function OnlineStoreTab({ organizationId }: Props) {
     storeLogoUrl: "",
     storeTimezone: "Africa/Accra",
     storefrontTemplateId: "classic",
-    closureMessage: "Store temporarily closed. Please contact support.",
+    closureMessage: "Online ordering is paused. Please check back soon.",
     deliveryEnabled: true,
     pickupEnabled: true,
     minOrderAmount: "",
@@ -58,7 +58,7 @@ export function OnlineStoreTab({ organizationId }: Props) {
     () => (process.env.NEXT_PUBLIC_SERVSTACK_API_URL || "").replace(/\/$/, ""),
     []
   );
-  const endpointBase = apiBaseUrl || "https://your-excelite-domain.com";
+  const endpointBase = apiBaseUrl || "https://your-servgo-domain.com";
   const publicEndpoints = useMemo(
     () => ({
       config: `${endpointBase}/api/public/store/${organizationId}/config`,
@@ -91,7 +91,7 @@ export function OnlineStoreTab({ organizationId }: Props) {
         storeLogoUrl: result.data.storeLogoUrl || "",
         storeTimezone: result.data.storeTimezone || "Africa/Accra",
         storefrontTemplateId: result.data.storefrontTemplateId || "classic",
-        closureMessage: result.data.closureMessage || "Store temporarily closed. Please contact support.",
+        closureMessage: result.data.closureMessage || "Online ordering is paused. Please check back soon.",
         deliveryEnabled: result.data.deliveryEnabled,
         pickupEnabled: result.data.pickupEnabled,
         minOrderAmount: result.data.minOrderAmount?.toString() || "",
@@ -192,7 +192,8 @@ export function OnlineStoreTab({ organizationId }: Props) {
         storeName: form.storeName || null,
         storeDescription: form.storeDescription || null,
         storeLogoUrl: form.storeLogoUrl.trim() || null,
-        storeBanners: banners,
+        // Banners persist immediately from StoreBannerManager — omit here so a
+        // stale empty local state cannot wipe a just-published upload.
         storeTimezone: form.storeTimezone || "Africa/Accra",
         storefrontTemplateId: form.storefrontTemplateId,
         businessHours: parsedBusinessHours,
@@ -289,7 +290,7 @@ export function OnlineStoreTab({ organizationId }: Props) {
           <div className="flex items-center justify-between rounded-md border p-2.5">
             <div>
               <p className="text-sm">Manual / pay at pickup or delivery</p>
-              <p className="text-xs text-muted-foreground">Creates an unpaid order in Excelite.</p>
+              <p className="text-xs text-muted-foreground">Creates an unpaid order in ServGo.</p>
             </div>
             <Switch
               checked={form.cashCheckoutEnabled}
@@ -299,7 +300,7 @@ export function OnlineStoreTab({ organizationId }: Props) {
           <div className="flex items-center justify-between rounded-md border p-2.5">
             <div>
               <p className="text-sm">Order via WhatsApp</p>
-              <p className="text-xs text-muted-foreground">Sends the cart to WhatsApp — no Excelite order.</p>
+              <p className="text-xs text-muted-foreground">Sends the cart to WhatsApp — no ServGo order.</p>
             </div>
             <Switch
               checked={form.whatsappOrderingEnabled}
@@ -417,7 +418,12 @@ export function OnlineStoreTab({ organizationId }: Props) {
           </div>
 
           <div className="sm:col-span-2">
-            <StoreBannerManager banners={banners} onChange={setBanners} disabled={isPending} />
+            <StoreBannerManager
+              organizationId={organizationId}
+              banners={banners}
+              onChange={setBanners}
+              disabled={isPending}
+            />
           </div>
 
           <div className="space-y-1.5">

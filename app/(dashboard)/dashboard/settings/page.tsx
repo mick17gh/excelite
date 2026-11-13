@@ -5,7 +5,7 @@ import { getSettingsBootstrap } from "@/lib/actions/settings";
 
 export const metadata = {
   title: "Settings",
-  description: "Configure your Excelite POS platform settings",
+  description: "Configure your ServGo platform settings",
 };
 
 export default async function SettingsPage() {

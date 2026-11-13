@@ -228,10 +228,10 @@ export function CategoriesContent({ categories: initialCategories, hideStats }: 
 
         {filteredCategories.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#22C55E]/10 mb-4">
-              <Tag className="h-8 w-8 text-[#16A34A]/60" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0066FF]/10 mb-4">
+              <Tag className="h-8 w-8 text-[#0052CC]/60" />
             </div>
-            <h3 className="font-semibold text-[#222831] mb-1">No categories found</h3>
+            <h3 className="font-semibold text-[#001F5C] mb-1">No categories found</h3>
             <p className="text-sm text-muted-foreground text-center mb-4 max-w-sm">
               Create your first category to organize menu items
             </p>
@@ -252,12 +252,12 @@ export function CategoriesContent({ categories: initialCategories, hideStats }: 
               </TableHeader>
               <TableBody>
                 {paginatedCategories.map((category) => (
-                  <TableRow key={category.id} className="hover:bg-[#22C55E]/5">
+                  <TableRow key={category.id} className="hover:bg-[#0066FF]/5">
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className="border-[#22C55E]/25 bg-[#22C55E]/8 text-[#16A34A]"
+                        className="border-[#0066FF]/25 bg-[#0066FF]/8 text-[#0052CC]"
                       >
                         {category.itemCount} items
                       </Badge>

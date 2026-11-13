@@ -478,7 +478,7 @@ export function CreateOrderDialog({
       <DialogContent className="w-[95vw] max-w-[800px] max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col rounded-2xl relative">
         {isSubmitting && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/85 backdrop-blur-sm">
-            <Loader2 className="h-10 w-10 animate-spin text-[#22C55E]" />
+            <Loader2 className="h-10 w-10 animate-spin text-[#0066FF]" />
             <p className="text-sm font-medium text-foreground">
               {submitPhase === "opening" ? "Opening order…" : "Creating order…"}
             </p>
@@ -895,7 +895,7 @@ export function CreateOrderDialog({
                 <Button
                   type="button"
                   onClick={confirmOptionPicker}
-                  className="bg-[#22C55E] hover:bg-[#16A34A] text-white"
+                  className="bg-[#0066FF] hover:bg-[#0052CC] text-white"
                 >
                   Add to order
                 </Button>
@@ -915,7 +915,7 @@ export function CreateOrderDialog({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white"
+            className="rounded-xl bg-[#0066FF] hover:bg-[#0052CC] text-white"
           >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting

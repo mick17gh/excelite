@@ -190,7 +190,7 @@ export function AddUserForm({ open, onOpenChange, branches, warehouses }: AddUse
                 <Input
                   id="email"
                   type="email"
-                  placeholder="kwame.asante@excelite.app"
+                  placeholder="kwame.asante@servgo.app"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required

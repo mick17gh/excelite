@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Minus, Plus, ShoppingBag, X } from "lucide-react";
+import { toast } from "sonner";
 import type { PublicStoreConfig } from "@/lib/storefront/config";
 import type { PublicMenuItem } from "@/lib/storefront/menu";
 import { resolveStoreBanners } from "@/lib/storefront/banners";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/storefront/cart-storage";
 import { StorefrontChrome } from "@/components/storefront/storefront-chrome";
 import { StorefrontBannerCarousel } from "@/components/storefront/storefront-banner-carousel";
+import { StorefrontClosed } from "@/components/storefront/storefront-closed";
 import { StorefrontProductCard } from "@/components/storefront/storefront-product-card";
 
 type Props = {
@@ -32,8 +34,17 @@ export function StorefrontHome({ organizationId }: Props) {
   const [categoryId, setCategoryId] = useState<string>("all");
   const [cart, setCart] = useState<StorefrontCartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
+  const [cartPulseKey, setCartPulseKey] = useState(0);
   const [pickerItem, setPickerItem] = useState<PublicMenuItem | null>(null);
   const [pickerSelections, setPickerSelections] = useState<Record<string, string[]>>({});
+
+  const notifyAddedToCart = useCallback((itemName: string) => {
+    setCartPulseKey((n) => n + 1);
+    toast.success("Added to cart", {
+      description: itemName,
+      duration: 1800,
+    });
+  }, []);
 
   useEffect(() => {
     setCart(loadStorefrontCart(organizationId));
@@ -95,6 +106,7 @@ export function StorefrontHome({ organizationId }: Props) {
   const currency = config?.checkout.currency || "GHS";
   const canCheckout = Boolean(config?.status.enabled && config.status.isOpenNow);
   const canBrowseOrder = Boolean(config?.status.enabled);
+  const isStoreClosed = Boolean(config && (!config.status.enabled || !config.status.isOpenNow));
 
   const addSimpleItem = useCallback((item: PublicMenuItem) => {
     if (item.optionGroups.length > 0) {
@@ -126,8 +138,8 @@ export function StorefrontHome({ organizationId }: Props) {
         },
       ];
     });
-    setCartOpen(true);
-  }, []);
+    notifyAddedToCart(item.name);
+  }, [notifyAddedToCart]);
 
   const confirmPicker = () => {
     if (!pickerItem) return;
@@ -151,6 +163,7 @@ export function StorefrontHome({ organizationId }: Props) {
       pickerItem.id,
       options.map((o) => o.optionId),
     );
+    const addedName = pickerItem.name;
     setCart((prev) => {
       const existing = prev.find((line) => line.key === key);
       if (existing) {
@@ -171,13 +184,13 @@ export function StorefrontHome({ organizationId }: Props) {
       ];
     });
     setPickerItem(null);
-    setCartOpen(true);
+    notifyAddedToCart(addedName);
   };
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F8FAF8]">
-        <Loader2 className="h-7 w-7 animate-spin text-[#22C55E]" />
+        <Loader2 className="h-7 w-7 animate-spin text-[#0066FF]" />
       </div>
     );
   }
@@ -185,7 +198,7 @@ export function StorefrontHome({ organizationId }: Props) {
   if (error || !config) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F8FAF8] px-4 text-center">
-        <p className="text-lg font-bold text-[#222831]">Store unavailable</p>
+        <p className="text-lg font-bold text-[#001F5C]">Store unavailable</p>
         <p className="max-w-md text-sm text-muted-foreground">
           {error || "Please try again later."}
         </p>
@@ -193,23 +206,21 @@ export function StorefrontHome({ organizationId }: Props) {
     );
   }
 
+  if (isStoreClosed) {
+    return (
+      <StorefrontChrome config={config}>
+        <StorefrontClosed config={config} />
+      </StorefrontChrome>
+    );
+  }
+
   return (
     <StorefrontChrome
       config={config}
       cartCount={cartCount}
+      cartPulseKey={cartPulseKey}
       onOpenCart={() => setCartOpen(true)}
     >
-      {!config.status.enabled ? (
-        <div className="mb-5 rounded-2xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          {config.status.closedReason || "This store is temporarily closed."}
-        </div>
-      ) : !config.status.isOpenNow ? (
-        <div className="mb-5 rounded-2xl border border-[#222831]/8 bg-white px-4 py-3 text-sm text-[#222831]">
-          {config.status.closedReason ||
-            "Outside business hours. You can browse the menu; checkout is paused."}
-        </div>
-      ) : null}
-
       {banners.length > 0 ? (
         <StorefrontBannerCarousel
           banners={banners}
@@ -217,11 +228,11 @@ export function StorefrontHome({ organizationId }: Props) {
           className="mb-8"
         />
       ) : (
-        <div className="mb-8 overflow-hidden rounded-3xl border border-[#22C55E]/15 bg-gradient-to-br from-[#22C55E]/15 via-white to-[#222831]/5 px-6 py-10 sm:px-10 sm:py-14">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#16A34A]">
+        <div className="mb-8 overflow-hidden rounded-3xl border border-[#0066FF]/15 bg-gradient-to-br from-[#0066FF]/15 via-white to-[#001F5C]/5 px-6 py-10 sm:px-10 sm:py-14">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#0052CC]">
             Order online
           </p>
-          <h1 className="mt-3 max-w-xl text-3xl font-bold tracking-tight text-[#222831] sm:text-5xl">
+          <h1 className="mt-3 max-w-xl text-3xl font-bold tracking-tight text-[#001F5C] sm:text-5xl">
             {config.store.name}
           </h1>
           <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground sm:text-base">
@@ -232,7 +243,7 @@ export function StorefrontHome({ organizationId }: Props) {
 
       {banners.length > 0 ? (
         <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-[#222831] sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-tight text-[#001F5C] sm:text-3xl">
             {config.store.name}
           </h1>
           {config.store.description ? (
@@ -249,8 +260,8 @@ export function StorefrontHome({ organizationId }: Props) {
           onClick={() => setCategoryId("all")}
           className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
             categoryId === "all"
-              ? "bg-[#22C55E] text-white shadow-sm"
-              : "border border-[#222831]/10 bg-white text-[#222831] hover:border-[#22C55E]/40"
+              ? "bg-[#0066FF] text-white shadow-sm"
+              : "border border-[#001F5C]/10 bg-white text-[#001F5C] hover:border-[#0066FF]/40"
           }`}
         >
           All
@@ -262,8 +273,8 @@ export function StorefrontHome({ organizationId }: Props) {
             onClick={() => setCategoryId(cat.id)}
             className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
               categoryId === cat.id
-                ? "bg-[#22C55E] text-white shadow-sm"
-                : "border border-[#222831]/10 bg-white text-[#222831] hover:border-[#22C55E]/40"
+                ? "bg-[#0066FF] text-white shadow-sm"
+                : "border border-[#001F5C]/10 bg-white text-[#001F5C] hover:border-[#0066FF]/40"
             }`}
           >
             {cat.name}
@@ -272,8 +283,8 @@ export function StorefrontHome({ organizationId }: Props) {
       </div>
 
       {visibleMenu.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#222831]/15 bg-white px-6 py-16 text-center">
-          <p className="font-semibold text-[#222831]">No products yet</p>
+        <div className="rounded-2xl border border-dashed border-[#001F5C]/15 bg-white px-6 py-16 text-center">
+          <p className="font-semibold text-[#001F5C]">No products yet</p>
           <p className="mt-1 text-sm text-muted-foreground">Check back soon for the full menu.</p>
         </div>
       ) : (
@@ -293,12 +304,15 @@ export function StorefrontHome({ organizationId }: Props) {
       {cartCount > 0 && !cartOpen ? (
         <div className="fixed inset-x-0 bottom-4 z-40 px-4">
           <button
+            key={cartPulseKey > 0 ? `bar-pulse-${cartPulseKey}` : "cart-bar"}
             type="button"
             onClick={() => setCartOpen(true)}
-            className="mx-auto flex w-full max-w-md items-center justify-between rounded-2xl bg-[#222831] px-4 py-3.5 text-white shadow-xl"
+            className={`mx-auto flex w-full max-w-md items-center justify-between rounded-2xl bg-[#001F5C] px-4 py-3.5 text-white shadow-xl ${
+              cartPulseKey > 0 ? "animate-storefront-cart-shake" : ""
+            }`}
           >
             <span className="inline-flex items-center gap-2 text-sm font-semibold">
-              <ShoppingBag className="h-4 w-4 text-[#22C55E]" />
+              <ShoppingBag className="h-4 w-4 text-[#0066FF]" />
               {cartCount} item{cartCount === 1 ? "" : "s"}
             </span>
             <span className="text-sm font-bold">
@@ -309,15 +323,15 @@ export function StorefrontHome({ organizationId }: Props) {
       ) : null}
 
       {cartOpen ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-[#222831]/40" onClick={() => setCartOpen(false)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-[#001F5C]/40" onClick={() => setCartOpen(false)}>
           <aside
             className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#222831]/8 px-4 py-4">
-              <h2 className="font-bold text-[#222831]">Your cart</h2>
+            <div className="flex items-center justify-between border-b border-[#001F5C]/8 px-4 py-4">
+              <h2 className="font-bold text-[#001F5C]">Your cart</h2>
               <button type="button" onClick={() => setCartOpen(false)} aria-label="Close cart">
-                <X className="h-5 w-5 text-[#222831]" />
+                <X className="h-5 w-5 text-[#001F5C]" />
               </button>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -327,24 +341,24 @@ export function StorefrontHome({ organizationId }: Props) {
                 cart.map((line) => (
                   <div
                     key={line.key}
-                    className="rounded-2xl border border-[#222831]/8 bg-[#F8FAF8] p-3"
+                    className="rounded-2xl border border-[#001F5C]/8 bg-[#F8FAF8] p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-semibold text-[#222831]">{line.name}</p>
+                        <p className="font-semibold text-[#001F5C]">{line.name}</p>
                         {line.options.length ? (
                           <p className="text-xs text-muted-foreground">
                             {line.options.map((o) => o.name).join(", ")}
                           </p>
                         ) : null}
-                        <p className="mt-1 text-sm font-medium text-[#16A34A]">
+                        <p className="mt-1 text-sm font-medium text-[#0052CC]">
                           {currency} {(lineUnitTotal(line) * line.quantity).toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          className="rounded-full border border-[#222831]/15 bg-white p-1.5"
+                          className="rounded-full border border-[#001F5C]/15 bg-white p-1.5"
                           onClick={() =>
                             setCart((prev) =>
                               prev
@@ -360,7 +374,7 @@ export function StorefrontHome({ organizationId }: Props) {
                         <span className="w-5 text-center text-sm font-semibold">{line.quantity}</span>
                         <button
                           type="button"
-                          className="rounded-full border border-[#222831]/15 bg-white p-1.5"
+                          className="rounded-full border border-[#001F5C]/15 bg-white p-1.5"
                           onClick={() =>
                             setCart((prev) =>
                               prev.map((l) =>
@@ -377,8 +391,8 @@ export function StorefrontHome({ organizationId }: Props) {
                 ))
               )}
             </div>
-            <div className="space-y-3 border-t border-[#222831]/8 p-4">
-              <div className="flex justify-between text-sm font-semibold text-[#222831]">
+            <div className="space-y-3 border-t border-[#001F5C]/8 p-4">
+              <div className="flex justify-between text-sm font-semibold text-[#001F5C]">
                 <span>Subtotal</span>
                 <span>
                   {currency} {subtotal.toFixed(2)}
@@ -399,7 +413,7 @@ export function StorefrontHome({ organizationId }: Props) {
               {canCheckout && cart.length > 0 ? (
                 <button
                   type="button"
-                  className="flex w-full items-center justify-center rounded-xl bg-[#22C55E] px-4 py-3 text-sm font-bold text-white hover:bg-[#16A34A]"
+                  className="flex w-full items-center justify-center rounded-xl bg-[#0066FF] px-4 py-3 text-sm font-bold text-white hover:bg-[#0052CC]"
                   onClick={() => {
                     // Navigate before unmounting the drawer — Link + setCartOpen(false) can cancel navigation.
                     router.push("/checkout");
@@ -425,21 +439,21 @@ export function StorefrontHome({ organizationId }: Props) {
 
       {pickerItem ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-[#222831]/45 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[#001F5C]/45 sm:items-center"
           onClick={() => setPickerItem(null)}
         >
           <div
             className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-[#222831]">{pickerItem.name}</h3>
-            <p className="mt-1 text-sm font-semibold text-[#16A34A]">
+            <h3 className="text-lg font-bold text-[#001F5C]">{pickerItem.name}</h3>
+            <p className="mt-1 text-sm font-semibold text-[#0052CC]">
               {currency} {pickerItem.price.toFixed(2)}
             </p>
             <div className="mt-4 space-y-4">
               {pickerItem.optionGroups.map((group) => (
                 <div key={group.id}>
-                  <p className="text-sm font-semibold text-[#222831]">
+                  <p className="text-sm font-semibold text-[#001F5C]">
                     {group.name}
                     {group.isRequired ? " *" : ""}
                   </p>
@@ -452,11 +466,11 @@ export function StorefrontHome({ organizationId }: Props) {
                           key={opt.id}
                           className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-sm ${
                             selected
-                              ? "border-[#22C55E] bg-[#22C55E]/8"
-                              : "border-[#222831]/10"
+                              ? "border-[#0066FF] bg-[#0066FF]/8"
+                              : "border-[#001F5C]/10"
                           }`}
                         >
-                          <span className="flex items-center gap-2 font-medium text-[#222831]">
+                          <span className="flex items-center gap-2 font-medium text-[#001F5C]">
                             <input
                               type={multi ? "checkbox" : "radio"}
                               name={group.id}
@@ -493,7 +507,7 @@ export function StorefrontHome({ organizationId }: Props) {
             <button
               type="button"
               onClick={confirmPicker}
-              className="mt-5 w-full rounded-xl bg-[#22C55E] px-4 py-3 text-sm font-bold text-white hover:bg-[#16A34A]"
+              className="mt-5 w-full rounded-xl bg-[#0066FF] px-4 py-3 text-sm font-bold text-white hover:bg-[#0052CC]"
             >
               Add to cart
             </button>

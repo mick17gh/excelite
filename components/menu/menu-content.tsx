@@ -215,7 +215,7 @@ export function MenuContent({
                   placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-10 rounded-xl bg-background border-border/80 focus-visible:ring-[#22C55E]/30"
+                  className="pl-9 h-10 rounded-xl bg-background border-border/80 focus-visible:ring-[#0066FF]/30"
                 />
               </div>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -253,7 +253,7 @@ export function MenuContent({
               </Button>
               <Button
                 onClick={() => setIsAddOpen(true)}
-                className="rounded-xl h-10 bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm"
+                className="rounded-xl h-10 bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-sm"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add product
@@ -268,19 +268,19 @@ export function MenuContent({
         <TabsList className={cn(orderTabListClass, "w-full sm:w-auto inline-flex h-11")}>
           <TabsTrigger
             value="grid"
-            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+            className="rounded-lg px-4 data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
           >
             Grid
           </TabsTrigger>
           <TabsTrigger
             value="list"
-            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+            className="rounded-lg px-4 data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
           >
             List
           </TabsTrigger>
           <TabsTrigger
             value="categories"
-            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+            className="rounded-lg px-4 data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
           >
             By category
           </TabsTrigger>
@@ -307,15 +307,15 @@ export function MenuContent({
           {filteredItems.length === 0 && (
             <ContentCard className="mt-4" padding="none">
               <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#22C55E]/10 mb-4">
-                  <Package className="h-8 w-8 text-[#16A34A]/60" />
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0066FF]/10 mb-4">
+                  <Package className="h-8 w-8 text-[#0052CC]/60" />
                 </div>
-                <h3 className="font-semibold text-[#222831] mb-1">No products found</h3>
+                <h3 className="font-semibold text-[#001F5C] mb-1">No products found</h3>
                 <p className="text-sm text-muted-foreground text-center max-w-sm">
                   Adjust your filters or add your first product to get started
                 </p>
                 <Button
-                  className="mt-4 bg-[#22C55E] hover:bg-[#16A34A] text-white rounded-xl"
+                  className="mt-4 bg-[#0066FF] hover:bg-[#0052CC] text-white rounded-xl"
                   onClick={() => setIsAddOpen(true)}
                 >
                   <Plus className="mr-2 h-4 w-4" />
@@ -476,7 +476,7 @@ export function MenuContent({
             {Object.entries(groupedByCategory).map(
               ([category, categoryItems]) => (
                 <ContentCard key={category} padding="none" className="overflow-hidden">
-                  <div className="excelite-header-gradient px-4 py-3 flex items-center gap-2 border-b border-white/10">
+                  <div className="servgo-header-gradient px-4 py-3 flex items-center gap-2 border-b border-white/10">
                     <Package className="h-4 w-4 text-white/90" />
                     <span className="font-semibold text-white">{category}</span>
                     <Badge className="ml-auto bg-white/20 text-white border-0 hover:bg-white/20">
@@ -489,20 +489,20 @@ export function MenuContent({
                         key={item.id}
                         type="button"
                         onClick={() => setEditingItem(item)}
-                        className="flex items-center gap-3 rounded-xl border border-border/80 bg-card p-3 text-left transition-all hover:border-[#22C55E]/40 hover:shadow-sm"
+                        className="flex items-center gap-3 rounded-xl border border-border/80 bg-card p-3 text-left transition-all hover:border-[#0066FF]/40 hover:shadow-sm"
                       >
-                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#22C55E]/8">
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#0066FF]/8">
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt="" fill className="object-cover" />
                           ) : (
                             <div className="flex h-full items-center justify-center">
-                              <ImageIcon className="h-5 w-5 text-[#16A34A]/40" />
+                              <ImageIcon className="h-5 w-5 text-[#0052CC]/40" />
                             </div>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm text-[#222831] truncate">{item.name}</p>
-                          <p className="text-xs font-semibold text-[#16A34A]">{formatCurrency(item.price)}</p>
+                          <p className="font-medium text-sm text-[#001F5C] truncate">{item.name}</p>
+                          <p className="text-xs font-semibold text-[#0052CC]">{formatCurrency(item.price)}</p>
                         </div>
                       </button>
                     ))}

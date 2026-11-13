@@ -338,7 +338,7 @@ export function CustomerPicker({
             />
             <Button
               size="sm"
-              className="w-full bg-[#22C55E] hover:bg-[#16A34A] rounded-lg"
+              className="w-full bg-[#0066FF] hover:bg-[#0052CC] rounded-lg"
               onClick={handleCreateCustomer}
               disabled={
                 isCreatingCustomer ||

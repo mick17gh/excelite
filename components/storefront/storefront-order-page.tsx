@@ -74,7 +74,7 @@ export function StorefrontOrderPage({ organizationId, orderNumber }: Props) {
     );
   }
 
-  const primary = String(config.theme?.primary || "#0f766e");
+  const primary = String(config.theme?.primary || "#0066FF");
   const trackHref = `/track?orderNumber=${encodeURIComponent(orderNumber)}${
     phone ? `&phone=${encodeURIComponent(phone)}` : ""
   }`;

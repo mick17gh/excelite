@@ -61,13 +61,13 @@ export function CategoriesHubContent({
         <TabsList className={cn(dashboardTabListClass, "w-full sm:w-auto inline-flex h-11")}>
           <TabsTrigger
             value="menu"
-            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+            className="rounded-lg px-4 data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
           >
             Menu categories
           </TabsTrigger>
           <TabsTrigger
             value="inventory"
-            className="rounded-lg px-4 data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+            className="rounded-lg px-4 data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
           >
             Inventory categories
           </TabsTrigger>

@@ -1,7 +1,7 @@
 "use server";
 
 import { sendEmail } from "@/lib/services/email";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 
 export interface DemoRequestInput {
   name: string;
@@ -36,8 +36,8 @@ export async function submitDemoRequest(input: DemoRequestInput) {
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #222831;">
-  <h2 style="color: #16A34A;">New Excelite Demo Request</h2>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #001F5C;">
+  <h2 style="color: #0052CC;">New ServGo Demo Request</h2>
   <p><strong>Name:</strong> ${escapeHtml(name)}</p>
   <p><strong>Business Name:</strong> ${escapeHtml(businessName)}</p>
   <p><strong>Phone / WhatsApp:</strong> ${escapeHtml(phone)}</p>
@@ -50,7 +50,7 @@ export async function submitDemoRequest(input: DemoRequestInput) {
   `;
 
   const text = `
-New Excelite Demo Request
+New ServGo Demo Request
 
 Name: ${name}
 Business Name: ${businessName}
@@ -62,7 +62,7 @@ Interests: ${interests.length > 0 ? interests.join(", ") : "Not specified"}
   `.trim();
 
   const sent = await sendEmail({
-    to: EXCELITE_BRAND.supportEmail,
+    to: SERVGO_BRAND.supportEmail,
     subject: `Demo request: ${businessName} (${name})`,
     html,
     text,

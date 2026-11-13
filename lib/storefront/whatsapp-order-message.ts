@@ -22,7 +22,7 @@ function money(currency: string, value: number): string {
   return `${currency} ${value.toFixed(2)}`;
 }
 
-/** Builds the WhatsApp cart handoff message (no Excelite order). */
+/** Builds the WhatsApp cart handoff message (no ServGo order record). */
 export function buildWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): string {
   const lines = [
     `New order — ${input.storeName}`,

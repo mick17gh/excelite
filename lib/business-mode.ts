@@ -16,28 +16,28 @@ const DINE_IN: PosOrderTypeOption = {
   value: "DINE_IN",
   label: "Dine-in",
   icon: UtensilsCrossed,
-  chipClass: "border-[#22C55E]/30 bg-[#22C55E]/10 text-[#16A34A]",
+  chipClass: "border-[#0066FF]/30 bg-[#0066FF]/10 text-[#0052CC]",
 };
 
 const TAKEOUT: PosOrderTypeOption = {
   value: "TAKEOUT",
   label: "Takeout",
   icon: Package,
-  chipClass: "border-[#222831]/20 bg-[#222831]/5 text-[#222831]",
+  chipClass: "border-[#001F5C]/20 bg-[#001F5C]/5 text-[#001F5C]",
 };
 
 const SALE: PosOrderTypeOption = {
   value: "TAKEOUT",
   label: "Sale",
   icon: ShoppingBag,
-  chipClass: "border-[#222831]/20 bg-[#222831]/5 text-[#222831]",
+  chipClass: "border-[#001F5C]/20 bg-[#001F5C]/5 text-[#001F5C]",
 };
 
 const DELIVERY: PosOrderTypeOption = {
   value: "DELIVERY",
   label: "Delivery",
   icon: Truck,
-  chipClass: "border-[#16A34A]/30 bg-[#16A34A]/10 text-[#16A34A]",
+  chipClass: "border-[#0052CC]/30 bg-[#0052CC]/10 text-[#0052CC]",
 };
 
 /** All restaurant POS order types (legacy default list). */

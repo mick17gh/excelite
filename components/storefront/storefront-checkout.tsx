@@ -88,7 +88,7 @@ export function StorefrontCheckout({ organizationId }: Props) {
     ? itemsTotal - itemsTotal / (1 + taxRate)
     : itemsTotal * taxRate;
   const amount = taxInclusive ? itemsTotal + deliveryFee : itemsTotal + taxAmount + deliveryFee;
-  const primary = String(config?.theme?.primary || "#0f766e");
+  const primary = String(config?.theme?.primary || "#0066FF");
   const canOrder = Boolean(config?.status.enabled && config.status.isOpenNow);
 
   const methods: { id: CheckoutMethod; label: string; hint: string }[] = [];
@@ -432,7 +432,7 @@ function BranchPicker({
   if (branches.length === 0) {
     return (
       <div>
-        <p className="mb-2 text-sm font-medium text-[#222831]">Location</p>
+        <p className="mb-2 text-sm font-medium text-[#001F5C]">Location</p>
         <div
           className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3.5 py-3 text-sm text-amber-900"
           role="status"
@@ -447,9 +447,9 @@ function BranchPicker({
     const only = branches[0];
     return (
       <div>
-        <p className="mb-2 text-sm font-medium text-[#222831]">Location</p>
+        <p className="mb-2 text-sm font-medium text-[#001F5C]">Location</p>
         <div
-          className="flex items-center gap-3 rounded-xl border border-[#222831]/10 bg-slate-50 px-3.5 py-3"
+          className="flex items-center gap-3 rounded-xl border border-[#001F5C]/10 bg-slate-50 px-3.5 py-3"
           aria-readonly="true"
         >
           <span
@@ -459,7 +459,7 @@ function BranchPicker({
             <Building2 className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-[#222831]">{only.name}</p>
+            <p className="truncate text-sm font-semibold text-[#001F5C]">{only.name}</p>
             {only.code ? (
               <p className="truncate text-xs text-slate-500">{only.code}</p>
             ) : null}
@@ -472,7 +472,7 @@ function BranchPicker({
 
   return (
     <div>
-      <p className="mb-2 text-sm font-medium text-[#222831]">Pickup location</p>
+      <p className="mb-2 text-sm font-medium text-[#001F5C]">Pickup location</p>
       <div className="grid gap-2" role="radiogroup" aria-label="Branch">
         {branches.map((b) => {
           const selected = b.id === branchId;
@@ -487,7 +487,7 @@ function BranchPicker({
                 "flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition",
                 selected
                   ? "shadow-sm"
-                  : "border-[#222831]/10 bg-white hover:border-[#222831]/20 hover:bg-slate-50",
+                  : "border-[#001F5C]/10 bg-white hover:border-[#001F5C]/20 hover:bg-slate-50",
               )}
               style={
                 selected
@@ -509,7 +509,7 @@ function BranchPicker({
                 <Building2 className="h-4 w-4" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-[#222831]">
+                <span className="block truncate text-sm font-semibold text-[#001F5C]">
                   {b.name}
                 </span>
                 {b.code ? (

@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronUp, ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { MAX_STORE_BANNERS, sortStoreBanners, type StoreBanner } from "@/lib/storefront/banners";
+import { updateOrganization } from "@/lib/actions/organization";
 
 type Props = {
+  organizationId: string;
   banners: StoreBanner[];
   onChange: (banners: StoreBanner[]) => void;
   disabled?: boolean;
@@ -17,15 +19,44 @@ type Props = {
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const MAX_SIZE = 5 * 1024 * 1024;
 
-export function StoreBannerManager({ banners, onChange, disabled }: Props) {
+export function StoreBannerManager({
+  organizationId,
+  banners,
+  onChange,
+  disabled,
+}: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isPersisting, setIsPersisting] = useState(false);
 
   const sortedBanners = sortStoreBanners(banners);
   const atMax = sortedBanners.length >= MAX_STORE_BANNERS;
+  const busy = disabled || isUploading || isPersisting;
+
+  const persistBanners = async (next: StoreBanner[], successMessage: string) => {
+    onChange(next);
+    setIsPersisting(true);
+    try {
+      const result = await updateOrganization({
+        id: organizationId,
+        storeBanners: next,
+      });
+      if (result.error) {
+        toast.error(result.error);
+        return false;
+      }
+      toast.success(successMessage);
+      return true;
+    } catch {
+      toast.error("Failed to save banners");
+      return false;
+    } finally {
+      setIsPersisting(false);
+    }
+  };
 
   const handleAddClick = () => {
-    if (disabled || atMax || isUploading) return;
+    if (busy || atMax) return;
     fileInputRef.current?.click();
   };
 
@@ -65,11 +96,10 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
 
       const nextBanner: StoreBanner = {
         id: crypto.randomUUID(),
-        url: uploadData.url as string,
+        url: String(uploadData.url),
         sortOrder: sortedBanners.length,
       };
-      onChange([...sortedBanners, nextBanner]);
-      toast.success("Banner added");
+      await persistBanners([...sortedBanners, nextBanner], "Banner uploaded and published to storefront");
     } catch {
       toast.error("Failed to upload banner");
     } finally {
@@ -77,15 +107,17 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
     }
   };
 
-  const handleRemove = (id: string) => {
-    const next = sortStoreBanners(sortedBanners.filter((banner) => banner.id !== id)).map((banner, index) => ({
-      ...banner,
-      sortOrder: index,
-    }));
-    onChange(next);
+  const handleRemove = async (id: string) => {
+    const next = sortStoreBanners(sortedBanners.filter((banner) => banner.id !== id)).map(
+      (banner, index) => ({
+        ...banner,
+        sortOrder: index,
+      }),
+    );
+    await persistBanners(next, "Banner removed");
   };
 
-  const moveBanner = (id: string, direction: "up" | "down") => {
+  const moveBanner = async (id: string, direction: "up" | "down") => {
     const index = sortedBanners.findIndex((banner) => banner.id === id);
     if (index < 0) return;
     const targetIndex = direction === "up" ? index - 1 : index + 1;
@@ -93,7 +125,10 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
 
     const next = [...sortedBanners];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-    onChange(next.map((banner, order) => ({ ...banner, sortOrder: order })));
+    await persistBanners(
+      next.map((banner, order) => ({ ...banner, sortOrder: order })),
+      "Banner order updated",
+    );
   };
 
   return (
@@ -102,7 +137,8 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
         <div>
           <p className="text-sm font-medium">Store banners</p>
           <p className="text-xs text-muted-foreground">
-            Upload up to {MAX_STORE_BANNERS} images for the storefront hero slider.
+            Upload up to {MAX_STORE_BANNERS} images for the storefront hero slider. Changes publish
+            immediately.
           </p>
         </div>
         <Button
@@ -111,9 +147,13 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
           size="sm"
           className="h-8 shrink-0"
           onClick={handleAddClick}
-          disabled={disabled || atMax || isUploading}
+          disabled={busy || atMax}
         >
-          {isUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="mr-1.5 h-3.5 w-3.5" />}
+          {isUploading || isPersisting ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
+          )}
           Add banner
         </Button>
       </div>
@@ -127,7 +167,9 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
       />
 
       {sortedBanners.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No banners yet. Add images to show a slider on your storefront.</p>
+        <p className="text-xs text-muted-foreground">
+          No banners yet. Add images to show a slider on your storefront.
+        </p>
       ) : (
         <ul className="space-y-2">
           {sortedBanners.map((banner, index) => (
@@ -145,8 +187,8 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => moveBanner(banner.id, "up")}
-                  disabled={disabled || index === 0}
+                  onClick={() => void moveBanner(banner.id, "up")}
+                  disabled={busy || index === 0}
                   aria-label="Move banner up"
                 >
                   <ChevronUp className="h-4 w-4" />
@@ -156,8 +198,8 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => moveBanner(banner.id, "down")}
-                  disabled={disabled || index === sortedBanners.length - 1}
+                  onClick={() => void moveBanner(banner.id, "down")}
+                  disabled={busy || index === sortedBanners.length - 1}
                   aria-label="Move banner down"
                 >
                   <ChevronDown className="h-4 w-4" />
@@ -167,8 +209,8 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => handleRemove(banner.id)}
-                  disabled={disabled}
+                  onClick={() => void handleRemove(banner.id)}
+                  disabled={busy}
                   aria-label="Remove banner"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -180,7 +222,9 @@ export function StoreBannerManager({ banners, onChange, disabled }: Props) {
       )}
 
       {atMax && (
-        <p className="text-xs text-muted-foreground">Maximum of {MAX_STORE_BANNERS} banners reached.</p>
+        <p className="text-xs text-muted-foreground">
+          Maximum of {MAX_STORE_BANNERS} banners reached.
+        </p>
       )}
     </div>
   );

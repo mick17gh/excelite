@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { submitDemoRequest } from "@/lib/actions/demo-requests";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 const DEMO_INTERESTS = [
@@ -16,7 +16,7 @@ const DEMO_INTERESTS = [
   "Sales & Business Reports",
   "Stock Management",
   "Orders & Payments",
-  "How Excelite Works Overall",
+  "How ServGo Works Overall",
   "Not Sure — Show Me Around",
 ] as const;
 
@@ -67,13 +67,13 @@ export function BookDemoForm() {
 
   if (submitted) {
     return (
-      <div className="rounded-2xl border border-[#22C55E]/20 bg-[#22C55E]/5 p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#22C55E]/15">
-          <CheckCircle2 className="h-6 w-6 text-[#16A34A]" />
+      <div className="rounded-2xl border border-[#0066FF]/20 bg-[#0066FF]/5 p-8 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#0066FF]/15">
+          <CheckCircle2 className="h-6 w-6 text-[#0052CC]" />
         </div>
         <h2 className="text-xl font-semibold mb-2">Request received</h2>
-        <p className="text-[#222831]/70 leading-relaxed mb-6">
-          Your demo request has been received. A member of the Excelite team will
+        <p className="text-[#001F5C]/70 leading-relaxed mb-6">
+          Your demo request has been received. A member of the ServGo team will
           contact you to confirm the date and time.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -82,10 +82,10 @@ export function BookDemoForm() {
           </Button>
           <Button
             asChild
-            className="bg-[#22C55E] hover:bg-[#16A34A] text-white"
+            className="bg-[#0066FF] hover:bg-[#0052CC] text-white"
           >
             <a
-              href={EXCELITE_BRAND.supportWhatsAppUrl}
+              href={SERVGO_BRAND.supportWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -172,11 +172,11 @@ export function BookDemoForm() {
           }
           className="flex flex-col sm:flex-row gap-3"
         >
-          <label className="flex items-center gap-2 rounded-xl border border-[#222831]/10 px-4 py-3 cursor-pointer hover:bg-[#22C55E]/5">
+          <label className="flex items-center gap-2 rounded-xl border border-[#001F5C]/10 px-4 py-3 cursor-pointer hover:bg-[#0066FF]/5">
             <RadioGroupItem value="WhatsApp" id="contact-whatsapp" />
             <span className="text-sm">WhatsApp</span>
           </label>
-          <label className="flex items-center gap-2 rounded-xl border border-[#222831]/10 px-4 py-3 cursor-pointer hover:bg-[#22C55E]/5">
+          <label className="flex items-center gap-2 rounded-xl border border-[#001F5C]/10 px-4 py-3 cursor-pointer hover:bg-[#0066FF]/5">
             <RadioGroupItem value="Phone Call" id="contact-phone" />
             <span className="text-sm">Phone Call</span>
           </label>
@@ -191,7 +191,7 @@ export function BookDemoForm() {
             return (
               <label
                 key={interest}
-                className="flex items-start gap-2 rounded-xl border border-[#222831]/10 px-3 py-3 cursor-pointer hover:bg-[#22C55E]/5"
+                className="flex items-start gap-2 rounded-xl border border-[#001F5C]/10 px-3 py-3 cursor-pointer hover:bg-[#0066FF]/5"
               >
                 <Checkbox
                   checked={checked}
@@ -216,7 +216,7 @@ export function BookDemoForm() {
       <Button
         type="submit"
         disabled={isPending}
-        className="w-full h-12 bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium"
+        className="w-full h-12 bg-[#0066FF] hover:bg-[#0052CC] text-white font-medium"
       >
         {isPending ? (
           <>

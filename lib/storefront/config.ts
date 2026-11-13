@@ -206,10 +206,10 @@ export function buildPublicStoreConfig(
         org.storefrontPlatformEnabled && org.onlineOrderingEnabled
           ? availability.isOpenNow
             ? null
-            : availability.nextOpenAt
-              ? `Opens ${availability.nextOpenAt}`
-              : org.closureMessage || "Temporarily closed"
-          : org.closureMessage || "Store temporarily closed",
+            : availability.nextOpenAt ||
+              org.closureMessage ||
+              "We're outside business hours right now"
+          : org.closureMessage || "Online ordering is paused",
     },
     checkout: {
       currency,
@@ -245,11 +245,11 @@ export function buildPublicStoreConfig(
       weekly: businessHours || {},
     },
     theme: {
-      primary: rawTheme.primary || "#0ea5e9",
-      secondary: rawTheme.secondary || "#22c55e",
-      accent: rawTheme.accent || "#f97316",
+      primary: rawTheme.primary || "#0066FF",
+      secondary: rawTheme.secondary || "#00D2FF",
+      accent: rawTheme.accent || "#0052CC",
       background: rawTheme.background || "#ffffff",
-      foreground: rawTheme.foreground || "#0f172a",
+      foreground: rawTheme.foreground || "#001F5C",
       radius: rawTheme.radius || "0.75rem",
       fontFamily: rawTheme.fontFamily || "Inter, sans-serif",
     },
@@ -275,7 +275,7 @@ export function resolveAllowedStorefrontOrigins(orgConfig: PublicStoreConfig): s
   }
   const slug = orgConfig.store.slug?.trim();
   if (!slug) return [];
-  return [`https://${slug}.excelite.app`];
+  return [`https://${slug}.servgo.app`];
 }
 
 export { getPaystackSecretForOrganization } from "@/lib/paystack/credentials";

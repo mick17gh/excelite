@@ -19,7 +19,7 @@ import {
   NotificationBell,
   type DashboardNotification,
 } from "@/components/dashboard/notification-bell";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -87,14 +87,14 @@ export function Header({
 
       <Link href="/dashboard" className="flex items-center gap-2 md:hidden shrink-0">
         <Image
-          src={EXCELITE_BRAND.logo}
-          alt={EXCELITE_BRAND.name}
+          src={SERVGO_BRAND.logo}
+          alt={SERVGO_BRAND.name}
           width={28}
           height={28}
           className="h-7 w-7 object-contain"
         />
         <span className="text-sm font-bold text-foreground">
-          Excelite <span className="text-primary">POS</span>
+          ServGo <span className="text-primary">POS</span>
         </span>
       </Link>
 

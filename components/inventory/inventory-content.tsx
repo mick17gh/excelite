@@ -555,9 +555,9 @@ export function InventoryContent({
       case "low":
         return "[&>div]:bg-amber-500";
       case "overstock":
-        return "[&>div]:bg-[#222831]";
+        return "[&>div]:bg-[#001F5C]";
       default:
-        return "[&>div]:bg-[#22C55E]";
+        return "[&>div]:bg-[#0066FF]";
     }
   };
 
@@ -574,9 +574,9 @@ export function InventoryContent({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <TabsList className={cn(dashboardTabListClass, "h-11 w-full sm:w-auto inline-flex flex-wrap")}>
-            <TabsTrigger value="all" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">All Items</TabsTrigger>
-            <TabsTrigger value="outbound" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Outbound</TabsTrigger>
-            <TabsTrigger value="reconciliations" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">Reconciliations</TabsTrigger>
+            <TabsTrigger value="all" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">All Items</TabsTrigger>
+            <TabsTrigger value="outbound" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">Outbound</TabsTrigger>
+            <TabsTrigger value="reconciliations" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">Reconciliations</TabsTrigger>
           </TabsList>
 
           <div className="flex flex-wrap gap-2">
@@ -738,7 +738,7 @@ export function InventoryContent({
                     </TableRow>
                   ) : (
                     paginatedItems.map((item) => (
-                    <TableRow key={item.id} className="hover:bg-[#22C55E]/5">
+                    <TableRow key={item.id} className="hover:bg-[#0066FF]/5">
                       <TableCell>
                         <div>
                           <p className="font-medium">{item.name}</p>
@@ -798,7 +798,7 @@ export function InventoryContent({
             <div className={dashboardToolbarClass}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
                 <div>
-                  <p className="font-semibold text-[#222831]">Warehouse to branch transfers</p>
+                  <p className="font-semibold text-[#001F5C]">Warehouse to branch transfers</p>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Incoming stock from warehouses to branches.
                   </p>
@@ -865,7 +865,7 @@ export function InventoryContent({
                   </TableHeader>
                   <TableBody>
                     {paginatedWarehouseTransfers.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-[#22C55E]/5">
+                      <TableRow key={record.id} className="hover:bg-[#0066FF]/5">
                         <TableCell>
                           <div>
                             <p className="font-medium">{record.itemName}</p>
@@ -929,7 +929,7 @@ export function InventoryContent({
             <div className={dashboardToolbarClass}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
                 <div>
-                  <p className="font-semibold text-[#222831]">Recent outbound stock</p>
+                  <p className="font-semibold text-[#001F5C]">Recent outbound stock</p>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Sales, waste, and adjustments that reduced branch stock.
                   </p>
@@ -973,7 +973,7 @@ export function InventoryContent({
                   </TableHeader>
                   <TableBody>
                     {paginatedOutboundRecords.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-[#22C55E]/5">
+                      <TableRow key={record.id} className="hover:bg-[#0066FF]/5">
                         <TableCell>
                           <div>
                             <p className="font-medium">{record.item.name}</p>
@@ -1016,7 +1016,7 @@ export function InventoryContent({
             <div className={dashboardToolbarClass}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
                 <div>
-                  <p className="font-semibold text-[#222831]">Branch-to-branch transfers</p>
+                  <p className="font-semibold text-[#001F5C]">Branch-to-branch transfers</p>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Stock moved between branches.
                   </p>
@@ -1165,7 +1165,7 @@ export function InventoryContent({
             <div className={dashboardToolbarClass}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between w-full">
                 <div>
-                  <p className="font-semibold text-[#222831]">Returns to warehouse</p>
+                  <p className="font-semibold text-[#001F5C]">Returns to warehouse</p>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Branch stock sent back to warehouses. Pending returns are received or
                     rejected in the Warehouse section.
@@ -1254,7 +1254,7 @@ export function InventoryContent({
                     </TableHeader>
                     <TableBody>
                       {paginatedBranchReturns.map((record) => (
-                        <TableRow key={record.id} className="hover:bg-[#22C55E]/5">
+                        <TableRow key={record.id} className="hover:bg-[#0066FF]/5">
                           <TableCell className="text-sm text-muted-foreground">
                             {formatDisplayDate(record.transferDate)}
                           </TableCell>

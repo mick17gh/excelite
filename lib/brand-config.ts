@@ -1,16 +1,25 @@
-/** Excelite POS product configuration — lite standalone brand */
+/** ServGo product configuration */
 
 const SUPPORT_PHONE_E164 = "233554510864";
 const WHATSAPP_INTRO_MESSAGE =
-  "Hi Excelite, I'd like to learn more about Excelite POS.";
+  "Hi ServGo, I'd like to learn more about ServGo.";
 
-export const EXCELITE_BRAND = {
-  name: "Excelite POS",
-  shortName: "Excelite",
+/** Logo-derived palette */
+export const SERVGO_COLORS = {
+  navy: "#001F5C",
+  blue: "#0066FF",
+  blueDark: "#0052CC",
+  cyan: "#00D2FF",
+  white: "#FFFFFF",
+} as const;
+
+export const SERVGO_BRAND = {
+  name: "ServGo",
+  shortName: "ServGo",
   tagline: "Run Your Business. Know Your Numbers.",
-  logo: "/excelite_logo.png",
-  themeColor: "#22C55E",
-  supportEmail: process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@excelite.app",
+  logo: "/servgo.jpeg",
+  themeColor: SERVGO_COLORS.blue,
+  supportEmail: process.env.NEXT_PUBLIC_SALES_EMAIL ?? "support@servgo.app",
   /** Primary contact phone (WhatsApp / call) */
   supportPhone: "+233554510864",
   supportPhoneTel: "tel:+233554510864",
@@ -19,7 +28,7 @@ export const EXCELITE_BRAND = {
   supportWhatsAppUrl: `https://wa.me/${SUPPORT_PHONE_E164}?text=${encodeURIComponent(WHATSAPP_INTRO_MESSAGE)}`,
 } as const;
 
-/** Paths not available in Excelite lite (SUPER_ADMIN may still access for support) */
+/** Paths not available in ServGo lite (SUPER_ADMIN may still access for support) */
 export const LITE_BLOCKED_PATH_MATCHERS: ((pathname: string) => boolean)[] = [
   (p) => p === "/kitchen" || p.startsWith("/kitchen/"),
   (p) => p === "/dashboard/transactions" || p.startsWith("/dashboard/transactions/"),

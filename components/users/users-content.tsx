@@ -277,12 +277,12 @@ export function UsersContent({
               </TableRow>
             ) : (
               users.map((user) => (
-              <TableRow key={user.id} className="hover:bg-[#22C55E]/5">
+              <TableRow key={user.id} className="hover:bg-[#0066FF]/5">
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9 ring-2 ring-[#22C55E]/20">
+                    <Avatar className="h-9 w-9 ring-2 ring-[#0066FF]/20">
                       <AvatarImage src="" />
-                      <AvatarFallback className="bg-[#22C55E]/10 text-[#16A34A] text-sm">
+                      <AvatarFallback className="bg-[#0066FF]/10 text-[#0052CC] text-sm">
                         {getInitials(user.name)}
                       </AvatarFallback>
                     </Avatar>

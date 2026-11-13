@@ -83,7 +83,7 @@ export function StorefrontTrackPage({ organizationId }: Props) {
     );
   }
 
-  const primary = String(config.theme?.primary || "#0f766e");
+  const primary = String(config.theme?.primary || "#0066FF");
 
   return (
     <StorefrontChrome config={config}>

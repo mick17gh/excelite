@@ -88,8 +88,8 @@ export function ChangePinCard() {
     <ContentCard padding="none">
       <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
         <div className="flex items-center gap-2">
-          <LockKeyhole className="h-4 w-4 text-[#16A34A]" />
-          <h3 className="text-base font-semibold text-[#222831]">
+          <LockKeyhole className="h-4 w-4 text-[#0052CC]" />
+          <h3 className="text-base font-semibold text-[#001F5C]">
             {hasPin ? "Change PIN" : "Set PIN"}
           </h3>
         </div>

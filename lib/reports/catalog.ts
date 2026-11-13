@@ -131,7 +131,7 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
   },
 ];
 
-/** Reports shown on the Excelite Reports page. */
+/** Reports shown on the ServGo Reports page. */
 export const PRIMARY_REPORT_IDS: ReportId[] = [
   "sales-report",
   "cash-transactions",

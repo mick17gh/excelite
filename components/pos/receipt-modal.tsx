@@ -92,9 +92,9 @@ function ReceiptTotalsBlock({
           <span>{formatCurrency(Number(order.deliveryFee))}</span>
         </div>
       )}
-      <div className="flex justify-between font-bold text-base border-t border-[#222831]/10 pt-2 mt-2 text-[#222831]">
+      <div className="flex justify-between font-bold text-base border-t border-[#001F5C]/10 pt-2 mt-2 text-[#001F5C]">
         <span>TOTAL</span>
-        <span className="text-[#16A34A]">{formatCurrency(Number(order.total))}</span>
+        <span className="text-[#0052CC]">{formatCurrency(Number(order.total))}</span>
       </div>
     </div>
   );
@@ -160,9 +160,9 @@ export function ReceiptModal({
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogHeader className="shrink-0 px-6 py-4 excelite-header-gradient text-white border-b border-white/10">
+        <DialogHeader className="shrink-0 px-6 py-4 servgo-header-gradient text-white border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#22C55E]/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0066FF]/20">
               {order.syncPending ? (
                 <Receipt className="h-5 w-5 text-white" />
               ) : (
@@ -186,13 +186,13 @@ export function ReceiptModal({
               Queued on this device — will sync when you are back online.
             </div>
           ) : (
-            <div className="mb-4 rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/8 px-3 py-2.5 text-sm text-[#166534]">
+            <div className="mb-4 rounded-xl border border-[#0066FF]/30 bg-[#0066FF]/8 px-3 py-2.5 text-sm text-[#166534]">
               Payment recorded successfully.
             </div>
           )}
           <div className="rounded-xl border border-border bg-white dark:bg-card p-5 font-mono text-sm space-y-3 shadow-sm">
             <div className="text-center space-y-1 border-b border-dashed border-border pb-3 mb-3">
-              <h3 className="font-bold text-base text-[#222831]">{order.branch?.name || "Your shop"}</h3>
+              <h3 className="font-bold text-base text-[#001F5C]">{order.branch?.name || "Your shop"}</h3>
               <p className="text-xs text-muted-foreground">
                 {order.branch?.code || ""}
               </p>
@@ -292,7 +292,7 @@ export function ReceiptModal({
             <Printer className="mr-2 h-4 w-4" />
             Print
           </Button>
-          <Button onClick={onClose} className="w-full sm:w-auto rounded-xl bg-[#22C55E] hover:bg-[#16A34A]">
+          <Button onClick={onClose} className="w-full sm:w-auto rounded-xl bg-[#0066FF] hover:bg-[#0052CC]">
             Done
           </Button>
         </DialogFooter>

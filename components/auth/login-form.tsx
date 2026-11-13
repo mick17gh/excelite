@@ -143,7 +143,7 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
     <form onSubmit={handleSubmit} className="space-y-5">
       <div
         className={`grid grid-cols-2 gap-1.5 rounded-xl p-1 login-mode-toggle ${
-          isDark ? "" : "bg-[#222831]/5"
+          isDark ? "" : "bg-[#001F5C]/5"
         }`}
       >
         <Button
@@ -151,7 +151,7 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
           variant={loginMode === "password" ? "default" : "ghost"}
           className={`h-9 text-xs font-medium rounded-lg transition-all duration-200 cursor-pointer ${
             loginMode === "password"
-              ? "bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm"
+              ? "bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-sm"
               : isDark
                 ? "login-mode-inactive hover:bg-white/10 text-white/60"
                 : "hover:bg-white/60"
@@ -166,7 +166,7 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
           variant={loginMode === "pin" ? "default" : "ghost"}
           className={`h-9 text-xs font-medium rounded-lg transition-all duration-200 cursor-pointer ${
             loginMode === "pin"
-              ? "bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-sm"
+              ? "bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-sm"
               : isDark
                 ? "login-mode-inactive hover:bg-white/10 text-white/60"
                 : "hover:bg-white/60"
@@ -192,10 +192,10 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
                   }
                   required
                   disabled={isLoading}
-                  className={`h-11 focus-visible:ring-[#22C55E]/30 ${
+                  className={`h-11 focus-visible:ring-[#0066FF]/30 ${
                     isDark
                       ? "bg-white/8 border-white/15 text-white placeholder:text-white/35"
-                      : "bg-white/70 border-[#222831]/10"
+                      : "bg-white/70 border-[#001F5C]/10"
                   }`}
                 />
               </div>
@@ -207,8 +207,8 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
                     href="/forgot-password"
                     className={`text-sm hover:underline font-medium ${
                       isDark
-                        ? "text-[#4ADE80] hover:text-[#22C55E]"
-                        : "text-[#22C55E] hover:text-[#16A34A]"
+                        ? "text-[#4ADE80] hover:text-[#0066FF]"
+                        : "text-[#0066FF] hover:text-[#0052CC]"
                     }`}
                   >
                     Forgot password?
@@ -225,10 +225,10 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
                     }
                     required
                     disabled={isLoading}
-                    className={`h-11 focus-visible:ring-[#22C55E]/30 pr-10 ${
+                    className={`h-11 focus-visible:ring-[#0066FF]/30 pr-10 ${
                       isDark
                         ? "bg-white/8 border-white/15 text-white placeholder:text-white/35"
-                        : "bg-white/70 border-[#222831]/10"
+                        : "bg-white/70 border-[#001F5C]/10"
                     }`}
                   />
                   <Button
@@ -261,10 +261,10 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
                     type="password"
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    className={`h-12 text-center text-lg tracking-widest focus-visible:ring-[#22C55E]/30 ${
+                    className={`h-12 text-center text-lg tracking-widest focus-visible:ring-[#0066FF]/30 ${
                       isDark
                         ? "bg-white/8 border-white/15 text-white"
-                        : "bg-white/70 border-[#222831]/10"
+                        : "bg-white/70 border-[#001F5C]/10"
                     }`}
                     value={digit}
                     onChange={(e) => handlePinChange(index, e.target.value)}
@@ -293,7 +293,7 @@ export function LoginForm({ variant = "light" }: { variant?: "light" | "dark" })
 
           <Button
             type="submit"
-            className="w-full h-11 bg-[#22C55E] hover:bg-[#16A34A] text-white font-medium shadow-md shadow-[#22C55E]/20 transition-all duration-200 hover:shadow-lg hover:shadow-[#22C55E]/30 cursor-pointer"
+            className="w-full h-11 bg-[#0066FF] hover:bg-[#0052CC] text-white font-medium shadow-md shadow-[#0066FF]/20 transition-all duration-200 hover:shadow-lg hover:shadow-[#0066FF]/30 cursor-pointer"
             disabled={isLoading}
           >
             {isLoading ? (

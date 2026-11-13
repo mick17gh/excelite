@@ -142,8 +142,8 @@ export function SettingsContent({
   const canPurgeData = hasPermission("transactions:purge");
   const canManagePlatform = hasPermission("subscriptions:manage");
   const canViewOrganization = hasPermission("organization:view");
-  const canViewSubscription = false; // Excelite lite — no subscription tiers
-  const canEditStaff = false; // Excelite lite — no staff module
+  const canViewSubscription = false; // ServGo lite — no subscription tiers
+  const canEditStaff = false; // ServGo lite — no staff module
 
   const [user, setUser] = useState<SettingsBootstrapUser | null>(initialUser);
   const canManageTeamPermissions =
@@ -284,44 +284,44 @@ export function SettingsContent({
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className={cn(dashboardTabListClass, "mb-6 h-11 flex-wrap w-full sm:w-auto inline-flex")}>
-        <TabsTrigger value="profile" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+        <TabsTrigger value="profile" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
           <User className="mr-1.5 h-4 w-4" />
           Profile
         </TabsTrigger>
-        <TabsTrigger value="security" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+        <TabsTrigger value="security" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
           <Shield className="mr-1.5 h-4 w-4" />
           Security
         </TabsTrigger>
-        <TabsTrigger value="tax" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+        <TabsTrigger value="tax" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
           <Calculator className="mr-1.5 h-4 w-4" />
           Tax
         </TabsTrigger>
         {canViewOrganization && (
-          <TabsTrigger value="organization" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <TabsTrigger value="organization" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
             <Building2 className="mr-1.5 h-4 w-4" />
             Business
           </TabsTrigger>
         )}
         {canViewOrganization && (
-          <TabsTrigger value="pos-policies" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <TabsTrigger value="pos-policies" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
             <ScanBarcode className="mr-1.5 h-4 w-4" />
             POS Policies
           </TabsTrigger>
         )}
         {canViewOrganization && storefrontPlatformEnabled && (
-          <TabsTrigger value="online-store" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <TabsTrigger value="online-store" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
             <Store className="mr-1.5 h-4 w-4" />
             Online Store
           </TabsTrigger>
         )}
         {canManageTeamPermissions && (
-          <TabsTrigger value="role-permissions" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <TabsTrigger value="role-permissions" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
             <Key className="mr-1.5 h-4 w-4" />
             Team Permissions
           </TabsTrigger>
         )}
         {canManagePlatform && (
-          <TabsTrigger value="platform-admin" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#22C55E] data-[state=active]:text-white">
+          <TabsTrigger value="platform-admin" className="rounded-lg px-3 text-sm data-[state=active]:bg-[#0066FF] data-[state=active]:text-white">
             <Shield className="mr-1.5 h-4 w-4" />
             Platform Admin
           </TabsTrigger>
@@ -332,14 +332,14 @@ export function SettingsContent({
         <div className="space-y-4">
           <ContentCard padding="none">
             <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
-              <h3 className="text-base font-semibold text-[#222831]">Profile Information</h3>
+              <h3 className="text-base font-semibold text-[#001F5C]">Profile Information</h3>
               <p className="text-xs text-muted-foreground mt-0.5">Update your personal information</p>
             </div>
             <CardContent className="px-4 pb-4 pt-4 space-y-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 ring-2 ring-[#22C55E]/25">
+                <Avatar className="h-16 w-16 ring-2 ring-[#0066FF]/25">
                   <AvatarImage src={user?.image || ""} />
-                  <AvatarFallback className="bg-[#22C55E]/10 text-[#16A34A] text-lg">
+                  <AvatarFallback className="bg-[#0066FF]/10 text-[#0052CC] text-lg">
                     {user ? getInitials(user.name) : "?"}
                   </AvatarFallback>
                 </Avatar>
@@ -406,8 +406,8 @@ export function SettingsContent({
 
           <ContentCard padding="none">
             <div className="px-4 py-3 border-b border-border/60 bg-muted/20 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-[#16A34A]" />
-              <h3 className="text-base font-semibold text-[#222831]">Branch Assignment</h3>
+              <Building2 className="h-4 w-4 text-[#0052CC]" />
+              <h3 className="text-base font-semibold text-[#001F5C]">Branch Assignment</h3>
             </div>
             <CardContent className="px-4 pb-4 pt-4">
               <div className="flex items-center gap-2">
@@ -492,7 +492,7 @@ export function SettingsContent({
               Appearance Settings
             </CardTitle>
             <CardDescription className="text-xs">
-              Customize how Excelite POS looks on your device
+              Customize how ServGo looks on your device
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0 space-y-3">

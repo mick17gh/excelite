@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 
 export const metadata = {
   title: "Get Started",
-  description: "Set up your shop on Excelite POS",
+  description: "Set up your shop on ServGo",
 };
 
 export default async function OnboardingPage() {
@@ -25,10 +25,10 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden excelite-hero-bg">
-      <div className="excelite-orb excelite-orb-green w-[360px] h-[360px] -top-24 -right-24 animate-excelite-pulse-ring opacity-70" />
-      <div className="excelite-orb excelite-orb-green w-[240px] h-[240px] bottom-8 left-[-60px] animate-excelite-float-slow opacity-50" />
-      <div className="excelite-orb excelite-orb-charcoal w-[180px] h-[180px] top-1/3 right-1/4 animate-excelite-float opacity-30" />
+    <div className="relative min-h-screen overflow-hidden servgo-hero-bg">
+      <div className="servgo-orb servgo-orb-blue w-[360px] h-[360px] -top-24 -right-24 animate-servgo-pulse-ring opacity-70" />
+      <div className="servgo-orb servgo-orb-blue w-[240px] h-[240px] bottom-8 left-[-60px] animate-servgo-float-slow opacity-50" />
+      <div className="servgo-orb servgo-orb-navy w-[180px] h-[180px] top-1/3 right-1/4 animate-servgo-float opacity-30" />
 
       <Suspense fallback={<OnboardingLoadingSkeleton />}>
         <OnboardingContent user={session.user} />

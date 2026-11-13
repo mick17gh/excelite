@@ -82,8 +82,8 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-[#16A34A]" />
-          <span className="text-sm font-medium text-[#222831]">Notifications</span>
+          <Bell className="h-4 w-4 text-[#0052CC]" />
+          <span className="text-sm font-medium text-[#001F5C]">Notifications</span>
           <Badge variant="secondary" className="text-xs rounded-md">{notifications.length}</Badge>
         </div>
         <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setShowForm(!showForm)}>
@@ -129,7 +129,7 @@ export function NotificationsTab({ orderId, customerPhone, customerEmail, notifi
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" className="rounded-lg bg-[#22C55E] hover:bg-[#16A34A]" onClick={handleSend} disabled={isSubmitting}>
+            <Button size="sm" className="rounded-lg bg-[#0066FF] hover:bg-[#0052CC]" onClick={handleSend} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Send className="mr-1 h-3 w-3" />}
               Send
             </Button>

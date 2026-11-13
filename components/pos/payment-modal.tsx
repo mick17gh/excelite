@@ -211,7 +211,7 @@ export function PaymentModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] p-0 gap-0 max-h-[90vh] flex flex-col rounded-2xl overflow-hidden">
-        <DialogHeader className="px-6 py-4 excelite-header-gradient text-white shrink-0 border-b border-white/10">
+        <DialogHeader className="px-6 py-4 servgo-header-gradient text-white shrink-0 border-b border-white/10">
           <DialogTitle className="text-lg font-semibold">Complete payment</DialogTitle>
           <p className="text-sm text-white/60 font-normal">Review total and take payment</p>
         </DialogHeader>
@@ -242,11 +242,11 @@ export function PaymentModal({
                     type="button"
                     className={cn(
                       "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center",
-                      isActive ? opt.chipClass : "border-border hover:border-[#22C55E]/30 bg-background",
+                      isActive ? opt.chipClass : "border-border hover:border-[#0066FF]/30 bg-background",
                     )}
                     onClick={() => handleOrderTypeChange(opt.value)}
                   >
-                    <Icon className={cn("h-5 w-5", isActive ? "text-[#16A34A]" : "text-muted-foreground")} />
+                    <Icon className={cn("h-5 w-5", isActive ? "text-[#0052CC]" : "text-muted-foreground")} />
                     <span className={cn("text-xs font-medium", !isActive && "text-muted-foreground")}>
                       {opt.label}
                     </span>
@@ -295,8 +295,8 @@ export function PaymentModal({
               )}
               <Separator />
               <div className="flex justify-between items-baseline">
-                <span className="font-semibold text-[#222831]">Total due</span>
-                <span className="font-bold text-2xl text-[#16A34A]">{formatCurrency(total)}</span>
+                <span className="font-semibold text-[#001F5C]">Total due</span>
+                <span className="font-bold text-2xl text-[#0052CC]">{formatCurrency(total)}</span>
               </div>
             </div>
 
@@ -307,7 +307,7 @@ export function PaymentModal({
                   variant={paymentMethod === "COMPLIMENTARY" ? "default" : "outline"}
                   className={cn(
                     "w-full rounded-xl",
-                    paymentMethod === "COMPLIMENTARY" && "excelite-header-gradient hover:opacity-90 text-white",
+                    paymentMethod === "COMPLIMENTARY" && "servgo-header-gradient hover:opacity-90 text-white",
                   )}
                   onClick={() =>
                     setPaymentMethod((m) => (m === "COMPLIMENTARY" ? "CASH" : "COMPLIMENTARY"))
@@ -332,7 +332,7 @@ export function PaymentModal({
 
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-2">
-                <User className="h-4 w-4 text-[#16A34A]" />
+                <User className="h-4 w-4 text-[#0052CC]" />
                 Customer
               </Label>
               <CustomerPicker
@@ -349,9 +349,9 @@ export function PaymentModal({
             </div>
 
             {isDelivery && (
-              <div className="space-y-3 rounded-xl border border-[#22C55E]/25 p-4 bg-[#22C55E]/5">
+              <div className="space-y-3 rounded-xl border border-[#0066FF]/25 p-4 bg-[#0066FF]/5">
                 <Label className="text-sm font-medium flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-[#16A34A]" />
+                  <MapPin className="h-4 w-4 text-[#0052CC]" />
                   Delivery details
                 </Label>
                 <Input
@@ -439,7 +439,7 @@ export function PaymentModal({
             <Button
               onClick={handleComplimentaryComplete}
               disabled={isProcessing || !isValidComplimentary}
-              className="flex-[2] h-11 text-base font-semibold rounded-xl bg-[#22C55E] hover:bg-[#16A34A]"
+              className="flex-[2] h-11 text-base font-semibold rounded-xl bg-[#0066FF] hover:bg-[#0052CC]"
             >
               {isProcessing ? (
                 <>
@@ -456,7 +456,7 @@ export function PaymentModal({
           ) : (
             <Button
               type="button"
-              className="flex-[2] h-11 text-base font-semibold rounded-xl bg-[#22C55E] hover:bg-[#16A34A] text-white shadow-md shadow-[#22C55E]/20"
+              className="flex-[2] h-11 text-base font-semibold rounded-xl bg-[#0066FF] hover:bg-[#0052CC] text-white shadow-md shadow-[#0066FF]/20"
               disabled={isProcessing || !canCompletePayment}
               onClick={() => splitPaymentRef.current?.submit()}
             >

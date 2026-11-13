@@ -244,7 +244,7 @@ export function InventoryCategoriesContent({
               </TableRow>
             ) : null}
             {paginatedCategories.map((row) => (
-              <TableRow key={row.id} className="hover:bg-[#22C55E]/5">
+              <TableRow key={row.id} className="hover:bg-[#0066FF]/5">
                 <TableCell className="font-medium">{row.name}</TableCell>
                 <TableCell>
                   <span className="font-mono text-xs">{row.code}</span>

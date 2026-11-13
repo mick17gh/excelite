@@ -62,17 +62,17 @@ export function RevenueChart({
             >
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22C55E" stopOpacity={0.4} />
+                  <stop offset="0%" stopColor="#0066FF" stopOpacity={0.4} />
                   <stop offset="50%" stopColor="#4ADE80" stopOpacity={0.2} />
                   <stop offset="100%" stopColor="#86EFAC" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorTarget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#16A34A" stopOpacity={0.25} />
-                  <stop offset="100%" stopColor="#16A34A" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#0052CC" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#0052CC" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="strokeRevenue" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#16A34A" />
-                  <stop offset="50%" stopColor="#22C55E" />
+                  <stop offset="0%" stopColor="#0052CC" />
+                  <stop offset="50%" stopColor="#0066FF" />
                   <stop offset="100%" stopColor="#4ADE80" />
                 </linearGradient>
               </defs>

@@ -1,5 +1,5 @@
 import { Role } from "@/lib/generated/prisma/client";
-import { LITE_ASSIGNABLE_ROLES, LITE_ROLE_LABELS } from "@/lib/excelite-config";
+import { LITE_ASSIGNABLE_ROLES, LITE_ROLE_LABELS } from "@/lib/brand-config";
 
 export const roleDisplayNames: Record<Role, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -26,7 +26,7 @@ export const roleDescriptions: Record<Role, string> = {
   SUPER_ADMIN:
     "Platform owner with full access to all features and subscription management",
   ADMIN:
-    "Full access to all Excelite POS features, users, and settings",
+    "Full access to all ServGo features, users, and settings",
   EXECUTIVE:
     "Company-wide visibility with full operational and strategic controls",
   OPERATIONS_MANAGER:
@@ -54,7 +54,7 @@ export const roleDescriptions: Record<Role, string> = {
     "Blank-slate role — assign permissions in Settings → Permissions for custom access",
 };
 
-/** Roles assignable when creating or editing users in Excelite lite */
+/** Roles assignable when creating or editing users in ServGo lite */
 export const USER_ASSIGNABLE_ROLES = [...LITE_ASSIGNABLE_ROLES] as const satisfies readonly Role[];
 
 /** Roles an actor may assign when creating or editing users. */

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { hasFeature, isSuperAdmin, type TierFeatures } from "@/lib/tier-config";
-import { isLiteBlockedPath } from "@/lib/excelite-config";
+import { isLiteBlockedPath } from "@/lib/brand-config";
 import { hasAnyPermissionInList, hasPermissionInList } from "@/lib/permissions/check-list";
 import type { Permission } from "@/lib/permissions/types";
 
@@ -35,7 +35,7 @@ export type RouteAccessRule = {
   match: (pathname: string) => boolean;
 };
 
-/** Excelite lite — core navigation only */
+/** ServGo lite — core navigation only */
 export const DASHBOARD_NAVIGATION: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
   { name: "POS", href: "/pos", icon: Monitor, permission: "pos:access", featureKey: "pos" },

@@ -213,26 +213,26 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
           <div className={cn(orderSectionCardClass, "grid grid-cols-2 gap-3 text-sm")}>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Type</p>
-              <p className="font-medium text-[#222831]">{TYPE_LABELS[order.type] || order.type}</p>
+              <p className="font-medium text-[#001F5C]">{TYPE_LABELS[order.type] || order.type}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Date</p>
-              <p className="font-medium text-[#222831]">{new Date(order.createdAt).toLocaleString()}</p>
+              <p className="font-medium text-[#001F5C]">{new Date(order.createdAt).toLocaleString()}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Placed by</p>
-              <p className="font-medium text-[#222831]">{order.placedBy || "—"}</p>
+              <p className="font-medium text-[#001F5C]">{order.placedBy || "—"}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Payment</p>
-              <p className="font-medium text-[#16A34A]">{order.paymentStatus}</p>
+              <p className="font-medium text-[#0052CC]">{order.paymentStatus}</p>
             </div>
           </div>
 
           {order.customerName && (
             <div className={orderSectionCardClass}>
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Customer</p>
-              <p className="font-medium text-[#222831]">{order.customerName}</p>
+              <p className="font-medium text-[#001F5C]">{order.customerName}</p>
               {order.customerPhone && (
                 <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
               )}
@@ -242,7 +242,7 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
           {order.deliveryAddress && (
             <div className={orderSectionCardClass}>
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Delivery</p>
-              <p className="font-medium text-[#222831]">{order.deliveryAddress}</p>
+              <p className="font-medium text-[#001F5C]">{order.deliveryAddress}</p>
               {order.deliveryCity && <p className="text-sm text-muted-foreground">{order.deliveryCity}</p>}
               {order.deliveryNeighborhood && (
                 <p className="text-sm text-muted-foreground">{order.deliveryNeighborhood}</p>
@@ -270,13 +270,13 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
                   className="flex items-center justify-between px-3 py-2.5 text-sm bg-card hover:bg-muted/20"
                 >
                   <div className="flex-1 min-w-0">
-                    <span className="font-medium text-[#222831]">{item.menuItemName}</span>
+                    <span className="font-medium text-[#001F5C]">{item.menuItemName}</span>
                     <span className="ml-2 text-muted-foreground">×{item.quantity}</span>
                     {item.notes && (
                       <p className="text-xs text-muted-foreground italic mt-0.5">{item.notes}</p>
                     )}
                   </div>
-                  <span className="font-semibold text-[#16A34A] shrink-0 ml-2">
+                  <span className="font-semibold text-[#0052CC] shrink-0 ml-2">
                     {formatCurrency(item.lineTotal)}
                   </span>
                 </div>
@@ -310,9 +310,9 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
               </div>
             )}
             <Separator className="my-2" />
-            <div className="flex justify-between font-bold text-base text-[#222831]">
+            <div className="flex justify-between font-bold text-base text-[#001F5C]">
               <span>Total</span>
-              <span className="text-[#16A34A]">{formatCurrency(order.total)}</span>
+              <span className="text-[#0052CC]">{formatCurrency(order.total)}</span>
             </div>
           </div>
 
@@ -351,19 +351,19 @@ export function OrderDetailModal({ order, open, onOpenChange, onRefresh }: Order
             <TabsList className={orderTabListClass}>
               <TabsTrigger
                 value="payment"
-                className="flex-1 rounded-lg data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+                className="flex-1 rounded-lg data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
               >
                 Payment
               </TabsTrigger>
               <TabsTrigger
                 value="notifications"
-                className="flex-1 rounded-lg data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+                className="flex-1 rounded-lg data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
               >
                 Notifications
               </TabsTrigger>
               <TabsTrigger
                 value="receipt"
-                className="flex-1 rounded-lg data-[state=active]:bg-[#22C55E] data-[state=active]:text-white"
+                className="flex-1 rounded-lg data-[state=active]:bg-[#0066FF] data-[state=active]:text-white"
               >
                 Receipt
               </TabsTrigger>

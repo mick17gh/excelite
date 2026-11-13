@@ -43,8 +43,8 @@ interface TableServicePanelProps {
 }
 
 const STATUS_DOT: Record<string, string> = {
-  AVAILABLE: "bg-[#22C55E]",
-  SEATED: "bg-[#16A34A]",
+  AVAILABLE: "bg-[#0066FF]",
+  SEATED: "bg-[#0052CC]",
   ORDERING: "bg-amber-500",
   BILL_REQUESTED: "bg-orange-500",
   DIRTY: "bg-slate-400",
@@ -134,19 +134,19 @@ export function TableServicePanel({
   if (!branchId) return null;
 
   return (
-    <div className="border-b border-border/60 bg-[#22C55E]/5 px-3 md:px-4 py-2.5 space-y-2">
+    <div className="border-b border-border/60 bg-[#0066FF]/5 px-3 md:px-4 py-2.5 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <p className={posSectionLabelClass}>Tables</p>
         {activeSessionId && activeLabel && (
           <div className="flex items-center gap-2">
-            <Badge className="excelite-header-gradient hover:opacity-90 text-white border-0 border-white/20">
+            <Badge className="servgo-header-gradient hover:opacity-90 text-white border-0 border-white/20">
               Table {activeLabel}
             </Badge>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="h-7 text-xs rounded-lg border-[#22C55E]/30"
+              className="h-7 text-xs rounded-lg border-[#0066FF]/30"
               onClick={requestBill}
               disabled={isPending}
             >
@@ -171,7 +171,7 @@ export function TableServicePanel({
       <ScrollArea className="w-full">
         <div className="flex gap-2 px-0.5 py-0.5">
           {tables.length === 0 && isPending && (
-            <Loader2 className="h-4 w-4 animate-spin text-[#16A34A]" />
+            <Loader2 className="h-4 w-4 animate-spin text-[#0052CC]" />
           )}
           {tables.map((t) => {
             const active = t.openSession?.id === activeSessionId;
@@ -181,12 +181,12 @@ export function TableServicePanel({
                 type="button"
                 onClick={() => selectTable(t)}
                 className={cn(
-                  "shrink-0 rounded-xl border bg-card px-3 py-2 text-left text-sm transition-all min-w-[76px] hover:border-[#22C55E]/40",
-                  active && "ring-2 ring-[#22C55E]/60 border-[#22C55E] shadow-sm",
+                  "shrink-0 rounded-xl border bg-card px-3 py-2 text-left text-sm transition-all min-w-[76px] hover:border-[#0066FF]/40",
+                  active && "ring-2 ring-[#0066FF]/60 border-[#0066FF] shadow-sm",
                   t.status === "BLOCKED" && "opacity-50 cursor-not-allowed",
                 )}
               >
-                <div className="flex items-center gap-1.5 font-semibold text-[#222831]">
+                <div className="flex items-center gap-1.5 font-semibold text-[#001F5C]">
                   <span
                     className={cn("h-2 w-2 rounded-full", STATUS_DOT[t.status] ?? "bg-muted")}
                   />
@@ -206,7 +206,7 @@ export function TableServicePanel({
 
       <Dialog open={seatOpen} onOpenChange={setSeatOpen}>
         <DialogContent className="max-w-sm rounded-2xl p-0 gap-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 excelite-header-gradient text-white border-b border-white/10">
+          <DialogHeader className="px-6 py-4 servgo-header-gradient text-white border-b border-white/10">
             <DialogTitle className="text-base font-semibold">Seat guests</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-4 space-y-2">
@@ -225,7 +225,7 @@ export function TableServicePanel({
             <Button variant="outline" onClick={() => setSeatOpen(false)} className="rounded-xl">
               Cancel
             </Button>
-            <Button onClick={handleSeat} disabled={isPending} className="rounded-xl bg-[#22C55E] hover:bg-[#16A34A]">
+            <Button onClick={handleSeat} disabled={isPending} className="rounded-xl bg-[#0066FF] hover:bg-[#0052CC]">
               Open table
             </Button>
           </DialogFooter>

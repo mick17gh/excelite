@@ -66,12 +66,16 @@ export async function GET(req: NextRequest, context: { params: Promise<{ organiz
   }
   if (!availability.isOpenNow) {
     recordStorefrontMetric("storefront.config.requests", { organizationId, status: 503, reason: "outside_business_hours" });
+    const outsideHoursReason =
+      availability.nextOpenAt ||
+      config.status.closedReason ||
+      "We're outside business hours right now";
     const closedConfig = {
       ...config,
       status: {
         ...config.status,
         isOpenNow: false,
-        closedReason: org.closureMessage || "Store is currently outside business hours",
+        closedReason: outsideHoursReason,
       },
     };
     return withCors(
@@ -81,7 +85,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ organiz
           error: "Store temporarily closed",
           data: closedConfig,
           maintenance: {
-            message: org.closureMessage || "Store is currently outside business hours",
+            message: outsideHoursReason,
             contactPhone: org.contactPhone,
             nextOpenAt: availability.nextOpenAt,
           },

@@ -13,7 +13,7 @@ import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { Role, SubscriptionTier } from "@/lib/generated/prisma/client";
 import { usePermissions } from "@/contexts/permissions-context";
-import { EXCELITE_BRAND } from "@/lib/excelite-config";
+import { SERVGO_BRAND } from "@/lib/brand-config";
 import {
   DASHBOARD_BOTTOM_NAVIGATION,
   DASHBOARD_NAVIGATION,
@@ -122,15 +122,15 @@ export function Sidebar({
         {!collapsed ? (
           <Link href={homeHref} className="flex items-center gap-2 flex-1 min-w-0">
             <Image
-              src={EXCELITE_BRAND.logo}
-              alt={EXCELITE_BRAND.name}
+              src={SERVGO_BRAND.logo}
+              alt={SERVGO_BRAND.name}
               width={36}
               height={36}
               className="h-9 w-9 object-contain shrink-0"
             />
             <div className="min-w-0">
               <span className="text-base font-bold text-sidebar-foreground truncate block leading-tight">
-                Excelite
+                ServGo
               </span>
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 POS
@@ -140,8 +140,8 @@ export function Sidebar({
         ) : (
           <Link href={homeHref} className="mx-auto">
             <Image
-              src={EXCELITE_BRAND.logo}
-              alt={EXCELITE_BRAND.name}
+              src={SERVGO_BRAND.logo}
+              alt={SERVGO_BRAND.name}
               width={36}
               height={36}
               className="h-9 w-9 object-contain"
